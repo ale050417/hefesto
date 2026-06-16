@@ -6,7 +6,7 @@
    ============================================================ */
 
 :root {
-  /* --- Primitivos (Cap. 7.2) --- */
+  /* --- Primitivos (Cap. 7.2) --- lo que estan aca son variables globales que se ussan para todo */
   --gold: #c9a84c;
   --gold-bright: #d4af37;
   --gold-deep: #a8863a;
