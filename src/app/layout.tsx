@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Orbitron, Sora } from "next/font/google";
+import { siteName, siteUrl } from "@/lib/site";
 import "./globals.css";
 
-// Display (Cap. 7.4)
 const orbitron = Orbitron({
   subsets: ["latin"],
   weight: ["600", "700", "800", "900"],
@@ -10,7 +10,6 @@ const orbitron = Orbitron({
   display: "swap",
 });
 
-// Body (Cap. 7.4)
 const sora = Sora({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700"],
@@ -18,9 +17,25 @@ const sora = Sora({
   display: "swap",
 });
 
+const description =
+  "Tienda de productos impresos en 3D, hechos a pedido en el color que elijas.";
+
 export const metadata: Metadata = {
-  title: "Hefesto 3D",
-  description: "Tienda de productos impresos en 3D",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "Hefesto 3D — Impresión 3D a pedido",
+    template: "%s · Hefesto 3D",
+  },
+  description,
+  openGraph: {
+    type: "website",
+    locale: "es_AR",
+    url: siteUrl,
+    siteName,
+    title: "Hefesto 3D — Impresión 3D a pedido",
+    description,
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({

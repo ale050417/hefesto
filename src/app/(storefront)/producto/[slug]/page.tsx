@@ -19,11 +19,17 @@ type Params = { params: Promise<{ slug: string }> };
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-  if (!product) return { title: "Producto no encontrado · Hefesto 3D" };
+  if (!product) return { title: "Producto no encontrado" };
+  const description =
+    product.description ?? `${product.name}, impreso en 3D a pedido.`;
   return {
-    title: `${product.name} · Hefesto 3D`,
-    description:
-      product.description ?? `${product.name}, impreso en 3D a pedido.`,
+    title: product.name,
+    description,
+    openGraph: {
+      title: product.name,
+      description,
+      images: product.primaryImage ? [product.primaryImage.url] : undefined,
+    },
   };
 }
 

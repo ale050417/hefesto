@@ -4,6 +4,7 @@ import {
   findFeatured,
   findMaterials,
   findPublished,
+  findPublishedSlugs,
   findRelated,
 } from "../repository";
 import { productFilterSchema, type ProductFilter } from "../schemas";
@@ -130,4 +131,11 @@ export async function getHomeData(): Promise<HomeData> {
 /** Materiales disponibles para el filtro del catálogo. */
 export async function listMaterials(): Promise<string[]> {
   return findMaterials();
+}
+
+/** Slugs publicados (para el sitemap). */
+export async function listPublishedSlugs(): Promise<
+  { slug: string; updatedAt: Date }[]
+> {
+  return findPublishedSlugs();
 }

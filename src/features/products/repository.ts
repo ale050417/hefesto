@@ -154,3 +154,13 @@ export async function findMaterials(
     .filter((m): m is string => m !== null)
     .sort((a, b) => a.localeCompare(b));
 }
+
+/** Slugs de productos publicados (para el sitemap). */
+export async function findPublishedSlugs(
+  database: Database = db,
+): Promise<{ slug: string; updatedAt: Date }[]> {
+  return database
+    .select({ slug: products.slug, updatedAt: products.updatedAt })
+    .from(products)
+    .where(eq(products.status, "published"));
+}
