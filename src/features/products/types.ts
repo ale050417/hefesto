@@ -55,3 +55,10 @@ export type CatalogPage = {
   pageSize: number;
   totalPages: number;
 };
+
+export type HomeData = {
+  featured: ProductView[];
+  latest: ProductView[];
+  onSale: ProductView[];
+  categories: Category[];
+};

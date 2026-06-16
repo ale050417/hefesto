@@ -1,98 +1,115 @@
+import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
 import { ProductGrid } from "@/features/products/components/product-grid";
+import { getHomeData } from "@/features/products/services/catalogService";
 import type { ProductView } from "@/features/products/types";
 
-// Datos de ejemplo SOLO para previsualizar ProductCard/Grid.
-// En el Paso 16 la Home trae los productos reales desde la base.
-const demoProducts: ProductView[] = [
+// Trae datos de la base en cada request (SSR). El caché estático/ISR se afina
+// en la Fase 10.
+export const dynamic = "force-dynamic";
+
+function Section({
+  title,
+  products,
+}: {
+  title: string;
+  products: ProductView[];
+}) {
+  if (products.length === 0) return null;
+  return (
+    <section className="mt-14">
+      <h2 className="font-display text-fg mb-5 text-2xl">{title}</h2>
+      <ProductGrid products={products} />
+    </section>
+  );
+}
+
+const steps = [
   {
-    id: "1",
-    name: "Maceta geométrica",
-    slug: "maceta-geometrica",
-    price: 4500,
-    salePrice: 3800,
-    effectivePrice: 3800,
-    isOnSale: true,
-    discountPercent: 16,
-    hasVariants: false,
-    isNew: true,
-    isFeatured: true,
-    material: "PLA",
-    category: { name: "Hogar y Deco", slug: "hogar-y-deco" },
-    primaryImage: {
-      url: "https://picsum.photos/seed/maceta-geometrica/800/800",
-      alt: "Maceta geométrica",
-    },
+    n: "1",
+    t: "Elegís",
+    d: "Explorá el catálogo y elegí tu producto y color.",
   },
   {
-    id: "2",
-    name: "Lámpara lunar",
-    slug: "lampara-lunar",
-    price: 7800,
-    salePrice: null,
-    effectivePrice: 7800,
-    isOnSale: false,
-    discountPercent: null,
-    hasVariants: true,
-    isNew: false,
-    isFeatured: true,
-    material: "PLA",
-    category: { name: "Hogar y Deco", slug: "hogar-y-deco" },
-    primaryImage: {
-      url: "https://picsum.photos/seed/lampara-lunar/800/800",
-      alt: "Lámpara lunar",
-    },
+    n: "2",
+    t: "Imprimimos",
+    d: "Lo imprimimos a pedido, especialmente para vos.",
   },
   {
-    id: "3",
-    name: "Soporte para joystick",
-    slug: "soporte-joystick",
-    price: 3200,
-    salePrice: null,
-    effectivePrice: 3200,
-    isOnSale: false,
-    discountPercent: null,
-    hasVariants: false,
-    isNew: true,
-    isFeatured: false,
-    material: "PETG",
-    category: { name: "Gaming", slug: "gaming" },
-    primaryImage: {
-      url: "https://picsum.photos/seed/soporte-joystick/800/800",
-      alt: "Soporte para joystick",
-    },
-  },
-  {
-    id: "4",
-    name: "Dragón articulado",
-    slug: "dragon-articulado",
-    price: 8500,
-    salePrice: null,
-    effectivePrice: 8500,
-    isOnSale: false,
-    discountPercent: null,
-    hasVariants: true,
-    isNew: true,
-    isFeatured: true,
-    material: "PLA",
-    category: { name: "Figuras", slug: "figuras" },
-    primaryImage: {
-      url: "https://picsum.photos/seed/dragon-articulado/800/800",
-      alt: "Dragón articulado",
-    },
+    n: "3",
+    t: "Te llega",
+    d: "Coordinamos el envío y registramos el seguimiento.",
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const { featured, latest, onSale, categories } = await getHomeData();
+
   return (
-    <div className="mx-auto max-w-6xl px-4 py-12">
-      <p className="eyebrow">Fase 1 · vista previa</p>
-      <h1 className="font-display text-fg mt-3 text-3xl">Productos</h1>
-      <p className="text-dim mt-2 max-w-prose">
-        Vista previa de las tarjetas de producto. En el próximo paso se conectan
-        los datos reales desde la base.
-      </p>
-      <div className="mt-10">
-        <ProductGrid products={demoProducts} />
+    <div>
+      <section className="border-surface-2 bg-surface-1 border-b">
+        <div className="mx-auto max-w-6xl px-4 py-20 text-center">
+          <p className="eyebrow">Impresión 3D a pedido</p>
+          <h1 className="font-display text-fg mt-4 text-3xl font-bold sm:text-[2.75rem]">
+            Objetos únicos,{" "}
+            <span className="text-primary">impresos para vos</span>
+          </h1>
+          <p className="text-dim mx-auto mt-4 max-w-xl">
+            Diseños en 3D hechos a pedido, en el color que elijas. Elegí,
+            imprimimos y te llega.
+          </p>
+          <div className="mt-8 flex justify-center gap-3">
+            <Link
+              href="/catalogo"
+              className={buttonVariants({ variant: "primary", size: "lg" })}
+            >
+              Ver catálogo
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <div className="mx-auto max-w-6xl px-4 pb-20">
+        {categories.length > 0 ? (
+          <section className="mt-12">
+            <h2 className="font-display text-fg mb-5 text-2xl">Categorías</h2>
+            <div className="flex flex-wrap gap-3">
+              {categories.map((category) => (
+                <Link
+                  key={category.id}
+                  href={`/catalogo?category=${category.slug}`}
+                  className="border-surface-3 bg-surface-1 text-fg hover:border-primary hover:text-primary rounded-md border px-4 py-2 text-sm transition-colors"
+                >
+                  {category.name}
+                </Link>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        <Section title="Destacados" products={featured} />
+        <Section title="Novedades" products={latest} />
+        <Section title="Ofertas" products={onSale} />
+
+        <section className="mt-16">
+          <h2 className="font-display text-fg mb-5 text-2xl">
+            ¿Cómo funciona?
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {steps.map((step) => (
+              <div
+                key={step.n}
+                className="border-surface-2 bg-surface-1 rounded-lg border p-5"
+              >
+                <span className="font-display text-primary text-2xl">
+                  {step.n}
+                </span>
+                <h3 className="text-fg mt-2 font-medium">{step.t}</h3>
+                <p className="text-dim mt-1 text-sm">{step.d}</p>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -1,13 +1,15 @@
 import {
   findBySlug,
   findCategories,
+  findFeatured,
   findPublished,
   findRelated,
 } from "../repository";
-import type { ProductFilter } from "../schemas";
+import { productFilterSchema, type ProductFilter } from "../schemas";
 import type {
   CatalogPage,
   Category,
+  HomeData,
   ProductDetailView,
   ProductView,
   ProductWithRelations,
@@ -102,4 +104,24 @@ export async function getRelatedProducts(
     limit,
   });
   return related.map(toProductView);
+}
+
+/** Datos para la Home: destacados, nuevos, ofertas y categorías. */
+export async function getHomeData(): Promise<HomeData> {
+  const section = (extra: Record<string, unknown>) =>
+    productFilterSchema.parse({ pageSize: 8, ...extra });
+
+  const [featured, latest, onSale, categories] = await Promise.all([
+    findFeatured(8),
+    findPublished(section({ isNew: "true" })),
+    findPublished(section({ onSale: "true" })),
+    findCategories(),
+  ]);
+
+  return {
+    featured: featured.map(toProductView),
+    latest: latest.items.map(toProductView),
+    onSale: onSale.items.map(toProductView),
+    categories,
+  };
 }

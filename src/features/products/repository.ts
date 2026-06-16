@@ -113,3 +113,20 @@ export async function findRelated(
     limit: params.limit ?? 4,
   });
 }
+
+/** Productos destacados publicados (para la Home). */
+export async function findFeatured(
+  limit = 8,
+  database: Database = db,
+): Promise<ProductWithRelations[]> {
+  return database.query.products.findMany({
+    where: and(eq(products.status, "published"), eq(products.isFeatured, true)),
+    with: {
+      category: true,
+      images: { orderBy: (img, { asc }) => [asc(img.sortOrder)] },
+      variants: true,
+    },
+    orderBy: [desc(products.createdAt)],
+    limit,
+  });
+}
