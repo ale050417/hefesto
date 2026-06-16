@@ -13,6 +13,9 @@ import {
 import { categories } from "./categories";
 import { productStatus } from "./enums";
 
+// Productos a pedido (made-to-order): NO tienen stock.
+// La disponibilidad se controla con `status`; el inventario real es el
+// filamento por color (gramos), que se modela en la Fase 7.
 export const products = pgTable(
   "products",
   {
@@ -29,7 +32,6 @@ export const products = pgTable(
     printTimeMinutes: integer("print_time_minutes"),
     weightGrams: integer("weight_grams"),
     dimensions: text("dimensions"),
-    stock: integer("stock").notNull().default(0),
     status: productStatus("status").notNull().default("draft"),
     isFeatured: boolean("is_featured").notNull().default(false),
     isNew: boolean("is_new").notNull().default(false),
@@ -47,7 +49,6 @@ export const products = pgTable(
       "products_sale_price_lt_price",
       sql`${t.salePrice} IS NULL OR ${t.salePrice} < ${t.price}`,
     ),
-    check("products_stock_non_negative", sql`${t.stock} >= 0`),
     index("products_slug_idx").on(t.slug),
     index("products_category_status_idx").on(t.categoryId, t.status),
     index("products_status_idx").on(t.status),
