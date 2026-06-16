@@ -10,9 +10,17 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { db } from "@/core/db";
-import { categories, products } from "@/core/db/schema";
+import { categories, productImages, products } from "@/core/db/schema";
 import type { ProductFilter } from "./schemas";
-import type { Category, ProductWithRelations } from "./types";
+import type {
+  Category,
+  NewProduct,
+  NewProductImage,
+  Product,
+  ProductImage,
+  ProductStatus,
+  ProductWithRelations,
+} from "./types";
 
 // Inyección ligera (Cap. 6): por defecto usa la conexión real; en tests se
 // puede pasar otra base. El repository es la ÚNICA puerta a la base (Cap. 5).
@@ -163,4 +171,122 @@ export async function findPublishedSlugs(
     .select({ slug: products.slug, updatedAt: products.updatedAt })
     .from(products)
     .where(eq(products.status, "published"));
+}
+
+/** Inserta un producto y lo devuelve. */
+export async function insertProduct(
+  values: NewProduct,
+  database: Database = db,
+): Promise<Product> {
+  const [row] = await database.insert(products).values(values).returning();
+  if (!row) throw new Error("No se pudo crear el producto");
+  return row;
+}
+
+/** Actualiza un producto por id (o null si no existe). */
+export async function updateProductRow(
+  id: string,
+  values: Partial<NewProduct>,
+  database: Database = db,
+): Promise<Product | null> {
+  const [row] = await database
+    .update(products)
+    .set(values)
+    .where(eq(products.id, id))
+    .returning();
+  return row ?? null;
+}
+
+/** Cambia el estado de un producto (draft/published/archived). */
+export async function setProductStatus(
+  id: string,
+  status: ProductStatus,
+  database: Database = db,
+): Promise<Product | null> {
+  const [row] = await database
+    .update(products)
+    .set({ status })
+    .where(eq(products.id, id))
+    .returning();
+  return row ?? null;
+}
+
+/** Busca un producto por id sin filtrar por estado (admin). */
+export async function findProductById(
+  id: string,
+  database: Database = db,
+): Promise<Product | null> {
+  const row = await database.query.products.findFirst({
+    where: eq(products.id, id),
+  });
+  return row ?? null;
+}
+
+/** Cuenta las imágenes de un producto (para la regla de publicación). */
+export async function countImages(
+  productId: string,
+  database: Database = db,
+): Promise<number> {
+  const rows = await database
+    .select({ count: sql<number>`count(*)::int` })
+    .from(productImages)
+    .where(eq(productImages.productId, productId));
+  return rows[0]?.count ?? 0;
+}
+
+// --- Imágenes de producto ---
+
+export async function insertImage(
+  values: NewProductImage,
+  database: Database = db,
+): Promise<ProductImage> {
+  const [row] = await database.insert(productImages).values(values).returning();
+  if (!row) throw new Error("No se pudo guardar la imagen");
+  return row;
+}
+
+export async function listImagesByProduct(
+  productId: string,
+  database: Database = db,
+): Promise<ProductImage[]> {
+  return database
+    .select()
+    .from(productImages)
+    .where(eq(productImages.productId, productId))
+    .orderBy(asc(productImages.sortOrder));
+}
+
+export async function findImageById(
+  id: string,
+  database: Database = db,
+): Promise<ProductImage | null> {
+  const [row] = await database
+    .select()
+    .from(productImages)
+    .where(eq(productImages.id, id))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function deleteImageRow(
+  id: string,
+  database: Database = db,
+): Promise<void> {
+  await database.delete(productImages).where(eq(productImages.id, id));
+}
+
+/** Marca una imagen como principal (y las demás del producto como no principal). */
+export async function setPrimaryImage(
+  productId: string,
+  imageId: string,
+  database: Database = db,
+): Promise<void> {
+  await database
+    .update(productImages)
+    .set({ isPrimary: false })
+    .where(eq(productImages.productId, productId));
+  await database
+    .update(productImages)
+    .set({ isPrimary: true })
+    .where(eq(productImages.id, imageId));
 }

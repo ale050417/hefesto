@@ -62,3 +62,5 @@ export type HomeData = {
   onSale: ProductView[];
   categories: Category[];
 };
+
+export type NewProductImage = typeof productImages.$inferInsert;
