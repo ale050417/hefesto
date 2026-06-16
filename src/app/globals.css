@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+/* ============================================================
+   HEFESTO 3D — Design tokens (Libro Maestro, Cap. 7)
+   Jerarquía: primitivos -> semánticos -> componente.
+   ============================================================ */
+
+:root {
+  /* --- Primitivos (Cap. 7.2) --- */
+  --gold: #c9a84c;
+  --gold-bright: #d4af37;
+  --gold-deep: #a8863a;
+  --gold-rgb: 201, 168, 76;
+  --gold-fg: #1a1505;
+  --gold-glow: rgba(201, 168, 76, 0.35);
+
+  /* --- Semánticos (Cap. 7.2) --- */
+  --primary: var(--gold);
+  --primary-strong: var(--gold-bright);
+  --accent: var(--gold-bright);
+
+  /* --- Estado (Cap. 7.2), con canal RGB para transparencias --- */
+  --success: #4cb782;
+  --success-rgb: 76, 183, 130;
+  --warning: #d9a441;
+  --warning-rgb: 217, 164, 65;
+  --danger: #d96a5a;
+  --danger-rgb: 217, 106, 90;
+  --info: #5a9cd9;
+  --info-rgb: 90, 156, 217;
+
+  /* --- Radios (Cap. 7.6) --- */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 26px;
+
+  /* --- Sombras (Cap. 7.6) --- */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-pop: 0 6px 20px rgba(0, 0, 0, 0.3);
+  --shadow-modal: 0 20px 50px rgba(0, 0, 0, 0.45);
+  --glow-gold:
+    0 0 0 1px rgba(var(--gold-rgb), 0.25), 0 8px 30px var(--gold-glow);
+
+  /* --- Z-index (Cap. 7.8): nunca a mano --- */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-drawer: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+}
+
+/* ============================================================
+   Temas (Cap. 7.3) — superficies 1->3 = elevación.
+   Dark es el tema por defecto.
+   ============================================================ */
+
+:root,
+[data-theme="dark"] {
+  --bg: #0a0a0f;
+  --surface-1: #111118;
+  --surface-2: #16161f;
+  --surface-3: #1d1d28;
+  --text: #e8e6e0;
+  --text-dim: #9b9aa6;
+  --text-faint: #62616e;
+}
+
+[data-theme="light"] {
+  --bg: #f8f9fc;
+  --surface-1: #ffffff;
+  --surface-2: #edeef2;
+  --surface-3: #e3e5ec;
+  --text: #18181f;
+  --text-dim: #5b5b68;
+  --text-faint: #9a9aa6;
+}
+
+[data-theme="warm"] {
+  --bg: #f2e8d5;
+  --surface-1: #fbf3e2;
+  --surface-2: #ede0c8;
+  --surface-3: #e3d3b5;
+  --text: #4a3a24;
+  --text-dim: #7a6647;
+  --text-faint: #a38e68;
+}
+
+/* ============================================================
+   Wiring a Tailwind v4 (@theme inline lee las CSS vars en runtime,
+   así el cambio de data-theme actualiza las utilidades).
+   Genera: bg-primary, text-dim, bg-surface-2, font-display, etc.
+   ============================================================ */
+
+@theme inline {
+  /* Colores de superficie y texto */
+  --color-bg: var(--bg);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-fg: var(--text);
+  --color-dim: var(--text-dim);
+  --color-faint: var(--text-faint);
+
+  /* Marca y acentos */
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-fg: var(--gold-fg);
+  --color-accent: var(--accent);
+
+  /* Estado */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+
+  /* Tipografía (Cap. 7.4) */
+  --font-display: var(--font-orbitron);
+  --font-body: var(--font-sora);
+
+  /* Escala tipográfica (Cap. 7.4) */
+  --text-xs: 0.75rem; /* 12 */
+  --text-sm: 0.84375rem; /* 13.5 */
+  --text-base: 0.9375rem; /* 15 */
+  --text-lg: 1.125rem; /* 18 */
+  --text-xl: 1.375rem; /* 22 */
+  --text-2xl: 1.75rem; /* 28 */
+  --text-3xl: 2.25rem; /* 36 */
+
+  /* Radios (Cap. 7.6) */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 26px;
+
+  /* Sombras (Cap. 7.6) */
+  --shadow-sm: var(--shadow-card);
+  --shadow-md: var(--shadow-pop);
+  --shadow-lg: var(--shadow-modal);
+  --shadow-glow: var(--glow-gold);
+}
+
+/* ============================================================
+   Base (Cap. 7.9 y 7.10)
+   ============================================================ */
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sora), system-ui, sans-serif;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-orbitron), system-ui, sans-serif;
+  }
+
+  ::selection {
+    background: var(--gold-glow);
+    color: var(--text);
+  }
+
+  /* Foco solo con teclado (Cap. 7.10) */
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+}
+
+/* Eyebrow tipográfico (Cap. 7.4) */
+.eyebrow {
+  font-family: var(--font-orbitron), system-ui, sans-serif;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  color: var(--text-dim);
+}
