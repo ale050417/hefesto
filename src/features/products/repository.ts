@@ -1,4 +1,14 @@
-import { and, asc, desc, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  ne,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { db } from "@/core/db";
 import { categories, products } from "@/core/db/schema";
 import type { ProductFilter } from "./schemas";
@@ -129,4 +139,18 @@ export async function findFeatured(
     orderBy: [desc(products.createdAt)],
     limit,
   });
+}
+
+/** Materiales distintos de productos publicados (para el filtro). */
+export async function findMaterials(
+  database: Database = db,
+): Promise<string[]> {
+  const rows = await database
+    .selectDistinct({ material: products.material })
+    .from(products)
+    .where(and(eq(products.status, "published"), isNotNull(products.material)));
+  return rows
+    .map((r) => r.material)
+    .filter((m): m is string => m !== null)
+    .sort((a, b) => a.localeCompare(b));
 }

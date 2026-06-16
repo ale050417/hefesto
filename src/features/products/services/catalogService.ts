@@ -2,6 +2,7 @@ import {
   findBySlug,
   findCategories,
   findFeatured,
+  findMaterials,
   findPublished,
   findRelated,
 } from "../repository";
@@ -124,4 +125,9 @@ export async function getHomeData(): Promise<HomeData> {
     onSale: onSale.items.map(toProductView),
     categories,
   };
+}
+
+/** Materiales disponibles para el filtro del catálogo. */
+export async function listMaterials(): Promise<string[]> {
+  return findMaterials();
 }
