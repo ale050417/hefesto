@@ -26,7 +26,18 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresca la sesión (renueva tokens) en cada request.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Candado 1: sin sesión no se entra al panel (la autorización por rol la
+  // hace el layout de /admin en el servidor).
+  if (!user && request.nextUrl.pathname.startsWith("/admin")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/ingresar";
+    url.searchParams.set("redirect", request.nextUrl.pathname);
+    return NextResponse.redirect(url);
+  }
 
   return response;
 }

@@ -25,3 +25,17 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   }
   return { id: user.id, email: user.email ?? null, profile };
 }
+
+import { redirect } from "next/navigation";
+
+/**
+ * Exige usuario con rol admin u operador (autorización en servidor).
+ * Si no hay sesión → login; si no es staff → home.
+ */
+export async function requireStaff(): Promise<CurrentUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/ingresar?redirect=/admin");
+  const role = user.profile?.role;
+  if (role !== "admin" && role !== "operator") redirect("/");
+  return user;
+}
