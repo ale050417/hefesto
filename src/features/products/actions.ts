@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { isStaff } from "@/core/auth/session";
 import { z, type ZodError } from "zod";
 import { categoryInputSchema, productInputSchema } from "./schemas";
 import {
@@ -22,6 +23,11 @@ type ActionResult<T = undefined> =
       ok: false;
       error: { code: string; message: string; fields?: Record<string, string> };
     };
+
+const UNAUTHORIZED = {
+  ok: false as const,
+  error: { code: "UNAUTHORIZED", message: "No autorizado" },
+};
 
 function fieldErrors(error: ZodError): Record<string, string> {
   const out: Record<string, string> = {};
@@ -53,6 +59,7 @@ const SLUG_TAKEN = {
 export async function createProductAction(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
+  if (!(await isStaff())) return UNAUTHORIZED;
   const parsed = productInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -81,6 +88,7 @@ export async function updateProductAction(
   id: string,
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
+  if (!(await isStaff())) return UNAUTHORIZED;
   const parsed = productInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -107,6 +115,7 @@ export async function updateProductAction(
 }
 
 export async function publishProductAction(id: string): Promise<ActionResult> {
+  if (!(await isStaff())) return UNAUTHORIZED;
   try {
     await publishProduct(id);
     revalidatePath("/admin/productos");
@@ -123,6 +132,7 @@ export async function publishProductAction(id: string): Promise<ActionResult> {
 }
 
 export async function archiveProductAction(id: string): Promise<ActionResult> {
+  if (!(await isStaff())) return UNAUTHORIZED;
   try {
     await archiveProduct(id);
     revalidatePath("/admin/productos");
@@ -151,6 +161,7 @@ function validationError(message: string) {
 export async function uploadProductImageAction(
   formData: FormData,
 ): Promise<ActionResult<{ id: string; url: string }>> {
+  if (!(await isStaff())) return UNAUTHORIZED;
   const productId = formData.get("productId");
   const file = formData.get("file");
   if (
@@ -182,6 +193,7 @@ export async function uploadProductImageAction(
 export async function deleteProductImageAction(
   imageId: string,
 ): Promise<ActionResult> {
+  if (!(await isStaff())) return UNAUTHORIZED;
   if (!uuidSchema.safeParse(imageId).success) {
     return validationError("Imagen inválida");
   }
@@ -204,6 +216,7 @@ export async function setPrimaryImageAction(
   productId: string,
   imageId: string,
 ): Promise<ActionResult> {
+  if (!(await isStaff())) return UNAUTHORIZED;
   if (
     !uuidSchema.safeParse(productId).success ||
     !uuidSchema.safeParse(imageId).success
@@ -236,6 +249,7 @@ const CATEGORY_TAKEN = {
 export async function createCategoryAction(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
+  if (!(await isStaff())) return UNAUTHORIZED;
   const parsed = categoryInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -264,6 +278,7 @@ export async function updateCategoryAction(
   id: string,
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
+  if (!(await isStaff())) return UNAUTHORIZED;
   const parsed = categoryInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -292,6 +307,7 @@ export async function updateCategoryAction(
 }
 
 export async function deleteCategoryAction(id: string): Promise<ActionResult> {
+  if (!(await isStaff())) return UNAUTHORIZED;
   if (!uuidSchema.safeParse(id).success) {
     return validationError("Categoría inválida");
   }

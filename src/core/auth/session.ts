@@ -39,3 +39,10 @@ export async function requireStaff(): Promise<CurrentUser> {
   if (role !== "admin" && role !== "operator") redirect("/");
   return user;
 }
+
+/** True si el usuario actual es staff (admin/operador). Para guards en actions. */
+export async function isStaff(): Promise<boolean> {
+  const user = await getCurrentUser();
+  const role = user?.profile?.role;
+  return role === "admin" || role === "operator";
+}
