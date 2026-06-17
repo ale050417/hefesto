@@ -64,3 +64,21 @@ export type HomeData = {
 };
 
 export type NewProductImage = typeof productImages.$inferInsert;
+
+export type AdminProductRow = {
+  id: string;
+  name: string;
+  slug: string;
+  status: ProductStatus;
+  price: number;
+  categoryName: string | null;
+  primaryImage: string | null;
+};
+
+export type AdminProductPage = {
+  items: AdminProductRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+};

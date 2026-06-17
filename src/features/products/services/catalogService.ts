@@ -1,6 +1,7 @@
 import {
   countImages,
   deleteImageRow,
+  findAllForAdmin,
   findBySlug,
   findCategories,
   findFeatured,
@@ -25,12 +26,15 @@ import {
   type ProductInput,
 } from "../schemas";
 import type {
+  AdminProductPage,
+  AdminProductRow,
   CatalogPage,
   Category,
   HomeData,
   Product,
   ProductDetailView,
   ProductImage,
+  ProductStatus,
   ProductView,
   ProductWithRelations,
 } from "../types";
@@ -276,4 +280,35 @@ export async function getProductAdmin(
   if (!product) return null;
   const images = await listImagesByProduct(id);
   return { product, images };
+}
+
+// --- Listado admin ---
+
+function toAdminRow(p: ProductWithRelations): AdminProductRow {
+  const primary = p.images.find((i) => i.isPrimary) ?? p.images[0] ?? null;
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    status: p.status,
+    price: Number(p.price),
+    categoryName: p.category?.name ?? null,
+    primaryImage: primary?.url ?? null,
+  };
+}
+
+export async function listProductsAdmin(opts: {
+  search?: string;
+  status?: ProductStatus;
+  page: number;
+  pageSize: number;
+}): Promise<AdminProductPage> {
+  const { items, total } = await findAllForAdmin(opts);
+  return {
+    items: items.map(toAdminRow),
+    total,
+    page: opts.page,
+    pageSize: opts.pageSize,
+    totalPages: Math.max(1, Math.ceil(total / opts.pageSize)),
+  };
 }

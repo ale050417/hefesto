@@ -3,6 +3,7 @@ import {
   asc,
   desc,
   eq,
+  ilike,
   inArray,
   isNotNull,
   ne,
@@ -289,4 +290,41 @@ export async function setPrimaryImage(
     .update(productImages)
     .set({ isPrimary: true })
     .where(eq(productImages.id, imageId));
+}
+
+/** Todos los productos (cualquier estado) para el admin, con búsqueda y filtro. */
+export async function findAllForAdmin(
+  opts: {
+    search?: string;
+    status?: ProductStatus;
+    page: number;
+    pageSize: number;
+  },
+  database: Database = db,
+): Promise<{ items: ProductWithRelations[]; total: number }> {
+  const conditions: SQL[] = [];
+  if (opts.search) conditions.push(ilike(products.name, `%${opts.search}%`));
+  if (opts.status) conditions.push(eq(products.status, opts.status));
+  const where = conditions.length ? and(...conditions) : undefined;
+  const offset = (opts.page - 1) * opts.pageSize;
+
+  const [items, totalRows] = await Promise.all([
+    database.query.products.findMany({
+      where,
+      with: {
+        category: true,
+        images: { orderBy: (img, { asc }) => [asc(img.sortOrder)] },
+        variants: true,
+      },
+      orderBy: [desc(products.updatedAt)],
+      limit: opts.pageSize,
+      offset,
+    }),
+    database
+      .select({ count: sql<number>`count(*)::int` })
+      .from(products)
+      .where(where),
+  ]);
+
+  return { items, total: totalRows[0]?.count ?? 0 };
 }
