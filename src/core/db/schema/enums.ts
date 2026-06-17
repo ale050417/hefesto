@@ -6,3 +6,6 @@ export const productStatus = pgEnum("product_status", [
   "published",
   "archived",
 ]);
+
+// Roles de usuario (Cap. 13). El rol inicial siempre es customer.
+export const userRole = pgEnum("user_role", ["customer", "operator", "admin"]);

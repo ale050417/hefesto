@@ -1,11 +1,17 @@
 import Link from "next/link";
+import { getCurrentUser } from "@/core/auth/session";
+import { logoutAction } from "@/features/auth/actions";
 
 const navLinks = [
   { href: "/", label: "Inicio" },
   { href: "/catalogo", label: "Catálogo" },
 ];
 
-export function Header() {
+export async function Header() {
+  const user = await getCurrentUser();
+  const role = user?.profile?.role;
+  const isStaff = role === "admin" || role === "operator";
+
   return (
     <header className="border-surface-2 bg-bg/80 sticky top-0 z-[200] border-b backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
@@ -25,6 +31,31 @@ export function Header() {
               {link.label}
             </Link>
           ))}
+          {isStaff ? (
+            <Link
+              href="/admin"
+              className="text-primary hover:text-primary-strong text-sm transition-colors"
+            >
+              Panel
+            </Link>
+          ) : null}
+          {user ? (
+            <form action={logoutAction}>
+              <button
+                type="submit"
+                className="text-dim hover:text-fg text-sm transition-colors"
+              >
+                Salir
+              </button>
+            </form>
+          ) : (
+            <Link
+              href="/ingresar"
+              className="text-dim hover:text-fg text-sm transition-colors"
+            >
+              Ingresar
+            </Link>
+          )}
         </nav>
       </div>
     </header>

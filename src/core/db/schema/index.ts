@@ -5,3 +5,4 @@ export * from "./product-images";
 export * from "./product-variants";
 export * from "./tags";
 export * from "./relations";
+export * from "./profiles";
