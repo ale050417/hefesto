@@ -72,3 +72,29 @@ export const productInputSchema = z
   });
 
 export type ProductInput = z.infer<typeof productInputSchema>;
+
+// Validación de alta/edición de categoría (admin).
+export const categoryInputSchema = z.object({
+  name: z.string().min(1, "El nombre es obligatorio").max(80),
+  slug: z
+    .string()
+    .min(1, "El slug es obligatorio")
+    .max(100)
+    .regex(
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+      "Slug inválido (minúsculas, números y guiones)",
+    ),
+  icon: z.preprocess(emptyToNull, z.string().max(40).nullable()).optional(),
+  color: z
+    .preprocess(
+      emptyToNull,
+      z
+        .string()
+        .regex(/^#[0-9a-fA-F]{6}$/, "Color inválido (formato #RRGGBB)")
+        .nullable(),
+    )
+    .optional(),
+  sortOrder: z.coerce.number().int().nonnegative().default(0),
+});
+
+export type CategoryInput = z.infer<typeof categoryInputSchema>;

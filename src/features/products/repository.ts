@@ -15,6 +15,8 @@ import { categories, productImages, products } from "@/core/db/schema";
 import type { ProductFilter } from "./schemas";
 import type {
   Category,
+  CategoryWithCount,
+  NewCategory,
   NewProduct,
   NewProductImage,
   Product,
@@ -327,4 +329,78 @@ export async function findAllForAdmin(
   ]);
 
   return { items, total: totalRows[0]?.count ?? 0 };
+}
+
+// --- Categorías (admin) ---
+
+export async function insertCategory(
+  values: NewCategory,
+  database: Database = db,
+): Promise<Category> {
+  const [row] = await database.insert(categories).values(values).returning();
+  if (!row) throw new Error("No se pudo crear la categoría");
+  return row;
+}
+
+export async function updateCategoryRow(
+  id: string,
+  values: Partial<NewCategory>,
+  database: Database = db,
+): Promise<Category | null> {
+  const [row] = await database
+    .update(categories)
+    .set(values)
+    .where(eq(categories.id, id))
+    .returning();
+  return row ?? null;
+}
+
+export async function deleteCategoryRow(
+  id: string,
+  database: Database = db,
+): Promise<void> {
+  await database.delete(categories).where(eq(categories.id, id));
+}
+
+export async function findCategoryById(
+  id: string,
+  database: Database = db,
+): Promise<Category | null> {
+  const [row] = await database
+    .select()
+    .from(categories)
+    .where(eq(categories.id, id))
+    .limit(1);
+  return row ?? null;
+}
+
+export async function countProductsInCategory(
+  categoryId: string,
+  database: Database = db,
+): Promise<number> {
+  const rows = await database
+    .select({ count: sql<number>`count(*)::int` })
+    .from(products)
+    .where(eq(products.categoryId, categoryId));
+  return rows[0]?.count ?? 0;
+}
+
+export async function listCategoriesWithCount(
+  database: Database = db,
+): Promise<CategoryWithCount[]> {
+  return database
+    .select({
+      id: categories.id,
+      name: categories.name,
+      slug: categories.slug,
+      icon: categories.icon,
+      color: categories.color,
+      sortOrder: categories.sortOrder,
+      createdAt: categories.createdAt,
+      productCount: sql<number>`count(${products.id})::int`,
+    })
+    .from(categories)
+    .leftJoin(products, eq(products.categoryId, categories.id))
+    .groupBy(categories.id)
+    .orderBy(asc(categories.sortOrder), asc(categories.name));
 }

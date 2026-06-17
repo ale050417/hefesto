@@ -82,3 +82,6 @@ export type AdminProductPage = {
   pageSize: number;
   totalPages: number;
 };
+
+export type NewCategory = typeof categories.$inferInsert;
+export type CategoryWithCount = Category & { productCount: number };

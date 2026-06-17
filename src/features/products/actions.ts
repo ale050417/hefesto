@@ -2,14 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { z, type ZodError } from "zod";
-import { productInputSchema } from "./schemas";
+import { categoryInputSchema, productInputSchema } from "./schemas";
 import {
   addProductImage,
   archiveProduct,
+  createCategory,
   createProduct,
+  deleteCategory,
   makeImagePrimary,
   publishProduct,
   removeProductImage,
+  updateCategory,
   updateProduct,
 } from "./services/catalogService";
 
@@ -215,6 +218,95 @@ export async function setPrimaryImageAction(
     return {
       ok: false,
       error: { code: "INTERNAL", message: "No se pudo marcar como principal" },
+    };
+  }
+}
+
+// --- Categorías ---
+
+const CATEGORY_TAKEN = {
+  ok: false as const,
+  error: {
+    code: "VALIDATION",
+    message: "Ya existe una categoría con ese nombre o slug",
+    fields: { slug: "Nombre o slug en uso" },
+  },
+};
+
+export async function createCategoryAction(
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  const parsed = categoryInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "Revisá los datos",
+        fields: fieldErrors(parsed.error),
+      },
+    };
+  }
+  try {
+    const category = await createCategory(parsed.data);
+    revalidatePath("/admin/categorias");
+    return { ok: true, data: { id: category.id } };
+  } catch (e) {
+    if (isUniqueViolation(e)) return CATEGORY_TAKEN;
+    return {
+      ok: false,
+      error: { code: "INTERNAL", message: "No se pudo crear la categoría" },
+    };
+  }
+}
+
+export async function updateCategoryAction(
+  id: string,
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  const parsed = categoryInputSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "Revisá los datos",
+        fields: fieldErrors(parsed.error),
+      },
+    };
+  }
+  try {
+    const category = await updateCategory(id, parsed.data);
+    revalidatePath("/admin/categorias");
+    return { ok: true, data: { id: category.id } };
+  } catch (e) {
+    if (isUniqueViolation(e)) return CATEGORY_TAKEN;
+    return {
+      ok: false,
+      error: {
+        code: "INTERNAL",
+        message: "No se pudo actualizar la categoría",
+      },
+    };
+  }
+}
+
+export async function deleteCategoryAction(id: string): Promise<ActionResult> {
+  if (!uuidSchema.safeParse(id).success) {
+    return validationError("Categoría inválida");
+  }
+  try {
+    await deleteCategory(id);
+    revalidatePath("/admin/categorias");
+    return { ok: true, data: undefined };
+  } catch (e) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message:
+          e instanceof Error ? e.message : "No se pudo borrar la categoría",
+      },
     };
   }
 }

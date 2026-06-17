@@ -1,9 +1,12 @@
 import {
   countImages,
+  countProductsInCategory,
+  deleteCategoryRow,
   deleteImageRow,
   findAllForAdmin,
   findBySlug,
   findCategories,
+  findCategoryById,
   findFeatured,
   findImageById,
   findMaterials,
@@ -11,17 +14,21 @@ import {
   findPublished,
   findPublishedSlugs,
   findRelated,
+  insertCategory,
   insertImage,
   insertProduct,
+  listCategoriesWithCount,
   listImagesByProduct,
   setPrimaryImage,
   setProductStatus,
+  updateCategoryRow,
   updateProductRow,
 } from "../repository";
 import { randomUUID } from "node:crypto";
 import { deleteObject, optimizeImage, uploadObject } from "@/core/storage";
 import {
   productFilterSchema,
+  type CategoryInput,
   type ProductFilter,
   type ProductInput,
 } from "../schemas";
@@ -30,6 +37,7 @@ import type {
   AdminProductRow,
   CatalogPage,
   Category,
+  CategoryWithCount,
   HomeData,
   Product,
   ProductDetailView,
@@ -311,4 +319,50 @@ export async function listProductsAdmin(opts: {
     pageSize: opts.pageSize,
     totalPages: Math.max(1, Math.ceil(total / opts.pageSize)),
   };
+}
+
+// --- Categorías (admin) ---
+
+export async function listCategoriesAdmin(): Promise<CategoryWithCount[]> {
+  return listCategoriesWithCount();
+}
+
+export async function getCategoryAdmin(id: string): Promise<Category | null> {
+  return findCategoryById(id);
+}
+
+export async function createCategory(input: CategoryInput): Promise<Category> {
+  return insertCategory({
+    name: input.name,
+    slug: input.slug,
+    icon: input.icon ?? null,
+    color: input.color ?? null,
+    sortOrder: input.sortOrder,
+  });
+}
+
+export async function updateCategory(
+  id: string,
+  input: CategoryInput,
+): Promise<Category> {
+  const row = await updateCategoryRow(id, {
+    name: input.name,
+    slug: input.slug,
+    icon: input.icon ?? null,
+    color: input.color ?? null,
+    sortOrder: input.sortOrder,
+  });
+  if (!row) throw new Error("Categoría no encontrada");
+  return row;
+}
+
+/** Borra una categoría. Regla: no se puede si tiene productos. */
+export async function deleteCategory(id: string): Promise<void> {
+  const count = await countProductsInCategory(id);
+  if (count > 0) {
+    throw new Error(
+      `No se puede borrar: la categoría tiene ${count} producto(s). Reasignalos primero.`,
+    );
+  }
+  await deleteCategoryRow(id);
 }
