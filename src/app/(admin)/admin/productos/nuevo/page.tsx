@@ -24,6 +24,22 @@ const emptyDefaults: ProductFormValues = {
 
 export default async function NuevoProductoPage() {
   const categories = await listCategories();
+  if (categories.length === 0) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <h1 className="font-display text-fg mt-2 text-2xl">Nuevo producto</h1>
+        <p className="text-dim mt-3">
+          Primero creá una categoría: todo producto debe tener una.
+        </p>
+        <Link
+          href="/admin/categorias"
+          className="text-primary mt-4 inline-block text-sm hover:underline"
+        >
+          Ir a categorías →
+        </Link>
+      </div>
+    );
+  }
   return (
     <div className="mx-auto max-w-2xl">
       <nav className="text-dim text-sm">

@@ -139,13 +139,20 @@ export function ProductForm({
             Categoría
           </label>
           <select id="categoryId" className={field} {...register("categoryId")}>
-            <option value="">Sin categoría</option>
+            <option value="" disabled>
+              Elegí una categoría
+            </option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
           </select>
+          {errors.categoryId ? (
+            <p className="text-danger mt-1 text-xs">
+              {errors.categoryId.message}
+            </p>
+          ) : null}
         </div>
         <div>
           <label className={labelCls} htmlFor="material">

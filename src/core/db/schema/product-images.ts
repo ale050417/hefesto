@@ -1,13 +1,32 @@
-import { boolean, integer, pgTable, text, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  index,
+  integer,
+  pgTable,
+  text,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { products } from "./products";
 
-export const productImages = pgTable("product_images", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  productId: uuid("product_id")
-    .notNull()
-    .references(() => products.id, { onDelete: "cascade" }),
-  url: text("url").notNull(),
-  alt: text("alt"),
-  sortOrder: integer("sort_order").notNull().default(0),
-  isPrimary: boolean("is_primary").notNull().default(false),
-});
+export const productImages = pgTable(
+  "product_images",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    productId: uuid("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    alt: text("alt"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isPrimary: boolean("is_primary").notNull().default(false),
+  },
+  (t) => [
+    // Una sola imagen principal por producto (índice único parcial).
+    uniqueIndex("images_one_primary_per_product")
+      .on(t.productId)
+      .where(sql`${t.isPrimary}`),
+    index("images_product_idx").on(t.productId),
+  ],
+);

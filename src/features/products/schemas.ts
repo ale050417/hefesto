@@ -46,7 +46,7 @@ export const productInputSchema = z
     description: z
       .preprocess(emptyToNull, z.string().max(2000).nullable())
       .optional(),
-    categoryId: z.preprocess(emptyToNull, z.uuid().nullable()).optional(),
+    categoryId: z.uuid("Elegí una categoría"),
     price: z.coerce.number().positive("El precio debe ser mayor a 0"),
     salePrice: z
       .preprocess(emptyToNull, z.coerce.number().positive().nullable())

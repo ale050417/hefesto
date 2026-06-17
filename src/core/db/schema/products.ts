@@ -23,9 +23,10 @@ export const products = pgTable(
     name: text("name").notNull(),
     slug: text("slug").notNull().unique(),
     description: text("description"),
-    categoryId: uuid("category_id").references(() => categories.id, {
-      onDelete: "set null",
-    }),
+    // Categoría obligatoria; no se puede borrar una categoría en uso (restrict).
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => categories.id, { onDelete: "restrict" }),
     price: numeric("price", { precision: 12, scale: 2 }).notNull(),
     salePrice: numeric("sale_price", { precision: 12, scale: 2 }),
     material: text("material"),
@@ -46,8 +47,16 @@ export const products = pgTable(
   (t) => [
     check("products_price_positive", sql`${t.price} > 0`),
     check(
-      "products_sale_price_lt_price",
-      sql`${t.salePrice} IS NULL OR ${t.salePrice} < ${t.price}`,
+      "products_sale_price_valid",
+      sql`${t.salePrice} IS NULL OR (${t.salePrice} > 0 AND ${t.salePrice} < ${t.price})`,
+    ),
+    check(
+      "products_print_time_non_negative",
+      sql`${t.printTimeMinutes} IS NULL OR ${t.printTimeMinutes} >= 0`,
+    ),
+    check(
+      "products_weight_non_negative",
+      sql`${t.weightGrams} IS NULL OR ${t.weightGrams} >= 0`,
     ),
     index("products_slug_idx").on(t.slug),
     index("products_category_status_idx").on(t.categoryId, t.status),

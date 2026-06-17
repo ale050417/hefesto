@@ -35,13 +35,19 @@ export async function seedDatabase(db: PostgresJsDatabase<typeof schema>) {
   // Productos + imágenes + variantes + tags.
   let productCount = 0;
   for (const p of productsData) {
+    const categoryId = catId.get(p.categorySlug);
+    if (!categoryId) {
+      throw new Error(
+        `Categoría no encontrada para ${p.slug}: ${p.categorySlug}`,
+      );
+    }
     const inserted = await db
       .insert(schema.products)
       .values({
         name: p.name,
         slug: p.slug,
         description: p.description,
-        categoryId: catId.get(p.categorySlug) ?? null,
+        categoryId,
         price: p.price,
         salePrice: p.salePrice ?? null,
         material: p.material ?? null,
