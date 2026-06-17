@@ -3,14 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PriceTag } from "@/components/shared/price-tag";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { AddToCart } from "@/features/cart/components/add-to-cart";
 import { ProductGallery } from "@/features/products/components/product-gallery";
 import { ProductGrid } from "@/features/products/components/product-grid";
 import {
   getProductBySlug,
   getRelatedProducts,
 } from "@/features/products/services/catalogService";
-import { formatMinutes, formatPrice } from "@/lib/format";
+import { formatMinutes } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -99,30 +99,19 @@ export default async function ProductPage({ params }: Params) {
             <p className="text-dim mt-4">{product.description}</p>
           ) : null}
 
-          {product.variants.length > 0 ? (
-            <div className="mt-6">
-              <p className="text-fg mb-2 text-sm font-medium">Tamaños</p>
-              <div className="flex flex-wrap gap-2">
-                {product.variants.map((v) => (
-                  <span
-                    key={v.id}
-                    className="border-surface-3 bg-surface-2 text-fg rounded-md border px-3 py-2 text-sm"
-                  >
-                    {v.label}
-                    {v.price != null ? ` · ${formatPrice(v.price)}` : ""}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
           <div className="mt-6">
-            <Button disabled title="Disponible próximamente">
-              Agregar al carrito
-            </Button>
-            <p className="text-faint mt-2 text-xs">
-              La compra online estará disponible próximamente.
-            </p>
+            <AddToCart
+              product={{
+                id: product.id,
+                slug: product.slug,
+                name: product.name,
+                price: product.price,
+                salePrice: product.salePrice,
+                isOnSale: product.isOnSale,
+                image: product.primaryImage?.url ?? null,
+                variants: product.variants,
+              }}
+            />
           </div>
 
           {specs.length > 0 ? (

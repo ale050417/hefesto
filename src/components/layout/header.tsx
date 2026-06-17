@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/core/auth/session";
+import { CartButton } from "@/features/cart/components/cart-button";
 import { logoutAction } from "@/features/auth/actions";
 
 const navLinks = [
@@ -31,6 +32,7 @@ export async function Header() {
               {link.label}
             </Link>
           ))}
+          <CartButton />
           {isStaff ? (
             <Link
               href="/admin"
