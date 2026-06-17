@@ -267,3 +267,13 @@ export async function listProductImages(
 ): Promise<ProductImage[]> {
   return listImagesByProduct(productId);
 }
+
+/** Trae un producto (cualquier estado) + sus imágenes, para el form de edición. */
+export async function getProductAdmin(
+  id: string,
+): Promise<{ product: Product; images: ProductImage[] } | null> {
+  const product = await findProductById(id);
+  if (!product) return null;
+  const images = await listImagesByProduct(id);
+  return { product, images };
+}
