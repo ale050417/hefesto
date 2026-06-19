@@ -6,3 +6,6 @@ coverage
 pnpm-lock.yaml
 public
 next-env.d.ts
+
+# Generados por drizzle-kit
+src/core/db/migrations
