@@ -12,6 +12,8 @@ import { z } from "zod";
  */
 const envSchema = z.object({
   // --- Públicas (Next las expone al navegador por el prefijo NEXT_PUBLIC) ---
+  // URL pública del sitio (back_urls de MercadoPago, sitemap, emails).
+  NEXT_PUBLIC_SITE_URL: z.url().default("http://localhost:3000"),
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   // Publishable key de Supabase (sistema nuevo de claves; antes "anon").
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
@@ -26,6 +28,11 @@ const envSchema = z.object({
       /^postgres(ql)?:\/\//,
       "Debe empezar con postgres:// o postgresql://",
     ),
+  // Access token de MercadoPago (servidor). Opcional: si no está, el pago con
+  // MP falla con un mensaje claro, pero la app arranca igual.
+  MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),
+  // Secret para verificar la firma del webhook de MercadoPago.
+  MERCADOPAGO_WEBHOOK_SECRET: z.string().optional(),
 });
 
 type Env = z.infer<typeof envSchema>;

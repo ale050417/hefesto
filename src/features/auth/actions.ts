@@ -1,13 +1,24 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { rateLimit } from "@/core/security/rate-limit";
+import { getClientIp } from "@/core/security/request";
 import { createClient } from "@/core/supabase/server";
 import { siteUrl } from "@/lib/site";
 import { loginSchema, registerSchema, resetRequestSchema } from "./schemas";
 
 type Result = { ok: true } | { ok: false; error: string };
 
+const TOO_MANY: Result = {
+  ok: false,
+  error: "Demasiados intentos. Esperá un minuto.",
+};
+
 export async function loginAction(input: unknown): Promise<Result> {
+  const ip = await getClientIp();
+  if (!rateLimit(`login:${ip}`, { limit: 5, windowMs: 60_000 }).ok) {
+    return TOO_MANY;
+  }
   const parsed = loginSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Datos inválidos" };
   const supabase = await createClient();
@@ -17,6 +28,10 @@ export async function loginAction(input: unknown): Promise<Result> {
 }
 
 export async function registerAction(input: unknown): Promise<Result> {
+  const ip = await getClientIp();
+  if (!rateLimit(`register:${ip}`, { limit: 5, windowMs: 60_000 }).ok) {
+    return TOO_MANY;
+  }
   const parsed = registerSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Revisá los datos" };
   const supabase = await createClient();
@@ -46,6 +61,10 @@ export async function logoutAction(): Promise<void> {
 export async function requestPasswordResetAction(
   input: unknown,
 ): Promise<Result> {
+  const ip = await getClientIp();
+  if (!rateLimit(`reset:${ip}`, { limit: 3, windowMs: 60_000 }).ok) {
+    return TOO_MANY;
+  }
   const parsed = resetRequestSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Email inválido" };
   const supabase = await createClient();
