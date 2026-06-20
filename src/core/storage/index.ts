@@ -1,4 +1,3 @@
-import sharp from "sharp";
 import { getSupabaseAdmin } from "@/core/supabase/admin";
 
 /** Redimensiona (máx `maxSize` px), reorienta y convierte a WebP. */
@@ -7,6 +6,9 @@ export async function optimizeImage(
   maxSize = 1600,
   quality = 80,
 ): Promise<Buffer> {
+  // Carga diferida: sharp (binario nativo) solo se necesita al optimizar
+  // imágenes (admin). Así las páginas que no suben imágenes no lo cargan.
+  const { default: sharp } = await import("sharp");
   return sharp(input)
     .rotate() // respeta la orientación EXIF
     .resize({

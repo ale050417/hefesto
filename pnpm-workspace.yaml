@@ -2,3 +2,11 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   esbuild: true
+
+supportedArchitectures:
+  os:
+    - current
+    - linux
+  cpu:
+    - current
+    - x64
