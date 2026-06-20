@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { type ZodError } from "zod";
 import { getCurrentUser, isStaff } from "@/core/auth/session";
+import { recordAudit } from "@/core/audit";
 import { toActionError } from "@/core/errors";
 import { siteUrl } from "@/lib/site";
 import { checkoutSchema, type CheckoutInput } from "./schemas";
@@ -117,6 +118,13 @@ export async function transitionOrderAction(
     }
     revalidatePath(`/admin/pedidos/${orderId}`);
     revalidatePath("/admin/pedidos");
+    await recordAudit({
+      actorId: user?.id ?? null,
+      action: "order.status_changed",
+      entityType: "order",
+      entityId: orderId,
+      metadata: { toStatus, ...(note ? { note } : {}) },
+    });
     return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
