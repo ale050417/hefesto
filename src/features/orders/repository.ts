@@ -190,3 +190,18 @@ export async function findOrderDetailForAdmin(
   });
   return order ?? null;
 }
+
+/** Actualiza datos editables del pedido (tracking / nota interna). */
+export async function updateOrderMeta(
+  orderId: string,
+  fields: { trackingCode?: string | null; internalNote?: string | null },
+  database: Database = db,
+): Promise<Order> {
+  const [row] = await database
+    .update(orders)
+    .set(fields)
+    .where(eq(orders.id, orderId))
+    .returning();
+  if (!row) throw new Error("No se pudo actualizar el pedido");
+  return row;
+}

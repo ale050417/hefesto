@@ -1,7 +1,9 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { type ZodError } from "zod";
-import { getCurrentUser } from "@/core/auth/session";
+import { getCurrentUser, isStaff } from "@/core/auth/session";
 import { toActionError } from "@/core/errors";
 import { siteUrl } from "@/lib/site";
 import { checkoutSchema, type CheckoutInput } from "./schemas";
@@ -10,6 +12,9 @@ import {
   cancelPendingOrder,
   startMercadoPagoPayment,
 } from "./services/paymentService";
+import { setOrderMeta, transitionOrder } from "./services/orderAdminService";
+import { notifyOrderStatus } from "./services/orderEmails";
+import type { OrderStatus } from "./types";
 
 type ActionResult =
   | { ok: true; orderNumber: string; redirectUrl?: string }
@@ -80,6 +85,56 @@ export async function createOrderAction(
     }
 
     return { ok: true, orderNumber: order.orderNumber };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+const NOT_STAFF = {
+  ok: false as const,
+  error: { code: "UNAUTHORIZED", message: "No autorizado" },
+};
+
+/** Admin: cambia el estado de un pedido (valida máquina de estados). */
+export async function transitionOrderAction(
+  orderId: string,
+  toStatus: OrderStatus,
+  note?: string,
+): Promise<
+  { ok: true } | { ok: false; error: { code: string; message: string } }
+> {
+  if (!(await isStaff())) return NOT_STAFF;
+  const user = await getCurrentUser();
+  try {
+    const updated = await transitionOrder(orderId, toStatus, {
+      changedBy: user?.id ?? null,
+      note: note ?? null,
+    });
+    try {
+      await notifyOrderStatus(updated);
+    } catch (mailError) {
+      console.error("[email] no se pudo notificar el estado:", mailError);
+    }
+    revalidatePath(`/admin/pedidos/${orderId}`);
+    revalidatePath("/admin/pedidos");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+/** Admin: guarda tracking / nota interna. */
+export async function updateOrderMetaAction(
+  orderId: string,
+  fields: { trackingCode?: string | null; internalNote?: string | null },
+): Promise<
+  { ok: true } | { ok: false; error: { code: string; message: string } }
+> {
+  if (!(await isStaff())) return NOT_STAFF;
+  try {
+    await setOrderMeta(orderId, fields);
+    revalidatePath(`/admin/pedidos/${orderId}`);
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
   }

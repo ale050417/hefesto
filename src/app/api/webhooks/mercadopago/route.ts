@@ -5,6 +5,7 @@ import {
   verifyWebhookSignature,
 } from "@/core/payments/mercadopago";
 import { confirmOrderPayment } from "@/features/orders/services/paymentService";
+import { notifyOrderStatus } from "@/features/orders/services/orderEmails";
 
 // Webhook de MercadoPago (REST, Cap. 17). Verifica firma, es idempotente y
 // responde rápido. El cobro se confirma SOLO acá (nunca desde el navegador).
@@ -58,7 +59,12 @@ export async function POST(req: Request) {
   try {
     const payment = await getPayment(String(dataId));
     if (payment.status === "approved" && payment.externalReference) {
-      await confirmOrderPayment(payment.externalReference);
+      const order = await confirmOrderPayment(payment.externalReference);
+      try {
+        await notifyOrderStatus(order);
+      } catch (mailError) {
+        console.error("[email] webhook:", mailError);
+      }
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

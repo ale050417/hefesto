@@ -1,22 +1,8 @@
 import { InvalidTransitionError, NotFoundError } from "@/core/errors";
+import { canTransition } from "../transitions";
 import type { Order, OrderStatus } from "../types";
 
-// Máquina de estados del pedido (Cap. 2.5 / 11). Define qué transiciones son
-// válidas; cancelled y refunded son terminales.
-export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  pending_payment: ["confirmed", "cancelled"],
-  confirmed: ["in_production", "cancelled", "refunded"],
-  in_production: ["ready", "cancelled", "refunded"],
-  ready: ["shipped", "cancelled", "refunded"],
-  shipped: ["delivered", "refunded"],
-  delivered: ["refunded"],
-  cancelled: [],
-  refunded: [],
-};
-
-export function canTransition(from: OrderStatus, to: OrderStatus): boolean {
-  return ORDER_TRANSITIONS[from].includes(to);
-}
+export { ORDER_TRANSITIONS, canTransition } from "../transitions";
 
 // Dependencias inyectables (tests puros, sin DB).
 export type TransitionDeps = {

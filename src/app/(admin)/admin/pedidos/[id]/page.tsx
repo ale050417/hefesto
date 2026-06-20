@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ORDER_STATUS_LABEL } from "@/features/orders/constants";
+import { OrderStatusManager } from "@/features/orders/components/order-status-manager";
 import { OrderSummary } from "@/features/orders/components/order-summary";
 import { getOrderAdmin } from "@/features/orders/services/orderAdminService";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,13 @@ export default async function OrderDetailAdminPage({
         <OrderSummary order={order} />
 
         <aside className="space-y-4">
+          <OrderStatusManager
+            orderId={order.id}
+            status={order.status}
+            trackingCode={order.trackingCode}
+            internalNote={order.internalNote}
+          />
+
           <div className="ui-card p-4">
             <h3 className="text-fg font-display mb-2 text-sm">Cliente</h3>
             <p className="text-dim text-sm">

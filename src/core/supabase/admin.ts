@@ -15,3 +15,11 @@ export function getSupabaseAdmin(): SupabaseClient {
   }
   return client;
 }
+
+/** Email de un usuario por id (desde auth.users, vía service role). */
+export async function getUserEmail(userId: string): Promise<string | null> {
+  const { data, error } =
+    await getSupabaseAdmin().auth.admin.getUserById(userId);
+  if (error || !data?.user) return null;
+  return data.user.email ?? null;
+}

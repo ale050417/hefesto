@@ -33,6 +33,9 @@ const envSchema = z.object({
   MERCADOPAGO_ACCESS_TOKEN: z.string().optional(),
   // Secret para verificar la firma del webhook de MercadoPago.
   MERCADOPAGO_WEBHOOK_SECRET: z.string().optional(),
+  // Resend (emails transaccionales). Opcionales: sin API key, el email se omite.
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_FROM: z.string().optional(),
 });
 
 type Env = z.infer<typeof envSchema>;
