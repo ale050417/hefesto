@@ -57,7 +57,7 @@ export default async function ProductPage({ params }: Params) {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-10">
+    <div className="store-wrap py-10">
       <nav className="text-dim text-sm">
         <Link href="/" className="hover:text-fg">
           Inicio

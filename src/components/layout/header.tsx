@@ -1,65 +1,73 @@
+import Image from "next/image";
 import Link from "next/link";
 import { getCurrentUser } from "@/core/auth/session";
+import { getBrandSettings } from "@/features/settings/service";
 import { CartButton } from "@/features/cart/components/cart-button";
 import { logoutAction } from "@/features/auth/actions";
-
-const navLinks = [
-  { href: "/", label: "Inicio" },
-  { href: "/catalogo", label: "Catálogo" },
-];
+import { BrandMark } from "./brand-mark";
 
 export async function Header() {
-  const user = await getCurrentUser();
+  const [user, brand] = await Promise.all([
+    getCurrentUser(),
+    getBrandSettings(),
+  ]);
   const role = user?.profile?.role;
   const isStaff = role === "admin" || role === "operator";
 
   return (
-    <header className="border-surface-2 bg-bg/80 sticky top-0 z-[200] border-b backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
-        <Link
-          href="/"
-          className="font-display text-primary text-xl font-bold tracking-wide"
-        >
-          HEFESTO<span className="text-fg"> 3D</span>
+    <header className="topbar">
+      <Link href="/" className="brand">
+        {brand.logoUrl ? (
+          <Image
+            src={brand.logoUrl}
+            alt="Hefesto 3D"
+            width={150}
+            height={40}
+            className="h-9 w-auto object-contain"
+            priority
+          />
+        ) : (
+          <>
+            <BrandMark size={38} />
+            <span className="flex flex-col leading-tight">
+              <span className="brand-name">
+                HEFESTO<b> 3D</b>
+              </span>
+              <span className="brand-sub">Impresión 3D a pedido</span>
+            </span>
+          </>
+        )}
+      </Link>
+
+      <nav className="ml-auto flex items-center gap-5 sm:gap-6">
+        <Link href="/" className="nav-link hidden sm:inline">
+          Inicio
         </Link>
-        <nav className="flex items-center gap-6">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-dim hover:text-fg text-sm transition-colors"
-            >
-              {link.label}
-            </Link>
-          ))}
-          <CartButton />
-          {isStaff ? (
-            <Link
-              href="/admin"
-              className="text-primary hover:text-primary-strong text-sm transition-colors"
-            >
-              Panel
-            </Link>
-          ) : null}
-          {user ? (
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="text-dim hover:text-fg text-sm transition-colors"
-              >
-                Salir
-              </button>
-            </form>
-          ) : (
-            <Link
-              href="/ingresar"
-              className="text-dim hover:text-fg text-sm transition-colors"
-            >
-              Ingresar
-            </Link>
-          )}
-        </nav>
-      </div>
+        <Link href="/catalogo" className="nav-link">
+          Catálogo
+        </Link>
+        <CartButton />
+        {isStaff ? (
+          <Link
+            href="/admin"
+            className="nav-link"
+            style={{ color: "var(--gold-bright)" }}
+          >
+            Panel
+          </Link>
+        ) : null}
+        {user ? (
+          <form action={logoutAction}>
+            <button type="submit" className="nav-link">
+              Salir
+            </button>
+          </form>
+        ) : (
+          <Link href="/ingresar" className="nav-link">
+            Ingresar
+          </Link>
+        )}
+      </nav>
     </header>
   );
 }

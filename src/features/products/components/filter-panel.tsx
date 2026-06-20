@@ -1,66 +1,115 @@
-import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { PRODUCT_SORTS, type ProductFilter } from "../schemas";
+"use client";
+
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { formatPrice } from "@/lib/format";
 import type { Category } from "../types";
 
-const sortLabels: Record<(typeof PRODUCT_SORTS)[number], string> = {
-  newest: "Más nuevos",
-  price_asc: "Precio: menor a mayor",
-  price_desc: "Precio: mayor a menor",
-  name: "Nombre (A-Z)",
-};
-
-const fieldClass =
-  "w-full rounded-md border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-fg";
-const labelClass = "mb-1 block text-xs font-medium text-dim";
+const PRICE_MIN = 3000;
+const PRICE_MAX = 50000;
 
 export function FilterPanel({
   categories,
   materials,
-  filter,
 }: {
   categories: Category[];
   materials: string[];
-  filter: ProductFilter;
 }) {
-  return (
-    <form
-      method="get"
-      action="/catalogo"
-      className="border-surface-2 bg-surface-1 space-y-4 rounded-lg border p-4"
-    >
-      {/* Al filtrar, volvemos a la página 1 */}
-      <input type="hidden" name="page" value="1" />
+  const router = useRouter();
+  const sp = useSearchParams();
+  const get = (k: string) => sp.get(k);
 
-      <div>
-        <label className={labelClass} htmlFor="f-category">
-          Categoría
-        </label>
-        <select
-          id="f-category"
-          name="category"
-          defaultValue={filter.category ?? ""}
-          className={fieldClass}
+  const [maxPrice, setMaxPrice] = useState<number>(
+    Number(sp.get("maxPrice")) || PRICE_MAX,
+  );
+
+  function setParams(updates: Record<string, string | null>) {
+    const params = new URLSearchParams(sp.toString());
+    for (const [k, v] of Object.entries(updates)) {
+      if (v) params.set(k, v);
+      else params.delete(k);
+    }
+    params.delete("page"); // cualquier cambio vuelve a la página 1
+    router.push(`/catalogo?${params.toString()}`);
+  }
+
+  const activeCategory = get("category");
+
+  return (
+    <div className="ui-card filter-panel p-5">
+      <div className="mb-1 flex items-center justify-between">
+        <b className="text-fg text-sm">Filtros</b>
+        <button
+          type="button"
+          className="text-xs"
+          style={{ color: "var(--gold-bright)" }}
+          onClick={() => router.push("/catalogo")}
         >
-          <option value="">Todas</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.slug}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+          Limpiar
+        </button>
       </div>
 
-      <div>
-        <label className={labelClass} htmlFor="f-material">
-          Material
+      <div className="filter-group">
+        <h5>Categoría</h5>
+        <label className="f-radio">
+          <input
+            type="radio"
+            name="cat"
+            className="sr-only"
+            checked={!activeCategory}
+            onChange={() => setParams({ category: null })}
+          />
+          <span className="rdot" />
+          Todas
         </label>
+        {categories.map((c) => (
+          <label key={c.id} className="f-radio">
+            <input
+              type="radio"
+              name="cat"
+              className="sr-only"
+              checked={activeCategory === c.slug}
+              onChange={() => setParams({ category: c.slug })}
+            />
+            <span className="rdot" />
+            {c.name}
+          </label>
+        ))}
+      </div>
+
+      <div className="filter-group">
+        <h5>Precio máximo</h5>
+        <input
+          type="range"
+          className="range"
+          min={PRICE_MIN}
+          max={PRICE_MAX}
+          step={1000}
+          value={maxPrice}
+          onChange={(e) => setMaxPrice(Number(e.target.value))}
+          onPointerUp={() =>
+            setParams({
+              maxPrice: maxPrice >= PRICE_MAX ? null : String(maxPrice),
+            })
+          }
+          onKeyUp={() =>
+            setParams({
+              maxPrice: maxPrice >= PRICE_MAX ? null : String(maxPrice),
+            })
+          }
+        />
+        <div className="text-faint mt-1.5 flex justify-between text-xs">
+          <span>{formatPrice(PRICE_MIN)}</span>
+          <b style={{ color: "var(--gold-bright)" }}>{formatPrice(maxPrice)}</b>
+        </div>
+      </div>
+
+      <div className="filter-group">
+        <h5>Material</h5>
         <select
-          id="f-material"
-          name="material"
-          defaultValue={filter.material ?? ""}
-          className={fieldClass}
+          className="select w-full"
+          value={get("material") ?? ""}
+          onChange={(e) => setParams({ material: e.target.value || null })}
         >
           <option value="">Todos</option>
           {materials.map((m) => (
@@ -71,85 +120,31 @@ export function FilterPanel({
         </select>
       </div>
 
-      <div>
-        <label className={labelClass} htmlFor="f-sort">
-          Ordenar por
-        </label>
-        <select
-          id="f-sort"
-          name="sort"
-          defaultValue={filter.sort}
-          className={fieldClass}
-        >
-          {PRODUCT_SORTS.map((s) => (
-            <option key={s} value={s}>
-              {sortLabels[s]}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className={labelClass} htmlFor="f-min">
-            Precio mín.
-          </label>
-          <input
-            id="f-min"
-            name="minPrice"
-            type="number"
-            min="0"
-            defaultValue={filter.minPrice ?? ""}
-            className={fieldClass}
-          />
-        </div>
-        <div className="flex-1">
-          <label className={labelClass} htmlFor="f-max">
-            Precio máx.
-          </label>
-          <input
-            id="f-max"
-            name="maxPrice"
-            type="number"
-            min="0"
-            defaultValue={filter.maxPrice ?? ""}
-            className={fieldClass}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <label className="text-fg flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            name="onSale"
-            value="true"
-            defaultChecked={filter.onSale ?? false}
-          />
-          Solo ofertas
-        </label>
-        <label className="text-fg flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            name="isNew"
-            value="true"
-            defaultChecked={filter.isNew ?? false}
-          />
+      <div className="filter-group">
+        <h5>Destacados</h5>
+        <label className="f-switch">
           Solo novedades
+          <input
+            type="checkbox"
+            className="accent-[var(--gold)]"
+            checked={get("isNew") === "true"}
+            onChange={(e) =>
+              setParams({ isNew: e.target.checked ? "true" : null })
+            }
+          />
+        </label>
+        <label className="f-switch">
+          Solo ofertas
+          <input
+            type="checkbox"
+            className="accent-[var(--gold)]"
+            checked={get("onSale") === "true"}
+            onChange={(e) =>
+              setParams({ onSale: e.target.checked ? "true" : null })
+            }
+          />
         </label>
       </div>
-
-      <div className="flex items-center gap-2 pt-2">
-        <button type="submit" className={buttonVariants({ size: "sm" })}>
-          Aplicar
-        </button>
-        <Link
-          href="/catalogo"
-          className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-        >
-          Limpiar
-        </Link>
-      </div>
-    </form>
+    </div>
   );
 }

@@ -1,29 +1,38 @@
-import { cva, type VariantProps } from "class-variance-authority";
 import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-export const badgeVariants = cva(
-  "inline-flex items-center rounded-sm px-2 py-0.5 text-xs font-medium",
-  {
-    variants: {
-      variant: {
-        primary: "bg-primary text-primary-fg",
-        success: "bg-success text-bg",
-        warning: "bg-warning text-bg",
-        danger: "bg-danger text-bg",
-        info: "bg-info text-bg",
-        neutral: "bg-surface-3 text-dim",
-      },
-    },
-    defaultVariants: { variant: "primary" },
-  },
-);
+type Variant =
+  | "primary"
+  | "gold"
+  | "success"
+  | "warning"
+  | "danger"
+  | "info"
+  | "neutral";
 
-export type BadgeProps = HTMLAttributes<HTMLSpanElement> &
-  VariantProps<typeof badgeVariants>;
+const variantClass: Record<Variant, string> = {
+  primary: "badge-gold",
+  gold: "badge-gold",
+  success: "badge-success",
+  warning: "badge-warning",
+  danger: "badge-danger",
+  info: "badge-info",
+  neutral: "badge-neutral",
+};
 
-export function Badge({ className, variant, ...props }: BadgeProps) {
+export type BadgeProps = HTMLAttributes<HTMLSpanElement> & {
+  variant?: Variant;
+};
+
+export function Badge({
+  className,
+  variant = "neutral",
+  ...props
+}: BadgeProps) {
   return (
-    <span className={cn(badgeVariants({ variant }), className)} {...props} />
+    <span
+      className={cn("badge", variantClass[variant], className)}
+      {...props}
+    />
   );
 }

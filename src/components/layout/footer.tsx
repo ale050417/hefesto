@@ -1,34 +1,59 @@
+import Image from "next/image";
 import Link from "next/link";
+import { getBrandSettings } from "@/features/settings/service";
+import { BrandMark } from "./brand-mark";
 
-export function Footer() {
+export async function Footer() {
   const year = new Date().getFullYear();
+  const brand = await getBrandSettings();
   return (
-    <footer className="border-surface-2 bg-surface-1 border-t">
-      <div className="mx-auto max-w-6xl px-4 py-10">
-        <div className="flex flex-col gap-6 sm:flex-row sm:justify-between">
+    <footer className="footer">
+      <div className="store-wrap">
+        <div className="foot-grid">
           <div>
-            <p className="font-display text-primary text-lg font-bold">
-              HEFESTO 3D
-            </p>
-            <p className="text-dim mt-2 max-w-xs text-sm">
-              Productos impresos en 3D, hechos a pedido.
+            <div className="brand mb-3">
+              {brand.logoUrl ? (
+                <Image
+                  src={brand.logoUrl}
+                  alt="Hefesto 3D"
+                  width={150}
+                  height={40}
+                  className="h-9 w-auto object-contain"
+                />
+              ) : (
+                <>
+                  <BrandMark size={40} />
+                  <span className="brand-name">
+                    HEFESTO<b> 3D</b>
+                  </span>
+                </>
+              )}
+            </div>
+            <p className="text-faint max-w-[280px] text-sm leading-relaxed">
+              Diseños imposibles, impresos en 3D. Hechos a pedido, en el color
+              que elijas.
             </p>
           </div>
-          <nav className="flex flex-col gap-2 text-sm">
-            <Link href="/" className="text-dim hover:text-fg transition-colors">
-              Inicio
-            </Link>
-            <Link
-              href="/catalogo"
-              className="text-dim hover:text-fg transition-colors"
-            >
-              Catálogo
-            </Link>
-          </nav>
+          <div>
+            <h5>Tienda</h5>
+            <Link href="/catalogo">Catálogo</Link>
+            <Link href="/catalogo?sale=true">Ofertas</Link>
+          </div>
+          <div>
+            <h5>Ayuda</h5>
+            <Link href="/catalogo">Cómo funciona</Link>
+            <Link href="/ingresar">Mi cuenta</Link>
+          </div>
+          <div>
+            <h5>Hefesto 3D</h5>
+            <Link href="/">Inicio</Link>
+            <Link href="/catalogo">Productos</Link>
+          </div>
         </div>
-        <p className="text-faint mt-8 text-xs">
-          © {year} Hefesto 3D. Todos los derechos reservados.
-        </p>
+        <div className="text-faint mt-6 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] pt-6 text-xs">
+          <span>© {year} Hefesto 3D. Todos los derechos reservados.</span>
+          <span>Hecho a pedido en Argentina.</span>
+        </div>
       </div>
     </footer>
   );

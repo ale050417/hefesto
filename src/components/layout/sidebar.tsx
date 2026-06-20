@@ -4,6 +4,8 @@ const adminLinks = [
   { href: "/admin", label: "Panel" },
   { href: "/admin/productos", label: "Productos" },
   { href: "/admin/categorias", label: "Categorías" },
+  { href: "/admin/pedidos", label: "Pedidos" },
+  { href: "/admin/apariencia", label: "Apariencia" },
 ];
 
 export function Sidebar() {

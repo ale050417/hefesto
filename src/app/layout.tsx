@@ -46,7 +46,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      data-theme="dark"
+      data-theme="light"
       className={`${orbitron.variable} ${sora.variable}`}
     >
       <body>{children}</body>
