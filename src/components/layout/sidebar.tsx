@@ -1,43 +1,88 @@
-import Link from "next/link";
+"use client";
 
-const adminLinks = [
-  { href: "/admin", label: "Panel" },
-  { href: "/admin/productos", label: "Productos" },
-  { href: "/admin/categorias", label: "Categorías" },
-  { href: "/admin/pedidos", label: "Pedidos" },
-  { href: "/admin/apariencia", label: "Apariencia" },
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { BrandMark } from "./brand-mark";
+
+const icons: Record<string, React.ReactNode> = {
+  panel: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  ),
+  productos: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <path d="M3.3 7 12 12l8.7-5M12 22V12" />
+    </svg>
+  ),
+  categorias: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M20.6 13.4 11 3.8a2 2 0 0 0-1.4-.6H4a1 1 0 0 0-1 1v5.6a2 2 0 0 0 .6 1.4l9.6 9.6a2 2 0 0 0 2.8 0l4.6-4.6a2 2 0 0 0 0-2.8z" />
+      <circle cx="7.5" cy="7.5" r="1" />
+    </svg>
+  ),
+  pedidos: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+      <path d="M3 6h18M16 10a4 4 0 0 1-8 0" />
+    </svg>
+  ),
+  apariencia: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21" />
+    </svg>
+  ),
+};
+
+const links = [
+  { href: "/admin", label: "Panel", icon: icons.panel, exact: true },
+  { href: "/admin/productos", label: "Productos", icon: icons.productos },
+  { href: "/admin/categorias", label: "Categorías", icon: icons.categorias },
+  { href: "/admin/pedidos", label: "Pedidos", icon: icons.pedidos },
+  { href: "/admin/apariencia", label: "Apariencia", icon: icons.apariencia },
 ];
 
 export function Sidebar() {
+  const pathname = usePathname();
+  const isActive = (href: string, exact?: boolean) =>
+    exact ? pathname === href : pathname.startsWith(href);
+
   return (
-    <aside className="border-surface-2 bg-surface-1 flex shrink-0 flex-col border-b md:min-h-dvh md:w-60 md:border-r md:border-b-0">
-      <div className="p-4">
-        <Link
-          href="/admin"
-          className="font-display text-primary text-lg font-bold"
-        >
-          HEFESTO <span className="text-fg">Admin</span>
-        </Link>
-      </div>
-      <nav className="flex gap-1 px-2 pb-3 md:flex-col md:px-3">
-        {adminLinks.map((link) => (
+    <aside className="admin-sidebar">
+      <Link href="/admin" className="brand mb-1 px-2 py-1">
+        <BrandMark size={30} />
+        <span className="brand-name text-[15px]">
+          HEFESTO<b> Admin</b>
+        </span>
+      </Link>
+
+      <span className="nav-section-label">Gestión</span>
+      <nav className="admin-nav">
+        {links.map((l) => (
           <Link
-            key={link.href}
-            href={link.href}
-            className="text-dim hover:bg-surface-2 hover:text-fg rounded-md px-3 py-2 text-sm transition-colors"
+            key={l.href}
+            href={l.href}
+            className={cn("nav-item", isActive(l.href, l.exact) && "active")}
           >
-            {link.label}
+            {l.icon}
+            <span>{l.label}</span>
           </Link>
         ))}
       </nav>
-      <div className="mt-auto hidden p-3 md:block">
-        <Link
-          href="/"
-          className="text-faint hover:text-fg text-xs transition-colors"
-        >
-          ← Volver a la tienda
-        </Link>
-      </div>
+
+      <Link
+        href="/"
+        className="text-faint hover:text-fg mt-auto hidden px-3 pt-4 text-xs transition-colors md:block"
+      >
+        ← Volver a la tienda
+      </Link>
     </aside>
   );
 }

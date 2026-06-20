@@ -1007,4 +1007,104 @@ body > * {
     color: var(--gold-fg);
     box-shadow: 0 0 0 4px rgba(var(--gold-rgb), 0.18);
   }
+
+  /* Admin (estilo index): sidebar + content */
+  .admin-sidebar {
+    background: var(--surface-1);
+    border-bottom: 1px solid var(--border);
+    padding: 14px;
+  }
+  .admin-nav {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+  }
+  @media (min-width: 768px) {
+    .admin-sidebar {
+      width: 252px;
+      flex-shrink: 0;
+      border-bottom: none;
+      border-right: 1px solid var(--border);
+      padding: 18px 14px;
+      position: sticky;
+      top: 0;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      overflow-y: auto;
+    }
+    .admin-nav {
+      flex-direction: column;
+      overflow: visible;
+    }
+  }
+  .admin-content {
+    flex: 1;
+    min-width: 0;
+    padding: 24px 16px;
+  }
+  @media (min-width: 768px) {
+    .admin-content {
+      padding: 28px 32px;
+      max-width: 1500px;
+    }
+  }
+  .nav-section-label {
+    display: none;
+  }
+  @media (min-width: 768px) {
+    .nav-section-label {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      font-weight: 700;
+      padding: 14px 12px 6px;
+    }
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    border-radius: var(--radius-md);
+    color: var(--text-dim);
+    font-size: 14px;
+    font-weight: 500;
+    transition:
+      background 0.18s,
+      color 0.18s;
+    position: relative;
+    white-space: nowrap;
+  }
+  .nav-item svg {
+    width: 19px;
+    height: 19px;
+    flex-shrink: 0;
+  }
+  .nav-item:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .nav-item.active {
+    background: linear-gradient(
+      135deg,
+      rgba(var(--gold-rgb), 0.16),
+      rgba(var(--gold-rgb), 0.05)
+    );
+    color: var(--gold-bright);
+  }
+  .nav-item.active::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 20px;
+    background: var(--gold);
+    border-radius: 3px;
+  }
 }
