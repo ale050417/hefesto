@@ -1,5 +1,6 @@
 import { NotFoundError, ValidationError } from "@/core/errors";
 import {
+  countOrdersByStatus,
   findOrderById,
   findOrderDetailForAdmin,
   findOrdersForAdmin,
@@ -24,6 +25,7 @@ export async function listOrdersAdmin(opts: {
       id: o.id,
       orderNumber: o.orderNumber,
       customerName: o.customer?.fullName ?? null,
+      paymentMethod: o.paymentMethod,
       total: Number(o.total),
       status: o.status,
       createdAt: o.createdAt,
@@ -65,4 +67,8 @@ export async function transitionOrder(
     }
   }
   return transitionOrderStatus(orderId, toStatus, opts);
+}
+
+export async function getOrderStatusCounts() {
+  return countOrdersByStatus();
 }

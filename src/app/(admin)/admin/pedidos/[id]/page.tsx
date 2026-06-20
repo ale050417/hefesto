@@ -28,6 +28,12 @@ export default async function OrderDetailAdminPage({
       <Link href="/admin/pedidos" className="text-dim hover:text-fg text-sm">
         ← Volver a pedidos
       </Link>
+      <div className="page-head mt-2">
+        <div>
+          <div className="eyebrow">Pedido</div>
+          <h1 className="page-title">{order.orderNumber}</h1>
+        </div>
+      </div>
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_320px]">
         <OrderSummary order={order} />

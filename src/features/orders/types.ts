@@ -21,6 +21,7 @@ export type OrderListItem = {
   id: string;
   orderNumber: string;
   customerName: string | null;
+  paymentMethod: PaymentMethod;
   total: number;
   status: OrderStatus;
   createdAt: Date;

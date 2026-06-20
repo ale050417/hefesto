@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { Pagination } from "@/components/shared/pagination";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import {
   ORDER_STATUS_LABEL,
   ORDER_STATUS_VARIANT,
+  PAYMENT_METHOD_LABEL,
 } from "@/features/orders/constants";
-import { listOrdersAdmin } from "@/features/orders/services/orderAdminService";
+import {
+  getOrderStatusCounts,
+  listOrdersAdmin,
+} from "@/features/orders/services/orderAdminService";
 import type { OrderStatus } from "@/features/orders/types";
 import { formatPrice } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pedidos" };
@@ -36,88 +40,102 @@ export default async function PedidosAdminPage({
   const pageParam = Number(first(sp.page) ?? "1");
   const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
 
-  const result = await listOrdersAdmin({ status, page, pageSize: 20 });
+  const [result, counts] = await Promise.all([
+    listOrdersAdmin({ status, page, pageSize: 20 }),
+    getOrderStatusCounts(),
+  ]);
 
+  const totalAll = Object.values(counts).reduce((a, b) => a + b, 0);
   const baseParams: Record<string, string> = {};
   if (status) baseParams.status = status;
 
-  const field =
-    "rounded-md border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-fg";
+  const chip = (
+    key: OrderStatus | "all",
+    label: string,
+    count: number,
+    active: boolean,
+  ) => (
+    <Link
+      key={key}
+      href={key === "all" ? "/admin/pedidos" : `/admin/pedidos?status=${key}`}
+      className={cn("chip", active && "active")}
+    >
+      {label} <b className="opacity-60">{count}</b>
+    </Link>
+  );
 
   return (
     <div>
-      <div>
-        <p className="eyebrow">Gestión</p>
-        <h1 className="font-display text-fg mt-1 text-2xl">Pedidos</h1>
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">Operación</div>
+          <h1 className="page-title">Pedidos</h1>
+          <div className="page-sub">{totalAll} pedidos en total</div>
+        </div>
       </div>
 
-      <form method="get" className="mt-6 flex flex-wrap gap-2">
-        <select name="status" defaultValue={status ?? ""} className={field}>
-          <option value="">Todos los estados</option>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {ORDER_STATUS_LABEL[s]}
-            </option>
-          ))}
-        </select>
-        <button type="submit" className={buttonVariants({ size: "sm" })}>
-          Filtrar
-        </button>
-      </form>
+      <div className="mb-5 flex flex-wrap gap-2">
+        {chip("all", "Todos", totalAll, !status)}
+        {STATUSES.map((s) =>
+          chip(s, ORDER_STATUS_LABEL[s], counts[s] ?? 0, status === s),
+        )}
+      </div>
 
-      <p className="text-dim mt-4 text-sm">
-        {result.total} {result.total === 1 ? "pedido" : "pedidos"}
-      </p>
-
-      <div className="border-surface-2 mt-3 overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead className="bg-surface-2 text-dim text-left text-xs">
-            <tr>
-              <th className="p-3 font-medium">Pedido</th>
-              <th className="p-3 font-medium">Cliente</th>
-              <th className="p-3 font-medium">Fecha</th>
-              <th className="p-3 font-medium">Total</th>
-              <th className="p-3 font-medium">Estado</th>
-              <th className="p-3 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {result.items.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="text-dim p-6 text-center">
-                  No hay pedidos.
-                </td>
-              </tr>
-            ) : (
-              result.items.map((o) => (
-                <tr key={o.id} className="border-surface-2 border-t">
-                  <td className="text-fg font-display p-3 tracking-wide">
-                    {o.orderNumber}
-                  </td>
-                  <td className="text-dim p-3">{o.customerName ?? "—"}</td>
-                  <td className="text-dim p-3">
-                    {dateFmt.format(o.createdAt)}
-                  </td>
-                  <td className="text-fg p-3">{formatPrice(o.total)}</td>
-                  <td className="p-3">
-                    <Badge variant={ORDER_STATUS_VARIANT[o.status]}>
-                      {ORDER_STATUS_LABEL[o.status]}
-                    </Badge>
-                  </td>
-                  <td className="p-3 text-right">
-                    <Link
-                      href={`/admin/pedidos/${o.id}`}
-                      className="text-primary text-sm hover:underline"
-                    >
-                      Ver
-                    </Link>
-                  </td>
+      {result.items.length === 0 ? (
+        <div className="ui-card text-dim p-10 text-center text-sm">
+          No hay pedidos con este filtro.
+        </div>
+      ) : (
+        <div className="ui-card overflow-hidden">
+          <div className="table-wrap" style={{ border: "none" }}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Pedido</th>
+                  <th>Cliente</th>
+                  <th>Fecha</th>
+                  <th>Pago</th>
+                  <th>Estado</th>
+                  <th className="text-right">Total</th>
+                  <th></th>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {result.items.map((o) => (
+                  <tr key={o.id}>
+                    <td className="font-display text-fg tracking-wide">
+                      {o.orderNumber}
+                    </td>
+                    <td className="text-dim">{o.customerName ?? "—"}</td>
+                    <td className="text-dim whitespace-nowrap">
+                      {dateFmt.format(o.createdAt)}
+                    </td>
+                    <td className="text-dim">
+                      {PAYMENT_METHOD_LABEL[o.paymentMethod]}
+                    </td>
+                    <td>
+                      <Badge variant={ORDER_STATUS_VARIANT[o.status]}>
+                        {ORDER_STATUS_LABEL[o.status]}
+                      </Badge>
+                    </td>
+                    <td className="text-fg text-right">
+                      {formatPrice(o.total)}
+                    </td>
+                    <td className="text-right">
+                      <Link
+                        href={`/admin/pedidos/${o.id}`}
+                        className="text-primary hover:underline"
+                      >
+                        Ver
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <Pagination
         page={result.page}

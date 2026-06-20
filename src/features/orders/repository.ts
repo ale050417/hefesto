@@ -205,3 +205,16 @@ export async function updateOrderMeta(
   if (!row) throw new Error("No se pudo actualizar el pedido");
   return row;
 }
+
+/** Conteo de pedidos por estado (para los chips del panel). */
+export async function countOrdersByStatus(
+  database: Database = db,
+): Promise<Record<string, number>> {
+  const rows = await database
+    .select({ status: orders.status, count: sql<number>`count(*)::int` })
+    .from(orders)
+    .groupBy(orders.status);
+  const map: Record<string, number> = {};
+  for (const r of rows) map[r.status] = r.count;
+  return map;
+}
