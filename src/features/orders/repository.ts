@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/core/db";
 import { orderItems, orderStatusHistory, orders } from "@/core/db/schema";
 import type {
@@ -140,4 +140,53 @@ export async function updateOrderStatus(
 
     return updated;
   });
+}
+
+/** Pedidos para el panel (admin ve todos), con filtro por estado y paginación. */
+export async function findOrdersForAdmin(
+  opts: { status?: OrderStatus; page: number; pageSize: number },
+  database: Database = db,
+): Promise<{
+  items: Array<Order & { customer: { fullName: string | null } | null }>;
+  total: number;
+}> {
+  const where = opts.status ? eq(orders.status, opts.status) : undefined;
+  const offset = (opts.page - 1) * opts.pageSize;
+
+  const [items, totalRows] = await Promise.all([
+    database.query.orders.findMany({
+      where,
+      with: { customer: { columns: { fullName: true } } },
+      orderBy: [desc(orders.createdAt)],
+      limit: opts.pageSize,
+      offset,
+    }),
+    database
+      .select({ count: sql<number>`count(*)::int` })
+      .from(orders)
+      .where(where),
+  ]);
+
+  return { items, total: totalRows[0]?.count ?? 0 };
+}
+
+/** Pedido completo para el panel: ítems, historial y datos del cliente. */
+export async function findOrderDetailForAdmin(
+  id: string,
+  database: Database = db,
+): Promise<
+  | (OrderWithItems & {
+      customer: { fullName: string | null; phone: string | null } | null;
+    })
+  | null
+> {
+  const order = await database.query.orders.findFirst({
+    where: eq(orders.id, id),
+    with: {
+      items: true,
+      history: { orderBy: (h, { asc }) => [asc(h.createdAt)] },
+      customer: { columns: { fullName: true, phone: true } },
+    },
+  });
+  return order ?? null;
 }

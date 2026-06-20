@@ -37,12 +37,15 @@ const PAYMENT_OPTIONS: {
 
 const STEPS = ["Envío", "Pago", "Revisión"] as const;
 
-export function CheckoutStepper() {
+export function CheckoutStepper({ mpEnabled = true }: { mpEnabled?: boolean }) {
   const router = useRouter();
   const mounted = useMounted();
   const items = useCartStore((s) => s.items);
   const subtotal = useCartStore(selectSubtotal);
 
+  const paymentOptions = PAYMENT_OPTIONS.filter(
+    (o) => o.value !== "mercadopago" || mpEnabled,
+  );
   const [step, setStep] = useState(0);
   const [payment, setPayment] = useState<PaymentMethod>("transfer");
   const [submitting, setSubmitting] = useState(false);
@@ -276,7 +279,7 @@ export function CheckoutStepper() {
         {/* Paso 2: pago */}
         {step === 1 ? (
           <div className="space-y-3">
-            {PAYMENT_OPTIONS.map((opt) => (
+            {paymentOptions.map((opt) => (
               <label
                 key={opt.value}
                 className={cn(
@@ -331,7 +334,7 @@ export function CheckoutStepper() {
             <section className="bg-surface-1 border-surface-2 rounded-lg border p-4">
               <h3 className="text-fg mb-1 text-sm font-medium">Pago</h3>
               <p className="text-dim text-sm">
-                {PAYMENT_OPTIONS.find((o) => o.value === payment)?.label}
+                {paymentOptions.find((o) => o.value === payment)?.label}
               </p>
             </section>
             <div className="flex gap-3">

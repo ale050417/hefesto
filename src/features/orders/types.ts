@@ -15,3 +15,13 @@ export type OrderWithItems = Order & {
   items: OrderItem[];
   history: OrderStatusHistory[];
 };
+
+// DTO de vista para la lista de pedidos del admin.
+export type OrderListItem = {
+  id: string;
+  orderNumber: string;
+  customerName: string | null;
+  total: number;
+  status: OrderStatus;
+  createdAt: Date;
+};
