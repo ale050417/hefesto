@@ -5,6 +5,11 @@ import { env } from "@/core/config/env";
 // Adapter: envolvemos el SDK de MercadoPago tras una interfaz propia, para que
 // el resto de la app no dependa directamente del tercero (Cap. 6).
 
+/** True si hay access token de MercadoPago configurado. */
+export function isMercadoPagoConfigured(): boolean {
+  return Boolean(env.MERCADOPAGO_ACCESS_TOKEN);
+}
+
 export type PreferenceItem = {
   title: string;
   quantity: number;
