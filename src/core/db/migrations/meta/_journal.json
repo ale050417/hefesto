@@ -50,6 +50,13 @@
       "when": 1781898262471,
       "tag": "0006_rls_orders",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1781909692724,
+      "tag": "0007_business_settings",
+      "breakpoints": true
     }
   ]
 }

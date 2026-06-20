@@ -10,3 +10,4 @@ export * from "./orders";
 export * from "./order-items";
 export * from "./order-status-history";
 export * from "./order-relations";
+export * from "./business-settings";
