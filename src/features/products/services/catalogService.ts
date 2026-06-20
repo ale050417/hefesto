@@ -366,3 +366,10 @@ export async function deleteCategory(id: string): Promise<void> {
   }
   await deleteCategoryRow(id);
 }
+
+/** Lista de ProductView por ids (favoritos del cliente). */
+export async function listProductsByIds(ids: string[]): Promise<ProductView[]> {
+  const { findByIds } = await import("../repository");
+  const rows = await findByIds(ids);
+  return rows.map(toProductView);
+}

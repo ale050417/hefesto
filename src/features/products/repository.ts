@@ -404,3 +404,19 @@ export async function listCategoriesWithCount(
     .groupBy(categories.id)
     .orderBy(asc(categories.sortOrder), asc(categories.name));
 }
+
+/** Productos publicados por lista de ids (para favoritos). */
+export async function findByIds(
+  ids: string[],
+  database: Database = db,
+): Promise<ProductWithRelations[]> {
+  if (ids.length === 0) return [];
+  return database.query.products.findMany({
+    where: and(eq(products.status, "published"), inArray(products.id, ids)),
+    with: {
+      category: true,
+      images: { orderBy: (img, { asc }) => [asc(img.sortOrder)] },
+      variants: true,
+    },
+  });
+}

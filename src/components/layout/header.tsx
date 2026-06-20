@@ -57,11 +57,16 @@ export async function Header() {
           </Link>
         ) : null}
         {user ? (
-          <form action={logoutAction}>
-            <button type="submit" className="nav-link">
-              Salir
-            </button>
-          </form>
+          <>
+            <Link href="/cuenta" className="nav-link">
+              Mi cuenta
+            </Link>
+            <form action={logoutAction}>
+              <button type="submit" className="nav-link">
+                Salir
+              </button>
+            </form>
+          </>
         ) : (
           <Link href="/ingresar" className="nav-link">
             Ingresar

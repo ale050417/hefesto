@@ -1164,4 +1164,72 @@ body > * {
   table.tbl tbody tr:last-child td {
     border-bottom: none;
   }
+
+  /* Favorito en la card (estilo index) */
+  .prod-fav {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 3;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--surface-1) 80%, transparent);
+    backdrop-filter: blur(6px);
+    display: grid;
+    place-items: center;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    transition:
+      color 0.2s,
+      transform 0.2s;
+  }
+  .prod-fav:hover {
+    color: var(--gold-bright);
+    transform: scale(1.1);
+  }
+  .prod-fav.on {
+    color: var(--danger);
+  }
+
+  /* Cuenta del cliente: tabs + order card */
+  .account-nav {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+    overflow-x: auto;
+  }
+  .account-nav a {
+    padding: 10px 14px;
+    font-size: 14px;
+    color: var(--text-dim);
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition:
+      color 0.2s,
+      border-color 0.2s;
+  }
+  .account-nav a:hover {
+    color: var(--text);
+  }
+  .account-nav a.active {
+    color: var(--gold-bright);
+    border-bottom-color: var(--gold);
+    font-weight: 600;
+  }
+  .order-card {
+    display: block;
+    padding: 18px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-1);
+    transition:
+      border-color 0.25s,
+      box-shadow 0.25s;
+  }
+  .order-card:hover {
+    border-color: rgba(var(--gold-rgb), 0.35);
+    box-shadow: var(--shadow-card);
+  }
 }

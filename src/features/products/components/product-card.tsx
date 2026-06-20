@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { WishlistButton } from "@/features/wishlist/components/wishlist-button";
 import { PriceTag } from "@/components/shared/price-tag";
 import type { ProductView } from "../types";
 
@@ -23,6 +24,7 @@ export function ProductCard({ product }: { product: ProductView }) {
           ) : null}
           {product.isNew ? <Badge variant="info">Nuevo</Badge> : null}
         </div>
+        <WishlistButton productId={product.id} />
       </div>
       <div className="prod-body">
         {product.category ? (

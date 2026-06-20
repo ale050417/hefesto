@@ -40,6 +40,15 @@ export async function requireStaff(): Promise<CurrentUser> {
   return user;
 }
 
+/** Exige sesión (cualquier rol). Si no hay, va al login con redirect. */
+export async function requireUser(
+  redirectTo = "/cuenta",
+): Promise<CurrentUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect(`/ingresar?redirect=${encodeURIComponent(redirectTo)}`);
+  return user;
+}
+
 /** True si el usuario actual es staff (admin/operador). Para guards en actions. */
 export async function isStaff(): Promise<boolean> {
   const user = await getCurrentUser();
