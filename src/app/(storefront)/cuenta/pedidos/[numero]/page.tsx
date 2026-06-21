@@ -4,6 +4,8 @@ import { requireUser } from "@/core/auth/session";
 import { ORDER_STATUS_LABEL } from "@/features/orders/constants";
 import { OrderSummary } from "@/features/orders/components/order-summary";
 import { getOrderForCustomer } from "@/features/orders/services/orderQueries";
+import { getOrderMessages } from "@/features/orders/services/orderChat";
+import { OrderChat } from "@/features/orders/components/order-chat";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +25,7 @@ export default async function MyOrderDetailPage({
   const user = await requireUser(`/cuenta/pedidos/${numero}`);
   const order = await getOrderForCustomer(decodeURIComponent(numero), user.id);
   if (!order) notFound();
+  const messages = await getOrderMessages(order.id);
 
   return (
     <div>
@@ -30,7 +33,19 @@ export default async function MyOrderDetailPage({
         ← Volver a mis pedidos
       </Link>
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_320px]">
-        <OrderSummary order={order} />
+        <div className="space-y-6">
+          <OrderSummary order={order} />
+          <section className="ui-card p-5">
+            <h3 className="text-fg font-display mb-3 text-sm">
+              Mensajes con el taller
+            </h3>
+            <OrderChat
+              orderId={order.id}
+              messages={messages}
+              viewerIsStaff={false}
+            />
+          </section>
+        </div>
         {order.trackingCode || order.history.length > 0 ? (
           <aside className="space-y-4">
             {order.trackingCode ? (

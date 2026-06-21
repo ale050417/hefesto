@@ -5,10 +5,15 @@ import { revalidatePath } from "next/cache";
 import { type ZodError } from "zod";
 import { getCurrentUser, isStaff } from "@/core/auth/session";
 import { recordAudit } from "@/core/audit";
-import { toActionError } from "@/core/errors";
+import {
+  type ActionResult as CoreActionResult,
+  toActionError,
+} from "@/core/errors";
 import { siteUrl } from "@/lib/site";
 import { checkoutSchema, type CheckoutInput } from "./schemas";
+import { messageSchema } from "@/features/custom/schemas";
 import { createOrder } from "./services/orderService";
+import { getOrderCustomerId, sendOrderMessage } from "./services/orderChat";
 import {
   cancelPendingOrder,
   startMercadoPagoPayment,
@@ -141,6 +146,45 @@ export async function updateOrderMetaAction(
   if (!(await isStaff())) return NOT_STAFF;
   try {
     await setOrderMeta(orderId, fields);
+    revalidatePath(`/admin/pedidos/${orderId}`);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+export async function sendOrderMessageAction(
+  orderId: string,
+  input: unknown,
+): Promise<CoreActionResult> {
+  const user = await getCurrentUser();
+  if (!user)
+    return {
+      ok: false,
+      error: { code: "UNAUTHORIZED", message: "Iniciá sesión." },
+    };
+  const parsed = messageSchema.safeParse(input);
+  if (!parsed.success)
+    return {
+      ok: false,
+      error: { code: "VALIDATION", message: "Escribí un mensaje." },
+    };
+  const staff = await isStaff();
+  try {
+    const ownerId = await getOrderCustomerId(orderId);
+    if (!ownerId || (!staff && ownerId !== user.id)) {
+      return {
+        ok: false,
+        error: { code: "NOT_FOUND", message: "No encontrado." },
+      };
+    }
+    await sendOrderMessage({
+      orderId,
+      fromStaff: staff,
+      authorId: user.id,
+      body: parsed.data.body,
+    });
+    revalidatePath(`/cuenta/pedidos`);
     revalidatePath(`/admin/pedidos/${orderId}`);
     return { ok: true };
   } catch (error) {
