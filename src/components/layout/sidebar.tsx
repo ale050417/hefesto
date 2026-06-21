@@ -32,6 +32,18 @@ const icons: Record<string, React.ReactNode> = {
       <path d="M3 6h18M16 10a4 4 0 0 1-8 0" />
     </svg>
   ),
+  filamentos: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="3.2" />
+    </svg>
+  ),
+  fallas: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M10.3 3.8 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z" />
+      <path d="M12 9v4M12 17h.01" />
+    </svg>
+  ),
   auditoria: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -52,6 +64,8 @@ const links = [
   { href: "/admin/productos", label: "Productos", icon: icons.productos },
   { href: "/admin/categorias", label: "Categorías", icon: icons.categorias },
   { href: "/admin/pedidos", label: "Pedidos", icon: icons.pedidos },
+  { href: "/admin/filamentos", label: "Filamentos", icon: icons.filamentos },
+  { href: "/admin/fallas", label: "Fallas", icon: icons.fallas },
   { href: "/admin/apariencia", label: "Apariencia", icon: icons.apariencia },
   { href: "/admin/auditoria", label: "Auditoría", icon: icons.auditoria },
 ];
