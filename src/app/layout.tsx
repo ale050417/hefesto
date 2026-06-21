@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Orbitron, Sora } from "next/font/google";
 import { siteName, siteUrl } from "@/lib/site";
+import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
 const orbitron = Orbitron({
@@ -57,6 +58,7 @@ export default function RootLayout({
           }}
         />
         {children}
+        <Toaster />
       </body>
     </html>
   );

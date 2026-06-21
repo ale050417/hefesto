@@ -1,9 +1,15 @@
+"use client";
+
 import Image from "next/image";
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 type GalleryImage = { url: string; alt: string };
 
 export function ProductGallery({ images }: { images: GalleryImage[] }) {
-  const main = images[0];
+  const [active, setActive] = useState(0);
+  const main = images[active] ?? images[0];
+
   return (
     <div>
       <div className="border-surface-2 bg-surface-2 relative aspect-square overflow-hidden rounded-lg border">
@@ -21,9 +27,17 @@ export function ProductGallery({ images }: { images: GalleryImage[] }) {
       {images.length > 1 ? (
         <div className="mt-3 grid grid-cols-4 gap-2">
           {images.map((img, i) => (
-            <div
+            <button
               key={i}
-              className="border-surface-2 bg-surface-2 relative aspect-square overflow-hidden rounded-md border"
+              type="button"
+              onClick={() => setActive(i)}
+              aria-label={`Ver imagen ${i + 1}`}
+              className={cn(
+                "bg-surface-2 relative aspect-square overflow-hidden rounded-md border-2 transition-colors",
+                i === active
+                  ? "border-[var(--gold)]"
+                  : "border-surface-2 hover:border-surface-3",
+              )}
             >
               <Image
                 src={img.url}
@@ -32,7 +46,7 @@ export function ProductGallery({ images }: { images: GalleryImage[] }) {
                 sizes="120px"
                 className="object-cover"
               />
-            </div>
+            </button>
           ))}
         </div>
       ) : null}

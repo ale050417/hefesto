@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { getCurrentUser } from "@/core/auth/session";
 import { PriceTag } from "@/components/shared/price-tag";
 import { Badge } from "@/components/ui/badge";
 import { AddToCart } from "@/features/cart/components/add-to-cart";
 import { ProductGallery } from "@/features/products/components/product-gallery";
 import { ProductGrid } from "@/features/products/components/product-grid";
+import { ProductReviews } from "@/features/reviews/components/product-reviews";
+import { getProductReviewsFor } from "@/features/reviews/service";
 import {
   getProductBySlug,
   getRelatedProducts,
@@ -40,6 +43,8 @@ export default async function ProductPage({ params }: Params) {
   if (!product) notFound();
 
   const related = await getRelatedProducts(slug);
+  const user = await getCurrentUser();
+  const reviews = await getProductReviewsFor(product.id, user?.id ?? null);
 
   const specs: { label: string; value: string }[] = [];
   if (product.material)
@@ -158,6 +163,15 @@ export default async function ProductPage({ params }: Params) {
           </p>
         </div>
       </div>
+
+      <ProductReviews
+        productId={product.id}
+        slug={product.slug}
+        stats={reviews.stats}
+        items={reviews.items}
+        canReview={Boolean(user)}
+        alreadyReviewed={reviews.alreadyReviewed}
+      />
 
       {related.length > 0 ? (
         <section className="mt-16">
