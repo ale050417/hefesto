@@ -38,6 +38,12 @@ const icons: Record<string, React.ReactNode> = {
       <circle cx="12" cy="12" r="3.2" />
     </svg>
   ),
+  produccion: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M6 9V3h12v6M6 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1" />
+      <rect x="7" y="14" width="10" height="7" rx="1" />
+    </svg>
+  ),
   fallas: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M10.3 3.8 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z" />
@@ -110,6 +116,7 @@ const links = [
   { href: "/admin/clientes", label: "Clientes", icon: icons.clientes },
   { href: "/admin/filamentos", label: "Filamentos", icon: icons.filamentos },
   { href: "/admin/fallas", label: "Fallas", icon: icons.fallas },
+  { href: "/admin/produccion", label: "Producción", icon: icons.produccion },
   { href: "/admin/descuentos", label: "Descuentos", icon: icons.descuentos },
   { href: "/admin/reportes", label: "Reportes", icon: icons.reportes },
   { href: "/admin/calculadora", label: "Calculadora", icon: icons.calculadora },
