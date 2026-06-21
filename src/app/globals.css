@@ -1860,10 +1860,10 @@ body > * {
 
   /* Búsqueda central tipo pill */
   .store-search-wrap {
-    flex: 1;
+    flex: 1 1 auto;
     min-width: 0;
-    max-width: 460px;
-    margin: 0 6px;
+    max-width: 640px;
+    margin: 0 auto;
   }
   .store-search {
     position: relative;
@@ -1895,8 +1895,8 @@ body > * {
     background: transparent;
     border: 0;
     outline: none;
-    padding: 10px 16px 10px 10px;
-    font-size: 14px;
+    padding: 12px 18px 12px 10px;
+    font-size: 14.5px;
     color: var(--text);
   }
   .ss-input::placeholder {
