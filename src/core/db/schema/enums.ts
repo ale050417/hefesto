@@ -40,3 +40,19 @@ export const customRequestStatus = pgEnum("custom_request_status", [
   "done",
   "rejected",
 ]);
+
+// Estado de una impresora.
+export const printerStatus = pgEnum("printer_status", [
+  "idle",
+  "printing",
+  "maintenance",
+  "offline",
+]);
+
+// Estado de un trabajo de impresión.
+export const printJobStatus = pgEnum("print_job_status", [
+  "queued",
+  "printing",
+  "done",
+  "failed",
+]);

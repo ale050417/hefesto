@@ -154,4 +154,23 @@ Migración `printers`/`print_jobs`. RLS solo staff.
 ### Aún a evaluar (🔵, fuera del plan por ahora)
 
 Ganancias y socios, gestión de roles por UI, superadmin/multi-tenant, importar
-ventas, banne
+ventas, banners/pricing dinámico.
+
+---
+
+## Progreso de ejecución — FASE 9.5 COMPLETA ✅
+
+- **9.5.0 Base de UI** ✅ — Modal, Toaster + `toast()`, Dropdown.
+- **9.5.1 Detalle de producto** ✅ — galería con miniaturas + relacionados.
+- **9.5.2 Reseñas** ✅ — `0013_reviews` (RLS), feature `reviews` + moderación.
+- **9.5.3 Pedidos a medida + chat** ✅ — `0014_custom_requests` (RLS), máquina de estados + tests, cliente y admin.
+- **9.5.4 Chat por pedido** ✅ — `0015_order_messages` (RLS), `OrderChat` en cuenta y admin. pglite 4/4.
+- **9.5.5 Notificaciones** ✅ — `0016_notifications` (RLS), campana en el header, se generan al cambiar el estado del pedido. pglite 4/4.
+- **9.5.6 Admin: Clientes** ✅ — `/admin/clientes` (listado + gasto) y ficha de detalle. Sin migración.
+- **9.5.7 Configuración** ✅ — `0017_business_info` (amplía `business_settings`), panel `/admin/configuracion`; el WhatsApp del FAB sale de acá.
+- **9.5.8 Pulidos** ✅ — cambiar contraseña en la cuenta + buscador con resultados en vivo.
+- **9.5.9 Recompensas/puntos** ✅ — `0018_rewards` (RLS), lógica pura (1 punto/$100) + tests, se otorgan al pagar; `/cuenta/puntos`. pglite 3/3. (Canje en checkout = mejora futura.)
+- **9.5.10 Calculadora 3D** ✅ — `computePrintPrice` puro + tests; `/admin/calculadora`. Sin migración.
+- **9.5.11 Cola de impresión** ✅ — `0019_printing` (`printers`/`print_jobs` + RLS solo-staff), `/admin/produccion`. pglite 6/6.
+
+Cierre: migraciones hasta **0019**, **74 tests**, build OK. Diseño del header/storefront según preferencia del dueño (no las capturas), conservando todas las funcionalidades.
