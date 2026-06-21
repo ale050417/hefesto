@@ -5,6 +5,7 @@ import { getBrandSettings } from "@/features/settings/service";
 import { CartButton } from "@/features/cart/components/cart-button";
 import { logoutAction } from "@/features/auth/actions";
 import { SearchBox } from "@/features/products/components/search-box";
+import { AuthTrigger } from "@/features/auth/components/auth-trigger";
 import { BrandMark } from "./brand-mark";
 import { StoreNav } from "./store-nav";
 import { ThemeSwitcher } from "./theme-switcher";
@@ -108,20 +109,7 @@ export async function Header() {
             </form>
           </>
         ) : (
-          <Link href="/ingresar" className="store-cta">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              width="15"
-              height="15"
-            >
-              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-              <path d="m10 17 5-5-5-5M15 12H3" />
-            </svg>
-            Iniciar sesión
-          </Link>
+          <AuthTrigger />
         )}
       </div>
     </header>
