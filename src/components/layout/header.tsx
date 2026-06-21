@@ -54,8 +54,8 @@ export async function Header() {
       <div className="store-actions ml-auto">
         <ThemeSwitcher />
         <FavButton />
-        <CartButton />
         {user ? <NotificationBell /> : null}
+        <CartButton />
 
         {isStaff ? (
           <Link
@@ -69,32 +69,12 @@ export async function Header() {
 
         {user ? (
           <>
-            <Link
-              href="/cuenta/pedidos"
-              className="store-nav-link hidden md:inline-flex"
-            >
-              Mis pedidos
-            </Link>
             <Link href="/cuenta" className="store-nav-link">
               Mi cuenta
             </Link>
             <form action={logoutAction}>
-              <button
-                type="submit"
-                className="icon-btn"
-                aria-label="Cerrar sesión"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  width="17"
-                  height="17"
-                >
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <path d="m16 17 5-5-5-5M21 12H9" />
-                </svg>
+              <button type="submit" className="store-nav-link">
+                Salir
               </button>
             </form>
           </>
