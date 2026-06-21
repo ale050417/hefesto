@@ -6,6 +6,7 @@ import { CartButton } from "@/features/cart/components/cart-button";
 import { logoutAction } from "@/features/auth/actions";
 import { SearchBox } from "@/features/products/components/search-box";
 import { AuthTrigger } from "@/features/auth/components/auth-trigger";
+import { FavButton } from "@/features/wishlist/components/fav-button";
 import { BrandMark } from "./brand-mark";
 import { StoreNav } from "./store-nav";
 import { ThemeSwitcher } from "./theme-switcher";
@@ -52,20 +53,7 @@ export async function Header() {
       <div className="store-actions ml-auto">
         <ThemeSwitcher />
 
-        <Link
-          href="/cuenta/favoritos"
-          className="icon-btn"
-          aria-label="Favoritos"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 0 0-7.1 7.1l1.7 1.7L12 21.5l7.1-7.1 1.7-1.7a5 5 0 0 0 0-7.1z" />
-          </svg>
-        </Link>
+        <FavButton />
 
         <CartButton />
 

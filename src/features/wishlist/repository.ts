@@ -40,3 +40,12 @@ export async function removeWishlistItem(
       ),
     );
 }
+
+export async function clearWishlist(
+  customerId: string,
+  database: Database = db,
+): Promise<void> {
+  await database
+    .delete(wishlistItems)
+    .where(eq(wishlistItems.customerId, customerId));
+}

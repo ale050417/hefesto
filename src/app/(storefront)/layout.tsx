@@ -5,6 +5,7 @@ import { ToTop } from "@/components/layout/to-top";
 import { TopBanner } from "@/components/layout/top-banner";
 import { CartDrawer } from "@/features/cart/components/cart-drawer";
 import { AuthModal } from "@/features/auth/components/auth-modal";
+import { FavDrawer } from "@/features/wishlist/components/fav-drawer";
 import { WishlistLoader } from "@/features/wishlist/components/wishlist-loader";
 
 export default function StorefrontLayout({
@@ -20,6 +21,7 @@ export default function StorefrontLayout({
       <Footer />
       <CartDrawer />
       <AuthModal />
+      <FavDrawer />
       <WishlistLoader />
       <ToTop />
     </div>

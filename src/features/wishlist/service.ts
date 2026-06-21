@@ -2,6 +2,7 @@ import { listProductsByIds } from "@/features/products/services/catalogService";
 import type { ProductView } from "@/features/products/types";
 import {
   addWishlistItem,
+  clearWishlist as clearWishlistRepo,
   listWishlistIds,
   removeWishlistItem,
 } from "./repository";
@@ -24,4 +25,8 @@ export async function removeFromWishlist(
   productId: string,
 ) {
   return removeWishlistItem(customerId, productId);
+}
+
+export async function clearWishlist(customerId: string) {
+  return clearWishlistRepo(customerId);
 }

@@ -7,6 +7,10 @@ type UiState = {
   openCart: () => void;
   closeCart: () => void;
 
+  favOpen: boolean;
+  openFav: () => void;
+  closeFav: () => void;
+
   authOpen: boolean;
   authMode: AuthMode;
   openAuth: (mode?: AuthMode) => void;
@@ -18,6 +22,10 @@ export const useUiStore = create<UiState>((set) => ({
   cartOpen: false,
   openCart: () => set({ cartOpen: true }),
   closeCart: () => set({ cartOpen: false }),
+
+  favOpen: false,
+  openFav: () => set({ favOpen: true }),
+  closeFav: () => set({ favOpen: false }),
 
   authOpen: false,
   authMode: "login",
