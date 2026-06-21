@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
 import { ToTop } from "@/components/layout/to-top";
+import { WhatsappFab } from "@/components/layout/whatsapp-fab";
 import { TopBanner } from "@/components/layout/top-banner";
 import { CartDrawer } from "@/features/cart/components/cart-drawer";
 import { AuthModal } from "@/features/auth/components/auth-modal";
@@ -24,6 +25,7 @@ export default function StorefrontLayout({
       <FavDrawer />
       <WishlistLoader />
       <ToTop />
+      <WhatsappFab />
     </div>
   );
 }

@@ -478,8 +478,8 @@ body > * {
     height: 64px;
     display: flex;
     align-items: center;
-    gap: 18px;
-    padding: 0 22px;
+    gap: 14px;
+    padding: 0 20px;
     background: color-mix(in srgb, var(--bg) 82%, transparent);
     backdrop-filter: blur(14px);
     border-bottom: 1px solid var(--border);
@@ -488,6 +488,7 @@ body > * {
     display: flex;
     align-items: center;
     gap: 11px;
+    flex-shrink: 0;
   }
   .brand-name {
     font-family: var(--font-display), sans-serif;
@@ -1831,6 +1832,9 @@ body > * {
       display: inline-flex;
     }
   }
+  .store-nav {
+    flex-shrink: 0;
+  }
   .store-nav-link {
     display: inline-flex;
     align-items: center;
@@ -1907,7 +1911,8 @@ body > * {
   .store-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
+    flex-shrink: 0;
   }
   /* Los icon-btn del header son "ghost" (sin borde, hover suave) */
   .topbar .icon-btn {

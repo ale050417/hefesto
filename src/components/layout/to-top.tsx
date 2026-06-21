@@ -17,7 +17,7 @@ export function ToTop() {
       type="button"
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       aria-label="Volver arriba"
-      className="bg-primary text-primary-fg fixed right-5 bottom-5 z-[250] grid h-11 w-11 place-items-center rounded-full shadow-lg"
+      className="bg-primary text-primary-fg fixed right-5 bottom-[5.25rem] z-[250] grid h-11 w-11 place-items-center rounded-full shadow-lg"
     >
       ↑
     </button>
