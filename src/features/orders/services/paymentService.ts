@@ -3,6 +3,7 @@ import type {
   CreatedPreference,
 } from "@/core/payments/mercadopago";
 import type { Order, OrderWithItems } from "../types";
+import { awardForOrder } from "@/features/rewards/service";
 import { OrderError } from "./orderService";
 
 export type StartPaymentResult = { redirectUrl: string; preferenceId: string };
@@ -94,13 +95,23 @@ export async function confirmOrderPayment(
   if (!order) throw new OrderError("NOT_FOUND", "No encontramos el pedido.");
   if (order.status !== "pending_payment") return order;
 
-  return deps.markPaid({
+  const updated = await deps.markPaid({
     orderId: order.id,
     fromStatus: "pending_payment",
     toStatus: "confirmed",
     paidAt: new Date(),
     note: "Pago aprobado (MercadoPago)",
   });
+  try {
+    await awardForOrder({
+      customerId: updated.customerId,
+      orderId: updated.id,
+      orderTotal: Number(updated.total),
+    });
+  } catch (e) {
+    console.error("[rewards] no se pudieron otorgar puntos:", e);
+  }
+  return updated;
 }
 
 // Cancela un pedido que quedó pendiente porque el pago nunca se inició (evita

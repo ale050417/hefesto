@@ -9,6 +9,7 @@ const tabs = [
   { href: "/cuenta/perfil", label: "Perfil y direcciones" },
   { href: "/cuenta/a-medida", label: "A medida" },
   { href: "/cuenta/favoritos", label: "Favoritos" },
+  { href: "/cuenta/puntos", label: "Puntos" },
 ];
 
 export function AccountNav() {

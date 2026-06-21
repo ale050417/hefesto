@@ -14,6 +14,9 @@ import { checkoutSchema, type CheckoutInput } from "./schemas";
 import { messageSchema } from "@/features/custom/schemas";
 import { createOrder } from "./services/orderService";
 import { getOrderCustomerId, sendOrderMessage } from "./services/orderChat";
+import { notifyCustomer } from "@/features/notifications/service";
+import { awardForOrder } from "@/features/rewards/service";
+import { ORDER_STATUS_LABEL } from "./constants";
 import {
   cancelPendingOrder,
   startMercadoPagoPayment,
@@ -120,6 +123,27 @@ export async function transitionOrderAction(
       await notifyOrderStatus(updated);
     } catch (mailError) {
       console.error("[email] no se pudo notificar el estado:", mailError);
+    }
+    try {
+      await notifyCustomer({
+        customerId: updated.customerId,
+        title: `Tu pedido ${updated.orderNumber} cambió de estado`,
+        body: `Ahora está: ${ORDER_STATUS_LABEL[updated.status]}.`,
+        link: `/cuenta/pedidos/${updated.orderNumber}`,
+      });
+    } catch (notifError) {
+      console.error("[notif] no se pudo crear la notificación:", notifError);
+    }
+    if (updated.status === "confirmed") {
+      try {
+        await awardForOrder({
+          customerId: updated.customerId,
+          orderId: updated.id,
+          orderTotal: Number(updated.total),
+        });
+      } catch (rwErr) {
+        console.error("[rewards] no se pudieron otorgar puntos:", rwErr);
+      }
     }
     revalidatePath(`/admin/pedidos/${orderId}`);
     revalidatePath("/admin/pedidos");

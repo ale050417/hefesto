@@ -11,6 +11,8 @@ export * from "./order-items";
 export * from "./order-status-history";
 export * from "./order-relations";
 export * from "./order-messages";
+export * from "./notifications";
+export * from "./point-transactions";
 export * from "./business-settings";
 export * from "./audit-log";
 export * from "./addresses";
