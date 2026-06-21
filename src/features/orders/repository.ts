@@ -1,6 +1,12 @@
 import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/core/db";
-import { orderItems, orderStatusHistory, orders } from "@/core/db/schema";
+import {
+  couponRedemptions,
+  coupons,
+  orderItems,
+  orderStatusHistory,
+  orders,
+} from "@/core/db/schema";
 import type {
   NewOrder,
   NewOrderItem,
@@ -18,6 +24,7 @@ type Database = typeof db;
 export type CreateOrderInput = {
   order: NewOrder;
   items: Array<Omit<NewOrderItem, "orderId">>;
+  redeemCoupon?: { couponId: string };
 };
 
 /**
@@ -47,6 +54,19 @@ export async function createOrder(
       changedBy: created.customerId,
       note: "Pedido creado",
     });
+
+    // Canje del cupón (atómico): suma un uso y registra el canje.
+    if (input.redeemCoupon) {
+      await tx
+        .update(coupons)
+        .set({ usedCount: sql`${coupons.usedCount} + 1` })
+        .where(eq(coupons.id, input.redeemCoupon.couponId));
+      await tx.insert(couponRedemptions).values({
+        couponId: input.redeemCoupon.couponId,
+        orderId: created.id,
+        customerId: created.customerId,
+      });
+    }
 
     return created;
   });

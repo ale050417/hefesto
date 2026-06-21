@@ -42,6 +42,7 @@ export function CheckoutStepper({ mpEnabled = true }: { mpEnabled?: boolean }) {
   const mounted = useMounted();
   const items = useCartStore((s) => s.items);
   const subtotal = useCartStore(selectSubtotal);
+  const appliedCoupon = useCartStore((s) => s.appliedCoupon);
 
   const paymentOptions = PAYMENT_OPTIONS.filter(
     (o) => o.value !== "mercadopago" || mpEnabled,
@@ -108,6 +109,7 @@ export function CheckoutStepper({ mpEnabled = true }: { mpEnabled?: boolean }) {
       })),
       paymentMethod: payment,
       shippingAddress: getValues(),
+      ...(appliedCoupon ? { couponCode: appliedCoupon.code } : {}),
     });
     if (!res.ok) {
       setFormError(res.error.message);
@@ -373,9 +375,27 @@ export function CheckoutStepper({ mpEnabled = true }: { mpEnabled?: boolean }) {
             </li>
           ))}
         </ul>
-        <div className="border-surface-2 mt-3 flex justify-between border-t pt-3 text-sm">
-          <span className="text-dim">Subtotal</span>
-          <span className="text-fg font-medium">{formatPrice(subtotal)}</span>
+        <div className="border-surface-2 mt-3 space-y-1 border-t pt-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-dim">Subtotal</span>
+            <span className="text-fg">{formatPrice(subtotal)}</span>
+          </div>
+          {appliedCoupon ? (
+            <div className="flex justify-between">
+              <span className="text-dim">Cupón {appliedCoupon.code}</span>
+              <span className="text-success">
+                -{formatPrice(appliedCoupon.discount)}
+              </span>
+            </div>
+          ) : null}
+          <div className="flex justify-between text-base font-medium">
+            <span className="text-fg">Total</span>
+            <span className="text-fg">
+              {formatPrice(
+                Math.max(0, subtotal - (appliedCoupon?.discount ?? 0)),
+              )}
+            </span>
+          </div>
         </div>
         <p className="text-dim mt-2 text-xs">
           El total final se confirma al crear el pedido.

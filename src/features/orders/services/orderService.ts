@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
 import { AppError, type ErrorCode } from "@/core/errors";
+import { validateCoupon } from "@/features/discounts/service";
+import type { Coupon } from "@/features/discounts/types";
 import type { ProductDetailView } from "@/features/products/types";
 import type { CreateOrderInput } from "../repository";
 import type { CheckoutInput } from "../schemas";
@@ -22,6 +24,7 @@ export class OrderError extends AppError {
 // que los tests unitarios no arrastren la conexión a la base.
 export type OrderServiceDeps = {
   getProduct: (slug: string) => Promise<ProductDetailView | null>;
+  getCoupon: (code: string) => Promise<Coupon | null>;
   persist: (input: CreateOrderInput) => Promise<Order>;
   generateOrderNumber: () => string;
 };
@@ -30,6 +33,10 @@ const defaultDeps: OrderServiceDeps = {
   getProduct: (slug) =>
     import("@/features/products/services/catalogService").then((m) =>
       m.getProductBySlug(slug),
+    ),
+  getCoupon: (code) =>
+    import("@/features/discounts/repository").then((m) =>
+      m.findByCode(code.trim().toUpperCase()),
     ),
   persist: (input) => import("../repository").then((m) => m.createOrder(input)),
   generateOrderNumber: () =>
@@ -116,7 +123,18 @@ export async function createOrder(
     });
   }
 
-  const discountAmount = 0; // Cupones: Fase 8.
+  // Cupón: se revalida en el servidor contra el subtotal recalculado.
+  let discountAmount = 0;
+  let couponId: string | null = null;
+  if (params.couponCode) {
+    const coupon = await deps.getCoupon(params.couponCode);
+    if (!coupon) throw new OrderError("INVALID_COUPON", "El cupón no existe.");
+    const result = validateCoupon(coupon, subtotal);
+    if (!result.valid) throw new OrderError("INVALID_COUPON", result.reason);
+    discountAmount = result.discount;
+    couponId = coupon.id;
+  }
+
   const total = round2(subtotal - discountAmount);
 
   return deps.persist({
@@ -129,7 +147,9 @@ export async function createOrder(
       total: money(total),
       paymentMethod: params.paymentMethod,
       shippingAddress: params.shippingAddress,
+      couponId,
     },
     items: lines,
+    ...(couponId ? { redeemCoupon: { couponId } } : {}),
   });
 }

@@ -50,6 +50,7 @@ function makeDeps(products: Record<string, ProductDetailView | null>) {
   );
   const deps: OrderServiceDeps = {
     getProduct: async (slug) => products[slug] ?? null,
+    getCoupon: async () => null,
     persist,
     generateOrderNumber: () => "HEF-TEST-0001",
   };
@@ -272,5 +273,47 @@ describe("createOrder", () => {
     const { deps, persist } = makeDeps({ dragon: null });
     await expect(createOrder(params(), deps)).rejects.toThrow();
     expect(persist).not.toHaveBeenCalled();
+  });
+
+  it("aplica un cupón válido (descuento y total)", async () => {
+    const { deps, persist } = makeDeps({
+      dragon: makeProduct({ effectivePrice: 1000 }),
+    });
+    deps.getCoupon = async () =>
+      ({
+        id: "c1",
+        type: "percentage",
+        value: "10",
+        minPurchase: "0",
+        maxUses: null,
+        usedCount: 0,
+        startsAt: null,
+        expiresAt: null,
+        isActive: true,
+      }) as unknown as Awaited<ReturnType<typeof deps.getCoupon>>;
+
+    await createOrder(
+      params({
+        couponCode: "DESC10",
+        items: [
+          { productId: "p1", slug: "dragon", variantId: null, quantity: 2 },
+        ],
+      }),
+      deps,
+    );
+
+    const input = persist.mock.calls[0]![0];
+    expect(input.order.subtotal).toBe("2000.00");
+    expect(input.order.discountAmount).toBe("200.00");
+    expect(input.order.total).toBe("1800.00");
+    expect(input.redeemCoupon).toEqual({ couponId: "c1" });
+  });
+
+  it("rechaza un cupón inexistente", async () => {
+    const { deps } = makeDeps({ dragon: makeProduct() });
+    deps.getCoupon = async () => null;
+    await expect(
+      createOrder(params({ couponCode: "NOPE" }), deps),
+    ).rejects.toMatchObject({ code: "INVALID_COUPON" });
   });
 });

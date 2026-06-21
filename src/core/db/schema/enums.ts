@@ -27,3 +27,6 @@ export const paymentMethod = pgEnum("payment_method", [
   "mercadopago",
   "cash",
 ]);
+
+// Tipo de cupón (Strategy: % o monto fijo).
+export const couponType = pgEnum("coupon_type", ["percentage", "fixed"]);

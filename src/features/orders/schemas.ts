@@ -24,6 +24,7 @@ export const checkoutSchema = z.object({
   items: z.array(checkoutLineSchema).min(1, "El carrito está vacío."),
   paymentMethod: z.enum(["transfer", "mercadopago", "cash"]),
   shippingAddress: shippingAddressSchema,
+  couponCode: z.string().trim().optional(),
 });
 
 export type CheckoutInput = z.infer<typeof checkoutSchema>;

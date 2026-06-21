@@ -12,8 +12,11 @@ export type CartItem = {
   quantity: number;
 };
 
+export type AppliedCoupon = { code: string; discount: number };
+
 type CartState = {
   items: CartItem[];
+  appliedCoupon: AppliedCoupon | null;
   addItem: (item: Omit<CartItem, "quantity">, quantity?: number) => void;
   removeItem: (productId: string, variantId: string | null) => void;
   setQuantity: (
@@ -21,6 +24,7 @@ type CartState = {
     variantId: string | null,
     quantity: number,
   ) => void;
+  setCoupon: (coupon: AppliedCoupon | null) => void;
   clear: () => void;
 };
 
@@ -36,6 +40,7 @@ export const useCartStore = create<CartState>()(
   persist(
     (set) => ({
       items: [],
+      appliedCoupon: null,
       addItem: (item, quantity = 1) =>
         set((state) => {
           const exists = state.items.some((i) =>
@@ -58,6 +63,7 @@ export const useCartStore = create<CartState>()(
             (i) => !isSameLine(i, productId, variantId),
           ),
         })),
+      setCoupon: (coupon) => set({ appliedCoupon: coupon }),
       setQuantity: (productId, variantId, quantity) =>
         set((state) => {
           if (quantity <= 0) {
@@ -73,7 +79,7 @@ export const useCartStore = create<CartState>()(
             ),
           };
         }),
-      clear: () => set({ items: [] }),
+      clear: () => set({ items: [], appliedCoupon: null }),
     }),
     { name: "hefesto-cart" },
   ),

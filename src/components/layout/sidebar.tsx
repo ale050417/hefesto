@@ -44,6 +44,12 @@ const icons: Record<string, React.ReactNode> = {
       <path d="M12 9v4M12 17h.01" />
     </svg>
   ),
+  descuentos: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M9 9h.01M15 15h.01M16 8 8 16" />
+      <path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-3a2 2 0 0 0 0-4z" />
+    </svg>
+  ),
   auditoria: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -66,6 +72,7 @@ const links = [
   { href: "/admin/pedidos", label: "Pedidos", icon: icons.pedidos },
   { href: "/admin/filamentos", label: "Filamentos", icon: icons.filamentos },
   { href: "/admin/fallas", label: "Fallas", icon: icons.fallas },
+  { href: "/admin/descuentos", label: "Descuentos", icon: icons.descuentos },
   { href: "/admin/apariencia", label: "Apariencia", icon: icons.apariencia },
   { href: "/admin/auditoria", label: "Auditoría", icon: icons.auditoria },
 ];

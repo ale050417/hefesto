@@ -9,6 +9,7 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
+import { coupons } from "./coupons";
 import { orderStatus, paymentMethod } from "./enums";
 import { profiles } from "./profiles";
 
@@ -27,6 +28,9 @@ export const orders = pgTable(
     discountAmount: numeric("discount_amount", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
+    couponId: uuid("coupon_id").references(() => coupons.id, {
+      onDelete: "set null",
+    }),
     total: numeric("total", { precision: 12, scale: 2 }).notNull(),
     paymentMethod: paymentMethod("payment_method").notNull(),
     shippingAddress: jsonb("shipping_address"),
