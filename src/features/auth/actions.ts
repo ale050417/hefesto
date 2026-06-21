@@ -1,5 +1,8 @@
 "use server";
 
+import { z } from "zod";
+import { getCurrentUser } from "@/core/auth/session";
+
 import { redirect } from "next/navigation";
 import { rateLimit } from "@/core/security/rate-limit";
 import { getClientIp } from "@/core/security/request";
@@ -72,5 +75,32 @@ export async function requestPasswordResetAction(
   await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: `${siteUrl}/ingresar`,
   });
+  return { ok: true };
+}
+
+const changePasswordSchema = z
+  .object({
+    password: z.string().min(8, "Mínimo 8 caracteres"),
+    confirmPassword: z.string().min(1, "Repetí la contraseña"),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    message: "Las contraseñas no coinciden",
+    path: ["confirmPassword"],
+  });
+
+export async function changePasswordAction(input: unknown): Promise<Result> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Iniciá sesión." };
+  const ip = await getClientIp();
+  if (!rateLimit(`changepw:${ip}`, { limit: 5, windowMs: 60_000 }).ok) {
+    return TOO_MANY;
+  }
+  const parsed = changePasswordSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Revisá los datos" };
+  const supabase = await createClient();
+  const { error } = await supabase.auth.updateUser({
+    password: parsed.data.password,
+  });
+  if (error) return { ok: false, error: "No se pudo cambiar la contraseña." };
   return { ok: true };
 }

@@ -1,6 +1,7 @@
 import { requireUser } from "@/core/auth/session";
 import { AddressManager } from "@/features/customers/components/address-manager";
 import { ProfileForm } from "@/features/customers/components/profile-form";
+import { ChangePasswordForm } from "@/features/auth/components/change-password-form";
 import { getAccount } from "@/features/customers/service";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +18,7 @@ export default async function ProfilePage() {
         phone={profile?.phone ?? ""}
       />
       <AddressManager addresses={addresses} />
+      <ChangePasswordForm />
     </div>
   );
 }

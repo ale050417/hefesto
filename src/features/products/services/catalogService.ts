@@ -84,6 +84,21 @@ export function toProductView(p: ProductWithRelations): ProductView {
 }
 
 /** Catálogo público: productos publicados con filtros, orden y paginación. */
+export async function quickSearch(
+  q: string,
+  limit = 6,
+): Promise<ProductView[]> {
+  const term = q.trim();
+  if (term.length < 2) return [];
+  const { items } = await findPublished({
+    q: term,
+    sort: "newest",
+    page: 1,
+    pageSize: limit,
+  });
+  return items.map(toProductView);
+}
+
 export async function listProducts(
   filter: ProductFilter,
 ): Promise<CatalogPage> {
