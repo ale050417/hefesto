@@ -30,3 +30,13 @@ export const paymentMethod = pgEnum("payment_method", [
 
 // Tipo de cupón (Strategy: % o monto fijo).
 export const couponType = pgEnum("coupon_type", ["percentage", "fixed"]);
+
+// Estado de un pedido a medida.
+export const customRequestStatus = pgEnum("custom_request_status", [
+  "pending",
+  "quoted",
+  "approved",
+  "in_production",
+  "done",
+  "rejected",
+]);

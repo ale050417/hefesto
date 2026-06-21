@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const tabs = [
   { href: "/cuenta/pedidos", label: "Mis pedidos" },
   { href: "/cuenta/perfil", label: "Perfil y direcciones" },
+  { href: "/cuenta/a-medida", label: "A medida" },
   { href: "/cuenta/favoritos", label: "Favoritos" },
 ];
 

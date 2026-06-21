@@ -20,12 +20,12 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta · 🔵 a evaluar (feature avanz
 | Home con todas las secciones              | ✅     | Hero, banda, categorías, nuevos, números, ofertas, materiales, más vendidos, galería, cómo funciona, testimonios, FAQ, newsletter |
 | Catálogo con filtros + orden              | ✅     | Categoría, precio, material, novedad/oferta, sort                                                                                 |
 | **Buscador**                              | 🟡     | Hay buscador básico (header → /catalogo?q). Falta **overlay con resultados en vivo** (como el demo)                               |
-| Detalle de producto                       | 🟡     | Falta **selector de color**, **galería con miniaturas**, **productos relacionados**, **reseñas**                                  |
+| Detalle de producto                       | ✅     | 9.5.1/9.5.2 — galería con miniaturas + relacionados + reseñas (falta selector de color opcional)                                  |
 | Carrito (drawer) + cupón                  | ✅     | Cantidades, cupón, subtotal                                                                                                       |
 | Checkout (3 pasos)                        | ✅     | Envío → pago → confirmación                                                                                                       |
-| **Reseñas de productos**                  | ❌     | Estrellas + comentarios; escribir reseña; ver en el detalle                                                                       |
-| **Pedidos "A medida"** (solicitud custom) | ❌     | Pedir presupuesto con descripción + imagen de referencia; estado; cotización; pagar                                               |
-| **Chat** (en pedido y en pedido a medida) | ❌     | Mensajería cliente ↔ taller                                                                                                       |
+| **Reseñas de productos**                  | ✅     | Estrellas + comentarios; escribir reseña; ver en el detalle                                                                       |
+| **Pedidos "A medida"** (solicitud custom) | ✅     | Pedir presupuesto con descripción + imagen de referencia; estado; cotización; pagar                                               |
+| **Chat** (en pedido y en pedido a medida) | 🟡     | Mensajería cliente ↔ taller                                                                                                       |
 | **Notificaciones del cliente** (campana)  | ❌     | Listado de avisos (pedido confirmado, listo, etc.)                                                                                |
 | WhatsApp flotante                         | ❌     | Botón flotante de contacto                                                                                                        |
 | Volver arriba / banner promo / tema       | ✅     | Hechos en la tanda de paridad                                                                                                     |
@@ -39,7 +39,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta · 🔵 a evaluar (feature avanz
 | Perfil + direcciones            | ✅     | Datos + ABM de direcciones      |
 | Favoritos                       | ✅     | Grilla wishlist                 |
 | **Cambiar contraseña**          | ❌     | `acc-pass`                      |
-| **Mis pedidos a medida** + chat | ❌     | Crear/ver solicitudes y chatear |
+| **Mis pedidos a medida** + chat | ✅     | Crear/ver solicitudes y chatear |
 | Chat por pedido                 | ❌     | `acc-chat`                      |
 
 ## C. Back-office (admin)
@@ -53,7 +53,7 @@ Leyenda: ✅ hecho · 🟡 parcial · ❌ falta · 🔵 a evaluar (feature avanz
 | Descuentos                                   | ✅     | Fase 8                                                                                 |
 | Reportes                                     | ✅     | Fase 9                                                                                 |
 | Auditoría / Apariencia                       | ✅     | Fase 5 / config de marca                                                               |
-| **Pedidos a medida** (gestión)               | ❌     | Bandeja de solicitudes + cotizar + chat                                                |
+| **Pedidos a medida** (gestión)               | ✅     | Bandeja de solicitudes + cotizar + chat                                                |
 | **Clientes** (fichas)                        | ❌     | Listado + detalle (pedidos, datos, gasto)                                              |
 | **Configuración** (settings completa)        | 🟡     | Hoy solo logo/hero. Falta negocio, redes, WhatsApp, medios de pago, secciones del home |
 | **Reseñas** (moderar/responder)              | ❌     | `reply-review`, `feature-review`                                                       |
@@ -154,26 +154,4 @@ Migración `printers`/`print_jobs`. RLS solo staff.
 ### Aún a evaluar (🔵, fuera del plan por ahora)
 
 Ganancias y socios, gestión de roles por UI, superadmin/multi-tenant, importar
-ventas, banners/pricing dinámico.
-
----
-
-## Cómo seguimos
-
-Propuesta: ejecutar **9.5.0 → 9.5.8 en orden**, una sub-fase por tanda, cada una
-con su control/tests/documento. Empezamos por **9.5.0 (base de UI)** porque
-desbloquea reseñas, chat, "a medida" y notificaciones.
-
-_Documento de planificación de la Fase 9.5. La fuente de verdad de arquitectura
-sigue siendo `HEFESTO-Libro-Maestro.md`; este plan extiende el alcance hacia la
-paridad con el demo a pedido del dueño._
-
----
-
-## Progreso de ejecución
-
-- **9.5.0 Base de UI** ✅ — Modal, Toaster + `toast()`, Dropdown (en `components/ui`), montados globalmente.
-- **9.5.1 Detalle de producto** ✅ — galería con miniaturas **interactivas** + relacionados (ya existían).
-- **9.5.2 Reseñas** ✅ — migración `0013_reviews` (rating 1–5 + unique por cliente/producto + RLS aprobada-o-propia), feature `reviews` (promedio + listado + form en el detalle, moderación en `/admin/resenas`), 2 tests + pglite 5/5.
-
-Pendientes: 9.5.3 a medida+chat · 9.5.4 chat por pedido · 9.5.5 notificaciones · 9.5.6 clientes · 9.5.7 configuración · 9.5.8 pulidos · 9.5.9 recompensas · 9.5.10 calculadora · 9.5.11 cola de impresión.
+ventas, banne
