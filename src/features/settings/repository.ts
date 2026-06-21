@@ -16,7 +16,7 @@ export async function getSettings(
 }
 
 export async function upsertSettings(
-  patch: Partial<Pick<BusinessSettings, "logoUrl" | "heroImageUrl">>,
+  patch: Partial<Omit<typeof businessSettings.$inferInsert, "id">>,
   database: Database = db,
 ): Promise<BusinessSettings> {
   const [row] = await database

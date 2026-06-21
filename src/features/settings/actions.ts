@@ -1,10 +1,12 @@
 "use server";
 
+import { z } from "zod";
+
 import { revalidatePath } from "next/cache";
 import { isStaff } from "@/core/auth/session";
 import { type ActionResult, toActionError } from "@/core/errors";
 import { optimizeImage, uploadObject } from "@/core/storage";
-import { setBrandImage } from "./service";
+import { saveBusinessInfo, setBrandImage } from "./service";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -48,6 +50,51 @@ export async function uploadBrandImageAction(
     revalidatePath("/", "layout");
     revalidatePath("/admin/apariencia");
     return { ok: true, data: { url } };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+const businessInfoSchema = z.object({
+  storeName: z.string().trim().max(120).optional().or(z.literal("")),
+  description: z.string().trim().max(500).optional().or(z.literal("")),
+  whatsapp: z.string().trim().max(40).optional().or(z.literal("")),
+  contactEmail: z.string().trim().max(160).optional().or(z.literal("")),
+  addressText: z.string().trim().max(200).optional().or(z.literal("")),
+  instagram: z.string().trim().max(160).optional().or(z.literal("")),
+  facebook: z.string().trim().max(160).optional().or(z.literal("")),
+});
+
+export async function saveBusinessInfoAction(
+  input: unknown,
+): Promise<ActionResult> {
+  if (!(await isStaff())) {
+    return {
+      ok: false,
+      error: { code: "UNAUTHORIZED", message: "No autorizado" },
+    };
+  }
+  const parsed = businessInfoSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION", message: "Revisá los datos." },
+    };
+  }
+  const norm = (v?: string) => (v && v.length > 0 ? v : null);
+  try {
+    await saveBusinessInfo({
+      storeName: norm(parsed.data.storeName),
+      description: norm(parsed.data.description),
+      whatsapp: norm(parsed.data.whatsapp),
+      contactEmail: norm(parsed.data.contactEmail),
+      addressText: norm(parsed.data.addressText),
+      instagram: norm(parsed.data.instagram),
+      facebook: norm(parsed.data.facebook),
+    });
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/configuracion");
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
   }

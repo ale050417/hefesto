@@ -113,6 +113,20 @@
       "when": 1782073424049,
       "tag": "0015_order_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1782073735995,
+      "tag": "0016_notifications",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1782074046070,
+      "tag": "0017_business_info",
+      "breakpoints": true
     }
   ]
 }
