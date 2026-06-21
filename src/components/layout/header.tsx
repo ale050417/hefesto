@@ -6,6 +6,7 @@ import { CartButton } from "@/features/cart/components/cart-button";
 import { logoutAction } from "@/features/auth/actions";
 import { SearchBox } from "@/features/products/components/search-box";
 import { BrandMark } from "./brand-mark";
+import { StoreNav } from "./store-nav";
 import { ThemeSwitcher } from "./theme-switcher";
 
 export async function Header() {
@@ -41,47 +42,88 @@ export async function Header() {
         )}
       </Link>
 
-      <div className="mx-2 hidden flex-1 justify-center sm:flex">
-        <div className="w-full max-w-md">
-          <SearchBox />
-        </div>
+      <StoreNav />
+
+      <div className="store-search-wrap hidden sm:block">
+        <SearchBox />
       </div>
 
-      <nav className="ml-auto flex items-center gap-4 sm:gap-5">
-        <Link href="/" className="nav-link hidden sm:inline">
-          Inicio
-        </Link>
-        <Link href="/catalogo" className="nav-link">
-          Catálogo
-        </Link>
-        <CartButton />
+      <div className="store-actions ml-auto">
         <ThemeSwitcher />
+
+        <Link
+          href="/cuenta/favoritos"
+          className="icon-btn"
+          aria-label="Favoritos"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 0 0-7.1 7.1l1.7 1.7L12 21.5l7.1-7.1 1.7-1.7a5 5 0 0 0 0-7.1z" />
+          </svg>
+        </Link>
+
+        <CartButton />
+
         {isStaff ? (
           <Link
             href="/admin"
-            className="nav-link"
+            className="store-nav-link"
             style={{ color: "var(--gold-bright)" }}
           >
             Panel
           </Link>
         ) : null}
+
         {user ? (
           <>
-            <Link href="/cuenta" className="nav-link">
+            <Link
+              href="/cuenta/pedidos"
+              className="store-nav-link hidden md:inline-flex"
+            >
+              Mis pedidos
+            </Link>
+            <Link href="/cuenta" className="store-nav-link">
               Mi cuenta
             </Link>
             <form action={logoutAction}>
-              <button type="submit" className="nav-link">
-                Salir
+              <button
+                type="submit"
+                className="icon-btn"
+                aria-label="Cerrar sesión"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <path d="m16 17 5-5-5-5M21 12H9" />
+                </svg>
               </button>
             </form>
           </>
         ) : (
-          <Link href="/ingresar" className="nav-link">
-            Ingresar
+          <Link href="/ingresar" className="store-cta">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              width="15"
+              height="15"
+            >
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+              <path d="m10 17 5-5-5-5M15 12H3" />
+            </svg>
+            Iniciar sesión
           </Link>
         )}
-      </nav>
+      </div>
     </header>
   );
 }

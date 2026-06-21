@@ -17,11 +17,7 @@ export function SearchBox() {
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="store-search hidden sm:flex"
-      role="search"
-    >
+    <form onSubmit={submit} className="store-search" role="search">
       <span className="ss-ico" aria-hidden>
         <svg
           viewBox="0 0 24 24"
@@ -39,7 +35,7 @@ export function SearchBox() {
         className="ss-input"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        placeholder="Buscar productos…"
+        placeholder="Buscar productos, categorías, materiales…"
         aria-label="Buscar productos"
       />
     </form>

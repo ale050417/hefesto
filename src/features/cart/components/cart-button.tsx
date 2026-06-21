@@ -13,15 +13,20 @@ export function CartButton() {
     <button
       type="button"
       onClick={openCart}
-      className="text-dim hover:text-fg relative text-sm transition-colors"
-      aria-label="Abrir carrito"
+      className="icon-btn"
+      aria-label={`Abrir carrito${mounted && count > 0 ? ` (${count})` : ""}`}
     >
-      Carrito
-      {mounted && count > 0 ? (
-        <span className="bg-primary text-primary-fg ml-1 rounded-full px-1.5 py-0.5 text-xs">
-          {count}
-        </span>
-      ) : null}
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <circle cx="9" cy="21" r="1.6" />
+        <circle cx="18" cy="21" r="1.6" />
+        <path d="M2.5 3h2l2.2 12.4a2 2 0 0 0 2 1.6h8.3a2 2 0 0 0 2-1.6L21.5 7H6" />
+      </svg>
+      {mounted && count > 0 ? <span className="ic-badge">{count}</span> : null}
     </button>
   );
 }
