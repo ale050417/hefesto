@@ -1912,8 +1912,8 @@ body > * {
   /* Los icon-btn del header son "ghost" (sin borde, hover suave) */
   .topbar .icon-btn {
     position: relative;
-    width: 40px;
-    height: 40px;
+    width: 34px;
+    height: 34px;
     border-color: transparent;
     background: transparent;
   }
@@ -2150,5 +2150,70 @@ body > * {
   .auth-social button:hover {
     background: var(--hover);
     border-color: var(--gold);
+  }
+}
+
+@layer components {
+  /* ===== Dropdown de tema (paridad demo) ===== */
+  .theme-menu {
+    min-width: 230px;
+    padding: 7px;
+  }
+  .theme-menu-head {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 700;
+    padding: 7px 9px 6px;
+  }
+  .theme-opt {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: var(--radius-sm);
+    text-align: left;
+    transition: background 0.14s;
+  }
+  .theme-opt:hover {
+    background: var(--hover);
+  }
+  .theme-opt.on {
+    background: rgba(var(--gold-rgb), 0.1);
+  }
+  .theme-opt-ic {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: var(--surface-3);
+    color: var(--gold-bright);
+  }
+  .theme-opt-ic svg {
+    width: 16px;
+    height: 16px;
+  }
+  .theme-opt-txt {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 0;
+  }
+  .theme-opt-txt b {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .theme-opt-txt span {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .theme-opt-check {
+    color: var(--gold-bright);
+    flex-shrink: 0;
   }
 }

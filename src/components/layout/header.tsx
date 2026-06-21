@@ -52,9 +52,7 @@ export async function Header() {
 
       <div className="store-actions ml-auto">
         <ThemeSwitcher />
-
         <FavButton />
-
         <CartButton />
 
         {isStaff ? (
@@ -89,6 +87,8 @@ export async function Header() {
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="2"
+                  width="17"
+                  height="17"
                 >
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                   <path d="m16 17 5-5-5-5M21 12H9" />

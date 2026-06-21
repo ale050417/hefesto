@@ -54,7 +54,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "try{var t=localStorage.getItem('hefesto-theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}",
+              "try{var t=localStorage.getItem('hefesto-theme');if(t&&t!=='system')document.documentElement.setAttribute('data-theme',t)}catch(e){}",
           }}
         />
         {children}
