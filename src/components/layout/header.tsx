@@ -7,6 +7,7 @@ import { logoutAction } from "@/features/auth/actions";
 import { SearchBox } from "@/features/products/components/search-box";
 import { AuthTrigger } from "@/features/auth/components/auth-trigger";
 import { FavButton } from "@/features/wishlist/components/fav-button";
+import { NotificationBell } from "@/features/notifications/components/notification-bell";
 import { BrandMark } from "./brand-mark";
 import { StoreNav } from "./store-nav";
 import { ThemeSwitcher } from "./theme-switcher";
@@ -54,6 +55,7 @@ export async function Header() {
         <ThemeSwitcher />
         <FavButton />
         <CartButton />
+        {user ? <NotificationBell /> : null}
 
         {isStaff ? (
           <Link
