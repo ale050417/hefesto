@@ -134,6 +134,13 @@
       "when": 1782074433783,
       "tag": "0018_rewards",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1782074750558,
+      "tag": "0019_printing",
+      "breakpoints": true
     }
   ]
 }
