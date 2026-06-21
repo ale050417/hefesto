@@ -49,7 +49,15 @@ export default function RootLayout({
       data-theme="light"
       className={`${orbitron.variable} ${sora.variable}`}
     >
-      <body>{children}</body>
+      <body>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "try{var t=localStorage.getItem('hefesto-theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}",
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

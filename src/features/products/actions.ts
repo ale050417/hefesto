@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { isStaff } from "@/core/auth/session";
+import { getStaffUser, isStaff } from "@/core/auth/session";
+import { recordAudit } from "@/core/audit";
 import { z, type ZodError } from "zod";
 import { categoryInputSchema, productInputSchema } from "./schemas";
 import {
@@ -59,7 +60,8 @@ const SLUG_TAKEN = {
 export async function createProductAction(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
-  if (!(await isStaff())) return UNAUTHORIZED;
+  const actor = await getStaffUser();
+  if (!actor) return UNAUTHORIZED;
   const parsed = productInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -73,6 +75,13 @@ export async function createProductAction(
   }
   try {
     const product = await createProduct(parsed.data);
+    await recordAudit({
+      actorId: actor.id,
+      action: "product.created",
+      entityType: "product",
+      entityId: product.id,
+      metadata: { name: parsed.data.name, slug: parsed.data.slug },
+    });
     revalidatePath("/admin/productos");
     return { ok: true, data: { id: product.id } };
   } catch (e) {
@@ -88,7 +97,8 @@ export async function updateProductAction(
   id: string,
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
-  if (!(await isStaff())) return UNAUTHORIZED;
+  const actor = await getStaffUser();
+  if (!actor) return UNAUTHORIZED;
   const parsed = productInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -102,6 +112,13 @@ export async function updateProductAction(
   }
   try {
     const product = await updateProduct(id, parsed.data);
+    await recordAudit({
+      actorId: actor.id,
+      action: "product.updated",
+      entityType: "product",
+      entityId: product.id,
+      metadata: { name: parsed.data.name, slug: parsed.data.slug },
+    });
     revalidatePath("/admin/productos");
     revalidatePath(`/producto/${product.slug}`);
     return { ok: true, data: { id: product.id } };
@@ -115,9 +132,16 @@ export async function updateProductAction(
 }
 
 export async function publishProductAction(id: string): Promise<ActionResult> {
-  if (!(await isStaff())) return UNAUTHORIZED;
+  const actor = await getStaffUser();
+  if (!actor) return UNAUTHORIZED;
   try {
     await publishProduct(id);
+    await recordAudit({
+      actorId: actor.id,
+      action: "product.published",
+      entityType: "product",
+      entityId: id,
+    });
     revalidatePath("/admin/productos");
     return { ok: true, data: undefined };
   } catch (e) {
@@ -132,9 +156,16 @@ export async function publishProductAction(id: string): Promise<ActionResult> {
 }
 
 export async function archiveProductAction(id: string): Promise<ActionResult> {
-  if (!(await isStaff())) return UNAUTHORIZED;
+  const actor = await getStaffUser();
+  if (!actor) return UNAUTHORIZED;
   try {
     await archiveProduct(id);
+    await recordAudit({
+      actorId: actor.id,
+      action: "product.archived",
+      entityType: "product",
+      entityId: id,
+    });
     revalidatePath("/admin/productos");
     return { ok: true, data: undefined };
   } catch (e) {
@@ -249,7 +280,8 @@ const CATEGORY_TAKEN = {
 export async function createCategoryAction(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
-  if (!(await isStaff())) return UNAUTHORIZED;
+  const actor = await getStaffUser();
+  if (!actor) return UNAUTHORIZED;
   const parsed = categoryInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -263,6 +295,13 @@ export async function createCategoryAction(
   }
   try {
     const category = await createCategory(parsed.data);
+    await recordAudit({
+      actorId: actor.id,
+      action: "category.created",
+      entityType: "category",
+      entityId: category.id,
+      metadata: { name: parsed.data.name },
+    });
     revalidatePath("/admin/categorias");
     return { ok: true, data: { id: category.id } };
   } catch (e) {
@@ -278,7 +317,8 @@ export async function updateCategoryAction(
   id: string,
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
-  if (!(await isStaff())) return UNAUTHORIZED;
+  const actor = await getStaffUser();
+  if (!actor) return UNAUTHORIZED;
   const parsed = categoryInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -292,6 +332,13 @@ export async function updateCategoryAction(
   }
   try {
     const category = await updateCategory(id, parsed.data);
+    await recordAudit({
+      actorId: actor.id,
+      action: "category.updated",
+      entityType: "category",
+      entityId: category.id,
+      metadata: { name: parsed.data.name },
+    });
     revalidatePath("/admin/categorias");
     return { ok: true, data: { id: category.id } };
   } catch (e) {
@@ -307,12 +354,19 @@ export async function updateCategoryAction(
 }
 
 export async function deleteCategoryAction(id: string): Promise<ActionResult> {
-  if (!(await isStaff())) return UNAUTHORIZED;
+  const actor = await getStaffUser();
+  if (!actor) return UNAUTHORIZED;
   if (!uuidSchema.safeParse(id).success) {
     return validationError("Categoría inválida");
   }
   try {
     await deleteCategory(id);
+    await recordAudit({
+      actorId: actor.id,
+      action: "category.deleted",
+      entityType: "category",
+      entityId: id,
+    });
     revalidatePath("/admin/categorias");
     return { ok: true, data: undefined };
   } catch (e) {

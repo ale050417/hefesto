@@ -36,6 +36,12 @@ const envSchema = z.object({
   // Resend (emails transaccionales). Opcionales: sin API key, el email se omite.
   RESEND_API_KEY: z.string().optional(),
   RESEND_FROM: z.string().optional(),
+  // Observabilidad (Cap. 17). Opcionales: sin DSN, captureException solo loguea.
+  // El SDK de Sentry se cablea en el deploy (no agregamos la dependencia acá).
+  SENTRY_DSN: z.string().optional(),
+  NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
+  // Analytics (ej. Vercel Analytics / Plausible). Opcional.
+  NEXT_PUBLIC_ANALYTICS_ID: z.string().optional(),
 });
 
 type Env = z.infer<typeof envSchema>;

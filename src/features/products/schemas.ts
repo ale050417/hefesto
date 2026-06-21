@@ -13,6 +13,7 @@ export type ProductSort = (typeof PRODUCT_SORTS)[number];
 const boolFromString = z.enum(["true", "false"]).transform((v) => v === "true");
 
 export const productFilterSchema = z.object({
+  q: z.string().trim().min(1).max(80).optional(), // búsqueda por nombre
   category: z.string().min(1).optional(), // slug de categoría
   material: z.string().min(1).optional(),
   minPrice: z.coerce.number().nonnegative().optional(),

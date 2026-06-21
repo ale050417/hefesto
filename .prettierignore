@@ -9,3 +9,6 @@ next-env.d.ts
 
 # Generados por drizzle-kit
 src/core/db/migrations
+
+# Demo de referencia (no es código del proyecto; se conserva tal cual)
+index.html

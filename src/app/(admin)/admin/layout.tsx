@@ -12,7 +12,9 @@ export default async function AdminLayout({
   return (
     <div className="flex min-h-dvh flex-col md:flex-row">
       <Sidebar />
-      <main className="admin-content">{children}</main>
+      <main id="main" className="admin-content">
+        {children}
+      </main>
     </div>
   );
 }

@@ -53,7 +53,9 @@ export default async function CatalogoPage({
       <div className="sec-head mt-2">
         <div>
           <div className="eyebrow">Tienda</div>
-          <h1 className="sec-title">Catálogo</h1>
+          <h1 className="sec-title">
+            {filter.q ? `Resultados para "${filter.q}"` : "Catálogo"}
+          </h1>
           <div className="sec-sub">
             {page.total} {page.total === 1 ? "producto" : "productos"}
           </div>

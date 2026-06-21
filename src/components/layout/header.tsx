@@ -4,7 +4,9 @@ import { getCurrentUser } from "@/core/auth/session";
 import { getBrandSettings } from "@/features/settings/service";
 import { CartButton } from "@/features/cart/components/cart-button";
 import { logoutAction } from "@/features/auth/actions";
+import { SearchBox } from "@/features/products/components/search-box";
 import { BrandMark } from "./brand-mark";
+import { ThemeSwitcher } from "./theme-switcher";
 
 export async function Header() {
   const [user, brand] = await Promise.all([
@@ -39,7 +41,13 @@ export async function Header() {
         )}
       </Link>
 
-      <nav className="ml-auto flex items-center gap-5 sm:gap-6">
+      <div className="mx-2 hidden flex-1 justify-center sm:flex">
+        <div className="w-full max-w-md">
+          <SearchBox />
+        </div>
+      </div>
+
+      <nav className="ml-auto flex items-center gap-4 sm:gap-5">
         <Link href="/" className="nav-link hidden sm:inline">
           Inicio
         </Link>
@@ -47,6 +55,7 @@ export async function Header() {
           Catálogo
         </Link>
         <CartButton />
+        <ThemeSwitcher />
         {isStaff ? (
           <Link
             href="/admin"

@@ -55,3 +55,13 @@ export async function isStaff(): Promise<boolean> {
   const role = user?.profile?.role;
   return role === "admin" || role === "operator";
 }
+
+/**
+ * Devuelve el usuario actual si es staff, o null. Igual que isStaff() pero
+ * conserva la identidad del actor (para auditoría) sin una segunda consulta.
+ */
+export async function getStaffUser(): Promise<CurrentUser | null> {
+  const user = await getCurrentUser();
+  const role = user?.profile?.role;
+  return role === "admin" || role === "operator" ? user : null;
+}

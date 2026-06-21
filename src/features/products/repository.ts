@@ -44,6 +44,7 @@ export async function findPublished(
   database: Database = db,
 ): Promise<{ items: ProductWithRelations[]; total: number }> {
   const conditions: SQL[] = [eq(products.status, "published")];
+  if (filter.q) conditions.push(ilike(products.name, `%${filter.q}%`));
 
   if (filter.category) {
     conditions.push(

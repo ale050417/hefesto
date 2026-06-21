@@ -11,6 +11,7 @@ import {
   getRelatedProducts,
 } from "@/features/products/services/catalogService";
 import { formatMinutes } from "@/lib/format";
+import { siteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -56,8 +57,31 @@ export default async function ProductPage({ params }: Params) {
     specs.push({ label: "Dimensiones", value: product.dimensions });
   }
 
+  const effectivePrice =
+    product.isOnSale && product.salePrice ? product.salePrice : product.price;
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description:
+      product.description ?? `${product.name}, impreso en 3D a pedido.`,
+    ...(product.primaryImage ? { image: product.primaryImage.url } : {}),
+    ...(product.category ? { category: product.category.name } : {}),
+    offers: {
+      "@type": "Offer",
+      price: String(effectivePrice),
+      priceCurrency: "ARS",
+      availability: "https://schema.org/InStock",
+      url: `${siteUrl}/producto/${product.slug}`,
+    },
+  };
+
   return (
     <div className="store-wrap py-10">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+      />
       <nav className="text-dim text-sm">
         <Link href="/" className="hover:text-fg">
           Inicio
