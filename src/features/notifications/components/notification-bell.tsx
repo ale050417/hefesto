@@ -2,20 +2,25 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
 import {
   getMyNotificationsAction,
   markNotificationsReadAction,
 } from "../actions";
 import type { Notification } from "../repository";
 
+const dateFmt = new Intl.DateTimeFormat("es-AR", {
+  day: "2-digit",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
-  const ref = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
-  // Carga inicial (setState en la continuación async, no en el cuerpo del efecto).
   useEffect(() => {
     let active = true;
     getMyNotificationsAction().then((r) => {
@@ -28,14 +33,20 @@ export function NotificationBell() {
     };
   }, []);
 
+  // Cerrar al hacer clic afuera o con Escape.
   useEffect(() => {
     if (!open) return;
-    const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node))
         setOpen(false);
     };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   function toggle() {
@@ -49,10 +60,10 @@ export function NotificationBell() {
   }
 
   return (
-    <div className={cn("dropdown", open && "open")} ref={ref}>
+    <div className="notif-wrap" ref={wrapRef}>
       <button
         type="button"
-        className="icon-btn"
+        className="icon-btn relative"
         onClick={toggle}
         aria-label={`Notificaciones${unread > 0 ? ` (${unread})` : ""}`}
       >
@@ -69,39 +80,72 @@ export function NotificationBell() {
         </svg>
         {unread > 0 ? <span className="ic-badge">{unread}</span> : null}
       </button>
-      <div className="dropdown-menu notif-menu">
-        <div className="notif-head">Notificaciones</div>
-        <div className="notif-list">
+
+      {open ? (
+        <div className="notif-panel" role="dialog" aria-label="Notificaciones">
+          <div className="notif-head">
+            <h3>Notificaciones</h3>
+            <button
+              type="button"
+              className="text-dim hover:text-fg text-lg leading-none"
+              onClick={() => setOpen(false)}
+              aria-label="Cerrar"
+            >
+              ✕
+            </button>
+          </div>
+
           {items.length === 0 ? (
-            <p className="text-dim px-3 py-6 text-center text-sm">
-              No tenés notificaciones.
-            </p>
+            <div className="notif-empty">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                width="40"
+                height="40"
+              >
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+                <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+              </svg>
+              <p className="text-sm">No tenés notificaciones todavía.</p>
+            </div>
           ) : (
-            items.map((n) => {
-              const inner = (
-                <>
-                  <b>{n.title}</b>
-                  {n.body ? <span>{n.body}</span> : null}
-                </>
-              );
-              return n.link ? (
-                <Link
-                  key={n.id}
-                  href={n.link}
-                  className="notif-item"
-                  onClick={() => setOpen(false)}
-                >
-                  {inner}
-                </Link>
-              ) : (
-                <div key={n.id} className="notif-item">
-                  {inner}
-                </div>
-              );
-            })
+            <div className="notif-list">
+              {items.map((n) => {
+                const inner = (
+                  <>
+                    <span
+                      className={n.isRead ? "notif-dot read" : "notif-dot"}
+                      aria-hidden
+                    />
+                    <span className="notif-body">
+                      <b>{n.title}</b>
+                      {n.body ? <p>{n.body}</p> : null}
+                      <time>{dateFmt.format(new Date(n.createdAt))}</time>
+                    </span>
+                  </>
+                );
+                const cls = n.isRead ? "notif-item" : "notif-item unread";
+                return n.link ? (
+                  <Link
+                    key={n.id}
+                    href={n.link}
+                    className={cls}
+                    onClick={() => setOpen(false)}
+                  >
+                    {inner}
+                  </Link>
+                ) : (
+                  <div key={n.id} className={cls}>
+                    {inner}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

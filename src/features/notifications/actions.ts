@@ -10,7 +10,13 @@ export async function getMyNotificationsAction(): Promise<{
 }> {
   const user = await getCurrentUser();
   if (!user) return { items: [], unread: 0 };
-  return getNotifications(user.id);
+  try {
+    return await getNotifications(user.id);
+  } catch (e) {
+    // Si la tabla aún no está migrada en la base, no rompemos el header.
+    console.error("[notif] no se pudieron leer las notificaciones:", e);
+    return { items: [], unread: 0 };
+  }
 }
 
 export async function markNotificationsReadAction(): Promise<{ ok: boolean }> {
