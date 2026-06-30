@@ -1779,6 +1779,62 @@ body > * {
     }
   }
 
+  /* ====== Pulido mobile general (≤600px): títulos, paddings, encabezados,
+     pestañas y KPIs más prolijos en celular, sin tocar el desktop. ====== */
+  @media (max-width: 600px) {
+    .page-head {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .page-title {
+      font-size: 22px;
+    }
+    .page-sub {
+      font-size: 13px;
+    }
+    .section-card {
+      padding: 16px;
+    }
+    .kpi {
+      padding: 16px;
+    }
+    .kpi-val {
+      font-size: 24px;
+    }
+    .kpi-ic {
+      width: 38px;
+      height: 38px;
+    }
+    .kpi-ic svg {
+      width: 19px;
+      height: 19px;
+    }
+    /* Pestañas (config, etc.): scroll horizontal en vez de romper el layout */
+    .tabs {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      flex-wrap: nowrap;
+    }
+    .tabs::-webkit-scrollbar {
+      display: none;
+    }
+    .tab {
+      white-space: nowrap;
+    }
+    /* Botones de acción dentro del encabezado: ocupan el ancho en celular */
+    .page-head .btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+  @media (max-width: 400px) {
+    .kpi-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .table-wrap {
     overflow-x: auto;
     border-radius: var(--radius-md);
@@ -3636,6 +3692,46 @@ body > * {
     color: var(--text);
     border-color: transparent;
     background: var(--hover);
+  }
+
+  /* ====== Header en móvil: que no se amontone ====== */
+  @media (max-width: 600px) {
+    .topbar {
+      height: 58px;
+      padding: 0 12px;
+      gap: 8px;
+    }
+    .store-subnav {
+      top: 58px;
+    }
+    .brand {
+      gap: 8px;
+    }
+    .brand-sub {
+      display: none;
+    }
+    .brand-name {
+      font-size: 15px;
+      letter-spacing: 0.03em;
+    }
+    .store-actions {
+      gap: 2px;
+    }
+    .topbar .icon-btn {
+      width: 32px;
+      height: 32px;
+    }
+    /* El link "Panel" como ícono compacto: que no empuje el resto */
+    .store-actions .store-nav-link {
+      padding: 6px 8px;
+      font-size: 12.5px;
+    }
+  }
+  @media (max-width: 380px) {
+    /* Pantallas muy chicas: dejamos solo el isotipo */
+    .brand-name {
+      display: none;
+    }
   }
   /* Badge contador sobre un icon-btn (carrito/favoritos) */
   .ic-badge {
