@@ -155,6 +155,7 @@ export type DeliveredManualSale = {
   customerName: string;
   detail: string | null;
   total: number;
+  profitSplit: Array<{ name: string; pct: number }> | null;
   createdAt: Date;
 };
 
@@ -172,6 +173,7 @@ export async function getDeliveredManualSales(
       customerName: manualSales.customerName,
       detail: manualSales.detail,
       total: manualSales.total,
+      profitSplit: manualSales.profitSplit,
       createdAt: manualSales.saleDate,
     })
     .from(manualSales)
@@ -182,6 +184,7 @@ export async function getDeliveredManualSales(
     customerName: r.customerName,
     detail: r.detail,
     total: Number(r.total),
+    profitSplit: r.profitSplit ?? null,
     createdAt: r.createdAt,
   }));
 }

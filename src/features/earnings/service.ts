@@ -1,6 +1,7 @@
 import * as repo from "./repository";
 import {
   computeOrderEconomics,
+  distribute,
   manualSaleEconomics,
   type CostSettings,
   type EconItem,
@@ -69,7 +70,11 @@ export type EarningsOrderRow = {
   grams: number;
   /** true si proviene de una venta manual / histórica (sin items ni costo). */
   manual: boolean;
+  /** Reparto de la ganancia de esta fila por persona (monto). */
+  split: Array<{ name: string; amount: number }>;
 };
+
+export type EarningsPayout = { name: string; amount: number };
 
 // Mes (YYYY-MM) de una fecha, en horario de Argentina, para agrupar/filtrar.
 const TZ = "America/Argentina/Buenos_Aires";
@@ -123,6 +128,12 @@ export async function getEarningsOverview(month?: string | null) {
     byOrder.set(it.orderId, arr);
   }
 
+  // Socios actuales: para pedidos web y como default de ventas manuales sin split.
+  const currentParts = shares.map((s) => ({
+    name: s.name,
+    pct: Number(s.pct),
+  }));
+
   const orderRows: EarningsOrderRow[] = ords.map((o) => {
     const e = computeOrderEconomics(o.total, byOrder.get(o.id) ?? [], settings);
     return {
@@ -135,12 +146,16 @@ export async function getEarningsOverview(month?: string | null) {
       gananciaPura: e.gananciaPura,
       grams: e.grams,
       manual: false,
+      split: distribute(e.gananciaPura, currentParts),
     };
   });
 
   // Ventas manuales cobradas: entran al reparto con amortización 0 (sin costo).
+  // Cada una usa SU reparto guardado; si no tiene, se divide por los socios actuales.
   const manualRows: EarningsOrderRow[] = manual.map((m) => {
     const e = manualSaleEconomics(m.total);
+    const parts =
+      m.profitSplit && m.profitSplit.length > 0 ? m.profitSplit : currentParts;
     return {
       id: m.id,
       orderNumber: "Venta manual",
@@ -151,6 +166,7 @@ export async function getEarningsOverview(month?: string | null) {
       gananciaPura: e.gananciaPura,
       grams: e.grams,
       manual: true,
+      split: distribute(e.gananciaPura, parts),
     };
   });
 
@@ -182,5 +198,17 @@ export async function getEarningsOverview(month?: string | null) {
     { ingreso: 0, amort: 0, profit: 0, grams: 0 },
   );
 
-  return { settings, shares, rows, totals, months, selectedMonth };
+  // A cobrar por persona: suma el reparto de cada fila (web = socios actuales,
+  // manual = su reparto guardado). Por nombre. Más a cobrar primero.
+  const payoutMap = new Map<string, number>();
+  for (const r of rows) {
+    for (const part of r.split) {
+      payoutMap.set(part.name, (payoutMap.get(part.name) ?? 0) + part.amount);
+    }
+  }
+  const payouts: EarningsPayout[] = [...payoutMap.entries()]
+    .map(([name, amount]) => ({ name, amount }))
+    .sort((a, b) => b.amount - a.amount);
+
+  return { settings, shares, rows, totals, months, selectedMonth, payouts };
 }

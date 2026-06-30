@@ -110,3 +110,19 @@ export function manualSaleEconomics(total: number): OrderEconomics {
 export function sharesTotal(shares: Array<{ pct: number }>): number {
   return shares.reduce((a, s) => a + (Number(s.pct) || 0), 0);
 }
+
+/**
+ * Reparte una ganancia entre partes [{nombre, pct}] → [{nombre, monto}]. Puro.
+ * Se usa tanto para los socios actuales (pedidos web) como para el reparto
+ * guardado de cada venta manual.
+ */
+export function distribute(
+  profit: number,
+  parts: Array<{ name: string; pct: number }>,
+): Array<{ name: string; amount: number }> {
+  const p = Math.max(0, profit);
+  return parts.map((part) => ({
+    name: part.name,
+    amount: (p * (Number(part.pct) || 0)) / 100,
+  }));
+}

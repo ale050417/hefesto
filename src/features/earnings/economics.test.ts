@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   computeOrderEconomics,
+  distribute,
   manualSaleEconomics,
   productAmort,
   sharesTotal,
@@ -74,6 +75,27 @@ describe("manualSaleEconomics", () => {
 
   it("ganancia pura nunca es negativa", () => {
     expect(manualSaleEconomics(-100).gananciaPura).toBe(0);
+  });
+});
+
+describe("distribute", () => {
+  it("reparte por porcentaje", () => {
+    const r = distribute(10000, [
+      { name: "Vos", pct: 60 },
+      { name: "Socio", pct: 40 },
+    ]);
+    expect(r).toEqual([
+      { name: "Vos", amount: 6000 },
+      { name: "Socio", amount: 4000 },
+    ]);
+  });
+  it("todo para uno", () => {
+    expect(distribute(5000, [{ name: "Vos", pct: 100 }])).toEqual([
+      { name: "Vos", amount: 5000 },
+    ]);
+  });
+  it("ganancia negativa = 0", () => {
+    expect(distribute(-100, [{ name: "Vos", pct: 100 }])[0]?.amount).toBe(0);
   });
 });
 
