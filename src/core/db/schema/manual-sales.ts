@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   index,
+  jsonb,
   numeric,
   pgTable,
   text,
@@ -25,6 +26,10 @@ export const manualSales = pgTable(
     total: numeric("total", { precision: 12, scale: 2 }).notNull(),
     paymentMethod: paymentMethod("payment_method").notNull(),
     status: orderStatus("status").notNull().default("delivered"),
+    // Reparto de la ganancia de ESTA venta (foto del momento): [{nombre, pct}].
+    // Si es null, se divide por los socios actuales (ver earnings).
+    profitSplit:
+      jsonb("profit_split").$type<Array<{ name: string; pct: number }>>(),
     // Quién la cargó (staff). Se conserva el historial si se borra el usuario.
     createdBy: uuid("created_by").references(() => profiles.id, {
       onDelete: "set null",
