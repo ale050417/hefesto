@@ -1,4 +1,6 @@
 import * as repo from "./repository";
+import { isAdmin } from "@/core/auth/permissions";
+import { listFilamentsView } from "@/features/inventory/queries";
 import { computeQuote, selectActiveMargin } from "./calculator";
 import type {
   CalcConfigInput,
@@ -178,6 +180,37 @@ export async function quoteFinalPriceByPreset(input: {
     marginPct,
   });
   return { precioFinal: q.precioFinal };
+}
+
+/**
+ * Contexto para el PriceEstimator (calculadora embebida en producto y pedido
+ * manual): config de costos, materiales y costo/kg (filamentos), tipos activos
+ * y, solo si es admin, los tipos con margen. Una sola función para no repetir el
+ * armado en cada página.
+ */
+export type EstimatorContext = {
+  config: CalcConfig;
+  materials: string[];
+  costMap: Record<string, number>;
+  presetOptions: MarginPresetOption[];
+  presets: MarginPreset[];
+  isAdmin: boolean;
+};
+
+export async function getEstimatorContext(): Promise<EstimatorContext> {
+  const admin = await isAdmin();
+  const [config, filaments, presetOptions, presets] = await Promise.all([
+    getCalcConfig(),
+    listFilamentsView(),
+    listActivePresetOptions(),
+    admin ? listMarginPresets() : Promise.resolve([] as MarginPreset[]),
+  ]);
+  const materials = [...new Set(filaments.map((fm) => fm.material))];
+  const costMap: Record<string, number> = {};
+  for (const fm of filaments) {
+    if (!(fm.material in costMap)) costMap[fm.material] = fm.costPerKg;
+  }
+  return { config, materials, costMap, presetOptions, presets, isAdmin: admin };
 }
 
 export async function saveCalcConfig(input: CalcConfigInput) {
