@@ -50,7 +50,7 @@ export function ShippingSettingsForm({
   }
 
   return (
-    <div className="grid gap-4">
+    <div className="grid-2" style={{ alignItems: "start" }}>
       <div className="ui-card section-card flex flex-col gap-3">
         <div className="section-title">Envíos y retiro</div>
         <div className="text-faint -mt-2 text-[12.5px]">
@@ -147,29 +147,60 @@ export function ShippingSettingsForm({
             ))
           )}
         </div>
-      </div>
 
-      <div className="ui-card section-card flex flex-col gap-3">
-        <div className="section-title">
-          Mensaje &quot;fuera de la ciudad&quot;
-        </div>
-        <div className="text-faint -mt-2 text-[12.5px]">
-          Lo que ve el cliente al elegir un envío fuera de tu ciudad, en el
-          checkout.
-        </div>
-        <textarea
-          className="textarea"
-          style={{ minHeight: 90 }}
-          value={outMsg}
-          onChange={(e) => setOutMsg(e.target.value)}
-          placeholder="Coordinamos el envío por WhatsApp; el costo del flete queda a cargo del comprador."
-        />
-      </div>
-
-      <div>
         <Button type="button" onClick={submit} disabled={busy}>
           {busy ? "Guardando…" : "Guardar envíos"}
         </Button>
+      </div>
+
+      {/* Columna derecha: mensaje fuera de ciudad + cómo funciona */}
+      <div className="flex flex-col gap-4">
+        <div className="ui-card section-card flex flex-col gap-3">
+          <div className="section-title">
+            Mensaje &quot;fuera de {city || "la ciudad"}&quot;
+          </div>
+          <div className="text-faint -mt-2 text-[12.5px]">
+            Lo que ve el cliente al elegir un envío fuera de tu ciudad, en el
+            checkout.
+          </div>
+          <textarea
+            className="textarea"
+            style={{ minHeight: 90 }}
+            value={outMsg}
+            onChange={(e) => setOutMsg(e.target.value)}
+            placeholder="Coordinamos el envío por WhatsApp; el costo del flete queda a cargo del comprador."
+          />
+        </div>
+
+        <div className="ui-card section-card flex flex-col gap-2">
+          <div
+            className="flex items-center gap-2"
+            style={{ color: "var(--info, #5A9CD9)" }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width={16}
+              height={16}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4M12 8h.01" />
+            </svg>
+            <b className="text-[13px]">¿Cómo funcionan los envíos?</b>
+          </div>
+          <div className="text-faint text-[12.5px] leading-relaxed">
+            Dentro de <b>{city || "tu ciudad"}</b>: el cliente elige su barrio y
+            paga el precio que configures acá.{" "}
+            <b>Fuera de {city || "tu ciudad"}</b>: el pedido se coordina por
+            chat y el <b>envío corre por cuenta del comprador</b>{" "}
+            (encomienda/correo). El retiro en el taller siempre es gratis.
+          </div>
+        </div>
       </div>
     </div>
   );

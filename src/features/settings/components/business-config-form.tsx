@@ -65,7 +65,8 @@ export function BusinessConfigForm({
   }
 
   return (
-    <div className="grid gap-5" style={{ alignItems: "start" }}>
+    <div className="grid-2" style={{ alignItems: "start" }}>
+      {/* Columna 1 — Información del negocio */}
       <div className="ui-card section-card flex flex-col gap-4">
         <div className="section-title">Información del negocio</div>
         <div className="grid-2">
@@ -123,6 +124,21 @@ export function BusinessConfigForm({
             />
           </div>
         </div>
+        <div className="field">
+          <label htmlFor="b-desc">Descripción</label>
+          <textarea
+            id="b-desc"
+            className="textarea"
+            value={form.description}
+            onChange={(e) => set("description", e.target.value)}
+            placeholder="Impresión 3D a pedido…"
+          />
+        </div>
+      </div>
+
+      {/* Columna 2 — Redes y envíos */}
+      <div className="ui-card section-card flex flex-col gap-3">
+        <div className="section-title">Redes y envíos</div>
         <div className="grid-2">
           <div className="field">
             <label htmlFor="b-ig">Instagram</label>
@@ -156,64 +172,55 @@ export function BusinessConfigForm({
           />
         </div>
         <div className="field">
-          <label htmlFor="b-desc">Descripción</label>
-          <textarea
-            id="b-desc"
-            className="textarea"
-            value={form.description}
-            onChange={(e) => set("description", e.target.value)}
-            placeholder="Impresión 3D a pedido…"
-          />
-        </div>
-      </div>
-
-      <div className="ui-card section-card flex flex-col gap-3">
-        <div className="section-title">Horario de atención</div>
-        {hours.map((h, i) => (
-          <div
-            key={i}
-            className="ui-card flex items-center gap-2"
-            style={{ padding: "9px 12px" }}
-          >
-            <button
-              type="button"
-              role="switch"
-              aria-checked={h.on}
-              aria-label={h.label}
-              className={`switch ${h.on ? "on" : ""}`}
-              onClick={() => setHour(i, { on: !h.on })}
-            />
-            <input
-              className="input"
-              style={{ width: 110, padding: "6px 9px" }}
-              value={h.label}
-              onChange={(e) => setHour(i, { label: e.target.value })}
-            />
-            <div className="ml-auto flex items-center gap-1">
-              {h.on ? (
-                <>
-                  <input
-                    type="time"
-                    className="input"
-                    style={{ width: "auto", padding: "6px 9px" }}
-                    value={h.from}
-                    onChange={(e) => setHour(i, { from: e.target.value })}
-                  />
-                  <span className="text-faint">a</span>
-                  <input
-                    type="time"
-                    className="input"
-                    style={{ width: "auto", padding: "6px 9px" }}
-                    value={h.to}
-                    onChange={(e) => setHour(i, { to: e.target.value })}
-                  />
-                </>
-              ) : (
-                <span className="badge badge-neutral">Cerrado</span>
-              )}
-            </div>
+          <label>Horario de atención</label>
+          <div className="flex flex-col gap-2">
+            {hours.map((h, i) => (
+              <div
+                key={i}
+                className="ui-card flex items-center gap-2"
+                style={{ padding: "9px 12px" }}
+              >
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={h.on}
+                  aria-label={h.label}
+                  className={`switch ${h.on ? "on" : ""}`}
+                  onClick={() => setHour(i, { on: !h.on })}
+                />
+                <input
+                  className="input"
+                  style={{ width: 110, padding: "6px 9px" }}
+                  value={h.label}
+                  onChange={(e) => setHour(i, { label: e.target.value })}
+                />
+                <div className="ml-auto flex items-center gap-1">
+                  {h.on ? (
+                    <>
+                      <input
+                        type="time"
+                        className="input"
+                        style={{ width: "auto", padding: "6px 9px" }}
+                        value={h.from}
+                        onChange={(e) => setHour(i, { from: e.target.value })}
+                      />
+                      <span className="text-faint">a</span>
+                      <input
+                        type="time"
+                        className="input"
+                        style={{ width: "auto", padding: "6px 9px" }}
+                        value={h.to}
+                        onChange={(e) => setHour(i, { to: e.target.value })}
+                      />
+                    </>
+                  ) : (
+                    <span className="badge badge-neutral">Cerrado</span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
 
         <div
           className="ui-card flex items-center justify-between"
@@ -253,14 +260,12 @@ export function BusinessConfigForm({
             onClick={() => setDelivery((v) => !v)}
           />
         </div>
-      </div>
 
-      {err ? (
-        <p className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
-          {err}
-        </p>
-      ) : null}
-      <div>
+        {err ? (
+          <p className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
+            {err}
+          </p>
+        ) : null}
         <Button type="button" onClick={submit} disabled={busy}>
           {busy ? "Guardando…" : "Guardar cambios"}
         </Button>
