@@ -211,6 +211,9 @@ function toRow(input: ProductInput) {
     layerHeight: input.layerHeight ?? null,
     infillPercent: input.infillPercent ?? null,
     productionTime: input.productionTime ?? null,
+    amortization:
+      input.amortization != null ? input.amortization.toString() : null,
+    profit: input.profit != null ? input.profit.toString() : null,
     isFeatured: input.isFeatured,
     isNew: input.isNew,
   };

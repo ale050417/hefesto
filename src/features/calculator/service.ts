@@ -197,6 +197,38 @@ export type EstimatorContext = {
   isAdmin: boolean;
 };
 
+/**
+ * Amortización (costo de producir) desde material + gramos + horas, en el
+ * servidor. Es independiente del tipo/margen: material + electricidad + desgaste
+ * + margen de error (computeQuote con margen 0 → costoTotal). Para guardar el
+ * costo real al crear producto/venta.
+ */
+export async function getAmortization(input: {
+  material?: string | null;
+  grams: number;
+  hours: number;
+}): Promise<number> {
+  const [cfg, filaments] = await Promise.all([
+    getCalcConfig(),
+    listFilamentsView(),
+  ]);
+  const costPerKg = input.material
+    ? (filaments.find((f) => f.material === input.material)?.costPerKg ?? 0)
+    : 0;
+  const q = computeQuote({
+    grams: input.grams,
+    hours: input.hours,
+    costPerKg,
+    kwhPrice: cfg.kwhPrice,
+    machineWatts: cfg.machineWatts,
+    machineLifeHours: cfg.machineLifeHours,
+    maintenanceCost: cfg.maintenanceCost,
+    marginErrorPct: cfg.marginErrorPct,
+    marginPct: 0,
+  });
+  return q.costoTotal;
+}
+
 export async function getEstimatorContext(): Promise<EstimatorContext> {
   const admin = await isAdmin();
   const [config, filaments, presetOptions, presets] = await Promise.all([

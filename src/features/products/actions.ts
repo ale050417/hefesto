@@ -5,7 +5,12 @@ import { getStaffUser } from "@/core/auth/session";
 import { can } from "@/core/auth/permissions";
 import { recordAudit } from "@/core/audit";
 import { z, type ZodError } from "zod";
-import { categoryInputSchema, productInputSchema } from "./schemas";
+import { getAmortization } from "@/features/calculator/service";
+import {
+  categoryInputSchema,
+  productInputSchema,
+  type ProductInput,
+} from "./schemas";
 import {
   addProductImage,
   archiveProduct,
@@ -50,6 +55,37 @@ function isUniqueViolation(e: unknown): boolean {
     "code" in e &&
     (e as { code?: unknown }).code === "23505"
   );
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+const NO_AMORT = {
+  ok: false as const,
+  error: {
+    code: "VALIDATION",
+    message:
+      "Cargá la amortización con la calculadora (gramos/horas y material).",
+    fields: { price: "Falta calcular la amortización" },
+  },
+};
+
+/**
+ * Calcula amortización (costo) en el servidor y la ganancia (precio − amort) y
+ * las inyecta. Devuelve null si no se puede calcular (sin gramos/horas) → la
+ * amortización es obligatoria.
+ */
+async function withCosts(data: ProductInput): Promise<ProductInput | null> {
+  const amort = await getAmortization({
+    material: data.material ?? null,
+    grams: data.weightGrams ?? 0,
+    hours: (data.printTimeMinutes ?? 0) / 60,
+  });
+  if (!(amort > 0)) return null;
+  return {
+    ...data,
+    amortization: round2(amort),
+    profit: round2(Math.max(0, data.price - amort)),
+  };
 }
 
 const SLUG_TAKEN = {
@@ -122,8 +158,10 @@ export async function createProductAction(
       },
     };
   }
+  const data = await withCosts(parsed.data);
+  if (!data) return NO_AMORT;
   try {
-    const product = await createProduct(parsed.data);
+    const product = await createProduct(data);
     await recordAudit({
       actorId: actor.id,
       action: "product.created",
@@ -160,8 +198,10 @@ export async function updateProductAction(
       },
     };
   }
+  const data = await withCosts(parsed.data);
+  if (!data) return NO_AMORT;
   try {
-    const product = await updateProduct(id, parsed.data);
+    const product = await updateProduct(id, data);
     await recordAudit({
       actorId: actor.id,
       action: "product.updated",

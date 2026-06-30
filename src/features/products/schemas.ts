@@ -79,6 +79,11 @@ export const productInputSchema = z
     productionTime: z
       .preprocess(emptyToNull, z.string().max(120).nullable())
       .optional(),
+    // Costos (los completa el servidor con la calculadora, no el cliente).
+    amortization: z
+      .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
+      .optional(),
+    profit: z.preprocess(emptyToNull, z.coerce.number().nullable()).optional(),
     isFeatured: z.boolean().default(false),
     isNew: z.boolean().default(false),
   })
