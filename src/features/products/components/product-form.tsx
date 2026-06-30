@@ -5,10 +5,8 @@ import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  PriceEstimator,
-  type EstimatorValue,
-} from "@/features/calculator/components/price-estimator";
+import { EstimatorModalButton } from "@/features/calculator/components/estimator-modal-button";
+import type { EstimatorValue } from "@/features/calculator/components/price-estimator";
 import type { EstimatorContext } from "@/features/calculator/service";
 import { createProductAction, updateProductAction } from "../actions";
 import type { Category } from "../types";
@@ -91,10 +89,6 @@ export function ProductForm({
     presetId: "",
     price: null,
   });
-  // El precio se autocompleta con el sugerido (solo cuando elegís un tipo y hay
-  // datos) salvo que lo edites a mano. En edición, el precio guardado se respeta
-  // hasta que elijas un tipo para recalcular.
-  const [priceTouched, setPriceTouched] = useState(false);
   const {
     register,
     handleSubmit,
@@ -113,11 +107,11 @@ export function ProductForm({
     );
   }
 
-  function handleEst(v: EstimatorValue) {
+  // La calculadora flotante es opcional: al "Usar precio" copia el precio y
+  // guarda la ficha técnica (material/peso/tiempo/altura) para costos/reportes.
+  function handleEstUse(v: EstimatorValue) {
     setEst(v);
-    if (!priceTouched && v.price != null) {
-      setValue("price", String(v.price));
-    }
+    if (v.price != null) setValue("price", String(v.price));
   }
 
   const onSubmit = handleSubmit(async (values) => {
@@ -245,10 +239,19 @@ export function ProductForm({
             type="number"
             step="0.01"
             className="input"
-            {...register("price", { onChange: () => setPriceTouched(true) })}
+            {...register("price")}
           />
-          <div className="text-faint text-[11.5px]">
-            Se completa solo con el precio sugerido; podés editarlo.
+          <div className="mt-1">
+            <EstimatorModalButton
+              estimator={estimator}
+              onUse={handleEstUse}
+              initial={{
+                material: defaultValues.material,
+                grams: Number(defaultValues.weightGrams) || 0,
+                printMinutes: Number(defaultValues.printTimeMinutes) || 0,
+                layerHeight: defaultValues.layerHeight,
+              }}
+            />
           </div>
           {errors.price ? (
             <p className="text-danger text-xs">{errors.price.message}</p>
@@ -388,31 +391,6 @@ export function ProductForm({
             </div>
           </div>
         ) : null}
-
-        {/* Material, gramos, tiempo (h+m), altura de capa y tipo → precio.
-            Mismo motor que la calculadora (amortización + ganancia). */}
-        <div
-          className="mb-3.5 rounded-lg p-3"
-          style={{
-            background: "color-mix(in srgb, var(--surface-1) 60%, transparent)",
-          }}
-        >
-          <PriceEstimator
-            config={estimator.config}
-            materials={estimator.materials}
-            costMap={estimator.costMap}
-            presetOptions={estimator.presetOptions}
-            presets={estimator.presets}
-            isAdmin={estimator.isAdmin}
-            initial={{
-              material: defaultValues.material,
-              grams: Number(defaultValues.weightGrams) || 0,
-              printMinutes: Number(defaultValues.printTimeMinutes) || 0,
-              layerHeight: defaultValues.layerHeight,
-            }}
-            onChange={handleEst}
-          />
-        </div>
 
         <div className="field mb-3.5">
           <label htmlFor="infillPercent">Relleno (infill)</label>
