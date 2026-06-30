@@ -20,6 +20,11 @@ export function toManualSaleRow(
     total: input.total.toFixed(2),
     paymentMethod: input.paymentMethod,
     status: input.status,
+    // Reparto de esta venta (solo partes con % > 0). Null = dividir por socios actuales.
+    profitSplit:
+      input.profitSplit && input.profitSplit.length > 0
+        ? input.profitSplit.filter((p) => p.pct > 0)
+        : null,
     createdBy,
   };
 }

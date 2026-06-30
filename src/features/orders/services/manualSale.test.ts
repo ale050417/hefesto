@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { manualSaleSchema } from "../schemas";
+import { toManualSaleRow } from "./manualSaleService";
 
 const base = {
   saleDate: "2025-11-02",
@@ -51,5 +52,51 @@ describe("manualSaleSchema", () => {
     expect(
       manualSaleSchema.safeParse({ ...base, status: "lo_que_sea" }).success,
     ).toBe(false);
+  });
+
+  it("acepta un reparto (profitSplit) válido", () => {
+    const r = manualSaleSchema.safeParse({
+      ...base,
+      profitSplit: [
+        { name: "Yo", pct: 60 },
+        { name: "Socio", pct: "40" },
+      ],
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.profitSplit).toEqual([
+        { name: "Yo", pct: 60 },
+        { name: "Socio", pct: 40 },
+      ]);
+    }
+  });
+});
+
+describe("toManualSaleRow (profit_split)", () => {
+  const input = {
+    saleDate: "2025-11-02",
+    customerName: "Juan Pérez",
+    total: 12500,
+    paymentMethod: "cash" as const,
+    status: "delivered" as const,
+  };
+
+  it("sin reparto → profit_split null (divide por socios actuales)", () => {
+    const row = toManualSaleRow(input, null);
+    expect(row.profitSplit).toBeNull();
+  });
+
+  it("con reparto → guarda solo las partes con % > 0", () => {
+    const row = toManualSaleRow(
+      {
+        ...input,
+        profitSplit: [
+          { name: "Yo", pct: 100 },
+          { name: "Vacío", pct: 0 },
+        ],
+      },
+      null,
+    );
+    expect(row.profitSplit).toEqual([{ name: "Yo", pct: 100 }]);
   });
 });

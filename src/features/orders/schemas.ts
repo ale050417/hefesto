@@ -47,6 +47,16 @@ export const manualSaleSchema = z.object({
   ),
   total: z.coerce.number().positive("Ingresá el total cobrado."),
   paymentMethod: z.enum(["transfer", "mercadopago", "cash"]),
+  // Reparto de la ganancia de esta venta: [{nombre, pct}]. Opcional; si no viene,
+  // se divide por los socios actuales (lo resuelve el panel de ganancias).
+  profitSplit: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(120),
+        pct: z.coerce.number().min(0).max(100),
+      }),
+    )
+    .optional(),
   status: z.enum([
     "pending_payment",
     "confirmed",
