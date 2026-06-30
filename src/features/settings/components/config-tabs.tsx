@@ -9,7 +9,6 @@ import type {
   StoreBanner,
   TeamMember,
 } from "../types";
-import { BrandImageUpload } from "./brand-image-upload";
 import { BusinessConfigForm } from "./business-config-form";
 import { PaymentSettingsForm } from "./payment-settings-form";
 import { RolesManager } from "./roles-manager";
@@ -62,25 +61,7 @@ export function ConfigTabs({
         ))}
       </div>
 
-      {tab === "negocio" ? (
-        <div className="grid gap-5">
-          <BusinessConfigForm settings={settings} />
-          <div className="grid-2">
-            <BrandImageUpload
-              kind="logo"
-              label="Logo"
-              hint="Se muestra en el header y el footer."
-              currentUrl={settings?.logoUrl ?? null}
-            />
-            <BrandImageUpload
-              kind="hero"
-              label="Imagen del hero"
-              hint="Banner principal del home."
-              currentUrl={settings?.heroImageUrl ?? null}
-            />
-          </div>
-        </div>
-      ) : null}
+      {tab === "negocio" ? <BusinessConfigForm settings={settings} /> : null}
 
       {tab === "pagos" ? <PaymentSettingsForm settings={payment} /> : null}
 
