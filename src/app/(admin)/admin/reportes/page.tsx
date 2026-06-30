@@ -38,12 +38,22 @@ export default async function ReportesPage({
   const raw = Number(Array.isArray(sp.year) ? sp.year[0] : sp.year);
   const year = years.includes(raw) ? raw : thisYear;
 
-  const { kpis, monthsCurrent, monthsPrev, categoryBreakdown, topProducts } =
-    await getReportsOverview(year);
+  const {
+    kpis,
+    monthsCurrent,
+    monthsPrev,
+    categoryBreakdown,
+    topProducts,
+    bySource,
+  } = await getReportsOverview(year);
 
   const avgTicket =
     kpis.salesCount > 0 ? Math.round(kpis.revenue / kpis.salesCount) : 0;
   const maxQty = Math.max(1, ...topProducts.map((p) => p.qty));
+
+  const sourceTotal = bySource.storefront.revenue + bySource.manual.revenue;
+  const pct = (v: number) =>
+    sourceTotal > 0 ? Math.round((v / sourceTotal) * 100) : 0;
 
   return (
     <div className="view grid gap-5">
@@ -100,6 +110,37 @@ export default async function ReportesPage({
           value={String(kpis.newCustomers)}
           tint="#9B7BD4"
         />
+      </div>
+
+      <div className="ui-card section-card">
+        <div className="section-title mb-1">Ventas por origen · {year}</div>
+        <div className="text-faint mb-4 text-[12.5px]">
+          Cuánto se vendió desde la tienda online vs. cargado como venta manual.
+        </div>
+        <div className="grid-2">
+          {(
+            [
+              ["Tienda online", bySource.storefront, "#4CB782"],
+              ["Venta manual", bySource.manual, "#C9A84C"],
+            ] as const
+          ).map(([label, data, color]) => (
+            <div
+              key={label}
+              className="ui-card flex items-center justify-between"
+              style={{ padding: "13px 15px" }}
+            >
+              <div>
+                <div className="text-[13.5px] font-semibold">{label}</div>
+                <div className="text-faint text-[11.5px]">
+                  {data.count} ventas · {pct(data.revenue)}% del total
+                </div>
+              </div>
+              <b className="price text-[16px]" style={{ color }}>
+                {formatPrice(data.revenue)}
+              </b>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="grid-2">

@@ -3,6 +3,7 @@ import { db } from "@/core/db";
 import {
   categories,
   filaments,
+  manualSales,
   orderItems,
   orders,
   products,
@@ -103,6 +104,54 @@ export async function getReportKpis(
     salesCount: sales?.count ?? 0,
     unitsSold: units?.qty ?? 0,
     newCustomers: customers?.count ?? 0,
+  };
+}
+
+/**
+ * Ventas por ORIGEN del año: tienda (orders) vs venta manual (manual_sales).
+ * Mismo set de estados "vendido" para ambos. Para el reporte por canal.
+ */
+export async function getRevenueBySource(
+  year: number,
+  database: Database = db,
+): Promise<{
+  storefront: { revenue: number; count: number };
+  manual: { revenue: number; count: number };
+}> {
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const yearEnd = new Date(Date.UTC(year + 1, 0, 1));
+
+  const [store] = await database
+    .select({
+      revenue: sql<number>`coalesce(sum(${orders.total}), 0)::float8`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(orders)
+    .where(
+      and(
+        inArray(orders.status, SALES_STATUSES),
+        gte(orders.createdAt, yearStart),
+        lt(orders.createdAt, yearEnd),
+      ),
+    );
+
+  const [manual] = await database
+    .select({
+      revenue: sql<number>`coalesce(sum(${manualSales.total}), 0)::float8`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(manualSales)
+    .where(
+      and(
+        inArray(manualSales.status, SALES_STATUSES),
+        gte(manualSales.saleDate, yearStart),
+        lt(manualSales.saleDate, yearEnd),
+      ),
+    );
+
+  return {
+    storefront: { revenue: store?.revenue ?? 0, count: store?.count ?? 0 },
+    manual: { revenue: manual?.revenue ?? 0, count: manual?.count ?? 0 },
   };
 }
 

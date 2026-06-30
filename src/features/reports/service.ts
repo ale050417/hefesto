@@ -89,14 +89,21 @@ export async function getSalesCsv(from: Date, to: Date): Promise<string> {
 /** Datos del panel de Reportes (espejo del index): KPIs + series + breakdown. */
 export async function getReportsOverview(year: number) {
   const prevYear = year - 1;
-  const [kpis, monthsCurrent, monthsPrev, categoryBreakdown, topProducts] =
-    await Promise.all([
-      repo.getReportKpis(year),
-      repo.getMonthlyRevenue(year),
-      repo.getMonthlyRevenue(prevYear),
-      repo.getCategoryBreakdown(),
-      repo.getTopProducts(6),
-    ]);
+  const [
+    kpis,
+    monthsCurrent,
+    monthsPrev,
+    categoryBreakdown,
+    topProducts,
+    bySource,
+  ] = await Promise.all([
+    repo.getReportKpis(year),
+    repo.getMonthlyRevenue(year),
+    repo.getMonthlyRevenue(prevYear),
+    repo.getCategoryBreakdown(),
+    repo.getTopProducts(6),
+    repo.getRevenueBySource(year),
+  ]);
 
   return {
     year,
@@ -106,5 +113,6 @@ export async function getReportsOverview(year: number) {
     monthsPrev,
     categoryBreakdown,
     topProducts,
+    bySource,
   };
 }
