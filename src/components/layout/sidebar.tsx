@@ -98,6 +98,34 @@ const icons: Record<string, React.ReactNode> = {
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.81 1.17V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15H4.5a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 6 9.4 1.65 1.65 0 0 0 5.67 7.6l-.06-.06A2 2 0 1 1 8.44 4.7l.06.06A1.65 1.65 0 0 0 11 4.6V4.5a2 2 0 0 1 4 0v.09A1.65 1.65 0 0 0 19 9.4l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 15z" />
     </svg>
   ),
+  ganancias: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="12" y1="1" x2="12" y2="23" />
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+  ),
+  recompensas: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="20 12 20 22 4 22 4 12" />
+      <rect x="2" y="7" width="20" height="5" />
+      <line x1="12" y1="22" x2="12" y2="7" />
+      <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
+    </svg>
+  ),
   apariencia: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -107,50 +135,176 @@ const icons: Record<string, React.ReactNode> = {
   ),
 };
 
-const links = [
-  { href: "/admin", label: "Panel", icon: icons.panel, exact: true },
-  { href: "/admin/productos", label: "Productos", icon: icons.productos },
-  { href: "/admin/categorias", label: "Categorías", icon: icons.categorias },
-  { href: "/admin/pedidos", label: "Pedidos", icon: icons.pedidos },
-  { href: "/admin/medida", label: "A medida", icon: icons.medida },
-  { href: "/admin/clientes", label: "Clientes", icon: icons.clientes },
-  { href: "/admin/filamentos", label: "Filamentos", icon: icons.filamentos },
-  { href: "/admin/fallas", label: "Fallas", icon: icons.fallas },
-  { href: "/admin/produccion", label: "Producción", icon: icons.produccion },
-  { href: "/admin/descuentos", label: "Descuentos", icon: icons.descuentos },
-  { href: "/admin/reportes", label: "Reportes", icon: icons.reportes },
-  { href: "/admin/calculadora", label: "Calculadora", icon: icons.calculadora },
-  { href: "/admin/resenas", label: "Reseñas", icon: icons.resenas },
-  { href: "/admin/configuracion", label: "Configuración", icon: icons.config },
-  { href: "/admin/apariencia", label: "Apariencia", icon: icons.apariencia },
-  { href: "/admin/auditoria", label: "Auditoría", icon: icons.auditoria },
+type NavLink = {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  group: string;
+  exact?: boolean;
+  /** Módulo con permiso fino. Si el usuario no lo puede ver, se oculta. */
+  module?: string;
+};
+
+const links: NavLink[] = [
+  {
+    href: "/admin",
+    label: "Panel",
+    icon: icons.panel,
+    exact: true,
+    group: "Principal",
+  },
+  {
+    href: "/admin/pedidos",
+    label: "Pedidos",
+    icon: icons.pedidos,
+    group: "Ventas",
+    module: "pedidos",
+  },
+  {
+    href: "/admin/medida",
+    label: "A medida",
+    icon: icons.medida,
+    group: "Ventas",
+    module: "medida",
+  },
+  {
+    href: "/admin/clientes",
+    label: "Clientes",
+    icon: icons.clientes,
+    group: "Ventas",
+    module: "clientes",
+  },
+  {
+    href: "/admin/produccion",
+    label: "Cola de impresión",
+    icon: icons.produccion,
+    group: "Producción",
+    module: "produccion",
+  },
+  {
+    href: "/admin/filamentos",
+    label: "Filamentos",
+    icon: icons.filamentos,
+    group: "Producción",
+    module: "filamentos",
+  },
+  {
+    href: "/admin/fallas",
+    label: "Impresiones fallidas",
+    icon: icons.fallas,
+    group: "Producción",
+    module: "fallas",
+  },
+  {
+    href: "/admin/productos",
+    label: "Productos",
+    icon: icons.productos,
+    group: "Catálogo",
+    module: "productos",
+  },
+  {
+    href: "/admin/categorias",
+    label: "Categorías",
+    icon: icons.categorias,
+    group: "Catálogo",
+    module: "productos",
+  },
+  {
+    href: "/admin/descuentos",
+    label: "Descuentos",
+    icon: icons.descuentos,
+    group: "Crecimiento",
+    module: "descuentos",
+  },
+  {
+    href: "/admin/recompensas",
+    label: "Recompensas",
+    icon: icons.recompensas,
+    group: "Crecimiento",
+    module: "recompensas",
+  },
+  {
+    href: "/admin/resenas",
+    label: "Reseñas",
+    icon: icons.resenas,
+    group: "Crecimiento",
+    module: "resenas",
+  },
+  {
+    href: "/admin/reportes",
+    label: "Reportes",
+    icon: icons.reportes,
+    group: "Análisis",
+    module: "reportes",
+  },
+  {
+    href: "/admin/ganancias",
+    label: "Ganancias y socios",
+    icon: icons.ganancias,
+    group: "Análisis",
+    module: "ganancias",
+  },
+  {
+    href: "/admin/calculadora",
+    label: "Calculadora 3D",
+    icon: icons.calculadora,
+    group: "Análisis",
+    module: "calculadora",
+  },
+  {
+    href: "/admin/configuracion",
+    label: "Configuración",
+    icon: icons.config,
+    group: "Sistema",
+    module: "config",
+  },
+  {
+    href: "/admin/auditoria",
+    label: "Auditoría",
+    icon: icons.auditoria,
+    group: "Sistema",
+    module: "auditoria",
+  },
 ];
 
-export function Sidebar() {
+export function Sidebar({ perms }: { perms?: Record<string, boolean> }) {
   const pathname = usePathname();
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href);
 
+  // Oculta los ítems de módulos con permiso fino que el usuario no puede ver.
+  const visible = links.filter((l) => !l.module || perms?.[l.module] !== false);
+  const groups = [...new Set(visible.map((l) => l.group))];
+
   return (
     <aside className="admin-sidebar">
-      <Link href="/admin" className="brand mb-1 px-2 py-1">
+      <Link href="/admin" className="brand mb-2 px-2 py-1">
         <BrandMark size={30} />
         <span className="brand-name text-[15px]">
           HEFESTO<b> Admin</b>
         </span>
       </Link>
 
-      <span className="nav-section-label">Gestión</span>
       <nav className="admin-nav">
-        {links.map((l) => (
-          <Link
-            key={l.href}
-            href={l.href}
-            className={cn("nav-item", isActive(l.href, l.exact) && "active")}
-          >
-            {l.icon}
-            <span>{l.label}</span>
-          </Link>
+        {groups.map((g) => (
+          <div key={g}>
+            <span className="nav-section-label">{g}</span>
+            {visible
+              .filter((l) => l.group === g)
+              .map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className={cn(
+                    "nav-item",
+                    isActive(l.href, l.exact) && "active",
+                  )}
+                >
+                  {l.icon}
+                  <span>{l.label}</span>
+                </Link>
+              ))}
+          </div>
         ))}
       </nav>
 

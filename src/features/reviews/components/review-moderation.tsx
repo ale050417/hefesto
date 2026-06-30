@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useCan } from "@/components/auth/perms-provider";
 import { approveReviewAction, deleteReviewAction } from "../actions";
 
 export function ReviewModeration({
@@ -14,6 +15,8 @@ export function ReviewModeration({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const canEdit = useCan("resenas", "editar");
+  const canDelete = useCan("resenas", "eliminar");
 
   async function run(fn: () => Promise<unknown>) {
     setBusy(true);
@@ -22,9 +25,13 @@ export function ReviewModeration({
     router.refresh();
   }
 
+  if (!canEdit && !canDelete) {
+    return <span className="text-faint text-[12px]">Solo lectura</span>;
+  }
+
   return (
     <div className="flex justify-end gap-2">
-      {!isApproved ? (
+      {!isApproved && canEdit ? (
         <Button
           size="sm"
           disabled={busy}
@@ -33,14 +40,16 @@ export function ReviewModeration({
           Aprobar
         </Button>
       ) : null}
-      <Button
-        size="sm"
-        variant="danger"
-        disabled={busy}
-        onClick={() => run(() => deleteReviewAction(id))}
-      >
-        Eliminar
-      </Button>
+      {canDelete ? (
+        <Button
+          size="sm"
+          variant="danger"
+          disabled={busy}
+          onClick={() => run(() => deleteReviewAction(id))}
+        >
+          Eliminar
+        </Button>
+      ) : null}
     </div>
   );
 }

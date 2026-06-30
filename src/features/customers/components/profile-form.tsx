@@ -37,28 +37,49 @@ export function ProfileForm({
   });
 
   return (
-    <form onSubmit={onSubmit} className="ui-card space-y-3 p-5">
-      <h2 className="text-fg font-display text-base">Mis datos</h2>
+    <form onSubmit={onSubmit} className="ui-card p-6">
+      <h2 className="text-fg font-display mb-5 text-lg font-bold">
+        Datos personales
+      </h2>
       {err ? (
-        <p className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
+        <p className="bg-danger/10 text-danger mb-4 rounded-md px-3 py-2 text-sm">
           {err}
         </p>
       ) : null}
       {msg ? (
-        <p className="bg-success/10 text-success rounded-md px-3 py-2 text-sm">
+        <p className="bg-success/10 text-success mb-4 rounded-md px-3 py-2 text-sm">
           {msg}
         </p>
       ) : null}
-      <div>
-        <label className="text-dim mb-1 block text-xs">Nombre y apellido</label>
-        <input className="input" {...register("fullName")} />
-      </div>
-      <div>
-        <label className="text-dim mb-1 block text-xs">Teléfono</label>
-        <input className="input" {...register("phone")} />
+      <div className="mb-4 grid gap-4 sm:grid-cols-2">
+        <div>
+          <label className="text-dim mb-1.5 block text-xs">
+            Nombre y apellido
+          </label>
+          <input className="input" {...register("fullName")} />
+        </div>
+        <div>
+          <label className="text-dim mb-1.5 block text-xs">
+            Teléfono / WhatsApp
+          </label>
+          <input className="input" {...register("phone")} />
+        </div>
       </div>
       <Button type="submit" disabled={isSubmitting}>
-        Guardar
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          width="16"
+          height="16"
+          aria-hidden
+        >
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+        Guardar cambios
       </Button>
     </form>
   );
