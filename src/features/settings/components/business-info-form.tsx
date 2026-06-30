@@ -23,6 +23,7 @@ export function BusinessInfoForm({
     setPending(true);
     const res = await saveBusinessInfoAction({
       storeName: String(fd.get("storeName") ?? ""),
+      slogan: String(fd.get("slogan") ?? ""),
       description: String(fd.get("description") ?? ""),
       whatsapp: String(fd.get("whatsapp") ?? ""),
       contactEmail: String(fd.get("contactEmail") ?? ""),
@@ -54,6 +55,20 @@ export function BusinessInfoForm({
             placeholder="Hefesto 3D"
           />
         </div>
+        <div>
+          <label className={labelCls} htmlFor="slogan">
+            Eslogan (bajo el logo)
+          </label>
+          <input
+            id="slogan"
+            name="slogan"
+            className="input"
+            defaultValue={settings?.slogan ?? ""}
+            placeholder="Forjado en capas"
+          />
+        </div>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label className={labelCls} htmlFor="whatsapp">
             WhatsApp (con código país)
