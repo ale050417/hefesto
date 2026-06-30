@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Orbitron, Sora } from "next/font/google";
 import { siteName, siteUrl } from "@/lib/site";
 import { Toaster } from "@/components/ui/toaster";
+import { ThemeApplier } from "@/features/settings/components/theme-applier";
 import "./globals.css";
 
 const orbitron = Orbitron({
@@ -49,6 +50,9 @@ export default function RootLayout({
       lang="es"
       data-theme="light"
       className={`${orbitron.variable} ${sora.variable}`}
+      // El script inline ajusta data-theme desde localStorage antes de hidratar;
+      // suprimimos el warning de mismatch SOLO en <html> (patrón estándar de tema).
+      suppressHydrationWarning
     >
       <body>
         <script
@@ -57,6 +61,7 @@ export default function RootLayout({
               "try{var t=localStorage.getItem('hefesto-theme');if(t&&t!=='system')document.documentElement.setAttribute('data-theme',t)}catch(e){}",
           }}
         />
+        <ThemeApplier />
         {children}
         <Toaster />
       </body>
