@@ -11,6 +11,7 @@ import {
   getProductAdmin,
   listCategories,
 } from "@/features/products/services/catalogService";
+import { getEstimatorContext } from "@/features/calculator/service";
 
 export const dynamic = "force-dynamic";
 
@@ -21,9 +22,10 @@ export default async function EditarProductoPage({
 }) {
   await requirePermissionPage("productos", "editar");
   const { id } = await params;
-  const [data, categories] = await Promise.all([
+  const [data, categories, estimator] = await Promise.all([
     getProductAdmin(id),
     listCategories(),
+    getEstimatorContext(),
   ]);
   if (!data) notFound();
   const { product, images } = data;
@@ -74,6 +76,7 @@ export default async function EditarProductoPage({
             productId={product.id}
             categories={categories}
             defaultValues={defaults}
+            estimator={estimator}
           />
         </div>
         <div>

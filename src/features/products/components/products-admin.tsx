@@ -13,6 +13,7 @@ import type {
   ProductImage,
   ProductStatus,
 } from "../types";
+import type { EstimatorContext } from "@/features/calculator/service";
 import { ProductForm, type ProductFormValues } from "./product-form";
 import { ImageUpload } from "./image-upload";
 import { ProductStatusActions } from "./product-status-actions";
@@ -119,9 +120,11 @@ const Icon = {
 export function ProductsAdmin({
   products,
   categories,
+  estimator,
 }: {
   products: AdminProductRow[];
   categories: Category[];
+  estimator: EstimatorContext;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -500,6 +503,7 @@ export function ProductsAdmin({
             mode="create"
             categories={categories}
             defaultValues={EMPTY_DEFAULTS}
+            estimator={estimator}
             onSaved={handleSaved}
           />
         ) : modal.open && modal.mode === "edit" ? (
@@ -515,6 +519,7 @@ export function ProductsAdmin({
               productId={modal.productId}
               categories={categories}
               defaultValues={modal.defaults}
+              estimator={estimator}
               onSaved={() => {
                 toast("Producto guardado", "success");
                 router.refresh();

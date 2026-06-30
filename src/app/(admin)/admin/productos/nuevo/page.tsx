@@ -5,6 +5,7 @@ import {
   type ProductFormValues,
 } from "@/features/products/components/product-form";
 import { listCategories } from "@/features/products/services/catalogService";
+import { getEstimatorContext } from "@/features/calculator/service";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,10 @@ const emptyDefaults: ProductFormValues = {
 
 export default async function NuevoProductoPage() {
   await requirePermissionPage("productos", "crear");
-  const categories = await listCategories();
+  const [categories, estimator] = await Promise.all([
+    listCategories(),
+    getEstimatorContext(),
+  ]);
   if (categories.length === 0) {
     return (
       <div className="mx-auto max-w-2xl">
@@ -67,6 +71,7 @@ export default async function NuevoProductoPage() {
           mode="create"
           categories={categories}
           defaultValues={emptyDefaults}
+          estimator={estimator}
         />
       </div>
     </div>

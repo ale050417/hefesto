@@ -5,6 +5,11 @@ import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  PriceEstimator,
+  type EstimatorValue,
+} from "@/features/calculator/components/price-estimator";
+import type { EstimatorContext } from "@/features/calculator/service";
 import { createProductAction, updateProductAction } from "../actions";
 import type { Category } from "../types";
 
@@ -41,14 +46,6 @@ const FILAMENT_COLORS = [
   { n: "Translúcido", c: "#cfe6ee" },
   { n: "Arcoíris", c: "#d98a5a" },
 ];
-const LAYER_HEIGHTS = [
-  "0.08 mm (ultra detalle)",
-  "0.12 mm (fino)",
-  "0.16 mm (estándar)",
-  "0.20 mm (normal)",
-  "0.28 mm (rápido)",
-];
-
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -63,12 +60,15 @@ export function ProductForm({
   productId,
   categories,
   defaultValues,
+  estimator,
   onSaved,
 }: {
   mode: "create" | "edit";
   productId?: string;
   categories: Category[];
   defaultValues: ProductFormValues;
+  /** Contexto de la calculadora embebida (config, filamentos, tipos, isAdmin). */
+  estimator: EstimatorContext;
   /** Si se pasa, en vez de navegar avisa al contenedor (uso en modal). */
   onSaved?: (id: string) => void;
 }) {
@@ -81,6 +81,20 @@ export function ProductForm({
   const [colorPrices, setColorPrices] = useState<Record<string, number>>(
     defaultValues.colorPrices ?? {},
   );
+  // Ficha técnica (material/peso/tiempo/altura) la maneja el PriceEstimator;
+  // acá guardamos su último valor para el payload.
+  const [est, setEst] = useState<EstimatorValue>({
+    material: defaultValues.material ?? "",
+    grams: Number(defaultValues.weightGrams) || 0,
+    printMinutes: Number(defaultValues.printTimeMinutes) || 0,
+    layerHeight: defaultValues.layerHeight ?? "",
+    presetId: "",
+    price: null,
+  });
+  // El precio se autocompleta con el sugerido (solo cuando elegís un tipo y hay
+  // datos) salvo que lo edites a mano. En edición, el precio guardado se respeta
+  // hasta que elijas un tipo para recalcular.
+  const [priceTouched, setPriceTouched] = useState(false);
   const {
     register,
     handleSubmit,
@@ -99,10 +113,22 @@ export function ProductForm({
     );
   }
 
+  function handleEst(v: EstimatorValue) {
+    setEst(v);
+    if (!priceTouched && v.price != null) {
+      setValue("price", String(v.price));
+    }
+  }
+
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
     const payload: ProductFormValues = {
       ...values,
+      // Ficha técnica desde el estimador (fuente única).
+      material: est.material,
+      weightGrams: est.grams ? String(est.grams) : "",
+      printTimeMinutes: est.printMinutes ? String(est.printMinutes) : "",
+      layerHeight: est.layerHeight,
       colorMode,
       colors,
       colorPrices:
@@ -194,31 +220,21 @@ export function ProductForm({
         />
       </div>
 
-      <div className="grid-2">
-        <div className="field">
-          <label htmlFor="categoryId">Categoría</label>
-          <select
-            id="categoryId"
-            className="select"
-            {...register("categoryId")}
-          >
-            <option value="" disabled>
-              Elegí una categoría
+      <div className="field">
+        <label htmlFor="categoryId">Categoría</label>
+        <select id="categoryId" className="select" {...register("categoryId")}>
+          <option value="" disabled>
+            Elegí una categoría
+          </option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
             </option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          {errors.categoryId ? (
-            <p className="text-danger text-xs">{errors.categoryId.message}</p>
-          ) : null}
-        </div>
-        <div className="field">
-          <label htmlFor="material">Material / filamento</label>
-          <input id="material" className="input" {...register("material")} />
-        </div>
+          ))}
+        </select>
+        {errors.categoryId ? (
+          <p className="text-danger text-xs">{errors.categoryId.message}</p>
+        ) : null}
       </div>
 
       <div className="grid-2">
@@ -229,8 +245,11 @@ export function ProductForm({
             type="number"
             step="0.01"
             className="input"
-            {...register("price")}
+            {...register("price", { onChange: () => setPriceTouched(true) })}
           />
+          <div className="text-faint text-[11.5px]">
+            Se completa solo con el precio sugerido; podés editarlo.
+          </div>
           {errors.price ? (
             <p className="text-danger text-xs">{errors.price.message}</p>
           ) : null}
@@ -370,50 +389,49 @@ export function ProductForm({
           </div>
         ) : null}
 
-        <div className="grid-3 mb-3.5">
-          <div className="field">
-            <label htmlFor="layerHeight">Altura de capa</label>
-            <select
-              id="layerHeight"
-              className="select"
-              {...register("layerHeight")}
-            >
-              <option value="">—</option>
-              {LAYER_HEIGHTS.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label htmlFor="infillPercent">Relleno (infill)</label>
-            <div className="flex items-center gap-2">
-              <input
-                id="infillPercent"
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                className="range"
-                {...register("infillPercent")}
-              />
-              <b
-                className="min-w-[42px] text-right"
-                style={{ color: "var(--gold-bright)" }}
-              >
-                {infill || 0}%
-              </b>
-            </div>
-          </div>
-          <div className="field">
-            <label htmlFor="printTimeMinutes">Tiempo de impresión (min)</label>
+        {/* Material, gramos, tiempo (h+m), altura de capa y tipo → precio.
+            Mismo motor que la calculadora (amortización + ganancia). */}
+        <div
+          className="mb-3.5 rounded-lg p-3"
+          style={{
+            background: "color-mix(in srgb, var(--surface-1) 60%, transparent)",
+          }}
+        >
+          <PriceEstimator
+            config={estimator.config}
+            materials={estimator.materials}
+            costMap={estimator.costMap}
+            presetOptions={estimator.presetOptions}
+            presets={estimator.presets}
+            isAdmin={estimator.isAdmin}
+            initial={{
+              material: defaultValues.material,
+              grams: Number(defaultValues.weightGrams) || 0,
+              printMinutes: Number(defaultValues.printTimeMinutes) || 0,
+              layerHeight: defaultValues.layerHeight,
+            }}
+            onChange={handleEst}
+          />
+        </div>
+
+        <div className="field mb-3.5">
+          <label htmlFor="infillPercent">Relleno (infill)</label>
+          <div className="flex items-center gap-2">
             <input
-              id="printTimeMinutes"
-              type="number"
-              className="input"
-              {...register("printTimeMinutes")}
+              id="infillPercent"
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              className="range"
+              {...register("infillPercent")}
             />
+            <b
+              className="min-w-[42px] text-right"
+              style={{ color: "var(--gold-bright)" }}
+            >
+              {infill || 0}%
+            </b>
           </div>
         </div>
 
@@ -432,25 +450,14 @@ export function ProductForm({
           />
         </div>
 
-        <div className="grid-2">
-          <div className="field">
-            <label htmlFor="weightGrams">Peso (g)</label>
-            <input
-              id="weightGrams"
-              type="number"
-              className="input"
-              {...register("weightGrams")}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="dimensions">Dimensiones</label>
-            <input
-              id="dimensions"
-              className="input"
-              placeholder="Ej: 10 × 8 × 12 cm"
-              {...register("dimensions")}
-            />
-          </div>
+        <div className="field">
+          <label htmlFor="dimensions">Dimensiones</label>
+          <input
+            id="dimensions"
+            className="input"
+            placeholder="Ej: 10 × 8 × 12 cm"
+            {...register("dimensions")}
+          />
         </div>
       </div>
 
