@@ -193,7 +193,7 @@ export function FailureForm({
             role="switch"
             aria-checked={deduct}
             aria-label="Descontar del stock"
-            className={`switch${deduct ? "on" : ""}`}
+            className={`switch ${deduct ? "on" : ""}`}
             onClick={() => setDeduct((d) => !d)}
           />
         </div>

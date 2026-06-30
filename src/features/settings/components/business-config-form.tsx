@@ -180,7 +180,7 @@ export function BusinessConfigForm({
               role="switch"
               aria-checked={h.on}
               aria-label={h.label}
-              className={`switch${h.on ? "on" : ""}`}
+              className={`switch ${h.on ? "on" : ""}`}
               onClick={() => setHour(i, { on: !h.on })}
             />
             <input
@@ -230,7 +230,7 @@ export function BusinessConfigForm({
             role="switch"
             aria-checked={pickup}
             aria-label="Retiro en local"
-            className={`switch${pickup ? "on" : ""}`}
+            className={`switch ${pickup ? "on" : ""}`}
             onClick={() => setPickup((v) => !v)}
           />
         </div>
@@ -249,7 +249,7 @@ export function BusinessConfigForm({
             role="switch"
             aria-checked={delivery}
             aria-label="Envío a domicilio"
-            className={`switch${delivery ? "on" : ""}`}
+            className={`switch ${delivery ? "on" : ""}`}
             onClick={() => setDelivery((v) => !v)}
           />
         </div>

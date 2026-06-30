@@ -182,7 +182,7 @@ export default async function AdminCustomPage({
             <Link
               key={f.key}
               href={href}
-              className={`chip${filter === f.key ? "active" : ""}`}
+              className={`chip ${filter === f.key ? "active" : ""}`}
             >
               {f.label} <b style={{ opacity: 0.6 }}>{counts[f.key]}</b>
             </Link>

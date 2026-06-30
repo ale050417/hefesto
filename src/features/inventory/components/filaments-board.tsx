@@ -151,7 +151,7 @@ export function FilamentsBoard({
           />
         </div>
         <button
-          className={`chip${mat === "all" ? "active" : ""}`}
+          className={`chip ${mat === "all" ? "active" : ""}`}
           onClick={() => setMat("all")}
         >
           Todos
@@ -159,7 +159,7 @@ export function FilamentsBoard({
         {materials.map((m) => (
           <button
             key={m}
-            className={`chip${mat === m ? "active" : ""}`}
+            className={`chip ${mat === m ? "active" : ""}`}
             onClick={() => setMat(m)}
           >
             {m}

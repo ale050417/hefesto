@@ -51,7 +51,7 @@ export function PaymentSettingsForm({
             role="switch"
             aria-checked={form.transferEnabled}
             aria-label="Transferencia"
-            className={`switch${form.transferEnabled ? "on" : ""}`}
+            className={`switch ${form.transferEnabled ? "on" : ""}`}
             onClick={() => set("transferEnabled", !form.transferEnabled)}
           />
         </div>
@@ -94,7 +94,7 @@ export function PaymentSettingsForm({
             role="switch"
             aria-checked={form.mpEnabled}
             aria-label="MercadoPago"
-            className={`switch${form.mpEnabled ? "on" : ""}`}
+            className={`switch ${form.mpEnabled ? "on" : ""}`}
             onClick={() => set("mpEnabled", !form.mpEnabled)}
           />
         </div>
@@ -125,7 +125,7 @@ export function PaymentSettingsForm({
             role="switch"
             aria-checked={form.cashEnabled}
             aria-label="Efectivo"
-            className={`switch${form.cashEnabled ? "on" : ""}`}
+            className={`switch ${form.cashEnabled ? "on" : ""}`}
             onClick={() => set("cashEnabled", !form.cashEnabled)}
           />
         </div>

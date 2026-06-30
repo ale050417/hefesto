@@ -54,7 +54,7 @@ export function ConfigTabs({
           <button
             key={id}
             type="button"
-            className={`tab${tab === id ? "active" : ""}`}
+            className={`tab ${tab === id ? "active" : ""}`}
             onClick={() => setTab(id)}
           >
             {label}

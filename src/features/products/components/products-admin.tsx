@@ -258,7 +258,7 @@ export function ProductsAdmin({
           />
         </div>
         <button
-          className={`chip${catFilter === "all" ? "active" : ""}`}
+          className={`chip ${catFilter === "all" ? "active" : ""}`}
           onClick={() => setCatFilter("all")}
         >
           Todas
@@ -266,7 +266,7 @@ export function ProductsAdmin({
         {categories.map((c) => (
           <button
             key={c.id}
-            className={`chip${catFilter === c.id ? "active" : ""}`}
+            className={`chip ${catFilter === c.id ? "active" : ""}`}
             onClick={() => setCatFilter(c.id)}
           >
             {c.name}

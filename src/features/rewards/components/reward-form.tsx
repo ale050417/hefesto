@@ -86,7 +86,7 @@ export function RewardForm({
             <button
               key={k}
               type="button"
-              className={`chip${type === k ? "active" : ""}`}
+              className={`chip ${type === k ? "active" : ""}`}
               onClick={() => setType(k)}
             >
               {REWARD_TYPES[k].label}
