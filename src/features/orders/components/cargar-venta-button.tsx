@@ -5,7 +5,11 @@ import { Modal } from "@/components/ui/modal";
 import { useCan } from "@/components/auth/perms-provider";
 import { ManualSaleForm } from "./manual-order-form";
 
-export function CargarVentaButton() {
+export function CargarVentaButton({
+  partners = [],
+}: {
+  partners?: Array<{ name: string; pct: number }>;
+}) {
   const [open, setOpen] = useState(false);
   const canCreate = useCan("pedidos", "crear");
   if (!canCreate) return null;
@@ -36,6 +40,7 @@ export function CargarVentaButton() {
         size="lg"
       >
         <ManualSaleForm
+          partners={partners}
           onDone={() => setOpen(false)}
           onCancel={() => setOpen(false)}
         />

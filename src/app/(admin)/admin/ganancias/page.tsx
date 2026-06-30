@@ -40,7 +40,7 @@ export default async function GananciasPage({
   await requirePermissionPage("ganancias", "ver");
   const canEdit = await can("ganancias", "editar");
   const sp = await searchParams;
-  const { settings, shares, rows, totals, months, selectedMonth } =
+  const { settings, shares, rows, totals, months, selectedMonth, payouts } =
     await getEarningsOverview(first(sp.mes));
 
   const pctProfit =
@@ -118,15 +118,15 @@ export default async function GananciasPage({
             Sobre {formatPrice(totals.profit)} de ganancia pura
             {periodo ? ` de ${periodo}` : " acumulada"}.
           </div>
-          {shares.length === 0 ? (
+          {payouts.length === 0 ? (
             <p className="text-dim text-sm">
-              Agregá socios para ver el reparto.
+              Agregá socios o cargá ventas para ver el reparto.
             </p>
           ) : (
             <div className="flex flex-col gap-2">
-              {shares.map((s, i) => (
+              {payouts.map((p, i) => (
                 <div
-                  key={s.id}
+                  key={p.name}
                   className="ui-card flex items-center justify-between"
                   style={{ padding: "13px 15px" }}
                 >
@@ -140,22 +140,15 @@ export default async function GananciasPage({
                         background: GN_COLORS[i % GN_COLORS.length],
                       }}
                     >
-                      {(s.name || "?")[0]?.toUpperCase()}
+                      {(p.name || "?")[0]?.toUpperCase()}
                     </span>
-                    <div>
-                      <div className="text-[13.5px] font-semibold">
-                        {s.name}
-                      </div>
-                      <div className="text-faint text-[11.5px]">
-                        {s.role ?? "—"} · {Number(s.pct)}%
-                      </div>
-                    </div>
+                    <div className="text-[13.5px] font-semibold">{p.name}</div>
                   </div>
                   <b
                     className="price text-[16px]"
                     style={{ color: "var(--success)" }}
                   >
-                    {formatPrice((totals.profit * Number(s.pct)) / 100)}
+                    {formatPrice(p.amount)}
                   </b>
                 </div>
               ))}
@@ -180,53 +173,61 @@ export default async function GananciasPage({
                   <th className="text-right">Ingreso</th>
                   <th className="text-right">Amortización</th>
                   <th className="text-right">Ganancia pura</th>
-                  {shares.map((s, i) => (
+                  {payouts.map((p, i) => (
                     <th
-                      key={s.id}
+                      key={p.name}
                       className="text-right"
                       style={{ color: GN_COLORS[i % GN_COLORS.length] }}
                     >
-                      {(s.name || "").split(" ")[0]}{" "}
-                      <span style={{ opacity: 0.7 }}>{Number(s.pct)}%</span>
+                      {(p.name || "").split(" ")[0]}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {rows.map((o) => (
-                  <tr key={o.id}>
-                    <td>
-                      <b>{o.orderNumber}</b>
-                      <div className="text-faint text-[11.5px]">
-                        {dateFmt.format(o.createdAt)}
-                      </div>
-                    </td>
-                    <td>{o.customerName ?? "—"}</td>
-                    <td className="price text-right">
-                      {formatPrice(o.ingreso)}
-                    </td>
-                    <td
-                      className="price text-right"
-                      style={{ color: "var(--warning)" }}
-                    >
-                      −{formatPrice(o.amort)}
-                    </td>
-                    <td className="price text-right">
-                      <b style={{ color: "var(--success)" }}>
-                        {formatPrice(o.gananciaPura)}
-                      </b>
-                    </td>
-                    {shares.map((s, i) => (
-                      <td key={s.id} className="price text-right">
-                        <span
-                          style={{ color: GN_COLORS[i % GN_COLORS.length] }}
-                        >
-                          {formatPrice((o.gananciaPura * Number(s.pct)) / 100)}
-                        </span>
+                {rows.map((o) => {
+                  const splitMap = new Map(
+                    o.split.map((s) => [s.name, s.amount]),
+                  );
+                  return (
+                    <tr key={o.id}>
+                      <td>
+                        <b>{o.orderNumber}</b>
+                        <div className="text-faint text-[11.5px]">
+                          {dateFmt.format(o.createdAt)}
+                        </div>
                       </td>
-                    ))}
-                  </tr>
-                ))}
+                      <td>{o.customerName ?? "—"}</td>
+                      <td className="price text-right">
+                        {formatPrice(o.ingreso)}
+                      </td>
+                      <td
+                        className="price text-right"
+                        style={{ color: "var(--warning)" }}
+                      >
+                        −{formatPrice(o.amort)}
+                      </td>
+                      <td className="price text-right">
+                        <b style={{ color: "var(--success)" }}>
+                          {formatPrice(o.gananciaPura)}
+                        </b>
+                      </td>
+                      {payouts.map((p, i) => (
+                        <td key={p.name} className="price text-right">
+                          {splitMap.has(p.name) ? (
+                            <span
+                              style={{ color: GN_COLORS[i % GN_COLORS.length] }}
+                            >
+                              {formatPrice(splitMap.get(p.name) ?? 0)}
+                            </span>
+                          ) : (
+                            <span className="text-faint">—</span>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr>
@@ -247,10 +248,10 @@ export default async function GananciasPage({
                       {formatPrice(totals.profit)}
                     </b>
                   </td>
-                  {shares.map((s, i) => (
-                    <td key={s.id} className="price text-right">
+                  {payouts.map((p, i) => (
+                    <td key={p.name} className="price text-right">
                       <b style={{ color: GN_COLORS[i % GN_COLORS.length] }}>
-                        {formatPrice((totals.profit * Number(s.pct)) / 100)}
+                        {formatPrice(p.amount)}
                       </b>
                     </td>
                   ))}
