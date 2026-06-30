@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { compressImageToWebp } from "@/lib/image-compress";
 import {
   deleteProductImageAction,
   setPrimaryImageAction,
@@ -33,9 +34,10 @@ export function ImageUpload({
     setError(null);
     startTransition(async () => {
       for (const file of files) {
+        const compact = await compressImageToWebp(file, 1600);
         const fd = new FormData();
         fd.set("productId", productId);
-        fd.set("file", file);
+        fd.set("file", compact);
         const res = await uploadProductImageAction(fd);
         if (!res.ok) setError(res.error.message);
       }

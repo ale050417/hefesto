@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { compressImageToWebp } from "@/lib/image-compress";
 import { uploadBrandImageAction } from "../actions";
 
 export function BrandImageUpload({
@@ -28,9 +29,15 @@ export function BrandImageUpload({
     if (!file) return;
     setBusy(true);
     setError(null);
+    // Convertimos a WebP y redimensionamos en el navegador (logo más chico que
+    // hero). Así el upload pesa poco y no choca con el límite del Server Action.
+    const compact = await compressImageToWebp(
+      file,
+      kind === "logo" ? 600 : 1600,
+    );
     const fd = new FormData();
     fd.set("kind", kind);
-    fd.set("file", file);
+    fd.set("file", compact);
     const res = await uploadBrandImageAction(fd);
     setBusy(false);
     if (inputRef.current) inputRef.current.value = "";

@@ -5,6 +5,7 @@ import { useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "@/stores/toastStore";
+import { compressImageToWebp } from "@/lib/image-compress";
 import {
   createBannerAction,
   deleteBannerAction,
@@ -131,8 +132,9 @@ export function StoreAppearance({
     const file = e.target.files?.[0];
     if (!file) return;
     setImgBusy(true);
+    const compact = await compressImageToWebp(file, 1600);
     const fd = new FormData();
-    fd.set("file", file);
+    fd.set("file", compact);
     const res = await uploadBannerImageAction(fd);
     setImgBusy(false);
     if (bannerFileRef.current) bannerFileRef.current.value = "";
