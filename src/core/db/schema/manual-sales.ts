@@ -24,6 +24,10 @@ export const manualSales = pgTable(
     customerName: text("customer_name").notNull(),
     detail: text("detail"),
     total: numeric("total", { precision: 12, scale: 2 }).notNull(),
+    // Costos cargados con la calculadora: amortización (costo) y ganancia
+    // (total − amortización). La ganancia es lo que se reparte entre socios.
+    amortization: numeric("amortization", { precision: 12, scale: 2 }),
+    profit: numeric("profit", { precision: 12, scale: 2 }),
     paymentMethod: paymentMethod("payment_method").notNull(),
     status: orderStatus("status").notNull().default("delivered"),
     // Reparto de la ganancia de ESTA venta (foto del momento): [{nombre, pct}].

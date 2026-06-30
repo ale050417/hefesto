@@ -30,6 +30,10 @@ export const products = pgTable(
       .references(() => categories.id, { onDelete: "restrict" }),
     price: numeric("price", { precision: 12, scale: 2 }).notNull(),
     salePrice: numeric("sale_price", { precision: 12, scale: 2 }),
+    // Costos del producto (cargados con la calculadora al crear/editar).
+    // amortization = costo de producir; profit = precio − amortización.
+    amortization: numeric("amortization", { precision: 12, scale: 2 }),
+    profit: numeric("profit", { precision: 12, scale: 2 }),
     material: text("material"),
     printTimeMinutes: integer("print_time_minutes"),
     weightGrams: integer("weight_grams"),
