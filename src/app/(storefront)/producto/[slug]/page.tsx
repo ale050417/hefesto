@@ -13,7 +13,6 @@ import {
   getProductBySlug,
   getRelatedProducts,
 } from "@/features/products/services/catalogService";
-import { formatMinutes } from "@/lib/format";
 import { siteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -46,20 +45,11 @@ export default async function ProductPage({ params }: Params) {
   const user = await getCurrentUser();
   const reviews = await getProductReviewsFor(product.id, user?.id ?? null);
 
+  // Solo lo que le interesa al cliente. Nada técnico (gramos, tiempo de
+  // impresión, material, altura de capa): eso es interno del taller.
   const specs: { label: string; value: string }[] = [];
-  if (product.material)
-    specs.push({ label: "Material", value: product.material });
-  if (product.printTimeMinutes) {
-    specs.push({
-      label: "Tiempo de impresión",
-      value: formatMinutes(product.printTimeMinutes),
-    });
-  }
-  if (product.weightGrams) {
-    specs.push({ label: "Peso", value: `${product.weightGrams} g` });
-  }
   if (product.dimensions) {
-    specs.push({ label: "Dimensiones", value: product.dimensions });
+    specs.push({ label: "Tamaño", value: product.dimensions });
   }
 
   const effectivePrice =
