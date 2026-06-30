@@ -235,21 +235,13 @@ export function StoreAppearance({
     <div className="store-cfg-grid" style={{ gap: 24 }}>
       {/* COLUMNA IZQUIERDA */}
       <div className="flex flex-col gap-4">
-        {/* Logo / Hero */}
-        <div className="grid-2">
-          <BrandImageUpload
-            kind="logo"
-            label="Logo"
-            hint="Header y pie. PNG con fondo transparente."
-            currentUrl={settings?.logoUrl ?? null}
-          />
-          <BrandImageUpload
-            kind="hero"
-            label="Imagen del hero"
-            hint="Portada del home. Horizontal."
-            currentUrl={settings?.heroImageUrl ?? null}
-          />
-        </div>
+        {/* Logo (la portada/hero se maneja desde "Banners del hero" más abajo) */}
+        <BrandImageUpload
+          kind="logo"
+          label="Logo"
+          hint="Header y pie. PNG con fondo transparente."
+          currentUrl={settings?.logoUrl ?? null}
+        />
 
         {/* Identidad */}
         <div className="ui-card section-card flex flex-col gap-4">
@@ -620,6 +612,12 @@ export function StoreAppearance({
         size="lg"
       >
         <div className="flex flex-col gap-4">
+          {/* Vista previa en vivo de cómo se ve el banner en el hero */}
+          <BannerLivePreview
+            banner={bf}
+            accent={seasonActive ? SEASONS[form.season].accent : form.accent}
+          />
+
           <div className="field">
             <label>Título</label>
             <input
@@ -757,6 +755,116 @@ export function StoreAppearance({
           </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+/** Vista previa en vivo del banner del hero mientras se carga (admin). */
+function BannerLivePreview({
+  banner,
+  accent,
+}: {
+  banner: BannerForm;
+  accent: string;
+}) {
+  const align = banner.align ?? "left";
+  const hasImg = Boolean(banner.imageUrl);
+  const title = banner.title.trim() || "Título del banner";
+  const words = title.split(" ");
+  const last = words.length > 1 ? words.pop() : null;
+
+  const justify =
+    align === "center"
+      ? "center"
+      : align === "right"
+        ? "flex-end"
+        : "flex-start";
+
+  return (
+    <div className="field">
+      <label>Vista previa</label>
+      <div
+        style={{
+          position: "relative",
+          aspectRatio: "8 / 3",
+          borderRadius: "var(--radius-md)",
+          overflow: "hidden",
+          border: "1px solid var(--border)",
+          background: hasImg
+            ? `linear-gradient(rgba(10,8,4,.55), rgba(10,8,4,.55)), center/cover url('${banner.imageUrl}')`
+            : `linear-gradient(135deg, ${accent}33, var(--surface-2))`,
+          color: hasImg ? "#fff" : "var(--fg)",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: justify,
+          textAlign: align,
+          padding: "20px 22px",
+          gap: 8,
+        }}
+      >
+        <div
+          className="font-display"
+          style={{
+            fontSize: 22,
+            fontWeight: 900,
+            lineHeight: 1.1,
+            maxWidth: "85%",
+          }}
+        >
+          {last ? (
+            <>
+              {words.join(" ")} <span style={{ color: accent }}>{last}</span>
+            </>
+          ) : (
+            title
+          )}
+        </div>
+        {banner.subtitle.trim() ? (
+          <div
+            style={{
+              fontSize: 12,
+              opacity: hasImg ? 0.9 : 0.7,
+              maxWidth: "80%",
+            }}
+          >
+            {banner.subtitle}
+          </div>
+        ) : null}
+        <span
+          className="font-semibold"
+          style={{
+            marginTop: 4,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            background: accent,
+            color: "#1a1505",
+            borderRadius: 999,
+            padding: "7px 14px",
+            fontSize: 12,
+            width: "fit-content",
+          }}
+        >
+          {banner.ctaText.trim() || "Ver catálogo"}
+        </span>
+        {!banner.isActive ? (
+          <span
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              background: "rgba(0,0,0,.6)",
+              color: "#fff",
+              borderRadius: 999,
+              padding: "3px 9px",
+              fontSize: 10,
+            }}
+          >
+            Oculto
+          </span>
+        ) : null}
+      </div>
     </div>
   );
 }
