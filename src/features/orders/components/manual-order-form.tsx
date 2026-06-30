@@ -3,6 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  PriceEstimator,
+  type EstimatorValue,
+} from "@/features/calculator/components/price-estimator";
+import type { EstimatorContext } from "@/features/calculator/service";
 import { createManualSaleAction } from "../actions";
 
 const PAYS = [
@@ -25,13 +30,15 @@ type SplitPart = { name: string; pct: string };
 
 export function ManualSaleForm({
   partners = [],
+  estimator,
   onDone,
   onCancel,
 }: {
   partners?: Array<{ name: string; pct: number }>;
+  estimator: EstimatorContext;
   onDone?: () => void;
   onCancel?: () => void;
-} = {}) {
+}) {
   const router = useRouter();
   const [form, setForm] = useState({
     saleDate: today(),
@@ -41,6 +48,14 @@ export function ManualSaleForm({
     paymentMethod: "cash" as (typeof PAYS)[number]["v"],
     status: "delivered" as (typeof STATUSES)[number]["v"],
   });
+  // El total se autocompleta con el precio del configurador salvo que lo edites.
+  const [totalTouched, setTotalTouched] = useState(false);
+
+  function handleEst(v: EstimatorValue) {
+    if (!totalTouched && v.price != null) {
+      setForm((f) => ({ ...f, total: String(v.price) }));
+    }
+  }
   // Reparto de la ganancia de ESTA venta. "current" = dividir por los socios
   // actuales (no se manda nada; lo resuelve Ganancias). "custom" = guardar este
   // reparto fijo (útil para ventas viejas: cuando trabajabas solo o eran menos).
@@ -147,6 +162,28 @@ export function ManualSaleForm({
         />
       </div>
 
+      {/* Configurador a medida: mismo motor que la calculadora y el producto.
+          Calcula el total; el operador ve solo el total. */}
+      <div
+        className="rounded-lg p-3"
+        style={{
+          background: "color-mix(in srgb, var(--surface-1) 60%, transparent)",
+        }}
+      >
+        <div className="text-faint mb-2 text-[12px]">
+          Configurá la pieza para calcular el total (o cargá el total a mano).
+        </div>
+        <PriceEstimator
+          config={estimator.config}
+          materials={estimator.materials}
+          costMap={estimator.costMap}
+          presetOptions={estimator.presetOptions}
+          presets={estimator.presets}
+          isAdmin={estimator.isAdmin}
+          onChange={handleEst}
+        />
+      </div>
+
       <div className="grid-2">
         <div className="field">
           <label htmlFor="ms-total">Total cobrado (ARS)</label>
@@ -157,7 +194,10 @@ export function ManualSaleForm({
             className="input"
             placeholder="0"
             value={form.total}
-            onChange={(e) => set("total", e.target.value)}
+            onChange={(e) => {
+              setTotalTouched(true);
+              set("total", e.target.value);
+            }}
           />
         </div>
         <div className="field">

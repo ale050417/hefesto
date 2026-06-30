@@ -13,6 +13,7 @@ import {
 } from "@/features/orders/services/orderAdminService";
 import { listManualSales } from "@/features/orders/services/manualSaleService";
 import { listProfitShares } from "@/features/earnings/service";
+import { getEstimatorContext } from "@/features/calculator/service";
 import { CargarVentaButton } from "@/features/orders/components/cargar-venta-button";
 import type { OrderStatus } from "@/features/orders/types";
 import { formatPrice } from "@/lib/format";
@@ -45,11 +46,12 @@ export default async function PedidosAdminPage({
   const pageParam = Number(first(sp.page) ?? "1");
   const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
 
-  const [result, counts, manualSales, shares] = await Promise.all([
+  const [result, counts, manualSales, shares, estimator] = await Promise.all([
     listOrdersAdmin({ status, page, pageSize: 20 }),
     getOrderStatusCounts(),
     listManualSales(),
     listProfitShares(),
+    getEstimatorContext(),
   ]);
 
   // Socios actuales: precargan el reparto del formulario de venta manual.
@@ -97,7 +99,7 @@ export default async function PedidosAdminPage({
             </svg>
             Importar Excel/CSV
           </Link>
-          <CargarVentaButton partners={partners} />
+          <CargarVentaButton partners={partners} estimator={estimator} />
         </div>
       </div>
 
