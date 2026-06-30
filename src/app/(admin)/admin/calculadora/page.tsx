@@ -1,10 +1,13 @@
-import { requirePermissionPage } from "@/core/auth/permissions";
+import { isAdmin, requirePermissionPage } from "@/core/auth/permissions";
 import { PriceCalculator } from "@/features/calculator/components/price-calculator";
 import { CalcConfigButton } from "@/features/calculator/components/calc-config-button";
+import { MarginPresetsButton } from "@/features/calculator/components/margin-presets-button";
 import {
   getCalcConfig,
   getStats,
   listHistory,
+  listActivePresetOptions,
+  listMarginPresets,
 } from "@/features/calculator/service";
 import { listFilamentsView } from "@/features/inventory/queries";
 
@@ -13,12 +16,17 @@ export const metadata = { title: "Calculadora 3D" };
 
 export default async function CalculatorPage() {
   await requirePermissionPage("calculadora", "ver");
-  const [config, history, stats, filaments] = await Promise.all([
-    getCalcConfig(),
-    listHistory(),
-    getStats(),
-    listFilamentsView(),
-  ]);
+  const admin = await isAdmin();
+  const [config, history, stats, filaments, presetOptions, presets] =
+    await Promise.all([
+      getCalcConfig(),
+      listHistory(),
+      getStats(),
+      listFilamentsView(),
+      listActivePresetOptions(),
+      // El margen completo solo se carga (y se envía al cliente) si es admin.
+      admin ? listMarginPresets() : Promise.resolve([]),
+    ]);
 
   const materials = [...new Set(filaments.map((f) => f.material))];
   const costMap: Record<string, number> = {};
@@ -65,7 +73,10 @@ export default async function CalculatorPage() {
             </div>
           </div>
         </div>
-        <CalcConfigButton config={config} />
+        <div className="flex flex-wrap gap-2">
+          {admin ? <MarginPresetsButton presets={presets} /> : null}
+          <CalcConfigButton config={config} />
+        </div>
       </div>
 
       <PriceCalculator
@@ -74,6 +85,9 @@ export default async function CalculatorPage() {
         costMap={costMap}
         history={history}
         stats={stats}
+        presetOptions={presetOptions}
+        presets={presets}
+        isAdmin={admin}
       />
     </div>
   );

@@ -1,14 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
 import { FILAMENT_COLORS } from "@/features/inventory/constants";
 import { computeQuote } from "../calculator";
-import { saveCalcAction, deleteCalcAction } from "../actions";
-import type { CalcConfig } from "../service";
+import { saveCalcAction, deleteCalcAction, quotePriceAction } from "../actions";
+import type { CalcConfig, MarginPreset, MarginPresetOption } from "../service";
 import type { CalcHistoryRow } from "../repository";
 
 const svg = (path: string) => (
@@ -56,12 +56,20 @@ export function PriceCalculator({
   costMap,
   history,
   stats,
+  presetOptions,
+  presets,
+  isAdmin,
 }: {
   config: CalcConfig;
   materials: string[];
   costMap: Record<string, number>;
   history: CalcHistoryRow[];
   stats: Stats;
+  /** Tipos activos (solo nombre): para el select. */
+  presetOptions: MarginPresetOption[];
+  /** Tipos con margen: solo viene poblado para admin. */
+  presets: MarginPreset[];
+  isAdmin: boolean;
 }) {
   const router = useRouter();
   const mats = materials.length ? materials : ["PLA"];
@@ -73,13 +81,16 @@ export function PriceCalculator({
     grams: "",
     hours: "",
     minutes: "",
-    marginPct: "200",
+    presetId: presetOptions[0]?.id ?? "",
     notes: "",
   });
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"fecha" | "precio" | "nombre">("fecha");
   const [pendingId, setPendingId] = useState<string | null>(null);
+  // Precio que calcula el servidor para el operador (sin exponer el margen).
+  const [opPrice, setOpPrice] = useState<number | null>(null);
+  const [opBusy, setOpBusy] = useState(false);
 
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
 
@@ -88,6 +99,12 @@ export function PriceCalculator({
   const totalHours = (Number(f.hours) || 0) + (Number(f.minutes) || 0) / 60;
   const hasData = grams > 0 || totalHours > 0;
 
+  // Margen del tipo elegido: SOLO admin lo conoce (presets viene vacío al operador).
+  const adminMargin = isAdmin
+    ? (presets.find((p) => p.id === f.presetId)?.marginPct ?? 0)
+    : 0;
+
+  // Desglose completo (admin). El operador no lo ve; su precio lo da el server.
   const q = computeQuote({
     grams,
     hours: totalHours,
@@ -97,13 +114,44 @@ export function PriceCalculator({
     machineLifeHours: config.machineLifeHours,
     maintenanceCost: config.maintenanceCost,
     marginErrorPct: config.marginErrorPct,
-    marginPct: Number(f.marginPct) || 0,
+    marginPct: adminMargin,
   });
+
+  // Operador: pide el precio final al servidor (debounce). Todo el setState va
+  // dentro del callback async para no romper la regla set-state-in-effect.
+  useEffect(() => {
+    if (isAdmin) return;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      if (cancelled) return;
+      if (!hasData || !f.presetId) {
+        setOpPrice(null);
+        setOpBusy(false);
+        return;
+      }
+      setOpBusy(true);
+      quotePriceAction({
+        presetId: f.presetId,
+        grams,
+        hours: totalHours,
+        material: f.material,
+      }).then((res) => {
+        if (cancelled) return;
+        setOpPrice(res.ok ? res.data.precioFinal : null);
+        setOpBusy(false);
+      });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [isAdmin, f.presetId, f.material, grams, totalHours, hasData]);
 
   async function save() {
     if (!f.name.trim())
       return toast("Ingresá un nombre para el cálculo", "danger");
     if (!hasData) return toast("Cargá gramos u horas", "danger");
+    if (!f.presetId) return toast("Elegí un tipo de producto", "danger");
     setBusy(true);
     const res = await saveCalcAction({
       name: f.name,
@@ -112,8 +160,7 @@ export function PriceCalculator({
       color: f.color,
       grams,
       hours: totalHours,
-      costPerKg,
-      marginPct: Number(f.marginPct) || 0,
+      presetId: f.presetId,
       notes: f.notes,
     });
     setBusy(false);
@@ -211,13 +258,28 @@ export function PriceCalculator({
   ];
   const maxc = Math.max(...bd.map((x) => x[3]), 1);
 
-  const statCards: Array<[string, string, string]> = [
-    [I.trending, formatPrice(stats.ganancia), "Ganancias calculadas"],
-    [I.calc, String(stats.count), "Piezas presupuestadas"],
-    [I.weight, `${(stats.grams / 1000).toFixed(2)} kg`, "Material consumido"],
-    [I.clock, `${stats.hours.toFixed(1)} h`, "Horas impresas"],
-    [I.dollar, formatPrice(stats.precioFinal), "Facturación estimada"],
-  ];
+  // El operador no ve métricas que revelen ganancia/facturación.
+  const statCards: Array<[string, string, string]> = isAdmin
+    ? [
+        [I.trending, formatPrice(stats.ganancia), "Ganancias calculadas"],
+        [I.calc, String(stats.count), "Piezas presupuestadas"],
+        [
+          I.weight,
+          `${(stats.grams / 1000).toFixed(2)} kg`,
+          "Material consumido",
+        ],
+        [I.clock, `${stats.hours.toFixed(1)} h`, "Horas impresas"],
+        [I.dollar, formatPrice(stats.precioFinal), "Facturación estimada"],
+      ]
+    : [
+        [I.calc, String(stats.count), "Piezas presupuestadas"],
+        [
+          I.weight,
+          `${(stats.grams / 1000).toFixed(2)} kg`,
+          "Material consumido",
+        ],
+        [I.clock, `${stats.hours.toFixed(1)} h`, "Horas impresas"],
+      ];
 
   return (
     <div className="grid gap-5">
@@ -351,15 +413,30 @@ export function PriceCalculator({
               </div>
             </div>
             <div className="field">
-              <label htmlFor="ci-margin">Margen de ganancia (%)</label>
-              <input
-                id="ci-margin"
-                className="input"
-                type="number"
-                placeholder="200"
-                value={f.marginPct}
-                onChange={(e) => set("marginPct", e.target.value)}
-              />
+              <label htmlFor="ci-tipo">Tipo de producto</label>
+              {presetOptions.length === 0 ? (
+                <p className="text-faint text-[12.5px]">
+                  {isAdmin
+                    ? 'No hay tipos cargados. Creá uno en "Tipos y márgenes".'
+                    : "No hay tipos disponibles. Avisale al administrador."}
+                </p>
+              ) : (
+                <select
+                  id="ci-tipo"
+                  className="select"
+                  value={f.presetId}
+                  onChange={(e) => set("presetId", e.target.value)}
+                >
+                  {presetOptions.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                      {isAdmin
+                        ? ` · ${presets.find((x) => x.id === p.id)?.marginPct ?? 0}%`
+                        : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="field">
               <label htmlFor="ci-obs">Observaciones</label>
@@ -380,7 +457,9 @@ export function PriceCalculator({
         {/* DESGLOSE */}
         <div className="ui-card section-card">
           <div className="mb-4 flex items-center justify-between">
-            <div className="section-title">Desglose detallado</div>
+            <div className="section-title">
+              {isAdmin ? "Desglose detallado" : "Precio sugerido"}
+            </div>
             <span className="text-faint text-[12px]">
               {f.name || "Sin nombre"} · {totalHours.toFixed(1)} h
             </span>
@@ -392,11 +471,12 @@ export function PriceCalculator({
                 Completá los datos
               </div>
               <div style={{ fontSize: 13, marginTop: 6, maxWidth: 300 }}>
-                El desglose de costos y el precio final aparecen acá,
-                actualizándose en tiempo real.
+                {isAdmin
+                  ? "El desglose de costos y el precio final aparecen acá, actualizándose en tiempo real."
+                  : "Elegí el tipo y cargá gramos/horas: el precio final aparece acá."}
               </div>
             </div>
-          ) : (
+          ) : isAdmin ? (
             <>
               <div className="mb-4 flex flex-col gap-3">
                 {bd.map(([l, icon, col, val, sub]) => (
@@ -461,14 +541,36 @@ export function PriceCalculator({
                       {svg(I.trending)} <b>Precio final sugerido</b>
                     </div>
                     <div className="text-faint text-[12px]">
-                      Ganancia {formatPrice(q.ganancia)} · margen{" "}
-                      {f.marginPct || 0}%
+                      Ganancia {formatPrice(q.ganancia)} · margen {adminMargin}%
                     </div>
                   </div>
                   <div className="cf-val">{formatPrice(q.precioFinal)}</div>
                 </div>
               </div>
             </>
+          ) : (
+            <div className="calc-final">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div
+                    className="mb-1.5 flex items-center gap-2 text-[12.5px] uppercase"
+                    style={{ color: "var(--success)", letterSpacing: ".04em" }}
+                  >
+                    {svg(I.trending)} <b>Precio final sugerido</b>
+                  </div>
+                  <div className="text-faint text-[12px]">
+                    {opBusy
+                      ? "Calculando…"
+                      : opPrice == null
+                        ? "Elegí un tipo válido para ver el precio."
+                        : "Precio listo para cotizar al cliente."}
+                  </div>
+                </div>
+                <div className="cf-val">
+                  {opPrice == null ? "—" : formatPrice(opPrice)}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -508,13 +610,15 @@ export function PriceCalculator({
               <option value="precio">Mayor precio</option>
               <option value="nombre">Nombre</option>
             </select>
-            <button
-              className="btn btn-secondary btn-sm"
-              onClick={exportCsv}
-              type="button"
-            >
-              Exportar CSV
-            </button>
+            {isAdmin ? (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={exportCsv}
+                type="button"
+              >
+                Exportar CSV
+              </button>
+            ) : null}
           </div>
         </div>
         {filtered.length === 0 ? (
