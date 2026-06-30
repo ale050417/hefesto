@@ -84,8 +84,10 @@ function monthKey(d: Date): string {
     .slice(0, 7);
 }
 function monthLabel(key: string): string {
-  const [y, m] = key.split("-").map(Number);
-  const label = new Date(y, m - 1, 1).toLocaleDateString("es-AR", {
+  const parts = key.split("-");
+  const year = Number(parts[0]);
+  const month = Number(parts[1]);
+  const label = new Date(year, month - 1, 1).toLocaleDateString("es-AR", {
     month: "long",
     year: "numeric",
   });

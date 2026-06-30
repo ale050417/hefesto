@@ -59,19 +59,23 @@ export function FailureForm({
     }
     setBusy(true);
     const payload = { ...form, deducted: edit ? undefined : deduct };
-    const res =
-      edit && failure?.id
-        ? await updateFailureAction(failure.id, payload)
-        : await registerFailureAction(payload);
-    setBusy(false);
-    if (!res.ok) return setErr(res.error.message);
-    if (!edit && "data" in res && res.data && !res.data.deducted && deduct) {
-      toast(
-        "Falla registrada (no se encontró un filamento de ese material/color para descontar).",
-        "warning",
-      );
+    if (edit && failure?.id) {
+      const res = await updateFailureAction(failure.id, payload);
+      setBusy(false);
+      if (!res.ok) return setErr(res.error.message);
+      toast("Falla actualizada", "success");
     } else {
-      toast(edit ? "Falla actualizada" : "Falla registrada", "success");
+      const res = await registerFailureAction(payload);
+      setBusy(false);
+      if (!res.ok) return setErr(res.error.message);
+      if (res.data && !res.data.deducted && deduct) {
+        toast(
+          "Falla registrada (no se encontró un filamento de ese material/color para descontar).",
+          "default",
+        );
+      } else {
+        toast("Falla registrada", "success");
+      }
     }
     onDone?.();
     router.refresh();

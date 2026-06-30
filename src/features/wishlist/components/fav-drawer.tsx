@@ -53,6 +53,7 @@ export function FavDrawer() {
       image: p.primaryImage?.url ?? null,
       variantId: null,
       variantLabel: null,
+      color: null,
     });
     toast(`${p.name} agregado al carrito`, "success");
   };
@@ -73,6 +74,7 @@ export function FavDrawer() {
         image: p.primaryImage?.url ?? null,
         variantId: null,
         variantLabel: null,
+        color: null,
       }),
     );
     toast("Favoritos agregados al carrito", "success");

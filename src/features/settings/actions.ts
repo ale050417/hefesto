@@ -137,8 +137,10 @@ export async function saveBusinessInfoAction(
   }
 }
 
-const UNAUTH: ActionResult = {
-  ok: false,
+// Sin anotar como ActionResult (que incluiría {ok:true}): así su tipo es solo la
+// rama de error y es asignable a cualquier ActionResult<T> (banners, etc.).
+const UNAUTH = {
+  ok: false as const,
   error: { code: "UNAUTHORIZED", message: "No autorizado" },
 };
 
