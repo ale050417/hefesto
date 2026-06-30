@@ -33,6 +33,7 @@ export * from "./rewards";
 export * from "./cost-settings";
 export * from "./profit-shares";
 export * from "./calc-history";
+export * from "./calc-margin-presets";
 export * from "./store-banners";
 export * from "./payment-settings";
 export * from "./shipping-settings";

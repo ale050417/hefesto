@@ -1,10 +1,11 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/core/db";
-import { calcHistory, costSettings } from "@/core/db/schema";
+import { calcHistory, calcMarginPresets, costSettings } from "@/core/db/schema";
 
 type Database = typeof db;
 
 export type CalcHistoryRow = typeof calcHistory.$inferSelect;
+export type MarginPresetRow = typeof calcMarginPresets.$inferSelect;
 
 export async function listCalcHistory(
   database: Database = db,
@@ -49,6 +50,68 @@ export async function getCalcStats(database: Database = db): Promise<{
     })
     .from(calcHistory);
   return r ?? { count: 0, grams: 0, hours: 0, ganancia: 0, precioFinal: 0 };
+}
+
+/* ---------- Tipos de producto con margen (calc_margin_presets) ---------- */
+
+/** Todos los tipos (admin: incluye inactivos). Ordenados por sort_order. */
+export async function listMarginPresets(
+  database: Database = db,
+): Promise<MarginPresetRow[]> {
+  return database
+    .select()
+    .from(calcMarginPresets)
+    .orderBy(
+      asc(calcMarginPresets.sortOrder),
+      asc(calcMarginPresets.createdAt),
+    );
+}
+
+/** Solo los tipos activos (para el select del operador en la calculadora). */
+export async function listActiveMarginPresets(
+  database: Database = db,
+): Promise<MarginPresetRow[]> {
+  return database
+    .select()
+    .from(calcMarginPresets)
+    .where(eq(calcMarginPresets.active, true))
+    .orderBy(
+      asc(calcMarginPresets.sortOrder),
+      asc(calcMarginPresets.createdAt),
+    );
+}
+
+export async function insertMarginPreset(
+  values: typeof calcMarginPresets.$inferInsert,
+  database: Database = db,
+): Promise<MarginPresetRow> {
+  const [row] = await database
+    .insert(calcMarginPresets)
+    .values(values)
+    .returning();
+  if (!row) throw new Error("No se pudo crear el tipo de producto");
+  return row;
+}
+
+export async function updateMarginPresetRow(
+  id: string,
+  fields: Partial<typeof calcMarginPresets.$inferInsert>,
+  database: Database = db,
+): Promise<MarginPresetRow> {
+  const [row] = await database
+    .update(calcMarginPresets)
+    .set(fields)
+    .where(eq(calcMarginPresets.id, id))
+    .returning();
+  if (!row) throw new Error("No se pudo actualizar el tipo de producto");
+  return row;
+}
+
+export async function deleteMarginPresetRow(
+  id: string,
+  database: Database = db,
+): Promise<void> {
+  await database.delete(calcMarginPresets).where(eq(calcMarginPresets.id, id));
 }
 
 /** Config de costos (tabla compartida cost_settings, fila única). */

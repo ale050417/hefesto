@@ -52,6 +52,17 @@ const loadResolveInput = cache(async function loadResolveInput(
   };
 });
 
+/**
+ * ¿El usuario actual es admin (dueño)? True si su enum de acceso es `admin` o si
+ * su rol custom tiene `is_admin`. Para features que solo el dueño controla
+ * (ej: márgenes de la calculadora), independientes de la matriz de permisos.
+ */
+export async function isAdmin(): Promise<boolean> {
+  const user = await getCurrentUser();
+  const input = await loadResolveInput(user);
+  return input.enumRole === "admin" || input.role?.isAdmin === true;
+}
+
 /** ¿El usuario actual puede `action` en `module`? */
 export async function can(
   module: PermModule,

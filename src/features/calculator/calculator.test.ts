@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { computePrintPrice, computeQuote } from "./calculator";
+import {
+  computePrintPrice,
+  computeQuote,
+  selectActiveMargin,
+} from "./calculator";
+import { marginPresetSchema } from "./schemas";
 
 describe("computePrintPrice", () => {
   it("suma material + tiempo + extra y aplica margen", () => {
@@ -75,5 +80,46 @@ describe("computeQuote", () => {
     expect(r.margenError).toBeCloseTo(1000, 5);
     expect(r.costoTotal).toBeCloseTo(11000, 5);
     expect(r.precioFinal).toBeCloseTo(11000, 5);
+  });
+});
+
+describe("selectActiveMargin", () => {
+  const presets = [
+    { id: "a", marginPct: 200, active: true },
+    { id: "b", marginPct: 150, active: false },
+  ];
+  it("devuelve el margen de un tipo activo", () => {
+    expect(selectActiveMargin(presets, "a")).toBe(200);
+  });
+  it("null si el tipo está inactivo", () => {
+    expect(selectActiveMargin(presets, "b")).toBeNull();
+  });
+  it("null si el tipo no existe", () => {
+    expect(selectActiveMargin(presets, "zzz")).toBeNull();
+  });
+});
+
+describe("marginPresetSchema", () => {
+  it("acepta un tipo válido y permite margen >100%", () => {
+    const r = marginPresetSchema.safeParse({
+      name: "Llaveros 2 colores",
+      marginPct: "230",
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.marginPct).toBe(230);
+      expect(r.data.active).toBe(true);
+      expect(r.data.sortOrder).toBe(0);
+    }
+  });
+  it("rechaza nombre vacío", () => {
+    expect(
+      marginPresetSchema.safeParse({ name: "  ", marginPct: 100 }).success,
+    ).toBe(false);
+  });
+  it("rechaza margen negativo", () => {
+    expect(
+      marginPresetSchema.safeParse({ name: "X", marginPct: -1 }).success,
+    ).toBe(false);
   });
 });

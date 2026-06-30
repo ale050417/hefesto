@@ -72,6 +72,17 @@ export type QuoteResult = {
   hours: number;
 };
 
+// Devuelve el margen (%) de un tipo de producto SOLO si existe y está activo;
+// si no, null. Puro: la regla de negocio que elige el margen del tipo elegido.
+// El margen vive en el servidor; el cliente nunca lo recibe (ver service).
+export function selectActiveMargin(
+  presets: Array<{ id: string; marginPct: number; active: boolean }>,
+  presetId: string,
+): number | null {
+  const p = presets.find((x) => x.id === presetId && x.active);
+  return p ? p.marginPct : null;
+}
+
 export function computeQuote(input: QuoteInput): QuoteResult {
   const grams = clamp0(input.grams);
   const hours = clamp0(input.hours);
