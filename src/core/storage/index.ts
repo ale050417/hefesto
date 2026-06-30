@@ -8,17 +8,28 @@ export async function optimizeImage(
 ): Promise<Buffer> {
   // Carga diferida: sharp (binario nativo) solo se necesita al optimizar
   // imágenes (admin). Así las páginas que no suben imágenes no lo cargan.
-  const { default: sharp } = await import("sharp");
-  return sharp(input)
-    .rotate() // respeta la orientación EXIF
-    .resize({
-      width: maxSize,
-      height: maxSize,
-      fit: "inside",
-      withoutEnlargement: true,
-    })
-    .webp({ quality })
-    .toBuffer();
+  // Si sharp no carga (p. ej. falta libvips en el runtime), no rompemos: el
+  // cliente ya manda la imagen convertida a WebP y redimensionada, así que
+  // subimos esos bytes tal cual.
+  try {
+    const { default: sharp } = await import("sharp");
+    return await sharp(input)
+      .rotate() // respeta la orientación EXIF
+      .resize({
+        width: maxSize,
+        height: maxSize,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality })
+      .toBuffer();
+  } catch (err) {
+    console.warn(
+      "[storage] sharp no disponible; subo la imagen sin re-optimizar:",
+      err,
+    );
+    return input;
+  }
 }
 
 /** Sube bytes a un bucket y devuelve la URL pública. */
