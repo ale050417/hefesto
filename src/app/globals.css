@@ -1221,6 +1221,12 @@ body > * {
     font-size: 26px;
     line-height: 1;
   }
+  .season-card .se-ico {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 28px;
+  }
   .season-card .se-name {
     font-weight: 600;
     font-size: 12.5px;
@@ -1271,6 +1277,23 @@ body > * {
   .banner-thumb svg {
     width: 18px;
     height: 18px;
+  }
+  .banner-drop {
+    width: 100%;
+    aspect-ratio: 8 / 3;
+    border-radius: var(--radius-md);
+    border: 1.5px dashed var(--border);
+    background: var(--surface-2);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    overflow: hidden;
+    transition:
+      border-color 0.2s,
+      background 0.2s;
+  }
+  .banner-drop:hover {
+    border-color: var(--gold);
   }
   .cfg-row {
     display: flex;

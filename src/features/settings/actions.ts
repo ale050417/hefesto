@@ -73,6 +73,42 @@ export async function uploadBrandImageAction(
   }
 }
 
+/**
+ * Sube la imagen de un banner del hero y devuelve la URL (no toca el logo/hero
+ * de la marca). Mismo pipeline sharp→Storage. Tamaño ideal apaisado (1600px).
+ */
+export async function uploadBannerImageAction(
+  formData: FormData,
+): Promise<ActionResult<{ url: string }>> {
+  if (!(await can("config", "editar"))) {
+    return {
+      ok: false,
+      error: { code: "UNAUTHORIZED", message: "No autorizado" },
+    };
+  }
+  const file = formData.get("file");
+  if (!(file instanceof File)) return validationError("Falta el archivo");
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return validationError("Formato no permitido (JPG, PNG o WebP)");
+  }
+  if (file.size > MAX_BYTES) {
+    return validationError("El archivo supera los 8 MB");
+  }
+  try {
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const webp = await optimizeImage(bytes, 1600);
+    const url = await uploadObject(
+      "products",
+      `banners/banner-${Date.now()}.webp`,
+      webp,
+      "image/webp",
+    );
+    return { ok: true, data: { url } };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
 const businessInfoSchema = z.object({
   storeName: z.string().trim().max(120).optional().or(z.literal("")),
   slogan: z.string().trim().max(120).optional().or(z.literal("")),

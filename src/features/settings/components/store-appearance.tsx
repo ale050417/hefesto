@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { toast } from "@/stores/toastStore";
@@ -11,6 +11,7 @@ import {
   saveAppearanceAction,
   saveBusinessInfoAction,
   updateBannerAction,
+  uploadBannerImageAction,
 } from "../actions";
 import { SEASONS, type SeasonKey } from "../seasons";
 import { HOME_SECTIONS, sectionOn } from "../home-sections";
@@ -123,6 +124,21 @@ export function StoreAppearance({
   const [pendingId, setPendingId] = useState<string | null>(null);
   const setB = <K extends keyof BannerForm>(k: K, v: BannerForm[K]): void =>
     setBf((f) => ({ ...f, [k]: v }));
+  const bannerFileRef = useRef<HTMLInputElement>(null);
+  const [imgBusy, setImgBusy] = useState(false);
+
+  async function onBannerFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImgBusy(true);
+    const fd = new FormData();
+    fd.set("file", file);
+    const res = await uploadBannerImageAction(fd);
+    setImgBusy(false);
+    if (bannerFileRef.current) bannerFileRef.current.value = "";
+    if (!res.ok) return toast(res.error.message, "danger");
+    setB("imageUrl", res.data.url);
+  }
 
   async function saveAll() {
     setBusy(true);
@@ -375,11 +391,29 @@ export function StoreAppearance({
                 <button
                   key={k}
                   type="button"
-                  className={`season-card${form.season === k ? "on" : ""}`}
+                  className={`season-card ${form.season === k ? "on" : ""}`}
                   onClick={() => set("season", k)}
                 >
                   <div className="se-check">{sIc(I.check)}</div>
-                  <div className="se-emoji">{s.emoji}</div>
+                  <div
+                    className="se-ico"
+                    style={{
+                      color: form.season === k ? s.accent : "var(--text-dim)",
+                    }}
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width={24}
+                      height={24}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                      dangerouslySetInnerHTML={{ __html: s.icon }}
+                    />
+                  </div>
                   <div className="se-name">{s.label}</div>
                   <div className="se-dots">
                     <span style={{ background: s.accent }} />
@@ -406,7 +440,7 @@ export function StoreAppearance({
               role="switch"
               aria-checked={form.deco}
               aria-label="Decoración"
-              className={`switch${form.deco ? "on" : ""}`}
+              className={`switch ${form.deco ? "on" : ""}`}
               onClick={() => set("deco", !form.deco)}
             />
           </div>
@@ -417,7 +451,7 @@ export function StoreAppearance({
                 <button
                   key={v}
                   type="button"
-                  className={`chip${form.intensity === v ? "active" : ""}`}
+                  className={`chip ${form.intensity === v ? "active" : ""}`}
                   onClick={() => set("intensity", v)}
                 >
                   {l}
@@ -530,7 +564,7 @@ export function StoreAppearance({
                 role="switch"
                 aria-checked={sections[s.id] !== false}
                 aria-label={s.label}
-                className={`switch${sections[s.id] !== false ? "on" : ""}`}
+                className={`switch ${sections[s.id] !== false ? "on" : ""}`}
                 onClick={() =>
                   setSections((x) => ({ ...x, [s.id]: x[s.id] === false }))
                 }
@@ -603,13 +637,57 @@ export function StoreAppearance({
             />
           </div>
           <div className="field">
-            <label>Imagen (URL)</label>
+            <label>
+              Imagen de fondo{" "}
+              <span className="text-faint font-normal">(opcional)</span>
+            </label>
+            <button
+              type="button"
+              className="banner-drop"
+              onClick={() => bannerFileRef.current?.click()}
+              style={
+                bf.imageUrl
+                  ? {
+                      background: `center/cover url('${bf.imageUrl}')`,
+                    }
+                  : undefined
+              }
+            >
+              {bf.imageUrl ? null : (
+                <span className="text-faint text-[12.5px]">
+                  {imgBusy ? "Subiendo…" : "Hacé clic para subir una imagen"}
+                </span>
+              )}
+            </button>
             <input
-              className="input"
-              value={bf.imageUrl}
-              onChange={(e) => setB("imageUrl", e.target.value)}
-              placeholder="https://…"
+              ref={bannerFileRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={onBannerFile}
             />
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={imgBusy}
+                onClick={() => bannerFileRef.current?.click()}
+              >
+                {sIc(I.box)} {imgBusy ? "Subiendo…" : "Subir imagen"}
+              </button>
+              {bf.imageUrl ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setB("imageUrl", "")}
+                >
+                  Quitar
+                </button>
+              ) : null}
+            </div>
+            <div className="text-faint mt-2 text-[11.5px] leading-relaxed">
+              Tamaño recomendado: <b>1600 × 600 px</b> (apaisado, relación 8:3).
+            </div>
           </div>
           <div className="grid-2">
             <div className="field">
@@ -633,18 +711,25 @@ export function StoreAppearance({
           </div>
           <div className="grid-2">
             <div className="field">
-              <label>Alineación</label>
-              <select
-                className="select"
-                value={bf.align}
-                onChange={(e) =>
-                  setB("align", e.target.value as BannerForm["align"])
-                }
-              >
-                <option value="left">Izquierda</option>
-                <option value="center">Centro</option>
-                <option value="right">Derecha</option>
-              </select>
+              <label>Posición del texto</label>
+              <div className="flex gap-2">
+                {(
+                  [
+                    ["left", "Izquierda"],
+                    ["center", "Centro"],
+                    ["right", "Derecha"],
+                  ] as const
+                ).map(([v, l]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    className={`chip ${bf.align === v ? "active" : ""}`}
+                    onClick={() => setB("align", v)}
+                  >
+                    {l}
+                  </button>
+                ))}
+              </div>
             </div>
             <label className="text-dim flex items-end gap-2 text-sm">
               <input
