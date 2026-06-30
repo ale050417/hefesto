@@ -44,3 +44,57 @@ export function computePrintPrice(input: CalcInput): CalcResult {
     price: round2(price),
   };
 }
+
+// --- Presupuesto detallado (espejo del index): material + luz + desgaste +
+//     margen de error, luego margen de ganancia. ---
+
+export type QuoteInput = {
+  grams: number;
+  hours: number; // tiempo total en horas
+  costPerKg: number; // costo del filamento por kg
+  kwhPrice: number;
+  machineWatts: number;
+  machineLifeHours: number;
+  maintenanceCost: number;
+  marginErrorPct: number; // % de margen de error sobre el costo
+  marginPct: number; // % de ganancia
+};
+
+export type QuoteResult = {
+  material: number;
+  electricidad: number;
+  desgaste: number;
+  subtotal: number;
+  margenError: number;
+  costoTotal: number;
+  ganancia: number;
+  precioFinal: number;
+  hours: number;
+};
+
+export function computeQuote(input: QuoteInput): QuoteResult {
+  const grams = clamp0(input.grams);
+  const hours = clamp0(input.hours);
+  const material = (grams / 1000) * clamp0(input.costPerKg);
+  const electricidad =
+    ((clamp0(input.machineWatts) * clamp0(input.kwhPrice)) / 1000) * hours;
+  const desgaste =
+    (clamp0(input.maintenanceCost) / Math.max(1, input.machineLifeHours)) *
+    hours;
+  const subtotal = material + electricidad + desgaste;
+  const margenError = subtotal * (clamp0(input.marginErrorPct) / 100);
+  const costoTotal = subtotal + margenError;
+  const ganancia = costoTotal * (clamp0(input.marginPct) / 100);
+  const precioFinal = costoTotal + ganancia;
+  return {
+    material: round2(material),
+    electricidad: round2(electricidad),
+    desgaste: round2(desgaste),
+    subtotal: round2(subtotal),
+    margenError: round2(margenError),
+    costoTotal: round2(costoTotal),
+    ganancia: round2(ganancia),
+    precioFinal: round2(precioFinal),
+    hours,
+  };
+}

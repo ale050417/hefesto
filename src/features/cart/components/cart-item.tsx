@@ -27,15 +27,22 @@ export function CartItem({ item }: { item: CartItemType }) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-fg truncate text-sm">{item.name}</p>
-        {item.variantLabel ? (
-          <p className="text-faint text-xs">{item.variantLabel}</p>
+        {item.variantLabel || item.color ? (
+          <p className="text-faint text-xs">
+            {[item.variantLabel, item.color].filter(Boolean).join(" · ")}
+          </p>
         ) : null}
         <p className="text-dim mt-1 text-sm">{formatPrice(item.unitPrice)}</p>
         <div className="mt-2 flex items-center gap-2">
           <button
             type="button"
             onClick={() =>
-              setQuantity(item.productId, item.variantId, item.quantity - 1)
+              setQuantity(
+                item.productId,
+                item.variantId,
+                item.quantity - 1,
+                item.color,
+              )
             }
             className="border-surface-3 text-fg h-6 w-6 rounded border"
             aria-label="Restar"
@@ -48,7 +55,12 @@ export function CartItem({ item }: { item: CartItemType }) {
           <button
             type="button"
             onClick={() =>
-              setQuantity(item.productId, item.variantId, item.quantity + 1)
+              setQuantity(
+                item.productId,
+                item.variantId,
+                item.quantity + 1,
+                item.color,
+              )
             }
             className="border-surface-3 text-fg h-6 w-6 rounded border"
             aria-label="Sumar"
@@ -61,7 +73,7 @@ export function CartItem({ item }: { item: CartItemType }) {
         type="button"
         variant="ghost"
         size="sm"
-        onClick={() => removeItem(item.productId, item.variantId)}
+        onClick={() => removeItem(item.productId, item.variantId, item.color)}
       >
         Quitar
       </Button>

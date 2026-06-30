@@ -1,4 +1,5 @@
 import { requireUser } from "@/core/auth/session";
+import { AccountShell } from "@/features/customers/components/account-shell";
 import { AddressManager } from "@/features/customers/components/address-manager";
 import { ProfileForm } from "@/features/customers/components/profile-form";
 import { ChangePasswordForm } from "@/features/auth/components/change-password-form";
@@ -12,13 +13,15 @@ export default async function ProfilePage() {
   const { profile, addresses } = await getAccount(user.id);
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2">
-      <ProfileForm
-        fullName={profile?.fullName ?? ""}
-        phone={profile?.phone ?? ""}
-      />
-      <AddressManager addresses={addresses} />
-      <ChangePasswordForm />
-    </div>
+    <AccountShell>
+      <div className="flex flex-col gap-5">
+        <ProfileForm
+          fullName={profile?.fullName ?? ""}
+          phone={profile?.phone ?? ""}
+        />
+        <AddressManager addresses={addresses} />
+        <ChangePasswordForm />
+      </div>
+    </AccountShell>
   );
 }

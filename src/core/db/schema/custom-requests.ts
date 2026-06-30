@@ -20,6 +20,8 @@ export const customRequests = pgTable(
     title: text("title").notNull(),
     description: text("description").notNull(),
     referenceImageUrl: text("reference_image_url"),
+    // Presupuesto estimado que carga el propio cliente al pedir (orientativo).
+    budget: numeric("budget", { precision: 12, scale: 2 }),
     status: customRequestStatus("status").notNull().default("pending"),
     quotedAmount: numeric("quoted_amount", { precision: 12, scale: 2 }),
     createdAt: timestamp("created_at", { withTimezone: true })

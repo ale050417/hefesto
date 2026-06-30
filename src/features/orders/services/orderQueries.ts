@@ -17,8 +17,15 @@ export async function getOrderForCustomer(
 export type MyOrderListItem = {
   orderNumber: string;
   status: OrderWithItems["status"];
+  paymentMethod: OrderWithItems["paymentMethod"];
   total: number;
   createdAt: Date;
+  /** Nombre del primer producto (para que el cliente reconozca el pedido). */
+  title: string;
+  /** Cantidad de productos adicionales además del primero. */
+  moreCount: number;
+  /** Total de unidades del pedido. */
+  units: number;
 };
 
 /** Lista de pedidos del cliente (para "Mis pedidos"). */
@@ -29,7 +36,11 @@ export async function getMyOrders(
   return orders.map((o) => ({
     orderNumber: o.orderNumber,
     status: o.status,
+    paymentMethod: o.paymentMethod,
     total: Number(o.total),
     createdAt: o.createdAt,
+    title: o.items[0]?.productName ?? o.orderNumber,
+    moreCount: Math.max(0, o.items.length - 1),
+    units: o.items.reduce((a, it) => a + it.quantity, 0),
   }));
 }

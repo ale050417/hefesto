@@ -31,6 +31,12 @@ function makeProduct(over: Partial<ProductDetailView> = {}): ProductDetailView {
     printTimeMinutes: null,
     weightGrams: null,
     dimensions: null,
+    colorMode: "single",
+    colors: [],
+    colorPrices: {},
+    layerHeight: null,
+    infillPercent: null,
+    productionTime: null,
     images: [],
     variants: [],
     ...over,
@@ -163,6 +169,123 @@ describe("createOrder", () => {
     );
 
     expect(persist.mock.calls[0]![0].items[0]!.unitPrice).toBe("1000.00");
+  });
+
+  it("aplica el ajuste de precio por color en modo color único", async () => {
+    const { deps, persist } = makeDeps({
+      dragon: makeProduct({
+        effectivePrice: 1000,
+        colorMode: "single",
+        colors: ["Negro", "Dorado"],
+        colorPrices: { Dorado: 300 },
+      }),
+    });
+
+    await createOrder(
+      params({
+        items: [
+          {
+            productId: "p1",
+            slug: "dragon",
+            variantId: null,
+            color: "Dorado",
+            quantity: 2,
+          },
+        ],
+      }),
+      deps,
+    );
+
+    const item = persist.mock.calls[0]![0].items[0]!;
+    expect(item.unitPrice).toBe("1300.00");
+    expect(item.lineTotal).toBe("2600.00");
+    expect(item.variantLabel).toBe("Dorado");
+  });
+
+  it("no ajusta el precio en multicolor (combinación fija)", async () => {
+    const { deps, persist } = makeDeps({
+      dragon: makeProduct({
+        effectivePrice: 1000,
+        colorMode: "multi",
+        colors: ["Negro", "Dorado"],
+        colorPrices: { Dorado: 300 },
+      }),
+    });
+
+    await createOrder(
+      params({
+        items: [
+          {
+            productId: "p1",
+            slug: "dragon",
+            variantId: null,
+            color: "Negro + Dorado",
+            quantity: 1,
+          },
+        ],
+      }),
+      deps,
+    );
+
+    expect(persist.mock.calls[0]![0].items[0]!.unitPrice).toBe("1000.00");
+  });
+
+  it("rechaza un color que no pertenece al producto (modo color único)", async () => {
+    const { deps } = makeDeps({
+      dragon: makeProduct({
+        colorMode: "single",
+        colors: ["Negro"],
+        colorPrices: {},
+      }),
+    });
+    await expect(
+      createOrder(
+        params({
+          items: [
+            {
+              productId: "p1",
+              slug: "dragon",
+              variantId: null,
+              color: "Inexistente",
+              quantity: 1,
+            },
+          ],
+        }),
+        deps,
+      ),
+    ).rejects.toMatchObject({ code: "INVALID_COLOR" });
+  });
+
+  it("combina tamaño y color en el label de la línea", async () => {
+    const { deps, persist } = makeDeps({
+      dragon: makeProduct({
+        hasVariants: true,
+        effectivePrice: 1000,
+        variants: [{ id: "v-grande", label: "Grande", price: 1500 }],
+        colorMode: "single",
+        colors: ["Negro"],
+        colorPrices: {},
+      }),
+    });
+
+    await createOrder(
+      params({
+        items: [
+          {
+            productId: "p1",
+            slug: "dragon",
+            variantId: "v-grande",
+            color: "Negro",
+            quantity: 1,
+          },
+        ],
+      }),
+      deps,
+    );
+
+    expect(persist.mock.calls[0]![0].items[0]!.variantLabel).toBe(
+      "Grande · Negro",
+    );
   });
 
   it("suma varias líneas correctamente", async () => {

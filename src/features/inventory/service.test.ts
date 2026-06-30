@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { NotFoundError } from "@/core/errors";
 import {
   computeNewStock,
+  filamentStatus,
   isLowStock,
   registerFailure,
   type RegisterFailureDeps,
@@ -19,7 +19,7 @@ const filament = {
 function deps(f: Filament | null = filament) {
   const persist = vi.fn<RegisterFailureDeps["persist"]>(async () => {});
   return {
-    deps: { getFilament: async () => f, persist } as RegisterFailureDeps,
+    deps: { findFilament: async () => f, persist } as RegisterFailureDeps,
     persist,
   };
 }
@@ -41,67 +41,59 @@ describe("isLowStock", () => {
   });
 });
 
+describe("filamentStatus", () => {
+  it("agotado cuando no hay stock", () => {
+    expect(filamentStatus(0, 200)).toBe("agotado");
+  });
+  it("bajo cuando está en o bajo el umbral (pero > 0)", () => {
+    expect(filamentStatus(200, 200)).toBe("bajo");
+    expect(filamentStatus(150, 200)).toBe("bajo");
+  });
+  it("ok cuando supera el umbral", () => {
+    expect(filamentStatus(201, 200)).toBe("ok");
+  });
+});
+
+const baseParams = {
+  pieceName: "Dragón",
+  material: "PLA",
+  color: "Negro",
+  gramsLost: 150,
+  reason: "warping",
+  deducted: true,
+};
+
 describe("registerFailure", () => {
-  it("descuenta del filamento cuando deducted", async () => {
+  it("descuenta del filamento que coincide cuando deducted", async () => {
     const { deps: d, persist } = deps();
-    await registerFailure(
-      {
-        filamentId: "f1",
-        pieceName: "Dragón",
-        gramsLost: 150,
-        reason: "warping",
-        deducted: true,
-      },
-      d,
-    );
+    const res = await registerFailure(baseParams, d);
     const arg = persist.mock.calls[0]![0];
     expect(arg.stockUpdate).toEqual({ filamentId: "f1", newStock: 850 });
     expect(arg.failure.material).toBe("PLA");
+    expect(arg.failure.filamentId).toBe("f1");
+    expect(res.deducted).toBe(true);
   });
 
   it("avisa bajo stock si queda en o bajo el umbral", async () => {
     const { deps: d } = deps();
-    const res = await registerFailure(
-      {
-        filamentId: "f1",
-        pieceName: "X",
-        gramsLost: 850,
-        reason: "y",
-        deducted: true,
-      },
-      d,
-    );
+    const res = await registerFailure({ ...baseParams, gramsLost: 850 }, d);
     expect(res.lowStock).toBe(true); // 1000-850=150 <= 200
   });
 
   it("no descuenta si deducted es false", async () => {
     const { deps: d, persist } = deps();
-    await registerFailure(
-      {
-        filamentId: "f1",
-        pieceName: "X",
-        gramsLost: 50,
-        reason: "y",
-        deducted: false,
-      },
-      d,
-    );
+    const res = await registerFailure({ ...baseParams, deducted: false }, d);
     expect(persist.mock.calls[0]![0].stockUpdate).toBeUndefined();
+    expect(res.deducted).toBe(false);
   });
 
-  it("lanza NotFound si el filamento no existe", async () => {
-    const { deps: d } = deps(null);
-    await expect(
-      registerFailure(
-        {
-          filamentId: "x",
-          pieceName: "X",
-          gramsLost: 1,
-          reason: "y",
-          deducted: true,
-        },
-        d,
-      ),
-    ).rejects.toBeInstanceOf(NotFoundError);
+  it("registra sin descontar si no hay filamento que coincida", async () => {
+    const { deps: d, persist } = deps(null);
+    const res = await registerFailure(baseParams, d);
+    const arg = persist.mock.calls[0]![0];
+    expect(arg.stockUpdate).toBeUndefined();
+    expect(arg.failure.filamentId).toBeNull();
+    expect(arg.failure.deducted).toBe(false);
+    expect(res.deducted).toBe(false);
   });
 });

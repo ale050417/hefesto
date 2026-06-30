@@ -1,4 +1,3 @@
-import { NotFoundError } from "@/core/errors";
 import type { Filament } from "./types";
 
 // --- Lógica pura (testeable) ---
@@ -13,11 +12,24 @@ export function isLowStock(stockGrams: number, threshold: number): boolean {
   return stockGrams <= threshold;
 }
 
+export type FilamentStatus = "ok" | "bajo" | "agotado";
+
+/** Estado de stock de 3 niveles (como el index): agotado / bajo / ok. */
+export function filamentStatus(
+  stockGrams: number,
+  threshold: number,
+): FilamentStatus {
+  if (stockGrams <= 0) return "agotado";
+  if (stockGrams <= threshold) return "bajo";
+  return "ok";
+}
+
 // --- registerFailure con dependencias inyectables (tests puros) ---
 
 export type RegisterFailureParams = {
-  filamentId: string;
   pieceName: string;
+  material: string;
+  color: string;
   gramsLost: number;
   reason: string;
   notes?: string | null;
@@ -25,10 +37,11 @@ export type RegisterFailureParams = {
 };
 
 export type RegisterFailureDeps = {
-  getFilament: (id: string) => Promise<Filament | null>;
+  // Busca el filamento que coincide con material+color (para descontar).
+  findFilament: (material: string, color: string) => Promise<Filament | null>;
   persist: (params: {
     failure: {
-      filamentId: string;
+      filamentId: string | null;
       pieceName: string;
       material: string;
       color: string;
@@ -42,41 +55,46 @@ export type RegisterFailureDeps = {
 };
 
 /**
- * Registra una falla. Si `deducted`, descuenta los gramos del filamento (sin
- * bajar de 0) y avisa si quedó bajo el umbral. Snapshot de material/color.
+ * Registra una falla (como el index: se elige material+color). Si `deducted` y
+ * existe un filamento de ese material/color, descuenta los gramos (sin bajar de
+ * 0) y avisa si quedó bajo el umbral. Si no hay match, igual queda registrada
+ * (con snapshot de material/color) pero sin descontar.
  */
 export async function registerFailure(
   params: RegisterFailureParams,
   deps: RegisterFailureDeps,
-): Promise<{ lowStock: boolean }> {
-  const filament = await deps.getFilament(params.filamentId);
-  if (!filament) throw new NotFoundError("No encontramos el filamento.");
+): Promise<{ lowStock: boolean; deducted: boolean }> {
+  const filament = params.deducted
+    ? await deps.findFilament(params.material, params.color)
+    : null;
 
   let stockUpdate: { filamentId: string; newStock: number } | undefined;
   let lowStock = false;
+  let deducted = false;
 
-  if (params.deducted) {
+  if (params.deducted && filament) {
     const newStock = computeNewStock(
       Number(filament.stockGrams),
       params.gramsLost,
     );
     stockUpdate = { filamentId: filament.id, newStock };
     lowStock = isLowStock(newStock, Number(filament.alertThresholdGrams));
+    deducted = true;
   }
 
   await deps.persist({
     failure: {
-      filamentId: filament.id,
+      filamentId: filament?.id ?? null,
       pieceName: params.pieceName,
-      material: filament.material,
-      color: filament.color,
+      material: params.material,
+      color: params.color,
       gramsLost: params.gramsLost,
       reason: params.reason,
       notes: params.notes ?? null,
-      deducted: params.deducted,
+      deducted,
     },
     ...(stockUpdate ? { stockUpdate } : {}),
   });
 
-  return { lowStock };
+  return { lowStock, deducted };
 }

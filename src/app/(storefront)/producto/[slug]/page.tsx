@@ -139,6 +139,9 @@ export default async function ProductPage({ params }: Params) {
                 isOnSale: product.isOnSale,
                 image: product.primaryImage?.url ?? null,
                 variants: product.variants,
+                colorMode: product.colorMode,
+                colors: product.colors,
+                colorPrices: product.colorPrices,
               }}
             />
           </div>

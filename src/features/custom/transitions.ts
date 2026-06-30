@@ -20,6 +20,13 @@ export function canTransitionCustom(
   return CUSTOM_TRANSITIONS[from].includes(to);
 }
 
+// Estados en los que el taller puede cargar/editar la cotización (dinero).
+export const QUOTABLE_STATUSES: CustomRequestStatus[] = ["pending", "quoted"];
+
+export function canQuote(status: CustomRequestStatus): boolean {
+  return QUOTABLE_STATUSES.includes(status);
+}
+
 export const CUSTOM_STATUS_LABEL: Record<CustomRequestStatus, string> = {
   pending: "Pendiente",
   quoted: "Cotizada",

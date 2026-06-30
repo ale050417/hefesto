@@ -1,9 +1,20 @@
-import { eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/core/db";
-import { customMessages, customRequests } from "@/core/db/schema";
+import { customMessages, customRequests, profiles } from "@/core/db/schema";
 import type { CustomMessage, CustomRequest } from "./types";
 
 type Database = typeof db;
+
+/** Fila del listado admin: la solicitud + datos del cliente + último mensaje. */
+export type AdminRequestRow = CustomRequest & {
+  customerName: string | null;
+  customerPhone: string | null;
+  lastMessage: {
+    body: string;
+    fromStaff: boolean;
+    createdAt: Date;
+  } | null;
+};
 
 export async function createRequest(
   values: typeof customRequests.$inferInsert,
@@ -46,6 +57,55 @@ export async function listAll(
   });
 }
 
+/**
+ * Listado para el panel: cada solicitud con el nombre/teléfono del cliente
+ * y su último mensaje (para detectar "por responder"). Dos queries (no N+1).
+ */
+export async function listAllWithMeta(
+  database: Database = db,
+): Promise<AdminRequestRow[]> {
+  const rows = await database
+    .select({
+      req: customRequests,
+      customerName: profiles.fullName,
+      customerPhone: profiles.phone,
+    })
+    .from(customRequests)
+    .leftJoin(profiles, eq(profiles.id, customRequests.customerId))
+    .orderBy(desc(customRequests.updatedAt))
+    .limit(200);
+
+  const ids = rows.map((r) => r.req.id);
+  const lastByReq = new Map<string, AdminRequestRow["lastMessage"]>();
+  if (ids.length > 0) {
+    // Ordenado asc: el último write por request gana en el Map.
+    const msgs = await database
+      .select({
+        requestId: customMessages.requestId,
+        body: customMessages.body,
+        fromStaff: customMessages.fromStaff,
+        createdAt: customMessages.createdAt,
+      })
+      .from(customMessages)
+      .where(inArray(customMessages.requestId, ids))
+      .orderBy(customMessages.createdAt);
+    for (const m of msgs) {
+      lastByReq.set(m.requestId, {
+        body: m.body,
+        fromStaff: m.fromStaff,
+        createdAt: m.createdAt,
+      });
+    }
+  }
+
+  return rows.map((r) => ({
+    ...r.req,
+    customerName: r.customerName,
+    customerPhone: r.customerPhone,
+    lastMessage: lastByReq.get(r.req.id) ?? null,
+  }));
+}
+
 export async function updateRequest(
   id: string,
   fields: Partial<typeof customRequests.$inferInsert>,
@@ -58,6 +118,14 @@ export async function updateRequest(
     .returning();
   if (!row) throw new Error("No se pudo actualizar la solicitud");
   return row;
+}
+
+export async function deleteRequest(
+  id: string,
+  database: Database = db,
+): Promise<void> {
+  // Los custom_messages tienen FK con onDelete: "cascade".
+  await database.delete(customRequests).where(eq(customRequests.id, id));
 }
 
 export async function listMessages(

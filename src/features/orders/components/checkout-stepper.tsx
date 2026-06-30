@@ -105,6 +105,7 @@ export function CheckoutStepper({ mpEnabled = true }: { mpEnabled?: boolean }) {
         productId: i.productId,
         slug: i.slug,
         variantId: i.variantId,
+        color: i.color,
         quantity: i.quantity,
       })),
       paymentMethod: payment,

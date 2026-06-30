@@ -110,13 +110,30 @@ export async function createOrder(
       );
     }
 
+    // Ajuste de precio por color: solo en "color único". En multicolor la pieza
+    // lleva una combinación fija y no ajusta el precio. El ajuste se aplica acá,
+    // en el servidor, desde la base (nunca se confía en el precio del cliente).
+    const lineColor = line.color ?? null;
+    if (lineColor && product.colorMode === "single") {
+      if (!product.colors.includes(lineColor)) {
+        throw new OrderError(
+          "INVALID_COLOR",
+          `El color elegido para "${product.name}" ya no está disponible.`,
+        );
+      }
+      const adjustment = product.colorPrices[lineColor] ?? 0;
+      unitPrice = Math.max(0, round2(unitPrice + adjustment));
+    }
+    const lineLabel =
+      [variantLabel, lineColor].filter(Boolean).join(" · ") || null;
+
     const lineTotal = round2(unitPrice * line.quantity);
     subtotal = round2(subtotal + lineTotal);
 
     lines.push({
       productId: product.id,
       productName: product.name,
-      variantLabel,
+      variantLabel: lineLabel,
       unitPrice: money(unitPrice),
       quantity: line.quantity,
       lineTotal: money(lineTotal),

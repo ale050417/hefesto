@@ -17,6 +17,8 @@ export const coupons = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     code: text("code").notNull().unique(),
+    // Texto descriptivo opcional (se muestra en la card del panel).
+    description: text("description"),
     type: couponType("type").notNull(),
     value: numeric("value", { precision: 12, scale: 2 }).notNull(),
     minPurchase: numeric("min_purchase", { precision: 12, scale: 2 })

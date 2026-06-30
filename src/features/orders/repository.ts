@@ -11,6 +11,7 @@ import type {
   NewOrder,
   NewOrderItem,
   Order,
+  OrderItem,
   OrderStatus,
   OrderWithItems,
 } from "./types";
@@ -117,10 +118,11 @@ export async function findOrderByNumber(
 export async function findOrdersByCustomer(
   customerId: string,
   database: Database = db,
-): Promise<Order[]> {
+): Promise<Array<Order & { items: OrderItem[] }>> {
   return database.query.orders.findMany({
     where: eq(orders.customerId, customerId),
     orderBy: (o, { desc }) => [desc(o.createdAt)],
+    with: { items: true },
   });
 }
 

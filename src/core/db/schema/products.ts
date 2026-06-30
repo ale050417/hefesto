@@ -4,6 +4,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   numeric,
   pgTable,
   text,
@@ -33,6 +34,16 @@ export const products = pgTable(
     printTimeMinutes: integer("print_time_minutes"),
     weightGrams: integer("weight_grams"),
     dimensions: text("dimensions"),
+    // Ficha técnica 3D (paridad index)
+    colorMode: text("color_mode").notNull().default("single"),
+    colors: jsonb("colors").$type<string[]>().notNull().default([]),
+    colorPrices: jsonb("color_prices")
+      .$type<Record<string, number>>()
+      .notNull()
+      .default({}),
+    layerHeight: text("layer_height"),
+    infillPercent: integer("infill_percent"),
+    productionTime: text("production_time"),
     status: productStatus("status").notNull().default("draft"),
     isFeatured: boolean("is_featured").notNull().default(false),
     isNew: boolean("is_new").notNull().default(false),
@@ -57,6 +68,14 @@ export const products = pgTable(
     check(
       "products_weight_non_negative",
       sql`${t.weightGrams} IS NULL OR ${t.weightGrams} >= 0`,
+    ),
+    check(
+      "products_infill_range",
+      sql`${t.infillPercent} IS NULL OR (${t.infillPercent} >= 0 AND ${t.infillPercent} <= 100)`,
+    ),
+    check(
+      "products_color_mode_valid",
+      sql`${t.colorMode} IN ('single','multi')`,
     ),
     index("products_slug_idx").on(t.slug),
     index("products_category_status_idx").on(t.categoryId, t.status),

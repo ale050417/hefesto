@@ -2,21 +2,19 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/stores/toastStore";
 import { createCategoryAction, updateCategoryAction } from "../actions";
+import { CAT_COLORS, CAT_ICONS, catIconPath } from "../category-icons";
 
-export type CategoryFormValues = {
+export type CategoryFormData = {
+  id?: string;
   name: string;
   slug: string;
-  icon: string;
-  color: string;
-  sortOrder: string;
+  icon: string | null;
+  color: string | null;
+  sortOrder: number;
 };
-
-const field =
-  "w-full rounded-md border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-fg";
-const labelCls = "mb-1 block text-xs font-medium text-dim";
 
 function slugify(text: string): string {
   return text
@@ -27,135 +25,133 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+function IconSvg({ name }: { name: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      dangerouslySetInnerHTML={{ __html: catIconPath(name) }}
+    />
+  );
+}
+
 export function CategoryForm({
-  mode,
-  categoryId,
-  defaultValues,
+  category,
+  onDone,
+  onCancel,
 }: {
-  mode: "create" | "edit";
-  categoryId?: string;
-  defaultValues: CategoryFormValues;
+  category?: CategoryFormData;
+  onDone?: () => void;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
-  const [formError, setFormError] = useState<string | null>(null);
-  const {
-    register,
-    handleSubmit,
-    setError,
-    setValue,
-    getValues,
-    formState: { errors, isSubmitting },
-  } = useForm<CategoryFormValues>({ defaultValues });
+  const edit = !!category?.id;
+  const [name, setName] = useState(category?.name ?? "");
+  const [icon, setIcon] = useState<string>(category?.icon ?? CAT_ICONS[0]);
+  const [color, setColor] = useState<string>(category?.color ?? CAT_COLORS[0]!);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const onSubmit = handleSubmit(async (values) => {
-    setFormError(null);
-    const result =
-      mode === "create"
-        ? await createCategoryAction(values)
-        : await updateCategoryAction(categoryId ?? "", values);
-
-    if (!result.ok) {
-      setFormError(result.error.message);
-      const fields = result.error.fields;
-      if (fields) {
-        for (const [key, message] of Object.entries(fields)) {
-          if (key in values) {
-            setError(key as keyof CategoryFormValues, { message });
-          }
-        }
-      }
-      return;
-    }
-    router.push("/admin/categorias");
+  async function submit() {
+    setErr(null);
+    if (!name.trim()) return setErr("Ingresá un nombre");
+    setBusy(true);
+    const payload = {
+      name: name.trim(),
+      slug: edit && category?.slug ? category.slug : slugify(name),
+      icon,
+      color,
+      sortOrder: String(category?.sortOrder ?? 0),
+    };
+    const res =
+      edit && category?.id
+        ? await updateCategoryAction(category.id, payload)
+        : await createCategoryAction(payload);
+    setBusy(false);
+    if (!res.ok) return setErr(res.error.message);
+    toast(edit ? "Categoría actualizada" : "Categoría creada", "success");
+    onDone?.();
     router.refresh();
-  });
+  }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
-      {formError ? (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-4">
+        <div
+          className="kpi-ic"
+          style={{
+            width: 54,
+            height: 54,
+            background: `${color}22`,
+            color: color,
+          }}
+        >
+          <IconSvg name={icon} />
+        </div>
+        <div className="field grow">
+          <label htmlFor="cat-name">Nombre de la categoría</label>
+          <input
+            id="cat-name"
+            className="input"
+            placeholder="Ej: Decoración"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="field">
+        <label>Ícono</label>
+        <div className="flex flex-wrap gap-2">
+          {CAT_ICONS.map((ic) => (
+            <button
+              key={ic}
+              type="button"
+              className={`icon-pick${icon === ic ? "on" : ""}`}
+              onClick={() => setIcon(ic)}
+              aria-label={ic}
+            >
+              <IconSvg name={ic} />
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="field">
+        <label>Color</label>
+        <div className="flex flex-wrap gap-2">
+          {CAT_COLORS.map((col) => (
+            <button
+              key={col}
+              type="button"
+              className={`color-pick${color === col ? "on" : ""}`}
+              style={{ background: col }}
+              onClick={() => setColor(col)}
+              aria-label={col}
+            />
+          ))}
+        </div>
+      </div>
+
+      {err ? (
         <p className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
-          {formError}
+          {err}
         </p>
       ) : null}
 
-      <div>
-        <label className={labelCls} htmlFor="name">
-          Nombre
-        </label>
-        <input id="name" className={field} {...register("name")} />
-        {errors.name ? (
-          <p className="text-danger mt-1 text-xs">{errors.name.message}</p>
-        ) : null}
-      </div>
-
-      <div>
-        <label className={labelCls} htmlFor="slug">
-          Slug
-        </label>
-        <div className="flex gap-2">
-          <input id="slug" className={field} {...register("slug")} />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setValue("slug", slugify(getValues("name")))}
-          >
-            Generar
-          </Button>
-        </div>
-        {errors.slug ? (
-          <p className="text-danger mt-1 text-xs">{errors.slug.message}</p>
-        ) : null}
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div>
-          <label className={labelCls} htmlFor="icon">
-            Ícono (opcional)
-          </label>
-          <input
-            id="icon"
-            placeholder="home"
-            className={field}
-            {...register("icon")}
-          />
-        </div>
-        <div>
-          <label className={labelCls} htmlFor="color">
-            Color (#RRGGBB)
-          </label>
-          <input
-            id="color"
-            placeholder="#C9A84C"
-            className={field}
-            {...register("color")}
-          />
-          {errors.color ? (
-            <p className="text-danger mt-1 text-xs">{errors.color.message}</p>
-          ) : null}
-        </div>
-        <div>
-          <label className={labelCls} htmlFor="sortOrder">
-            Orden
-          </label>
-          <input
-            id="sortOrder"
-            type="number"
-            className={field}
-            {...register("sortOrder")}
-          />
-        </div>
-      </div>
-
-      <div className="pt-2">
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? "Guardando..."
-            : mode === "create"
-              ? "Crear categoría"
-              : "Guardar cambios"}
+      <div className="flex justify-end gap-2 border-t border-[var(--border)] pt-4">
+        <Button type="button" variant="secondary" onClick={() => onCancel?.()}>
+          Cancelar
+        </Button>
+        <Button type="button" onClick={submit} disabled={busy}>
+          {busy ? "Guardando…" : edit ? "Guardar" : "Crear categoría"}
         </Button>
       </div>
-    </form>
+    </div>
   );
 }

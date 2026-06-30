@@ -8,6 +8,7 @@ import { CartDrawer } from "@/features/cart/components/cart-drawer";
 import { AuthModal } from "@/features/auth/components/auth-modal";
 import { FavDrawer } from "@/features/wishlist/components/fav-drawer";
 import { WishlistLoader } from "@/features/wishlist/components/wishlist-loader";
+import { StoreSeasonDecoration } from "@/features/settings/components/store-season-decoration";
 
 export default function StorefrontLayout({
   children,
@@ -16,8 +17,8 @@ export default function StorefrontLayout({
 }) {
   return (
     <div className="flex min-h-dvh flex-col">
-      <TopBanner />
       <Header />
+      <TopBanner />
       <main className="flex-1">{children}</main>
       <Footer />
       <CartDrawer />
@@ -26,6 +27,7 @@ export default function StorefrontLayout({
       <WishlistLoader />
       <ToTop />
       <WhatsappFab />
+      <StoreSeasonDecoration />
     </div>
   );
 }

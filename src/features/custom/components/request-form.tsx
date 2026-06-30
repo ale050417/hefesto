@@ -18,6 +18,7 @@ export function RequestForm() {
       title: String(fd.get("title") ?? ""),
       description: String(fd.get("description") ?? ""),
       referenceImageUrl: String(fd.get("referenceImageUrl") ?? ""),
+      budget: String(fd.get("budget") ?? ""),
     });
     setPending(false);
     if (res.ok) {
@@ -73,6 +74,26 @@ export function RequestForm() {
           className="input"
           placeholder="https://…"
         />
+      </div>
+      <div className="grid gap-1.5">
+        <label
+          className="text-dim mb-1 block text-xs font-medium"
+          htmlFor="budget"
+        >
+          Tu presupuesto estimado (ARS, opcional)
+        </label>
+        <input
+          id="budget"
+          name="budget"
+          type="number"
+          min="0"
+          className="input"
+          placeholder="Ej: 15000"
+        />
+        <span className="text-faint text-[11.5px]">
+          Es orientativo: nos ayuda a ajustar la propuesta a lo que tenés
+          pensado.
+        </span>
       </div>
       <div>
         <Button type="submit" variant="primary" disabled={pending}>

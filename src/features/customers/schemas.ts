@@ -23,5 +23,35 @@ export const addressSchema = z.object({
   isDefault: z.boolean().optional(),
 });
 
+// Email opcional: acepta vacío (lo tratamos como ausente).
+const optionalEmail = z
+  .string()
+  .trim()
+  .email("El email no es válido.")
+  .optional()
+  .or(z.literal(""))
+  .transform((v) => (v ? v : undefined));
+
+const optionalNote = z
+  .string()
+  .trim()
+  .max(1000)
+  .optional()
+  .or(z.literal(""))
+  .transform((v) => (v ? v : undefined));
+
+// Alta/edición de cliente manual (sin cuenta).
+export const manualCustomerSchema = z.object({
+  name: z.string().trim().min(2, "Ingresá el nombre del cliente."),
+  email: optionalEmail,
+  phone: optional,
+  city: optional,
+  note: optionalNote,
+});
+
+// Nota interna (admin) sobre cualquier cliente.
+export const adminNoteSchema = z.object({ note: optionalNote });
+
 export type ProfileInput = z.infer<typeof profileSchema>;
 export type AddressInput = z.infer<typeof addressSchema>;
+export type ManualCustomerInput = z.infer<typeof manualCustomerSchema>;

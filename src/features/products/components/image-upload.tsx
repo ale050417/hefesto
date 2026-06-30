@@ -15,9 +15,12 @@ import type { ProductImage } from "../types";
 export function ImageUpload({
   productId,
   images,
+  onChanged,
 }: {
   productId: string;
   images: ProductImage[];
+  /** Aviso extra tras cada operación (para refrescar dentro de un modal). */
+  onChanged?: () => void;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -38,6 +41,7 @@ export function ImageUpload({
       }
       if (inputRef.current) inputRef.current.value = "";
       router.refresh();
+      onChanged?.();
     });
   }
 
@@ -47,6 +51,7 @@ export function ImageUpload({
       const res = await deleteProductImageAction(imageId);
       if (!res.ok) setError(res.error.message);
       router.refresh();
+      onChanged?.();
     });
   }
 
@@ -56,6 +61,7 @@ export function ImageUpload({
       const res = await setPrimaryImageAction(productId, imageId);
       if (!res.ok) setError(res.error.message);
       router.refresh();
+      onChanged?.();
     });
   }
 

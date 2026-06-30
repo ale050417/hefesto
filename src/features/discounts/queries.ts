@@ -23,6 +23,7 @@ export async function getCoupon(id: string): Promise<Coupon | null> {
 function toValues(input: CouponInput) {
   return {
     code: input.code,
+    description: input.description ?? null,
     type: input.type,
     value: String(input.value),
     minPurchase: String(input.minPurchase ?? 0),

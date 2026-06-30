@@ -8,6 +8,10 @@ export const couponSchema = z.object({
     .trim()
     .min(2, "Ingresá un código.")
     .transform((v) => v.toUpperCase()),
+  description: z.preprocess(
+    emptyToUndef,
+    z.string().trim().max(200).optional(),
+  ),
   type: z.enum(["percentage", "fixed"]),
   value: z.coerce.number().positive("El valor debe ser mayor a 0."),
   minPurchase: z.coerce.number().min(0).optional(),

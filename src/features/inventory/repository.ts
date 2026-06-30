@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/core/db";
 import { filaments, printFailures } from "@/core/db/schema";
 import type { Filament, PrintFailure } from "./types";
@@ -46,6 +46,29 @@ export async function updateFilamentRow(
   return row;
 }
 
+export async function deleteFilamentRow(
+  id: string,
+  database: Database = db,
+): Promise<void> {
+  await database.delete(filaments).where(eq(filaments.id, id));
+}
+
+/** Filamento que coincide con material+color (fallback: solo color). */
+export async function findFilamentByMaterialColor(
+  material: string,
+  color: string,
+  database: Database = db,
+): Promise<Filament | null> {
+  const exact = await database.query.filaments.findFirst({
+    where: and(eq(filaments.material, material), eq(filaments.color, color)),
+  });
+  if (exact) return exact;
+  const byColor = await database.query.filaments.findFirst({
+    where: eq(filaments.color, color),
+  });
+  return byColor ?? null;
+}
+
 export async function listFailures(
   database: Database = db,
 ): Promise<PrintFailure[]> {
@@ -55,11 +78,32 @@ export async function listFailures(
   });
 }
 
+export async function updateFailureRow(
+  id: string,
+  fields: Partial<typeof printFailures.$inferInsert>,
+  database: Database = db,
+): Promise<PrintFailure> {
+  const [row] = await database
+    .update(printFailures)
+    .set(fields)
+    .where(eq(printFailures.id, id))
+    .returning();
+  if (!row) throw new Error("No se pudo actualizar la falla");
+  return row;
+}
+
+export async function deleteFailureRow(
+  id: string,
+  database: Database = db,
+): Promise<void> {
+  await database.delete(printFailures).where(eq(printFailures.id, id));
+}
+
 /** Inserta la falla y (si corresponde) descuenta el stock, en una transacción. */
 export async function registerFailureTx(
   params: {
     failure: {
-      filamentId: string;
+      filamentId: string | null;
       pieceName: string;
       material: string;
       color: string;

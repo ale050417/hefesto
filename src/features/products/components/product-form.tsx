@@ -2,8 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { createProductAction, updateProductAction } from "../actions";
 import type { Category } from "../types";
 
@@ -18,13 +19,35 @@ export type ProductFormValues = {
   printTimeMinutes: string;
   weightGrams: string;
   dimensions: string;
+  colorMode: "single" | "multi";
+  colors: string[];
+  colorPrices: Record<string, number>;
+  layerHeight: string;
+  infillPercent: string;
+  productionTime: string;
   isFeatured: boolean;
   isNew: boolean;
 };
 
-const field =
-  "w-full rounded-md border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-fg";
-const labelCls = "mb-1 block text-xs font-medium text-dim";
+const FILAMENT_COLORS = [
+  { n: "Negro", c: "#1a1a1f" },
+  { n: "Blanco", c: "#f4f4f0" },
+  { n: "Dorado", c: "#C9A84C" },
+  { n: "Gris", c: "#8b8b95" },
+  { n: "Rojo", c: "#d14b3c" },
+  { n: "Azul", c: "#3a72c4" },
+  { n: "Verde", c: "#3fa46a" },
+  { n: "Galaxia", c: "#4b3a78" },
+  { n: "Translúcido", c: "#cfe6ee" },
+  { n: "Arcoíris", c: "#d98a5a" },
+];
+const LAYER_HEIGHTS = [
+  "0.08 mm (ultra detalle)",
+  "0.12 mm (fino)",
+  "0.16 mm (estándar)",
+  "0.20 mm (normal)",
+  "0.28 mm (rápido)",
+];
 
 function slugify(text: string): string {
   return text
@@ -40,29 +63,61 @@ export function ProductForm({
   productId,
   categories,
   defaultValues,
+  onSaved,
 }: {
   mode: "create" | "edit";
   productId?: string;
   categories: Category[];
   defaultValues: ProductFormValues;
+  /** Si se pasa, en vez de navegar avisa al contenedor (uso en modal). */
+  onSaved?: (id: string) => void;
 }) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
+  const [colorMode, setColorMode] = useState<"single" | "multi">(
+    defaultValues.colorMode ?? "single",
+  );
+  const [colors, setColors] = useState<string[]>(defaultValues.colors ?? []);
+  const [colorPrices, setColorPrices] = useState<Record<string, number>>(
+    defaultValues.colorPrices ?? {},
+  );
   const {
     register,
     handleSubmit,
     setError,
     setValue,
     getValues,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<ProductFormValues>({ defaultValues });
 
+  const infill = useWatch({ control, name: "infillPercent" });
+
+  function toggleColor(name: string) {
+    setColors((prev) =>
+      prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name],
+    );
+  }
+
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
+    const payload: ProductFormValues = {
+      ...values,
+      colorMode,
+      colors,
+      colorPrices:
+        colorMode === "single"
+          ? Object.fromEntries(
+              colors
+                .filter((c) => colorPrices[c])
+                .map((c) => [c, colorPrices[c]!]),
+            )
+          : {},
+    };
     const result =
       mode === "create"
-        ? await createProductAction(values)
-        : await updateProductAction(productId ?? "", values);
+        ? await createProductAction(payload)
+        : await updateProductAction(productId ?? "", payload);
 
     if (!result.ok) {
       setFormError(result.error.message);
@@ -76,6 +131,12 @@ export function ProductForm({
       }
       return;
     }
+    const savedId = mode === "create" ? result.data.id : (productId ?? "");
+    if (onSaved) {
+      onSaved(savedId);
+      router.refresh();
+      return;
+    }
     if (mode === "create") {
       router.push(`/admin/productos/${result.data.id}/editar`);
     } else {
@@ -84,32 +145,33 @@ export function ProductForm({
   });
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
       {formError ? (
         <p className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
           {formError}
         </p>
       ) : null}
 
-      <div>
-        <label className={labelCls} htmlFor="name">
-          Nombre
-        </label>
-        <input id="name" className={field} {...register("name")} />
+      <div className="field">
+        <label htmlFor="name">Nombre del producto</label>
+        <input
+          id="name"
+          className="input"
+          placeholder="Ej: Lámpara Lunar Levitante"
+          {...register("name")}
+        />
         {errors.name ? (
-          <p className="text-danger mt-1 text-xs">{errors.name.message}</p>
+          <p className="text-danger text-xs">{errors.name.message}</p>
         ) : null}
       </div>
 
-      <div>
-        <label className={labelCls} htmlFor="slug">
-          Slug
-        </label>
+      <div className="field">
+        <label htmlFor="slug">Slug</label>
         <div className="flex gap-2">
-          <input id="slug" className={field} {...register("slug")} />
+          <input id="slug" className="input" {...register("slug")} />
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="sm"
             onClick={() => setValue("slug", slugify(getValues("name")))}
           >
@@ -117,28 +179,29 @@ export function ProductForm({
           </Button>
         </div>
         {errors.slug ? (
-          <p className="text-danger mt-1 text-xs">{errors.slug.message}</p>
+          <p className="text-danger text-xs">{errors.slug.message}</p>
         ) : null}
       </div>
 
-      <div>
-        <label className={labelCls} htmlFor="description">
-          Descripción
-        </label>
+      <div className="field">
+        <label htmlFor="description">Descripción</label>
         <textarea
           id="description"
           rows={4}
-          className={field}
+          className="textarea"
+          placeholder="Describí la pieza, su uso y detalles..."
           {...register("description")}
         />
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className={labelCls} htmlFor="categoryId">
-            Categoría
-          </label>
-          <select id="categoryId" className={field} {...register("categoryId")}>
+      <div className="grid-2">
+        <div className="field">
+          <label htmlFor="categoryId">Categoría</label>
+          <select
+            id="categoryId"
+            className="select"
+            {...register("categoryId")}
+          >
             <option value="" disabled>
               Elegí una categoría
             </option>
@@ -149,99 +212,268 @@ export function ProductForm({
             ))}
           </select>
           {errors.categoryId ? (
-            <p className="text-danger mt-1 text-xs">
-              {errors.categoryId.message}
-            </p>
+            <p className="text-danger text-xs">{errors.categoryId.message}</p>
           ) : null}
         </div>
-        <div>
-          <label className={labelCls} htmlFor="material">
-            Material
-          </label>
-          <input id="material" className={field} {...register("material")} />
+        <div className="field">
+          <label htmlFor="material">Material / filamento</label>
+          <input id="material" className="input" {...register("material")} />
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label className={labelCls} htmlFor="price">
-            Precio
-          </label>
+      <div className="grid-2">
+        <div className="field">
+          <label htmlFor="price">Precio</label>
           <input
             id="price"
             type="number"
             step="0.01"
-            className={field}
+            className="input"
             {...register("price")}
           />
           {errors.price ? (
-            <p className="text-danger mt-1 text-xs">{errors.price.message}</p>
+            <p className="text-danger text-xs">{errors.price.message}</p>
           ) : null}
         </div>
-        <div>
-          <label className={labelCls} htmlFor="salePrice">
-            Precio oferta (opcional)
-          </label>
+        <div className="field">
+          <label htmlFor="salePrice">Precio oferta (opcional)</label>
           <input
             id="salePrice"
             type="number"
             step="0.01"
-            className={field}
+            className="input"
             {...register("salePrice")}
           />
           {errors.salePrice ? (
-            <p className="text-danger mt-1 text-xs">
-              {errors.salePrice.message}
-            </p>
+            <p className="text-danger text-xs">{errors.salePrice.message}</p>
           ) : null}
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div>
-          <label className={labelCls} htmlFor="printTimeMinutes">
-            Tiempo (min)
+      {/* Ficha técnica de impresión 3D */}
+      <div
+        className="ui-card"
+        style={{
+          padding: 16,
+          background:
+            "linear-gradient(150deg, rgba(var(--gold-rgb),.07), transparent)",
+        }}
+      >
+        <div
+          className="mb-4 flex items-center gap-2"
+          style={{ color: "var(--gold-bright)" }}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            width="17"
+            height="17"
+            aria-hidden
+          >
+            <path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+            <path d="M6 14h12v8H6z" />
+          </svg>
+          <b className="text-[13.5px]">Ficha técnica de impresión 3D</b>
+        </div>
+
+        {/* Modo de color */}
+        <div className="field mb-3.5">
+          <label>Modo de color</label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={cn("chip", colorMode === "single" && "active")}
+              onClick={() => setColorMode("single")}
+            >
+              El cliente elige un color
+            </button>
+            <button
+              type="button"
+              className={cn("chip", colorMode === "multi" && "active")}
+              onClick={() => setColorMode("multi")}
+            >
+              Multicolor (combinación fija)
+            </button>
+          </div>
+          <div className="text-faint text-[11.5px]">
+            {colorMode === "multi"
+              ? "La pieza se imprime con TODOS los colores seleccionados a la vez."
+              : "El cliente elige uno de los colores disponibles al comprar."}
+          </div>
+        </div>
+
+        {/* Colores */}
+        <div className="field mb-3.5">
+          <label>
+            {colorMode === "multi"
+              ? "Colores que lleva la pieza"
+              : "Colores disponibles"}
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {FILAMENT_COLORS.map((fc) => (
+              <button
+                key={fc.n}
+                type="button"
+                className={cn("chip", colors.includes(fc.n) && "active")}
+                onClick={() => toggleColor(fc.n)}
+              >
+                <span
+                  style={{
+                    width: 13,
+                    height: 13,
+                    borderRadius: "50%",
+                    background: fc.c,
+                    border: "1px solid rgba(255,255,255,.25)",
+                    display: "inline-block",
+                  }}
+                />
+                {fc.n}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Ajuste de precio por color (single) */}
+        {colorMode === "single" && colors.length > 0 ? (
+          <div className="field mb-3.5">
+            <label>
+              Ajuste de precio por color{" "}
+              <span className="text-faint font-normal">
+                (opcional · + más caro / − más barato)
+              </span>
+            </label>
+            <div className="flex flex-col gap-2">
+              {colors.map((c) => (
+                <div key={c} className="flex items-center gap-3">
+                  <span className="w-28 text-sm">{c}</span>
+                  <input
+                    type="number"
+                    step="1"
+                    className="input"
+                    style={{ maxWidth: 140 }}
+                    placeholder="0"
+                    value={colorPrices[c] ?? ""}
+                    onChange={(e) =>
+                      setColorPrices((prev) => ({
+                        ...prev,
+                        [c]: Number(e.target.value) || 0,
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="grid-3 mb-3.5">
+          <div className="field">
+            <label htmlFor="layerHeight">Altura de capa</label>
+            <select
+              id="layerHeight"
+              className="select"
+              {...register("layerHeight")}
+            >
+              <option value="">—</option>
+              {LAYER_HEIGHTS.map((l) => (
+                <option key={l} value={l}>
+                  {l}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="infillPercent">Relleno (infill)</label>
+            <div className="flex items-center gap-2">
+              <input
+                id="infillPercent"
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                className="range"
+                {...register("infillPercent")}
+              />
+              <b
+                className="min-w-[42px] text-right"
+                style={{ color: "var(--gold-bright)" }}
+              >
+                {infill || 0}%
+              </b>
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="printTimeMinutes">Tiempo de impresión (min)</label>
+            <input
+              id="printTimeMinutes"
+              type="number"
+              className="input"
+              {...register("printTimeMinutes")}
+            />
+          </div>
+        </div>
+
+        <div className="field mb-3.5">
+          <label htmlFor="productionTime">
+            Tiempo de producción / entrega{" "}
+            <span className="text-faint font-normal">
+              (lo que ve el cliente)
+            </span>
           </label>
           <input
-            id="printTimeMinutes"
-            type="number"
-            className={field}
-            {...register("printTimeMinutes")}
+            id="productionTime"
+            className="input"
+            placeholder="Ej: 24-48 hs · 2-3 días hábiles"
+            {...register("productionTime")}
           />
         </div>
-        <div>
-          <label className={labelCls} htmlFor="weightGrams">
-            Peso (g)
-          </label>
-          <input
-            id="weightGrams"
-            type="number"
-            className={field}
-            {...register("weightGrams")}
-          />
-        </div>
-        <div>
-          <label className={labelCls} htmlFor="dimensions">
-            Dimensiones
-          </label>
-          <input
-            id="dimensions"
-            className={field}
-            {...register("dimensions")}
-          />
+
+        <div className="grid-2">
+          <div className="field">
+            <label htmlFor="weightGrams">Peso (g)</label>
+            <input
+              id="weightGrams"
+              type="number"
+              className="input"
+              {...register("weightGrams")}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="dimensions">Dimensiones</label>
+            <input
+              id="dimensions"
+              className="input"
+              placeholder="Ej: 10 × 8 × 12 cm"
+              {...register("dimensions")}
+            />
+          </div>
         </div>
       </div>
 
       <div className="flex gap-6">
         <label className="text-fg flex items-center gap-2 text-sm">
-          <input type="checkbox" {...register("isFeatured")} /> Destacado
+          <input
+            type="checkbox"
+            className="accent-[var(--gold)]"
+            {...register("isFeatured")}
+          />{" "}
+          Destacado
         </label>
         <label className="text-fg flex items-center gap-2 text-sm">
-          <input type="checkbox" {...register("isNew")} /> Nuevo
+          <input
+            type="checkbox"
+            className="accent-[var(--gold)]"
+            {...register("isNew")}
+          />{" "}
+          Nuevo
         </label>
       </div>
 
-      <div className="pt-2">
+      <div className="pt-1">
         <Button type="submit" disabled={isSubmitting}>
           {isSubmitting
             ? "Guardando..."

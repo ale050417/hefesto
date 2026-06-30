@@ -64,6 +64,21 @@ export const productInputSchema = z
     dimensions: z
       .preprocess(emptyToNull, z.string().max(120).nullable())
       .optional(),
+    colorMode: z.enum(["single", "multi"]).default("single"),
+    colors: z.array(z.string().max(40)).max(24).default([]),
+    colorPrices: z.record(z.string(), z.coerce.number()).default({}),
+    layerHeight: z
+      .preprocess(emptyToNull, z.string().max(60).nullable())
+      .optional(),
+    infillPercent: z
+      .preprocess(
+        emptyToNull,
+        z.coerce.number().int().min(0).max(100).nullable(),
+      )
+      .optional(),
+    productionTime: z
+      .preprocess(emptyToNull, z.string().max(120).nullable())
+      .optional(),
     isFeatured: z.boolean().default(false),
     isNew: z.boolean().default(false),
   })

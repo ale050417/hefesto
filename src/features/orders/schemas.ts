@@ -17,6 +17,7 @@ export const checkoutLineSchema = z.object({
   productId: z.uuid(),
   slug: z.string().min(1),
   variantId: z.uuid().nullable(),
+  color: z.string().max(60).nullable().optional(),
   quantity: z.number().int().min(1).max(99),
 });
 
@@ -30,3 +31,32 @@ export const checkoutSchema = z.object({
 export type CheckoutInput = z.infer<typeof checkoutSchema>;
 export type CheckoutLine = z.infer<typeof checkoutLineSchema>;
 export type ShippingAddress = z.infer<typeof shippingAddressSchema>;
+
+// Venta manual / histórica (admin). Registro libre que NO usa el checkout:
+// cliente por texto, total cargado a mano, estado a elección.
+export const manualSaleSchema = z.object({
+  saleDate: z.string().min(1, "Elegí la fecha."),
+  customerName: z
+    .string()
+    .trim()
+    .min(1, "Ingresá el nombre del cliente.")
+    .max(120),
+  detail: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().trim().max(300).optional(),
+  ),
+  total: z.coerce.number().positive("Ingresá el total cobrado."),
+  paymentMethod: z.enum(["transfer", "mercadopago", "cash"]),
+  status: z.enum([
+    "pending_payment",
+    "confirmed",
+    "in_production",
+    "ready",
+    "shipped",
+    "delivered",
+    "cancelled",
+    "refunded",
+  ]),
+});
+
+export type ManualSaleInput = z.infer<typeof manualSaleSchema>;

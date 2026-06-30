@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
 import { db } from "@/core/db";
 import {
   categories,
@@ -6,6 +6,7 @@ import {
   orderItems,
   orders,
   products,
+  profiles,
 } from "@/core/db/schema";
 import type { OrderStatus } from "@/features/orders/types";
 
@@ -45,6 +46,92 @@ export async function getKpiRows(database: Database = db) {
     pendingCount: pending?.count ?? 0,
     lowStockCount: lowStock?.count ?? 0,
   };
+}
+
+/** KPIs del reporte: facturación, ventas, unidades y clientes nuevos del año. */
+export async function getReportKpis(
+  year: number,
+  database: Database = db,
+): Promise<{
+  revenue: number;
+  salesCount: number;
+  unitsSold: number;
+  newCustomers: number;
+}> {
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const yearEnd = new Date(Date.UTC(year + 1, 0, 1));
+
+  const [sales] = await database
+    .select({
+      revenue: sql<number>`coalesce(sum(${orders.total}), 0)::float8`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(orders)
+    .where(
+      and(
+        inArray(orders.status, SALES_STATUSES),
+        gte(orders.createdAt, yearStart),
+        lt(orders.createdAt, yearEnd),
+      ),
+    );
+
+  const [units] = await database
+    .select({ qty: sql<number>`coalesce(sum(${orderItems.quantity}), 0)::int` })
+    .from(orderItems)
+    .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .where(
+      and(
+        inArray(orders.status, SALES_STATUSES),
+        gte(orders.createdAt, yearStart),
+        lt(orders.createdAt, yearEnd),
+      ),
+    );
+
+  const [customers] = await database
+    .select({ count: sql<number>`count(*)::int` })
+    .from(profiles)
+    .where(
+      and(
+        eq(profiles.role, "customer"),
+        gte(profiles.createdAt, yearStart),
+        lt(profiles.createdAt, yearEnd),
+      ),
+    );
+
+  return {
+    revenue: sales?.revenue ?? 0,
+    salesCount: sales?.count ?? 0,
+    unitsSold: units?.qty ?? 0,
+    newCustomers: customers?.count ?? 0,
+  };
+}
+
+/** Ingresos por mes (1-12) de un año dado. Devuelve array de 12 números. */
+export async function getMonthlyRevenue(
+  year: number,
+  database: Database = db,
+): Promise<number[]> {
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const yearEnd = new Date(Date.UTC(year + 1, 0, 1));
+  const rows = await database
+    .select({
+      m: sql<number>`extract(month from ${orders.createdAt})::int`,
+      total: sql<number>`coalesce(sum(${orders.total}), 0)::float8`,
+    })
+    .from(orders)
+    .where(
+      and(
+        inArray(orders.status, SALES_STATUSES),
+        gte(orders.createdAt, yearStart),
+        lt(orders.createdAt, yearEnd),
+      ),
+    )
+    .groupBy(sql`1`);
+  const out = Array(12).fill(0) as number[];
+  for (const r of rows) {
+    if (r.m >= 1 && r.m <= 12) out[r.m - 1] = Number(r.total);
+  }
+  return out;
 }
 
 export async function getRevenueByDay(

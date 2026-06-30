@@ -9,6 +9,19 @@ import { useUiStore } from "@/stores/uiStore";
 
 type Variant = { id: string; label: string; price: number | null };
 
+const FILAMENT_HEX: Record<string, string> = {
+  Negro: "#1a1a1f",
+  Blanco: "#f4f4f0",
+  Dorado: "#C9A84C",
+  Gris: "#8b8b95",
+  Rojo: "#d14b3c",
+  Azul: "#3a72c4",
+  Verde: "#3fa46a",
+  Galaxia: "#4b3a78",
+  Translúcido: "#cfe6ee",
+  Arcoíris: "#d98a5a",
+};
+
 export type AddToCartProduct = {
   id: string;
   slug: string;
@@ -18,12 +31,20 @@ export type AddToCartProduct = {
   isOnSale: boolean;
   image: string | null;
   variants: Variant[];
+  colorMode: "single" | "multi";
+  colors: string[];
+  colorPrices: Record<string, number>;
 };
 
 export function AddToCart({ product }: { product: AddToCartProduct }) {
   const hasVariants = product.variants.length > 0;
+  const hasColors = product.colors.length > 0;
+  const isMulti = product.colorMode === "multi";
   const [variantId, setVariantId] = useState<string | null>(
     product.variants[0]?.id ?? null,
+  );
+  const [color, setColor] = useState<string | null>(
+    !isMulti ? (product.colors[0] ?? null) : null,
   );
   const [qty, setQty] = useState(1);
   const addItem = useCartStore((s) => s.addItem);
@@ -34,7 +55,16 @@ export function AddToCart({ product }: { product: AddToCartProduct }) {
     product.isOnSale && product.salePrice != null
       ? product.salePrice
       : product.price;
-  const unitPrice = selected?.price ?? basePrice;
+  // Ajuste de precio por color (solo en "color único"). Es de referencia para
+  // la UI; el servidor lo recalcula igual en el checkout (orderService).
+  const colorAdj = !isMulti && color ? (product.colorPrices[color] ?? 0) : 0;
+  const unitPrice = Math.max(0, (selected?.price ?? basePrice) + colorAdj);
+  // En multicolor la pieza lleva la combinación fija; en color único, el elegido.
+  const lineColor = isMulti
+    ? hasColors
+      ? product.colors.join(" + ")
+      : null
+    : color;
 
   function handleAdd() {
     addItem(
@@ -46,6 +76,7 @@ export function AddToCart({ product }: { product: AddToCartProduct }) {
         image: product.image,
         variantId: selected?.id ?? null,
         variantLabel: selected?.label ?? null,
+        color: lineColor,
       },
       qty,
     );
@@ -75,6 +106,52 @@ export function AddToCart({ product }: { product: AddToCartProduct }) {
               </button>
             ))}
           </div>
+        </div>
+      ) : null}
+
+      {hasColors ? (
+        <div>
+          <p className="text-fg mb-2 text-sm font-medium">
+            {isMulti ? "Colores de la pieza" : "Color"}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {product.colors.map((c) => {
+              const active = !isMulti && color === c;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  disabled={isMulti}
+                  onClick={() => !isMulti && setColor(c)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors",
+                    active
+                      ? "border-primary text-primary"
+                      : "border-surface-3 text-fg",
+                    !isMulti && "hover:border-primary",
+                    isMulti && "cursor-default",
+                  )}
+                >
+                  <span
+                    style={{
+                      width: 13,
+                      height: 13,
+                      borderRadius: "50%",
+                      background: FILAMENT_HEX[c] ?? "#888",
+                      border: "1px solid rgba(255,255,255,.25)",
+                      display: "inline-block",
+                    }}
+                  />
+                  {c}
+                </button>
+              );
+            })}
+          </div>
+          {isMulti ? (
+            <p className="text-faint mt-1 text-xs">
+              Esta pieza se imprime con todos estos colores.
+            </p>
+          ) : null}
         </div>
       ) : null}
 

@@ -1,11 +1,17 @@
 import type { CSSProperties, ReactNode } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { ProductGrid } from "@/features/products/components/product-grid";
 import { getHomeData } from "@/features/products/services/catalogService";
-import { getBrandSettings } from "@/features/settings/service";
 import { Newsletter } from "@/features/cart/components/newsletter";
+import { HeroCarousel } from "@/components/home/hero-carousel";
+import {
+  getActiveBanners,
+  getBrandSettings,
+} from "@/features/settings/service";
+import { sectionOn } from "@/features/settings/home-sections";
+import { CountUp } from "@/components/home/count-up";
 import type { ProductView } from "@/features/products/types";
 
 export const dynamic = "force-dynamic";
@@ -51,6 +57,20 @@ const paths: Record<string, ReactNode> = {
   sparkles: (
     <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18" />
   ),
+  zap: <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />,
+  send: <path d="m22 2-7 20-4-9-9-4 20-7z" />,
+  whatsapp: (
+    <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z" />
+  ),
+  palette: (
+    <>
+      <circle cx="13.5" cy="6.5" r="1.5" />
+      <circle cx="17.5" cy="10.5" r="1.5" />
+      <circle cx="8.5" cy="7.5" r="1.5" />
+      <circle cx="6.5" cy="12.5" r="1.5" />
+      <path d="M12 2a10 10 0 0 0 0 20c1 0 1.5-.8 1.5-1.5 0-.5-.3-.9-.3-1.4 0-.6.5-1.1 1.1-1.1H16a5 5 0 0 0 5-5c0-5.5-4.5-9-9-9z" />
+    </>
+  ),
 };
 
 function Icon({ name, size = 21 }: { name: string; size?: number }) {
@@ -71,11 +91,6 @@ function Icon({ name, size = 21 }: { name: string; size?: number }) {
   );
 }
 
-const heroStats = [
-  { n: "3.490+", l: "Productos impresos" },
-  { n: "4.9★", l: "Valoración media" },
-  { n: "48h", l: "Producción promedio" },
-];
 const trust = [
   {
     ic: "truck",
@@ -94,31 +109,48 @@ const trust = [
     d: "Si algo sale mal, lo rehacemos",
   },
 ];
-const statsNums = [
-  { n: "3.490+", l: "Piezas impresas", ic: "box" },
-  { n: "1.200+", l: "Clientes felices", ic: "users" },
-  { n: "12", l: "Materiales y acabados", ic: "layers" },
-  { n: "4.9★", l: "Valoración promedio", ic: "star" },
+const statsNums: Array<{
+  value: number;
+  suffix?: string;
+  decimals?: number;
+  l: string;
+  ic: string;
+}> = [
+  { value: 3490, suffix: "+", l: "Piezas impresas", ic: "box" },
+  { value: 1200, suffix: "+", l: "Clientes felices", ic: "users" },
+  { value: 12, l: "Materiales y acabados", ic: "layers" },
+  {
+    value: 4.9,
+    decimals: 1,
+    suffix: "★",
+    l: "Valoración promedio",
+    ic: "star",
+  },
 ];
 const materials: Array<[string, string, string, string]> = [
   [
     "PLA",
     "#4CB782",
     "Resistente y versátil",
-    "Ideal para deco, figuras y prototipos.",
+    "Ideal para deco, figuras y prototipos. Amplia gama de colores.",
   ],
   [
     "PETG",
     "#5A9CD9",
     "Fuerte y flexible",
-    "Piezas funcionales y de exterior. Durable.",
+    "Soportes, piezas funcionales y de exterior. Muy durable.",
   ],
-  ["TPU", "#C9A84C", "Flexible tipo goma", "Fundas, topes y piezas elásticas."],
+  [
+    "TPU",
+    "#C9A84C",
+    "Flexible tipo goma",
+    "Fundas, topes y piezas que necesitan elasticidad.",
+  ],
   [
     "Resina",
     "#9B7BD4",
     "Máximo detalle",
-    "Figuras y miniaturas con acabado ultra fino.",
+    "Figuras y miniaturas con acabado ultra fino 8K.",
   ],
 ];
 const gallery = [
@@ -212,112 +244,43 @@ function ProductSection({
 }
 
 export default async function Home() {
-  const [{ featured, latest, onSale, categories }, brand] = await Promise.all([
-    getHomeData(),
-    getBrandSettings(),
-  ]);
+  const [{ featured, latest, onSale, categories }, banners, brand] =
+    await Promise.all([getHomeData(), getActiveBanners(), getBrandSettings()]);
+  const show = (id: string) => sectionOn(brand.homeSections, id);
+
+  const slides = banners.map((b) => ({
+    title: b.title,
+    sub: b.subtitle ?? "",
+    cta: b.ctaText ?? "Ver catálogo",
+    href: b.ctaHref ?? "/catalogo",
+    align: (b.align === "center" ? "center" : "left") as "left" | "center",
+  }));
 
   return (
     <div>
-      <section className="hero">
-        <div className="store-wrap grid items-center gap-10 lg:grid-cols-[1.1fr_.9fr]">
-          <div>
-            <span className="hero-tag">
-              <Icon name="sparkles" size={15} /> Impresión 3D a pedido
-            </span>
-            <h1 className="hero-title">
-              Diseños <span className="gold">imposibles</span>,
-              <br />
-              impresos en 3D
-            </h1>
-            <p className="hero-sub">
-              Del archivo a tu puerta. Productos únicos forjados capa por capa,
-              en el color que elijas.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/catalogo"
-                className={buttonVariants({ variant: "primary", size: "lg" })}
-              >
-                Explorar catálogo
-              </Link>
-              <Link
-                href="/catalogo?sale=true"
-                className={buttonVariants({ variant: "secondary", size: "lg" })}
-              >
-                Ofertas
-              </Link>
-            </div>
-            <div className="hero-stats">
-              {heroStats.map((s) => (
-                <div key={s.l} className="hero-stat">
-                  <div className="n">{s.n}</div>
-                  <div className="l">{s.l}</div>
+      <HeroCarousel slides={slides} />
+
+      {show("trustBar") ? (
+        <section className="trust-bar">
+          <div className="store-wrap">
+            <div className="trust-grid">
+              {trust.map((t) => (
+                <div key={t.t} className="trust-item">
+                  <span className="trust-ic">
+                    <Icon name={t.ic} />
+                  </span>
+                  <div>
+                    <div className="trust-t">{t.t}</div>
+                    <div className="trust-d">{t.d}</div>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
+        </section>
+      ) : null}
 
-          {brand.heroImageUrl ? (
-            <div
-              className="ui-card relative hidden aspect-square w-full overflow-hidden lg:block"
-              style={{ borderColor: "rgba(var(--gold-rgb),.22)" }}
-            >
-              <Image
-                src={brand.heroImageUrl}
-                alt="Hefesto 3D"
-                fill
-                sizes="(max-width:1024px) 0px, 560px"
-                className="object-cover"
-                priority
-              />
-            </div>
-          ) : (
-            <div className="scene">
-              <div className="cube">
-                <div className="face f-front">
-                  <Icon name="box" size={54} />
-                </div>
-                <div className="face f-back">
-                  <Icon name="layers" size={54} />
-                </div>
-                <div className="face f-right">
-                  <Icon name="printer" size={54} />
-                </div>
-                <div className="face f-left">
-                  <Icon name="sparkles" size={54} />
-                </div>
-                <div className="face f-top">
-                  <Icon name="star" size={54} />
-                </div>
-                <div className="face f-bottom">
-                  <Icon name="heart" size={54} />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="trust-bar">
-        <div className="store-wrap">
-          <div className="trust-grid">
-            {trust.map((t) => (
-              <div key={t.t} className="trust-item">
-                <span className="trust-ic">
-                  <Icon name={t.ic} />
-                </span>
-                <div>
-                  <div className="trust-t">{t.t}</div>
-                  <div className="trust-d">{t.d}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {categories.length > 0 ? (
+      {categories.length > 0 && show("categorias") ? (
         <section className="store-section">
           <div className="store-wrap">
             <div className="sec-head">
@@ -342,12 +305,34 @@ export default async function Home() {
                     { "--cc": category.color ?? "var(--gold)" } as CSSProperties
                   }
                 >
-                  <span className="cat-chip-ic">&#9670;</span>
-                  <span className="flex min-w-0 flex-col">
+                  <span className="cat-chip-ic">
+                    {category.icon && paths[category.icon] ? (
+                      <Icon name={category.icon} size={19} />
+                    ) : (
+                      <span>&#9670;</span>
+                    )}
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
                     <span className="cat-chip-name truncate">
                       {category.name}
                     </span>
-                    <span className="cat-chip-count">Ver productos</span>
+                    <span className="cat-chip-count">
+                      {category.productCount}{" "}
+                      {category.productCount === 1 ? "producto" : "productos"}
+                    </span>
+                  </span>
+                  <span className="cat-chip-arrow">
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden
+                    >
+                      <path d="M5 12h14M13 6l6 6-6 6" />
+                    </svg>
                   </span>
                 </Link>
               ))}
@@ -356,36 +341,46 @@ export default async function Home() {
         </section>
       ) : null}
 
-      <ProductSection
-        eyebrow="Recién salidos"
-        title="Nuevos lanzamientos"
-        products={latest}
-        href="/catalogo"
-      />
+      {show("nuevos") ? (
+        <ProductSection
+          eyebrow="Recién salidos"
+          title="Nuevos lanzamientos"
+          products={latest}
+          href="/catalogo"
+        />
+      ) : null}
 
-      <section className="store-section pt-0">
-        <div className="store-wrap">
-          <div className="sec-head flex-col items-center text-center">
-            <div>
-              <div className="eyebrow">Forjando confianza</div>
-              <h2 className="sec-title">Hefesto en números</h2>
+      {show("stats") ? (
+        <section className="store-section pt-0">
+          <div className="store-wrap">
+            <div className="sec-head flex-col items-center text-center">
+              <div>
+                <div className="eyebrow">Forjando confianza</div>
+                <h2 className="sec-title">Hefesto en números</h2>
+              </div>
+            </div>
+            <div className="stats-grid">
+              {statsNums.map((s) => (
+                <div key={s.l} className="stat-card">
+                  <span className="stat-ic">
+                    <Icon name={s.ic} size={22} />
+                  </span>
+                  <div className="stat-n">
+                    <CountUp
+                      value={s.value}
+                      decimals={s.decimals ?? 0}
+                      suffix={s.suffix ?? ""}
+                    />
+                  </div>
+                  <div className="stat-l">{s.l}</div>
+                </div>
+              ))}
             </div>
           </div>
-          <div className="stats-grid">
-            {statsNums.map((s) => (
-              <div key={s.l} className="stat-card">
-                <span className="stat-ic">
-                  <Icon name={s.ic} size={22} />
-                </span>
-                <div className="stat-n">{s.n}</div>
-                <div className="stat-l">{s.l}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
-      {onSale.length > 0 ? (
+      {onSale.length > 0 && show("ofertas") ? (
         <section className="store-section pt-0">
           <div className="store-wrap">
             <div
@@ -398,8 +393,11 @@ export default async function Home() {
             >
               <div className="sec-head">
                 <div>
-                  <div className="eyebrow" style={{ color: "var(--danger)" }}>
-                    Por tiempo limitado
+                  <div
+                    className="eyebrow flex items-center gap-1.5"
+                    style={{ color: "var(--danger)" }}
+                  >
+                    <Icon name="zap" size={14} /> Ofertas por tiempo limitado
                   </div>
                   <h2 className="sec-title">En oferta esta semana</h2>
                 </div>
@@ -416,136 +414,251 @@ export default async function Home() {
         </section>
       ) : null}
 
-      <section className="store-section pt-0">
-        <div className="store-wrap">
-          <div className="sec-head">
-            <div>
-              <div className="eyebrow">Calidad de taller</div>
-              <h2 className="sec-title">Materiales que imprimimos</h2>
-              <div className="sec-sub">
-                Elegimos el filamento ideal según tu pieza
-              </div>
-            </div>
-          </div>
-          <div className="grid-4">
-            {materials.map(([m, c, t, d]) => (
-              <div
-                key={m}
-                className="mat-card"
-                style={{ "--mc": c } as CSSProperties}
-              >
-                <div className="mat-top">
-                  <span
-                    className="mat-chip"
-                    style={{ background: `${c}1f`, color: c }}
-                  >
-                    {m}
-                  </span>
-                  <span className="mat-dot" style={{ background: c }} />
-                </div>
-                <div className="mat-t">{t}</div>
-                <div className="mat-d">{d}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <ProductSection
-        eyebrow="Favoritos del público"
-        title="Más vendidos"
-        products={featured}
-      />
-
-      <section className="store-section pt-0">
-        <div className="store-wrap">
-          <div className="sec-head">
-            <div>
-              <div className="eyebrow">De nuestro taller</div>
-              <h2 className="sec-title">Hecho por Hefesto</h2>
-            </div>
-          </div>
-          <div className="gallery-grid">
-            {gallery.map((cap, i) => (
-              <div key={cap} className={`gal-item ${i === 0 ? "gal-lg" : ""}`}>
-                <div className="ph h-full w-full" />
-                <div className="gal-cap">
-                  <Icon name="heart" size={13} /> {cap}
+      {show("materiales") ? (
+        <section className="store-section pt-0">
+          <div className="store-wrap">
+            <div className="sec-head">
+              <div>
+                <div className="eyebrow">Calidad de taller</div>
+                <h2 className="sec-title">Materiales que imprimimos</h2>
+                <div className="sec-sub">
+                  Elegimos el filamento ideal según tu pieza
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="store-section pt-0">
-        <div className="store-wrap">
-          <div className="sec-head flex-col items-center text-center">
-            <div>
-              <div className="eyebrow">Simple y rápido</div>
-              <h2 className="sec-title">¿Cómo funciona?</h2>
             </div>
-          </div>
-          <div className="grid-3">
-            {steps.map((s) => (
-              <div key={s.t} className="step">
-                <div className="step-n">{s.n}</div>
-                <h4>{s.t}</h4>
-                <p>{s.d}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="store-section pt-0">
-        <div className="store-wrap">
-          <div className="sec-head">
-            <div>
-              <div className="eyebrow">Lo que dicen</div>
-              <h2 className="sec-title">Clientes felices</h2>
-            </div>
-          </div>
-          <div className="grid-3">
-            {testimonials.map(([name, quote]) => (
-              <div key={name} className="testi">
-                <div className="stars">
-                  {[0, 1, 2, 3, 4].map((i) => (
-                    <Icon key={i} name="star" size={16} />
-                  ))}
+            <div className="grid-4">
+              {materials.map(([m, c, t, d]) => (
+                <div
+                  key={m}
+                  className="mat-card"
+                  style={{ "--mc": c } as CSSProperties}
+                >
+                  <div className="mat-top">
+                    <span
+                      className="mat-chip"
+                      style={{ background: `${c}1f`, color: c }}
+                    >
+                      {m}
+                    </span>
+                    <span className="mat-dot" style={{ background: c }} />
+                  </div>
+                  <div className="mat-t">{t}</div>
+                  <div className="mat-d">{d}</div>
                 </div>
-                <p>&ldquo;{quote}&rdquo;</p>
-                <div className="flex items-center gap-2">
-                  <span className="avatar">{name[0]}</span>
-                  <b className="text-sm">{name}</b>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="store-section pt-0">
-        <div className="store-wrap">
-          <div className="faq-grid">
-            <div className="faq-intro">
-              <div className="eyebrow">¿Dudas?</div>
-              <h2 className="sec-title mt-2 mb-3">Preguntas frecuentes</h2>
-              <p className="text-dim text-sm leading-relaxed">
-                Todo lo que necesitás saber antes de tu pedido.
-              </p>
-            </div>
-            <div className="faq-list">
-              {faqs.map(([q, a]) => (
-                <details key={q} className="faq-item">
-                  <summary>{q}</summary>
-                  <p>{a}</p>
-                </details>
               ))}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
+
+      {show("masVendidos") ? (
+        <ProductSection
+          eyebrow="Favoritos del público"
+          title="Más vendidos"
+          products={featured}
+        />
+      ) : null}
+
+      {show("galeria") ? (
+        <section className="store-section pt-0">
+          <div className="store-wrap">
+            <div className="sec-head">
+              <div>
+                <div className="eyebrow flex items-center gap-1.5">
+                  <Icon name="sparkles" size={14} /> De nuestro taller
+                </div>
+                <h2 className="sec-title">Hecho por Hefesto</h2>
+                <div className="sec-sub">
+                  Algunas piezas que imprimimos recientemente
+                </div>
+              </div>
+              <a
+                href="https://instagram.com/hefesto3d"
+                target="_blank"
+                rel="noreferrer noopener"
+                className={buttonVariants({ variant: "ghost" })}
+              >
+                Seguinos <Icon name="send" size={15} />
+              </a>
+            </div>
+            <div className="gallery-grid">
+              {gallery.map((cap, i) => (
+                <div
+                  key={cap}
+                  className={`gal-item ${i === 0 ? "gal-lg" : ""}`}
+                >
+                  <div className="ph h-full w-full" />
+                  <div className="gal-cap">
+                    <Icon name="heart" size={13} /> {cap}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {show("comoFunciona") ? (
+        <section className="store-section pt-0">
+          <div className="store-wrap">
+            <div className="sec-head flex-col items-center text-center">
+              <div>
+                <div className="eyebrow">Simple y rápido</div>
+                <h2 className="sec-title">¿Cómo funciona?</h2>
+              </div>
+            </div>
+            <div className="grid-3">
+              {steps.map((s) => (
+                <div key={s.t} className="step">
+                  <div className="step-n">{s.n}</div>
+                  <h4>{s.t}</h4>
+                  <p>{s.d}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {show("testimonios") ? (
+        <section className="store-section pt-0">
+          <div className="store-wrap">
+            <div className="sec-head">
+              <div>
+                <div className="eyebrow">Lo que dicen</div>
+                <h2 className="sec-title">Clientes felices</h2>
+              </div>
+            </div>
+            <div className="grid-3">
+              {testimonials.map(([name, quote]) => (
+                <div key={name} className="testi">
+                  <div className="stars">
+                    {[0, 1, 2, 3, 4].map((i) => (
+                      <Icon key={i} name="star" size={16} />
+                    ))}
+                  </div>
+                  <p>&ldquo;{quote}&rdquo;</p>
+                  <div className="flex items-center gap-2">
+                    <span className="avatar">{name[0]}</span>
+                    <b className="text-sm">{name}</b>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {show("faq") ? (
+        <section id="faq" className="store-section pt-0">
+          <div className="store-wrap">
+            <div className="faq-grid">
+              <div className="faq-intro">
+                <div className="eyebrow">¿Dudas?</div>
+                <h2 className="sec-title mt-2 mb-3">Preguntas frecuentes</h2>
+                <p className="text-dim mb-5 text-sm leading-relaxed">
+                  Todo lo que necesitás saber antes de tu pedido. ¿Algo más?
+                  Escribinos por WhatsApp.
+                </p>
+                <a
+                  href="https://wa.me/541155128834"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className={buttonVariants({ variant: "secondary" })}
+                >
+                  <Icon name="whatsapp" size={17} /> Hablar con nosotros
+                </a>
+              </div>
+              <div className="faq-list">
+                {faqs.map(([q, a]) => (
+                  <details key={q} className="faq-item">
+                    <summary>{q}</summary>
+                    <p>{a}</p>
+                  </details>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {show("pedidoMedida") ? (
+        <section className="store-section pt-0">
+          <div className="store-wrap">
+            <div
+              className="ui-card cust-cta overflow-hidden"
+              style={{ borderColor: "rgba(var(--gold-rgb),.25)" }}
+            >
+              <div className="cust-grid">
+                <div style={{ padding: "42px 44px" }}>
+                  <div className="eyebrow">¿No encontrás lo que buscás?</div>
+                  <h2 className="sec-title mt-2 mb-3">Pedí algo a medida</h2>
+                  <p className="text-dim mb-5 max-w-[420px] text-[15px] leading-relaxed">
+                    Contanos qué necesitás y mandanos una foto de referencia. Lo
+                    diseñamos e imprimimos para vos. Te contactamos con un
+                    presupuesto sin compromiso.
+                  </p>
+                  <div className="mb-6 flex flex-col gap-3">
+                    {(
+                      [
+                        ["palette", "Diseño personalizado según tu idea"],
+                        ["printer", "Cualquier color y material"],
+                        ["heart", "Te escribimos para coordinar"],
+                      ] as Array<[string, string]>
+                    ).map(([ic, t]) => (
+                      <div
+                        key={t}
+                        className="text-dim flex items-center gap-3 text-sm"
+                      >
+                        <span style={{ color: "var(--gold-bright)" }}>
+                          <Icon name={ic} size={18} />
+                        </span>
+                        {t}
+                      </div>
+                    ))}
+                  </div>
+                  <Link
+                    href="/cuenta/a-medida"
+                    className={cn(buttonVariants({ size: "lg" }))}
+                  >
+                    <Icon name="sparkles" size={17} /> Pedir presupuesto a
+                    medida
+                  </Link>
+                </div>
+                <div className="cust-art">
+                  <div
+                    className="scene"
+                    style={{ height: "300px", width: "100%" }}
+                  >
+                    <div className="cube">
+                      <div className="face f-front">
+                        <Icon name="box" size={54} />
+                      </div>
+                      <div className="face f-back">
+                        <Icon name="layers" size={54} />
+                      </div>
+                      <div className="face f-right">
+                        <Icon name="printer" size={54} />
+                      </div>
+                      <div className="face f-left">
+                        <Icon name="sparkles" size={54} />
+                      </div>
+                      <div className="face f-top">
+                        <Icon name="box" size={54} />
+                      </div>
+                      <div className="face f-bottom">
+                        <Icon name="layers" size={54} />
+                      </div>
+                    </div>
+                    <div className="layer-lines"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <Newsletter />
     </div>
   );

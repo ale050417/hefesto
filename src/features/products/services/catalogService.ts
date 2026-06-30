@@ -124,6 +124,12 @@ export async function getProductBySlug(
     printTimeMinutes: p.printTimeMinutes,
     weightGrams: p.weightGrams,
     dimensions: p.dimensions,
+    colorMode: p.colorMode === "multi" ? "multi" : "single",
+    colors: p.colors ?? [],
+    colorPrices: p.colorPrices ?? {},
+    layerHeight: p.layerHeight,
+    infillPercent: p.infillPercent,
+    productionTime: p.productionTime,
     images: p.images.map((i) => ({ url: i.url, alt: i.alt ?? p.name })),
     variants: p.variants.map((v) => ({
       id: v.id,
@@ -162,7 +168,7 @@ export async function getHomeData(): Promise<HomeData> {
     findFeatured(8),
     findPublished(section({ isNew: "true" })),
     findPublished(section({ onSale: "true" })),
-    findCategories(),
+    listCategoriesWithCount(),
   ]);
 
   return {
@@ -199,6 +205,12 @@ function toRow(input: ProductInput) {
     printTimeMinutes: input.printTimeMinutes ?? null,
     weightGrams: input.weightGrams ?? null,
     dimensions: input.dimensions ?? null,
+    colorMode: input.colorMode,
+    colors: input.colors,
+    colorPrices: input.colorPrices,
+    layerHeight: input.layerHeight ?? null,
+    infillPercent: input.infillPercent ?? null,
+    productionTime: input.productionTime ?? null,
     isFeatured: input.isFeatured,
     isNew: input.isNew,
   };
@@ -315,6 +327,10 @@ function toAdminRow(p: ProductWithRelations): AdminProductRow {
     slug: p.slug,
     status: p.status,
     price: Number(p.price),
+    salePrice: p.salePrice != null ? Number(p.salePrice) : null,
+    material: p.material ?? null,
+    isNew: p.isNew,
+    categoryId: p.categoryId ?? null,
     categoryName: p.category?.name ?? null,
     primaryImage: primary?.url ?? null,
   };

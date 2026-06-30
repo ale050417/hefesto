@@ -44,6 +44,12 @@ export type ProductDetailView = ProductView & {
   printTimeMinutes: number | null;
   weightGrams: number | null;
   dimensions: string | null;
+  colorMode: "single" | "multi";
+  colors: string[];
+  colorPrices: Record<string, number>;
+  layerHeight: string | null;
+  infillPercent: number | null;
+  productionTime: string | null;
   images: { url: string; alt: string }[];
   variants: { id: string; label: string; price: number | null }[];
 };
@@ -60,7 +66,7 @@ export type HomeData = {
   featured: ProductView[];
   latest: ProductView[];
   onSale: ProductView[];
-  categories: Category[];
+  categories: CategoryWithCount[];
 };
 
 export type NewProductImage = typeof productImages.$inferInsert;
@@ -71,6 +77,10 @@ export type AdminProductRow = {
   slug: string;
   status: ProductStatus;
   price: number;
+  salePrice: number | null;
+  material: string | null;
+  isNew: boolean;
+  categoryId: string | null;
   categoryName: string | null;
   primaryImage: string | null;
 };

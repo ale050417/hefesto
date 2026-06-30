@@ -7,7 +7,12 @@ export type FilamentView = {
   id: string;
   material: string;
   color: string;
+  brand: string;
+  diameter: string;
   stockGrams: number;
+  spoolGrams: number;
+  costPerKg: number;
   alertThresholdGrams: number;
   lowStock: boolean;
+  status: "ok" | "bajo" | "agotado";
 };

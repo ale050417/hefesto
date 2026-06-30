@@ -21,7 +21,9 @@ export const customMessages = pgTable(
     authorId: uuid("author_id").references(() => profiles.id, {
       onDelete: "set null",
     }),
-    body: text("body").notNull(),
+    body: text("body").notNull().default(""),
+    // Foto adjunta opcional (URL pública en el bucket de storage).
+    imageUrl: text("image_url"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
