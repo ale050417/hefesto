@@ -8,6 +8,7 @@ import { rateLimit } from "@/core/security/rate-limit";
 import { getClientIp } from "@/core/security/request";
 import { createClient } from "@/core/supabase/server";
 import { siteUrl } from "@/lib/site";
+import { clearMustChangePassword } from "./repository";
 import { loginSchema, registerSchema, resetRequestSchema } from "./schemas";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -96,11 +97,23 @@ export async function changePasswordAction(input: unknown): Promise<Result> {
     return TOO_MANY;
   }
   const parsed = changePasswordSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: "Revisá los datos" };
+  if (!parsed.success) {
+    // Mensaje específico (mínimo 8 / no coinciden), no genérico.
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Revisá los datos",
+    };
+  }
   const supabase = await createClient();
   const { error } = await supabase.auth.updateUser({
     password: parsed.data.password,
   });
   if (error) return { ok: false, error: "No se pudo cambiar la contraseña." };
+  // Limpia la marca de cambio obligatorio (invitados con contraseña temporal).
+  try {
+    await clearMustChangePassword(user.id);
+  } catch (e) {
+    console.error("[auth] no se pudo limpiar must_change_password:", e);
+  }
   return { ok: true };
 }

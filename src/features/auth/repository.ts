@@ -17,3 +17,14 @@ export async function getProfileById(
     .limit(1);
   return row ?? null;
 }
+
+/** Quita la marca de "cambiar contraseña en el primer ingreso". */
+export async function clearMustChangePassword(
+  id: string,
+  database: Database = db,
+): Promise<void> {
+  await database
+    .update(profiles)
+    .set({ mustChangePassword: false })
+    .where(eq(profiles.id, id));
+}
