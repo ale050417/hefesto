@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "@/core/supabase/server";
 import { getProfileById } from "@/features/auth/repository";
 import type { Profile } from "@/features/auth/types";
@@ -8,8 +9,13 @@ export type CurrentUser = {
   profile: Profile | null;
 };
 
-/** Usuario autenticado (verificado contra Supabase) + su perfil/rol, o null. */
-export async function getCurrentUser(): Promise<CurrentUser | null> {
+/**
+ * Usuario autenticado (verificado contra Supabase) + su perfil/rol, o null.
+ * Cacheado por request (React cache): aunque lo llamen el layout, los guards de
+ * página y los permisos, se resuelve UNA sola vez por render (evita una tormenta
+ * de consultas/auth que satura la conexión).
+ */
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -24,7 +30,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     console.error("[auth] no se pudo leer el profile:", error);
   }
   return { id: user.id, email: user.email ?? null, profile };
-}
+});
 
 import { redirect } from "next/navigation";
 
@@ -37,6 +43,8 @@ export async function requireStaff(): Promise<CurrentUser> {
   if (!user) redirect("/ingresar?redirect=/admin");
   const role = user.profile?.role;
   if (role !== "admin" && role !== "operator") redirect("/");
+  // Invitado con contraseña temporal: debe cambiarla antes de entrar al panel.
+  if (user.profile?.mustChangePassword) redirect("/cuenta/cambiar-clave");
   return user;
 }
 
