@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/core/audit";
-import { getCurrentUser, isStaff } from "@/core/auth/session";
+import { getCurrentUser } from "@/core/auth/session";
+import { can } from "@/core/auth/permissions";
 import { type ActionResult, toActionError } from "@/core/errors";
 import * as queries from "./queries";
 import { failureSchema, filamentSchema } from "./schemas";
@@ -25,7 +26,7 @@ export async function saveFilamentAction(
   input: unknown,
   id?: string,
 ): Promise<ActionResult> {
-  if (!(await isStaff())) return NOT_STAFF;
+  if (!(await can("filamentos", id ? "editar" : "crear"))) return NOT_STAFF;
   const parsed = filamentSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -47,10 +48,32 @@ export async function saveFilamentAction(
   }
 }
 
+export async function addSpoolAction(id: string): Promise<ActionResult> {
+  if (!(await can("filamentos", "editar"))) return NOT_STAFF;
+  try {
+    await queries.addSpool(id);
+    revalidatePath("/admin/filamentos");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+export async function deleteFilamentAction(id: string): Promise<ActionResult> {
+  if (!(await can("filamentos", "eliminar"))) return NOT_STAFF;
+  try {
+    await queries.deleteFilament(id);
+    revalidatePath("/admin/filamentos");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
 export async function registerFailureAction(
   input: unknown,
-): Promise<ActionResult<{ lowStock: boolean }>> {
-  if (!(await isStaff())) return NOT_STAFF;
+): Promise<ActionResult<{ lowStock: boolean; deducted: boolean }>> {
+  if (!(await can("fallas", "crear"))) return NOT_STAFF;
   const user = await getCurrentUser();
   const parsed = failureSchema.safeParse(input);
   if (!parsed.success) {
@@ -69,15 +92,53 @@ export async function registerFailureAction(
       actorId: user?.id ?? null,
       action: "inventory.failure_registered",
       entityType: "filament",
-      entityId: parsed.data.filamentId,
+      entityId: null,
       metadata: {
+        material: parsed.data.material,
+        color: parsed.data.color,
         gramsLost: parsed.data.gramsLost,
-        deducted: parsed.data.deducted ?? true,
+        deducted: res.deducted,
       },
     });
     revalidatePath("/admin/fallas");
     revalidatePath("/admin/filamentos");
     return { ok: true, data: res };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+export async function updateFailureAction(
+  id: string,
+  input: unknown,
+): Promise<ActionResult> {
+  if (!(await can("fallas", "editar"))) return NOT_STAFF;
+  const parsed = failureSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "Revisá los datos.",
+        fields: fieldErrors(parsed.error),
+      },
+    };
+  }
+  try {
+    await queries.updateFailure(id, parsed.data);
+    revalidatePath("/admin/fallas");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+export async function deleteFailureAction(id: string): Promise<ActionResult> {
+  if (!(await can("fallas", "eliminar"))) return NOT_STAFF;
+  try {
+    await queries.deleteFailure(id);
+    revalidatePath("/admin/fallas");
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
   }

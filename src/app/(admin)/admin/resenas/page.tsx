@@ -1,3 +1,4 @@
+import { requirePermissionPage } from "@/core/auth/permissions";
 import { Badge } from "@/components/ui/badge";
 import { ReviewModeration } from "@/features/reviews/components/review-moderation";
 import { Stars } from "@/features/reviews/components/stars";
@@ -9,6 +10,7 @@ export const metadata = { title: "Reseñas" };
 const dateFmt = new Intl.DateTimeFormat("es-AR", { dateStyle: "short" });
 
 export default async function ResenasPage() {
+  await requirePermissionPage("resenas", "ver");
   const reviews = await listForModeration();
   const pending = reviews.filter((r) => !r.isApproved).length;
 

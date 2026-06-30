@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser, isStaff } from "@/core/auth/session";
+import { can } from "@/core/auth/permissions";
 import { type ActionResult, toActionError } from "@/core/errors";
 import { customRequestSchema, messageSchema, quoteSchema } from "./schemas";
 import * as service from "./service";
@@ -62,9 +63,88 @@ export async function sendCustomMessageAction(
       fromStaff: staff,
       authorId: user.id,
       body: parsed.data.body,
+      imageUrl: parsed.data.imageUrl || null,
     });
     revalidatePath(`/cuenta/a-medida/${requestId}`);
-    revalidatePath(`/admin/medida/${requestId}`);
+    revalidatePath(`/cuenta/a-medida`);
+    revalidatePath(`/admin/medida`);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+/** Sube una foto del chat (cliente dueño o staff) y devuelve su URL pública. */
+export async function uploadCustomChatImageAction(
+  formData: FormData,
+): Promise<ActionResult<{ url: string }>> {
+  const user = await getCurrentUser();
+  if (!user)
+    return {
+      ok: false,
+      error: { code: "UNAUTHORIZED", message: "Iniciá sesión." },
+    };
+  const requestId = formData.get("requestId");
+  const file = formData.get("file");
+  if (typeof requestId !== "string") {
+    return {
+      ok: false,
+      error: { code: "VALIDATION", message: "Solicitud inválida." },
+    };
+  }
+  if (!(file instanceof File)) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION", message: "Falta el archivo." },
+    };
+  }
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "Formato no permitido (JPG, PNG o WebP).",
+      },
+    };
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION", message: "El archivo supera los 8 MB." },
+    };
+  }
+  const staff = await isStaff();
+  try {
+    const request = await repo.getRequestById(requestId);
+    if (!request || (!staff && request.customerId !== user.id)) {
+      return {
+        ok: false,
+        error: { code: "NOT_FOUND", message: "No encontrada." },
+      };
+    }
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const url = await service.uploadChatImage(requestId, bytes);
+    return { ok: true, data: { url } };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+/** Admin: elimina una conversación a medida (y sus mensajes por cascade). */
+export async function deleteCustomRequestAction(
+  id: string,
+): Promise<ActionResult> {
+  if (!(await can("medida", "eliminar")))
+    return {
+      ok: false,
+      error: { code: "UNAUTHORIZED", message: "No autorizado" },
+    };
+  try {
+    await service.deleteRequest(id);
+    revalidatePath("/admin/medida");
     return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
@@ -75,7 +155,7 @@ export async function quoteCustomRequestAction(
   id: string,
   input: unknown,
 ): Promise<ActionResult> {
-  if (!(await isStaff()))
+  if (!(await can("medida", "editar")))
     return {
       ok: false,
       error: { code: "UNAUTHORIZED", message: "No autorizado" },
@@ -100,7 +180,7 @@ export async function transitionCustomRequestAction(
   id: string,
   toStatus: CustomRequestStatus,
 ): Promise<ActionResult> {
-  if (!(await isStaff()))
+  if (!(await can("medida", "editar")))
     return {
       ok: false,
       error: { code: "UNAUTHORIZED", message: "No autorizado" },

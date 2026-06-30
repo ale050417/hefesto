@@ -1,79 +1,94 @@
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { requirePermissionPage } from "@/core/auth/permissions";
+import { KpiCard } from "@/features/reports/components/kpi-card";
+import { NuevoFilamentoButton } from "@/features/inventory/components/nuevo-filamento-button";
+import { FilamentsBoard } from "@/features/inventory/components/filaments-board";
 import { listFilamentsView } from "@/features/inventory/queries";
+import { compactPrice, formatPrice } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Filamentos" };
 
+const ic = (path: string) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden
+    dangerouslySetInnerHTML={{ __html: path }}
+  />
+);
+
 export default async function FilamentosPage() {
+  await requirePermissionPage("filamentos", "ver");
   const filaments = await listFilamentsView();
 
+  const totalG = filaments.reduce((a, f) => a + f.stockGrams, 0);
+  const valor = filaments.reduce(
+    (a, f) => a + (f.stockGrams / 1000) * f.costPerKg,
+    0,
+  );
+  const bajos = filaments.filter((f) => f.status === "bajo").length;
+  const agotados = filaments.filter((f) => f.status === "agotado").length;
+  const materials = [...new Set(filaments.map((f) => f.material))];
+
   return (
-    <div>
+    <div className="view grid gap-5">
       <div className="page-head">
         <div>
           <div className="eyebrow">Inventario</div>
           <h1 className="page-title">Filamentos</h1>
-          <div className="page-sub">{filaments.length} en stock</div>
-        </div>
-        <Link
-          href="/admin/filamentos/nuevo"
-          className={buttonVariants({ size: "sm" })}
-        >
-          Nuevo filamento
-        </Link>
-      </div>
-
-      {filaments.length === 0 ? (
-        <div className="ui-card text-dim p-10 text-center text-sm">
-          Todavía no cargaste filamentos.
-        </div>
-      ) : (
-        <div className="ui-card overflow-hidden">
-          <div className="table-wrap" style={{ border: "none" }}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Material</th>
-                  <th>Color</th>
-                  <th className="text-right">Stock (g)</th>
-                  <th className="text-right">Umbral (g)</th>
-                  <th>Estado</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filaments.map((f) => (
-                  <tr key={f.id}>
-                    <td className="text-fg">{f.material}</td>
-                    <td className="text-dim">{f.color}</td>
-                    <td className="text-fg text-right">{f.stockGrams}</td>
-                    <td className="text-dim text-right">
-                      {f.alertThresholdGrams}
-                    </td>
-                    <td>
-                      {f.lowStock ? (
-                        <Badge variant="warning">Bajo stock</Badge>
-                      ) : (
-                        <Badge variant="success">OK</Badge>
-                      )}
-                    </td>
-                    <td className="text-right">
-                      <Link
-                        href={`/admin/filamentos/${f.id}/editar`}
-                        className="text-primary hover:underline"
-                      >
-                        Editar
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="page-sub">
+            {filaments.length} bobinas/colores · {(totalG / 1000).toFixed(1)} kg
+            en stock · valor {formatPrice(valor)}
           </div>
         </div>
-      )}
+        <NuevoFilamentoButton />
+      </div>
+
+      <div className="kpi-grid">
+        <KpiCard
+          icon={ic(
+            '<path d="M12 2 2 7l10 5 10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>',
+          )}
+          label="Carretes en stock"
+          value={String(filaments.length)}
+          delta="colores"
+          tint="#C9A84C"
+        />
+        <KpiCard
+          icon={ic(
+            '<path d="M12 3a4 4 0 0 0-4 4h8a4 4 0 0 0-4-4z"/><path d="M6.5 7h11l2.5 12a2 2 0 0 1-2 2.4H6a2 2 0 0 1-2-2.4z"/>',
+          )}
+          label="Material total"
+          value={`${(totalG / 1000).toFixed(1)} kg`}
+          delta="disponible"
+          tint="#4CB782"
+        />
+        <KpiCard
+          icon={ic(
+            '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
+          )}
+          label="Valor del inventario"
+          value={compactPrice(valor)}
+          delta="estimado"
+          tint="#5A9CD9"
+        />
+        <KpiCard
+          icon={ic(
+            '<path d="M10.3 3.8 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>',
+          )}
+          label="Stock bajo / agotado"
+          value={String(bajos + agotados)}
+          delta={agotados ? `${agotados} agotados` : "a reponer"}
+          up={false}
+          tint="#D96A5A"
+        />
+      </div>
+
+      <FilamentsBoard filaments={filaments} materials={materials} />
     </div>
   );
 }

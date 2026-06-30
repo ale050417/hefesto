@@ -1,3 +1,4 @@
+import { requirePermissionPage } from "@/core/auth/permissions";
 import { listRecentAudit } from "@/core/audit";
 
 export const dynamic = "force-dynamic";
@@ -14,52 +15,57 @@ const ACTION_LABEL: Record<string, string> = {
 };
 
 export default async function AuditoriaPage() {
+  await requirePermissionPage("auditoria", "ver");
   const entries = await listRecentAudit(100);
 
   return (
     <div>
-      <p className="eyebrow">Seguridad</p>
-      <h1 className="font-display text-fg mt-1 text-2xl">Auditoría</h1>
-      <p className="text-dim mt-1 text-sm">
-        Registro de las acciones sensibles del equipo.
-      </p>
-
-      <div className="border-surface-2 mt-6 overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead className="bg-surface-2 text-dim text-left text-xs">
-            <tr>
-              <th className="p-3 font-medium">Fecha</th>
-              <th className="p-3 font-medium">Quién</th>
-              <th className="p-3 font-medium">Acción</th>
-              <th className="p-3 font-medium">Detalle</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="text-dim p-6 text-center">
-                  Todavía no hay registros.
-                </td>
-              </tr>
-            ) : (
-              entries.map((e) => (
-                <tr key={e.id} className="border-surface-2 border-t">
-                  <td className="text-dim p-3 whitespace-nowrap">
-                    {dateFmt.format(e.createdAt)}
-                  </td>
-                  <td className="text-fg p-3">{e.actorName ?? "—"}</td>
-                  <td className="text-fg p-3">
-                    {ACTION_LABEL[e.action] ?? e.action}
-                  </td>
-                  <td className="text-faint p-3 text-xs">
-                    {e.metadata ? JSON.stringify(e.metadata) : "—"}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+      <div className="page-head">
+        <div>
+          <div className="eyebrow">Seguridad</div>
+          <h1 className="page-title">Auditoría</h1>
+          <div className="page-sub">
+            Registro de las acciones sensibles del equipo.
+          </div>
+        </div>
       </div>
+
+      {entries.length === 0 ? (
+        <div className="ui-card text-dim p-10 text-center text-sm">
+          Todavía no hay registros.
+        </div>
+      ) : (
+        <div className="ui-card overflow-hidden">
+          <div className="table-wrap" style={{ border: "none" }}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Quién</th>
+                  <th>Acción</th>
+                  <th>Detalle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {entries.map((e) => (
+                  <tr key={e.id}>
+                    <td className="text-dim whitespace-nowrap">
+                      {dateFmt.format(e.createdAt)}
+                    </td>
+                    <td className="text-fg">{e.actorName ?? "—"}</td>
+                    <td className="text-fg">
+                      {ACTION_LABEL[e.action] ?? e.action}
+                    </td>
+                    <td className="text-faint text-xs">
+                      {e.metadata ? JSON.stringify(e.metadata) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

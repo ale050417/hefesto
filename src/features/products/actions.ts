@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getStaffUser, isStaff } from "@/core/auth/session";
+import { getStaffUser } from "@/core/auth/session";
+import { can } from "@/core/auth/permissions";
 import { recordAudit } from "@/core/audit";
 import { z, type ZodError } from "zod";
 import { categoryInputSchema, productInputSchema } from "./schemas";
@@ -11,12 +12,15 @@ import {
   createCategory,
   createProduct,
   deleteCategory,
+  getProductAdmin,
   makeImagePrimary,
   publishProduct,
   removeProductImage,
   updateCategory,
   updateProduct,
 } from "./services/catalogService";
+import type { ProductImage, ProductStatus } from "./types";
+import type { ProductFormValues } from "./components/product-form";
 
 type ActionResult<T = undefined> =
   | { ok: true; data: T }
@@ -57,11 +61,56 @@ const SLUG_TAKEN = {
   },
 };
 
+/** Datos del producto para abrir el modal de edición desde la lista. */
+export async function getProductFormDataAction(id: string): Promise<
+  ActionResult<{
+    name: string;
+    status: ProductStatus;
+    defaults: ProductFormValues;
+    images: ProductImage[];
+  }>
+> {
+  if (!(await can("productos", "ver"))) return UNAUTHORIZED;
+  const data = await getProductAdmin(id);
+  if (!data) {
+    return {
+      ok: false,
+      error: { code: "NOT_FOUND", message: "No encontrado" },
+    };
+  }
+  const { product, images } = data;
+  const defaults: ProductFormValues = {
+    name: product.name,
+    slug: product.slug,
+    description: product.description ?? "",
+    categoryId: product.categoryId ?? "",
+    price: product.price,
+    salePrice: product.salePrice ?? "",
+    material: product.material ?? "",
+    printTimeMinutes: product.printTimeMinutes?.toString() ?? "",
+    weightGrams: product.weightGrams?.toString() ?? "",
+    dimensions: product.dimensions ?? "",
+    colorMode: product.colorMode === "multi" ? "multi" : "single",
+    colors: product.colors ?? [],
+    colorPrices: product.colorPrices ?? {},
+    layerHeight: product.layerHeight ?? "",
+    infillPercent: product.infillPercent?.toString() ?? "",
+    productionTime: product.productionTime ?? "",
+    isFeatured: product.isFeatured,
+    isNew: product.isNew,
+  };
+  return {
+    ok: true,
+    data: { name: product.name, status: product.status, defaults, images },
+  };
+}
+
 export async function createProductAction(
   input: unknown,
 ): Promise<ActionResult<{ id: string }>> {
   const actor = await getStaffUser();
   if (!actor) return UNAUTHORIZED;
+  if (!(await can("productos", "crear"))) return UNAUTHORIZED;
   const parsed = productInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -99,6 +148,7 @@ export async function updateProductAction(
 ): Promise<ActionResult<{ id: string }>> {
   const actor = await getStaffUser();
   if (!actor) return UNAUTHORIZED;
+  if (!(await can("productos", "editar"))) return UNAUTHORIZED;
   const parsed = productInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -134,6 +184,7 @@ export async function updateProductAction(
 export async function publishProductAction(id: string): Promise<ActionResult> {
   const actor = await getStaffUser();
   if (!actor) return UNAUTHORIZED;
+  if (!(await can("productos", "editar"))) return UNAUTHORIZED;
   try {
     await publishProduct(id);
     await recordAudit({
@@ -158,6 +209,7 @@ export async function publishProductAction(id: string): Promise<ActionResult> {
 export async function archiveProductAction(id: string): Promise<ActionResult> {
   const actor = await getStaffUser();
   if (!actor) return UNAUTHORIZED;
+  if (!(await can("productos", "eliminar"))) return UNAUTHORIZED;
   try {
     await archiveProduct(id);
     await recordAudit({
@@ -192,7 +244,7 @@ function validationError(message: string) {
 export async function uploadProductImageAction(
   formData: FormData,
 ): Promise<ActionResult<{ id: string; url: string }>> {
-  if (!(await isStaff())) return UNAUTHORIZED;
+  if (!(await can("productos", "editar"))) return UNAUTHORIZED;
   const productId = formData.get("productId");
   const file = formData.get("file");
   if (
@@ -224,7 +276,7 @@ export async function uploadProductImageAction(
 export async function deleteProductImageAction(
   imageId: string,
 ): Promise<ActionResult> {
-  if (!(await isStaff())) return UNAUTHORIZED;
+  if (!(await can("productos", "editar"))) return UNAUTHORIZED;
   if (!uuidSchema.safeParse(imageId).success) {
     return validationError("Imagen inválida");
   }
@@ -247,7 +299,7 @@ export async function setPrimaryImageAction(
   productId: string,
   imageId: string,
 ): Promise<ActionResult> {
-  if (!(await isStaff())) return UNAUTHORIZED;
+  if (!(await can("productos", "editar"))) return UNAUTHORIZED;
   if (
     !uuidSchema.safeParse(productId).success ||
     !uuidSchema.safeParse(imageId).success
@@ -282,6 +334,7 @@ export async function createCategoryAction(
 ): Promise<ActionResult<{ id: string }>> {
   const actor = await getStaffUser();
   if (!actor) return UNAUTHORIZED;
+  if (!(await can("productos", "crear"))) return UNAUTHORIZED;
   const parsed = categoryInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -319,6 +372,7 @@ export async function updateCategoryAction(
 ): Promise<ActionResult<{ id: string }>> {
   const actor = await getStaffUser();
   if (!actor) return UNAUTHORIZED;
+  if (!(await can("productos", "editar"))) return UNAUTHORIZED;
   const parsed = categoryInputSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -356,6 +410,7 @@ export async function updateCategoryAction(
 export async function deleteCategoryAction(id: string): Promise<ActionResult> {
   const actor = await getStaffUser();
   if (!actor) return UNAUTHORIZED;
+  if (!(await can("productos", "eliminar"))) return UNAUTHORIZED;
   if (!uuidSchema.safeParse(id).success) {
     return validationError("Categoría inválida");
   }

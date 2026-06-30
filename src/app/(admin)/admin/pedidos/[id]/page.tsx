@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ORDER_STATUS_LABEL } from "@/features/orders/constants";
+import { requirePermissionPage } from "@/core/auth/permissions";
+import { Badge } from "@/components/ui/badge";
+import {
+  ORDER_STATUS_LABEL,
+  ORDER_STATUS_VARIANT,
+} from "@/features/orders/constants";
 import { OrderStatusManager } from "@/features/orders/components/order-status-manager";
 import { OrderSummary } from "@/features/orders/components/order-summary";
 import { getOrderAdmin } from "@/features/orders/services/orderAdminService";
@@ -21,6 +26,7 @@ export default async function OrderDetailAdminPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermissionPage("pedidos", "ver");
   const { id } = await params;
   const order = await getOrderAdmin(id);
   if (!order) notFound();
@@ -34,7 +40,13 @@ export default async function OrderDetailAdminPage({
       <div className="page-head mt-2">
         <div>
           <div className="eyebrow">Pedido</div>
-          <h1 className="page-title">{order.orderNumber}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="page-title">{order.orderNumber}</h1>
+            <Badge variant={ORDER_STATUS_VARIANT[order.status]}>
+              {ORDER_STATUS_LABEL[order.status]}
+            </Badge>
+          </div>
+          <div className="page-sub">{dateFmt.format(order.createdAt)}</div>
         </div>
       </div>
 

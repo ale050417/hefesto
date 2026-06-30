@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getCurrentUser, isStaff } from "@/core/auth/session";
+import { getCurrentUser } from "@/core/auth/session";
+import { can } from "@/core/auth/permissions";
 import { type ActionResult, toActionError } from "@/core/errors";
 import { reviewSchema } from "./schemas";
 import { createReview } from "./service";
@@ -41,7 +42,7 @@ export async function createReviewAction(
 }
 
 export async function approveReviewAction(id: string): Promise<ActionResult> {
-  if (!(await isStaff()))
+  if (!(await can("resenas", "editar")))
     return {
       ok: false,
       error: { code: "UNAUTHORIZED", message: "No autorizado" },
@@ -56,7 +57,7 @@ export async function approveReviewAction(id: string): Promise<ActionResult> {
 }
 
 export async function deleteReviewAction(id: string): Promise<ActionResult> {
-  if (!(await isStaff()))
+  if (!(await can("resenas", "eliminar")))
     return {
       ok: false,
       error: { code: "UNAUTHORIZED", message: "No autorizado" },

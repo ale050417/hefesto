@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { requirePermissionPage } from "@/core/auth/permissions";
 import {
   ProductForm,
   type ProductFormValues,
@@ -18,11 +19,18 @@ const emptyDefaults: ProductFormValues = {
   printTimeMinutes: "",
   weightGrams: "",
   dimensions: "",
+  colorMode: "single",
+  colors: [],
+  colorPrices: {},
+  layerHeight: "",
+  infillPercent: "",
+  productionTime: "",
   isFeatured: false,
   isNew: false,
 };
 
 export default async function NuevoProductoPage() {
+  await requirePermissionPage("productos", "crear");
   const categories = await listCategories();
   if (categories.length === 0) {
     return (
@@ -42,17 +50,19 @@ export default async function NuevoProductoPage() {
   }
   return (
     <div className="mx-auto max-w-2xl">
-      <nav className="text-dim text-sm">
-        <Link href="/admin/productos" className="hover:text-fg">
-          Productos
-        </Link>{" "}
-        / <span className="text-fg">Nuevo</span>
-      </nav>
-      <h1 className="font-display text-fg mt-2 text-2xl">Nuevo producto</h1>
-      <p className="text-dim mt-1 text-sm">
-        Creá el producto; después podrás subir imágenes y publicarlo.
-      </p>
-      <div className="mt-6">
+      <Link href="/admin/productos" className="text-dim hover:text-fg text-sm">
+        ← Productos
+      </Link>
+      <div className="page-head mt-2">
+        <div>
+          <div className="eyebrow">Catálogo</div>
+          <h1 className="page-title">Nuevo producto</h1>
+          <div className="page-sub">
+            Creá el producto; después podrás subir imágenes y publicarlo.
+          </div>
+        </div>
+      </div>
+      <div className="mt-2">
         <ProductForm
           mode="create"
           categories={categories}

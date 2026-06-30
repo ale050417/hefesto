@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { requirePermissionPage } from "@/core/auth/permissions";
 import { ImageUpload } from "@/features/products/components/image-upload";
 import {
   ProductForm,
@@ -18,6 +19,7 @@ export default async function EditarProductoPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requirePermissionPage("productos", "editar");
   const { id } = await params;
   const [data, categories] = await Promise.all([
     getProductAdmin(id),
@@ -37,21 +39,30 @@ export default async function EditarProductoPage({
     printTimeMinutes: product.printTimeMinutes?.toString() ?? "",
     weightGrams: product.weightGrams?.toString() ?? "",
     dimensions: product.dimensions ?? "",
+    colorMode: product.colorMode === "multi" ? "multi" : "single",
+    colors: product.colors ?? [],
+    colorPrices: product.colorPrices ?? {},
+    layerHeight: product.layerHeight ?? "",
+    infillPercent: product.infillPercent?.toString() ?? "",
+    productionTime: product.productionTime ?? "",
     isFeatured: product.isFeatured,
     isNew: product.isNew,
   };
 
   return (
     <div className="mx-auto max-w-3xl">
-      <nav className="text-dim text-sm">
-        <Link href="/admin/productos" className="hover:text-fg">
-          Productos
-        </Link>{" "}
-        / <span className="text-fg">{product.name}</span>
-      </nav>
-      <h1 className="font-display text-fg mt-2 text-2xl">Editar producto</h1>
+      <Link href="/admin/productos" className="text-dim hover:text-fg text-sm">
+        ← Productos
+      </Link>
+      <div className="page-head mt-2">
+        <div>
+          <div className="eyebrow">Catálogo</div>
+          <h1 className="page-title">Editar producto</h1>
+          <div className="page-sub">{product.name}</div>
+        </div>
+      </div>
 
-      <div className="border-surface-2 bg-surface-1 mt-6 rounded-lg border p-4">
+      <div className="ui-card p-4">
         <ProductStatusActions productId={product.id} status={product.status} />
       </div>
 

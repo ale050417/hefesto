@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/core/audit";
-import { getCurrentUser, isStaff } from "@/core/auth/session";
+import { getCurrentUser } from "@/core/auth/session";
+import { can } from "@/core/auth/permissions";
 import { type ActionResult, toActionError } from "@/core/errors";
 import { rateLimit } from "@/core/security/rate-limit";
 import { getClientIp } from "@/core/security/request";
@@ -46,7 +47,7 @@ export async function saveCouponAction(
   input: unknown,
   id?: string,
 ): Promise<ActionResult> {
-  if (!(await isStaff())) return NOT_STAFF;
+  if (!(await can("descuentos", id ? "editar" : "crear"))) return NOT_STAFF;
   const user = await getCurrentUser();
   const parsed = couponSchema.safeParse(input);
   if (!parsed.success) {
@@ -80,7 +81,7 @@ export async function toggleCouponAction(
   id: string,
   isActive: boolean,
 ): Promise<ActionResult> {
-  if (!(await isStaff())) return NOT_STAFF;
+  if (!(await can("descuentos", "editar"))) return NOT_STAFF;
   try {
     await queries.toggleCoupon(id, isActive);
     revalidatePath("/admin/descuentos");

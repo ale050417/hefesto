@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { isStaff } from "@/core/auth/session";
+import { can } from "@/core/auth/permissions";
 import { type ActionResult, toActionError } from "@/core/errors";
 import * as service from "./service";
 import type { JobStatus, PrinterStatus } from "./repository";
@@ -15,7 +15,7 @@ export async function addPrinterAction(
   name: string,
   model: string,
 ): Promise<ActionResult> {
-  if (!(await isStaff())) return NOT_STAFF;
+  if (!(await can("produccion", "crear"))) return NOT_STAFF;
   const trimmed = name.trim();
   if (trimmed.length < 2)
     return {
@@ -35,7 +35,7 @@ export async function setPrinterStatusAction(
   id: string,
   status: PrinterStatus,
 ): Promise<ActionResult> {
-  if (!(await isStaff())) return NOT_STAFF;
+  if (!(await can("produccion", "editar"))) return NOT_STAFF;
   try {
     await service.setPrinterStatus(id, status);
     revalidatePath("/admin/produccion");
@@ -49,7 +49,7 @@ export async function addJobAction(
   title: string,
   printerId: string,
 ): Promise<ActionResult> {
-  if (!(await isStaff())) return NOT_STAFF;
+  if (!(await can("produccion", "crear"))) return NOT_STAFF;
   const trimmed = title.trim();
   if (trimmed.length < 2)
     return {
@@ -69,7 +69,7 @@ export async function setJobStatusAction(
   id: string,
   status: JobStatus,
 ): Promise<ActionResult> {
-  if (!(await isStaff())) return NOT_STAFF;
+  if (!(await can("produccion", "editar"))) return NOT_STAFF;
   try {
     await service.setJobStatus(id, status);
     revalidatePath("/admin/produccion");

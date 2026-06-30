@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,14 +14,53 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Panel" };
 
 const dateFmt = new Intl.DateTimeFormat("es-AR", { dateStyle: "short" });
+const longDateFmt = new Intl.DateTimeFormat("es-AR", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+});
 
-const quickLinks = [
-  { href: "/admin/productos", label: "Productos" },
-  { href: "/admin/pedidos", label: "Pedidos" },
-  { href: "/admin/filamentos", label: "Filamentos" },
-  { href: "/admin/descuentos", label: "Descuentos" },
-  { href: "/admin/reportes", label: "Reportes" },
-];
+const P: Record<string, ReactNode> = {
+  dollar: (
+    <path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+  ),
+  chart: <path d="M3 3v18h18M7 14l4-4 3 3 5-6" />,
+  cart: (
+    <>
+      <circle cx="9" cy="21" r="1" />
+      <circle cx="20" cy="21" r="1" />
+      <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
+    </>
+  ),
+  layers: <path d="m12 2 9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5" />,
+  download: (
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" />
+  ),
+  plus: <path d="M12 5v14M5 12h14" />,
+};
+
+function Icon({ name, size = 20 }: { name: string; size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {P[name]}
+    </svg>
+  );
+}
+
+function greeting(): string {
+  const h = new Date().getHours();
+  return h < 13 ? "Buen día" : h < 20 ? "Buenas tardes" : "Buenas noches";
+}
 
 export default async function AdminDashboard() {
   const { kpis, revenueSeries, recentOrders, lowStock } =
@@ -30,79 +70,116 @@ export default async function AdminDashboard() {
     <div>
       <div className="page-head">
         <div>
-          <div className="eyebrow">Panel</div>
-          <h1 className="page-title">Dashboard</h1>
+          <div className="eyebrow">Panel de gestión</div>
+          <h1 className="page-title">{greeting()}, Hefesto</h1>
+          <div className="page-sub">
+            Resumen de tu operación · {longDateFmt.format(new Date())}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Link href="/admin/reportes" className="btn btn-secondary">
+            <Icon name="download" size={16} /> Exportar
+          </Link>
+          <Link href="/admin/productos/nuevo" className="btn btn-primary">
+            <Icon name="plus" size={16} /> Nuevo producto
+          </Link>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Ingresos" value={formatPrice(kpis.revenue)} />
-        <KpiCard label="Ventas" value={String(kpis.salesCount)} />
-        <KpiCard label="Pendientes de pago" value={String(kpis.pendingCount)} />
+      <div className="kpi-grid" style={{ marginBottom: 18 }}>
         <KpiCard
+          icon={<Icon name="dollar" />}
+          label="Ingresos · 30 días"
+          value={formatPrice(kpis.revenue)}
+          tint="#C9A84C"
+        />
+        <KpiCard
+          icon={<Icon name="chart" />}
+          label="Ventas"
+          value={String(kpis.salesCount)}
+          tint="#4CB782"
+        />
+        <KpiCard
+          icon={<Icon name="cart" />}
+          label="Pedidos pendientes"
+          value={String(kpis.pendingCount)}
+          tint="#D9A441"
+        />
+        <KpiCard
+          icon={<Icon name="layers" />}
           label="Filamentos bajo stock"
           value={String(kpis.lowStockCount)}
+          tint="#5A9CD9"
         />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_320px]">
-        <RevenueChart data={revenueSeries} />
-
-        <aside className="space-y-4">
-          <div className="ui-card p-4">
-            <h3 className="text-fg font-display mb-3 text-sm">
-              Últimos pedidos
-            </h3>
-            {recentOrders.length === 0 ? (
-              <p className="text-dim text-sm">Sin pedidos aún.</p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {recentOrders.map((o) => (
-                  <li
-                    key={o.id}
-                    className="flex items-center justify-between gap-2"
-                  >
-                    <Link
-                      href={`/admin/pedidos/${o.id}`}
-                      className="text-dim hover:text-fg truncate"
-                    >
-                      {o.orderNumber} · {dateFmt.format(o.createdAt)}
-                    </Link>
-                    <Badge variant={ORDER_STATUS_VARIANT[o.status]}>
-                      {ORDER_STATUS_LABEL[o.status]}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
+      <div className="dash-grid">
+        <div className="ui-card section-card">
+          <div className="mb-2 flex items-start justify-between">
+            <div>
+              <div className="section-title">Ingresos · últimos 30 días</div>
+              <div className="text-faint mt-1 text-[12.5px]">
+                Total{" "}
+                <b className="text-[var(--gold-bright)]">
+                  {formatPrice(kpis.revenue)}
+                </b>{" "}
+                · promedio diario {formatPrice(Math.round(kpis.revenue / 30))}
+              </div>
+            </div>
           </div>
+          <RevenueChart data={revenueSeries} />
+        </div>
+
+        <div className="ui-card section-card">
+          <div className="mb-3.5 flex items-center justify-between">
+            <div className="section-title">Últimos pedidos</div>
+            <Link href="/admin/pedidos" className="btn btn-ghost btn-sm">
+              Ver todos →
+            </Link>
+          </div>
+          {recentOrders.length === 0 ? (
+            <p className="text-dim text-sm">Sin pedidos aún.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {recentOrders.map((o) => (
+                <Link
+                  key={o.id}
+                  href={`/admin/pedidos/${o.id}`}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] p-3 text-sm transition hover:border-[var(--gold)]"
+                >
+                  <span className="min-w-0">
+                    <b>{o.orderNumber}</b>
+                    <span className="text-faint ml-2 text-xs">
+                      {dateFmt.format(o.createdAt)}
+                    </span>
+                  </span>
+                  <Badge variant={ORDER_STATUS_VARIANT[o.status]}>
+                    {ORDER_STATUS_LABEL[o.status]}
+                  </Badge>
+                </Link>
+              ))}
+            </div>
+          )}
 
           {lowStock.length > 0 ? (
-            <div className="ui-card p-4">
-              <h3 className="text-fg font-display mb-3 text-sm">
-                Alertas de stock
-              </h3>
-              <ul className="space-y-2 text-sm">
+            <div className="mt-5">
+              <div className="section-title mb-3">Alertas de stock</div>
+              <div className="flex flex-col gap-2">
                 {lowStock.map((f) => (
-                  <li key={f.id} className="flex items-center justify-between">
+                  <div
+                    key={f.id}
+                    className="flex items-center justify-between text-sm"
+                  >
                     <span className="text-dim">
                       {f.material} · {f.color}
                     </span>
                     <Badge variant="warning">{f.stockGrams} g</Badge>
-                  </li>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           ) : null}
-        </aside>
-      </div>
-
-      <div className="mt-6 flex flex-wrap gap-2">
-        {quickLinks.map((q) => (
-          <Link key={q.href} href={q.href} className="chip">
-            {q.label}
-          </Link>
-        ))}
+        </div>
       </div>
     </div>
   );
