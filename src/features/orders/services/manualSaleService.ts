@@ -18,6 +18,9 @@ export function toManualSaleRow(
     customerName: input.customerName,
     detail: input.detail ?? null,
     total: input.total.toFixed(2),
+    amortization:
+      input.amortization != null ? input.amortization.toFixed(2) : null,
+    profit: input.profit != null ? input.profit.toFixed(2) : null,
     paymentMethod: input.paymentMethod,
     status: input.status,
     // Reparto de esta venta (solo partes con % > 0). Null = dividir por socios actuales.

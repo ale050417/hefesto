@@ -46,6 +46,16 @@ export const manualSaleSchema = z.object({
     z.string().trim().max(300).optional(),
   ),
   total: z.coerce.number().positive("Ingresá el total cobrado."),
+  // Datos para calcular la amortización (costo) en el servidor.
+  material: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().trim().max(60).optional(),
+  ),
+  grams: z.coerce.number().min(0).optional(),
+  printMinutes: z.coerce.number().min(0).optional(),
+  // Costos resueltos en el servidor (no se confía en el cliente).
+  amortization: z.coerce.number().min(0).optional(),
+  profit: z.coerce.number().optional(),
   paymentMethod: z.enum(["transfer", "mercadopago", "cash"]),
   // Reparto de la ganancia de esta venta: [{nombre, pct}]. Opcional; si no viene,
   // se divide por los socios actuales (lo resuelve el panel de ganancias).

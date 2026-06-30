@@ -46,8 +46,20 @@ export function ManualSaleForm({
     paymentMethod: "cash" as (typeof PAYS)[number]["v"],
     status: "delivered" as (typeof STATUSES)[number]["v"],
   });
-  // Calculadora flotante opcional: al "Usar precio" copia el total.
+  // Datos de la calculadora para que el servidor calcule la amortización.
+  const [estData, setEstData] = useState<{
+    material: string;
+    grams: number;
+    printMinutes: number;
+  } | null>(null);
+  // Calculadora flotante (obligatoria): al "Usar precio" copia el total y guarda
+  // gramos/horas/material para la amortización.
   function handleEstUse(v: EstimatorValue) {
+    setEstData({
+      material: v.material,
+      grams: v.grams,
+      printMinutes: v.printMinutes,
+    });
     if (v.price != null) setForm((f) => ({ ...f, total: String(v.price) }));
   }
   // Reparto de la ganancia de ESTA venta. "current" = dividir por los socios
@@ -86,6 +98,11 @@ export function ManualSaleForm({
           `Los porcentajes deben sumar 100% (suman ${splitTotal}%).`,
         );
     }
+    if (!estData) {
+      return setErr(
+        "Calculá el precio con la calculadora (la amortización es obligatoria).",
+      );
+    }
     setBusy(true);
     const profitSplit =
       splitMode === "custom"
@@ -93,7 +110,13 @@ export function ManualSaleForm({
             .filter((p) => p.name.trim() && Number(p.pct) > 0)
             .map((p) => ({ name: p.name.trim(), pct: Number(p.pct) }))
         : undefined;
-    const res = await createManualSaleAction({ ...form, profitSplit });
+    const res = await createManualSaleAction({
+      ...form,
+      material: estData.material,
+      grams: estData.grams,
+      printMinutes: estData.printMinutes,
+      profitSplit,
+    });
     setBusy(false);
     if (!res.ok) return setErr(res.error.message);
     if (onDone) {

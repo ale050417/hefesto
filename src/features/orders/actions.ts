@@ -11,6 +11,7 @@ import {
   toActionError,
 } from "@/core/errors";
 import { siteUrl } from "@/lib/site";
+import { getAmortization } from "@/features/calculator/service";
 import {
   checkoutSchema,
   manualSaleSchema,
@@ -131,8 +132,30 @@ export async function createManualSaleAction(
       },
     };
   }
+  // Amortización (costo) obligatoria: se calcula en el servidor desde
+  // gramos/horas/material. La ganancia (total − amort) es lo que se reparte.
+  const amort = await getAmortization({
+    material: parsed.data.material ?? null,
+    grams: parsed.data.grams ?? 0,
+    hours: (parsed.data.printMinutes ?? 0) / 60,
+  });
+  if (!(amort > 0)) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message:
+          "Cargá la amortización con la calculadora (gramos/horas y material).",
+      },
+    };
+  }
+  const withCosts = {
+    ...parsed.data,
+    amortization: Math.round(amort * 100) / 100,
+    profit: Math.round(Math.max(0, parsed.data.total - amort) * 100) / 100,
+  };
   try {
-    const sale = await createManualSale(parsed.data, user?.id ?? null);
+    const sale = await createManualSale(withCosts, user?.id ?? null);
     revalidatePath("/admin/pedidos");
     // La venta manual cobrada suma al reparto de ganancias y a reportes.
     revalidatePath("/admin/ganancias");
