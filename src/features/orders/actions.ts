@@ -4,15 +4,21 @@ import { revalidatePath } from "next/cache";
 
 import { type ZodError } from "zod";
 import { getCurrentUser, isStaff } from "@/core/auth/session";
+import { can } from "@/core/auth/permissions";
 import { recordAudit } from "@/core/audit";
 import {
   type ActionResult as CoreActionResult,
   toActionError,
 } from "@/core/errors";
 import { siteUrl } from "@/lib/site";
-import { checkoutSchema, type CheckoutInput } from "./schemas";
+import {
+  checkoutSchema,
+  manualSaleSchema,
+  type CheckoutInput,
+} from "./schemas";
 import { messageSchema } from "@/features/custom/schemas";
 import { createOrder } from "./services/orderService";
+import { createManualSale } from "./services/manualSaleService";
 import { getOrderCustomerId, sendOrderMessage } from "./services/orderChat";
 import { notifyCustomer } from "@/features/notifications/service";
 import { awardForOrder } from "@/features/rewards/service";
@@ -104,6 +110,46 @@ const NOT_STAFF = {
   error: { code: "UNAUTHORIZED", message: "No autorizado" },
 };
 
+/**
+ * Admin: registra una venta manual / histórica (mostrador o ventas previas).
+ * NO usa el checkout: cliente por texto, total cargado a mano, estado a
+ * elección. Se guarda en `manual_sales` (no en `orders`). Requiere staff.
+ */
+export async function createManualSaleAction(
+  input: unknown,
+): Promise<ActionResult> {
+  if (!(await can("pedidos", "crear"))) return NOT_STAFF;
+  const user = await getCurrentUser();
+  const parsed = manualSaleSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "Revisá los datos de la venta.",
+        fields: fieldErrors(parsed.error),
+      },
+    };
+  }
+  try {
+    const sale = await createManualSale(parsed.data, user?.id ?? null);
+    revalidatePath("/admin/pedidos");
+    // La venta manual cobrada suma al reparto de ganancias y a reportes.
+    revalidatePath("/admin/ganancias");
+    revalidatePath("/admin/reportes");
+    await recordAudit({
+      actorId: user?.id ?? null,
+      action: "manual_sale.created",
+      entityType: "manual_sale",
+      entityId: sale.id,
+      metadata: { total: sale.total, customer: sale.customerName },
+    });
+    return { ok: true, orderNumber: sale.id };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
 /** Admin: cambia el estado de un pedido (valida máquina de estados). */
 export async function transitionOrderAction(
   orderId: string,
@@ -112,7 +158,7 @@ export async function transitionOrderAction(
 ): Promise<
   { ok: true } | { ok: false; error: { code: string; message: string } }
 > {
-  if (!(await isStaff())) return NOT_STAFF;
+  if (!(await can("pedidos", "editar"))) return NOT_STAFF;
   const user = await getCurrentUser();
   try {
     const updated = await transitionOrder(orderId, toStatus, {
@@ -167,7 +213,7 @@ export async function updateOrderMetaAction(
 ): Promise<
   { ok: true } | { ok: false; error: { code: string; message: string } }
 > {
-  if (!(await isStaff())) return NOT_STAFF;
+  if (!(await can("pedidos", "editar"))) return NOT_STAFF;
   try {
     await setOrderMeta(orderId, fields);
     revalidatePath(`/admin/pedidos/${orderId}`);
