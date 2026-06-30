@@ -155,6 +155,7 @@ export type DeliveredManualSale = {
   customerName: string;
   detail: string | null;
   total: number;
+  amortization: number;
   profitSplit: Array<{ name: string; pct: number }> | null;
   createdAt: Date;
 };
@@ -173,6 +174,7 @@ export async function getDeliveredManualSales(
       customerName: manualSales.customerName,
       detail: manualSales.detail,
       total: manualSales.total,
+      amortization: manualSales.amortization,
       profitSplit: manualSales.profitSplit,
       createdAt: manualSales.saleDate,
     })
@@ -184,6 +186,7 @@ export async function getDeliveredManualSales(
     customerName: r.customerName,
     detail: r.detail,
     total: Number(r.total),
+    amortization: r.amortization != null ? Number(r.amortization) : 0,
     profitSplit: r.profitSplit ?? null,
     createdAt: r.createdAt,
   }));

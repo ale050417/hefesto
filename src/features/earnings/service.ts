@@ -150,10 +150,11 @@ export async function getEarningsOverview(month?: string | null) {
     };
   });
 
-  // Ventas manuales cobradas: entran al reparto con amortización 0 (sin costo).
-  // Cada una usa SU reparto guardado; si no tiene, se divide por los socios actuales.
+  // Ventas manuales cobradas: descuentan su amortización (cargada con la
+  // calculadora) y reparten la ganancia. Cada una usa SU reparto guardado; si no
+  // tiene, se divide por los socios actuales.
   const manualRows: EarningsOrderRow[] = manual.map((m) => {
-    const e = manualSaleEconomics(m.total);
+    const e = manualSaleEconomics(m.total, m.amortization);
     const parts =
       m.profitSplit && m.profitSplit.length > 0 ? m.profitSplit : currentParts;
     return {

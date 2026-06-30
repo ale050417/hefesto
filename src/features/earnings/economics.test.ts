@@ -76,6 +76,16 @@ describe("manualSaleEconomics", () => {
   it("ganancia pura nunca es negativa", () => {
     expect(manualSaleEconomics(-100).gananciaPura).toBe(0);
   });
+
+  it("descuenta la amortización: ganancia = total − amort", () => {
+    const e = manualSaleEconomics(15000, 4000);
+    expect(e.amort).toBe(4000);
+    expect(e.gananciaPura).toBe(11000);
+  });
+
+  it("amort mayor al total → ganancia 0", () => {
+    expect(manualSaleEconomics(1000, 5000).gananciaPura).toBe(0);
+  });
 });
 
 describe("distribute", () => {

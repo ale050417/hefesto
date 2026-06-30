@@ -91,16 +91,16 @@ export function computeOrderEconomics(
 }
 
 /**
- * Economía de una venta manual / histórica. No tiene items ni datos de costo
- * (peso/material/tiempo), así que no hay amortización calculable: el total se
- * toma como ganancia pura. De este modo entra al reparto entre socios igual que
- * un pedido entregado (espejo del index, que las cuenta con amort = 0).
+ * Economía de una venta manual / histórica. La amortización (costo) se carga con
+ * la calculadora al registrar la venta; la ganancia pura = total − amortización
+ * (nunca negativa) y es lo que entra al reparto entre socios.
  */
-export function manualSaleEconomics(total: number): OrderEconomics {
+export function manualSaleEconomics(total: number, amort = 0): OrderEconomics {
+  const a = Math.max(0, amort);
   return {
     ingreso: total,
-    amort: 0,
-    gananciaPura: Math.max(0, total),
+    amort: a,
+    gananciaPura: Math.max(0, total - a),
     grams: 0,
     hours: 0,
   };
