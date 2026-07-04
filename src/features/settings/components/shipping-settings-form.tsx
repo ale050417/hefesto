@@ -35,18 +35,23 @@ export function ShippingSettingsForm({
 
   async function submit() {
     setBusy(true);
-    const res = await saveShippingSettingsAction({
-      city,
-      freeOver: Number(freeOver) || 0,
-      outMsg,
-      zones: zones
-        .filter((z) => z.name.trim())
-        .map((z) => ({ name: z.name, price: Number(z.price) || 0 })),
-    });
-    setBusy(false);
-    if (!res.ok) return toast(res.error.message, "danger");
-    toast("Envíos guardados", "success");
-    router.refresh();
+    try {
+      const res = await saveShippingSettingsAction({
+        city,
+        freeOver: Number(freeOver) || 0,
+        outMsg,
+        zones: zones
+          .filter((z) => z.name.trim())
+          .map((z) => ({ name: z.name, price: Number(z.price) || 0 })),
+      });
+      if (!res.ok) return toast(res.error.message, "danger");
+      toast("Envíos guardados", "success");
+      router.refresh();
+    } catch {
+      toast("No se pudo guardar. Intentá de nuevo.", "danger");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

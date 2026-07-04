@@ -2,7 +2,7 @@ import { requirePermissionPage } from "@/core/auth/permissions";
 import { Badge } from "@/components/ui/badge";
 import { ReviewModeration } from "@/features/reviews/components/review-moderation";
 import { Stars } from "@/features/reviews/components/stars";
-import { listForModeration } from "@/features/reviews/repository";
+import { listReviewsForModeration } from "@/features/reviews/service";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Reseñas" };
@@ -11,7 +11,7 @@ const dateFmt = new Intl.DateTimeFormat("es-AR", { dateStyle: "short" });
 
 export default async function ResenasPage() {
   await requirePermissionPage("resenas", "ver");
-  const reviews = await listForModeration();
+  const reviews = await listReviewsForModeration();
   const pending = reviews.filter((r) => !r.isApproved).length;
 
   return (

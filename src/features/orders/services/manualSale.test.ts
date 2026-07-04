@@ -70,6 +70,43 @@ describe("manualSaleSchema", () => {
       ]);
     }
   });
+
+  // Regla de dinero (auditoría 2026-07, I5): la suma del reparto se valida en
+  // el servidor, no solo en la UI.
+  it("rechaza un reparto que no suma 100%", () => {
+    expect(
+      manualSaleSchema.safeParse({
+        ...base,
+        profitSplit: [
+          { name: "Yo", pct: 100 },
+          { name: "Socio", pct: 100 },
+        ],
+      }).success,
+    ).toBe(false);
+    expect(
+      manualSaleSchema.safeParse({
+        ...base,
+        profitSplit: [{ name: "Yo", pct: 40 }],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("acepta suma 100% con decimales (tolerancia)", () => {
+    const r = manualSaleSchema.safeParse({
+      ...base,
+      profitSplit: [
+        { name: "A", pct: 33.33 },
+        { name: "B", pct: 33.33 },
+        { name: "C", pct: 33.34 },
+      ],
+    });
+    expect(r.success).toBe(true);
+  });
+
+  it("un reparto vacío sigue siendo válido (divide por socios actuales)", () => {
+    const r = manualSaleSchema.safeParse({ ...base, profitSplit: [] });
+    expect(r.success).toBe(true);
+  });
 });
 
 describe("toManualSaleRow (profit_split)", () => {

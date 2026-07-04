@@ -110,20 +110,25 @@ export function ManualSaleForm({
             .filter((p) => p.name.trim() && Number(p.pct) > 0)
             .map((p) => ({ name: p.name.trim(), pct: Number(p.pct) }))
         : undefined;
-    const res = await createManualSaleAction({
-      ...form,
-      material: estData.material,
-      grams: estData.grams,
-      printMinutes: estData.printMinutes,
-      profitSplit,
-    });
-    setBusy(false);
-    if (!res.ok) return setErr(res.error.message);
-    if (onDone) {
-      onDone();
-      router.refresh();
-    } else {
-      router.push("/admin/pedidos");
+    try {
+      const res = await createManualSaleAction({
+        ...form,
+        material: estData.material,
+        grams: estData.grams,
+        printMinutes: estData.printMinutes,
+        profitSplit,
+      });
+      if (!res.ok) return setErr(res.error.message);
+      if (onDone) {
+        onDone();
+        router.refresh();
+      } else {
+        router.push("/admin/pedidos");
+      }
+    } catch {
+      setErr("No se pudo registrar la venta. Intentá de nuevo.");
+    } finally {
+      setBusy(false);
     }
   }
 

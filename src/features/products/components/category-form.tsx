@@ -68,15 +68,20 @@ export function CategoryForm({
       color,
       sortOrder: String(category?.sortOrder ?? 0),
     };
-    const res =
-      edit && category?.id
-        ? await updateCategoryAction(category.id, payload)
-        : await createCategoryAction(payload);
-    setBusy(false);
-    if (!res.ok) return setErr(res.error.message);
-    toast(edit ? "Categoría actualizada" : "Categoría creada", "success");
-    onDone?.();
-    router.refresh();
+    try {
+      const res =
+        edit && category?.id
+          ? await updateCategoryAction(category.id, payload)
+          : await createCategoryAction(payload);
+      if (!res.ok) return setErr(res.error.message);
+      toast(edit ? "Categoría actualizada" : "Categoría creada", "success");
+      onDone?.();
+      router.refresh();
+    } catch {
+      setErr("No se pudo guardar. Intentá de nuevo.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

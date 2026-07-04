@@ -254,7 +254,20 @@ export default async function Home() {
     cta: b.ctaText ?? "Ver catálogo",
     href: b.ctaHref ?? "/catalogo",
     align: (b.align === "center" ? "center" : "left") as "left" | "center",
+    image: b.imageUrl ?? null,
   }));
+
+  // Sin banners pero con imagen de hero configurada: un slide con esa imagen.
+  if (slides.length === 0 && brand.heroImageUrl) {
+    slides.push({
+      title: brand.storeName || "Diseños imposibles, impresos en 3D",
+      sub: brand.slogan || "Del archivo a tu puerta, capa por capa.",
+      cta: "Explorar catálogo",
+      href: "/catalogo",
+      align: "left",
+      image: brand.heroImageUrl,
+    });
+  }
 
   return (
     <div>

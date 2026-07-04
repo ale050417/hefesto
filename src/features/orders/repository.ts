@@ -1,4 +1,5 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { AppError, InvalidTransitionError } from "@/core/errors";
 import { db } from "@/core/db";
 import {
   couponRedemptions,
@@ -56,12 +57,27 @@ export async function createOrder(
       note: "Pedido creado",
     });
 
-    // Canje del cupón (atómico): suma un uso y registra el canje.
+    // Canje del cupón (atómico): suma un uso y registra el canje. El tope de
+    // usos se re-chequea ACÁ, dentro de la transacción: la validación previa
+    // (service) es leer-luego-escribir y bajo concurrencia podía excederse.
+    // Si otro pedido ganó el último uso, no matchea fila y se revierte todo.
     if (input.redeemCoupon) {
-      await tx
+      const [redeemed] = await tx
         .update(coupons)
         .set({ usedCount: sql`${coupons.usedCount} + 1` })
-        .where(eq(coupons.id, input.redeemCoupon.couponId));
+        .where(
+          and(
+            eq(coupons.id, input.redeemCoupon.couponId),
+            sql`(${coupons.maxUses} is null or ${coupons.usedCount} < ${coupons.maxUses})`,
+          ),
+        )
+        .returning({ id: coupons.id });
+      if (!redeemed) {
+        throw new AppError(
+          "INVALID_COUPON",
+          "El cupón llegó a su límite de usos.",
+        );
+      }
       await tx.insert(couponRedemptions).values({
         couponId: input.redeemCoupon.couponId,
         orderId: created.id,
@@ -142,15 +158,28 @@ export async function updateOrderStatus(
   database: Database = db,
 ): Promise<Order> {
   return database.transaction(async (tx) => {
+    // La transición es CONDICIONAL al estado de partida (compare-and-set):
+    // si otro proceso (webhook + admin, o dos reintentos del webhook) movió el
+    // pedido primero, acá no matchea fila y NO se aplica dos veces la misma
+    // transición (auditoría 2026-07, hallazgo I3).
     const [updated] = await tx
       .update(orders)
       .set({
         status: params.toStatus,
         ...(params.paidAt !== undefined ? { paidAt: params.paidAt } : {}),
       })
-      .where(eq(orders.id, params.orderId))
+      .where(
+        and(
+          eq(orders.id, params.orderId),
+          eq(orders.status, params.fromStatus),
+        ),
+      )
       .returning();
-    if (!updated) throw new Error("No se pudo actualizar el pedido");
+    if (!updated) {
+      throw new InvalidTransitionError(
+        "El pedido cambió de estado mientras se procesaba. Recargá e intentá de nuevo.",
+      );
+    }
 
     await tx.insert(orderStatusHistory).values({
       orderId: params.orderId,

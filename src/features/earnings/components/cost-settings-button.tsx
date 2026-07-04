@@ -26,12 +26,17 @@ export function CostSettingsButton({ settings }: { settings: CostSettings }) {
   async function submit() {
     setErr(null);
     setBusy(true);
-    const res = await saveCostSettingsAction(form);
-    setBusy(false);
-    if (!res.ok) return setErr(res.error.message);
-    toast("Config de costos guardada", "success");
-    setOpen(false);
-    router.refresh();
+    try {
+      const res = await saveCostSettingsAction(form);
+      if (!res.ok) return setErr(res.error.message);
+      toast("Config de costos guardada", "success");
+      setOpen(false);
+      router.refresh();
+    } catch {
+      setErr("No se pudo guardar. Intentá de nuevo.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

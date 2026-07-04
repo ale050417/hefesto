@@ -225,6 +225,20 @@
       "when": 1782852304579,
       "tag": "0031_hard_stryfe",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1783183046600,
+      "tag": "0032_rls_hardening",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1783183046601,
+      "tag": "0033_points_order_unique",
+      "breakpoints": true
     }
   ]
 }

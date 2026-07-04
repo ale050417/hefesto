@@ -91,7 +91,23 @@ export async function getPointsSummary(
   return { balance: earned - redeemed, earned, redeemed, redemptions };
 }
 
-// Otorga puntos por un pedido pagado. Idempotente: no duplica si ya se otorgó.
+// Violación de unique de Postgres (código 23505).
+function isUniqueViolation(e: unknown): boolean {
+  return (
+    typeof e === "object" &&
+    e !== null &&
+    "code" in e &&
+    (e as { code?: unknown }).code === "23505"
+  );
+}
+
+/**
+ * Otorga puntos por un pedido pagado. Idempotente en DOS capas: el chequeo
+ * previo (rápido) y el índice único parcial `point_transactions(order_id)
+ * WHERE delta > 0` (migración 0033), que hace imposible duplicar bajo
+ * concurrencia (webhook y confirmación manual a la vez). Si otro proceso
+ * acreditó primero, el insert choca con el unique y se ignora.
+ */
 export async function awardForOrder(params: {
   customerId: string;
   orderId: string;
@@ -101,10 +117,15 @@ export async function awardForOrder(params: {
   if (already) return;
   const points = computePointsEarned(params.orderTotal);
   if (points <= 0) return;
-  await repo.addTransaction({
-    customerId: params.customerId,
-    orderId: params.orderId,
-    delta: points,
-    reason: "Compra",
-  });
+  try {
+    await repo.addTransaction({
+      customerId: params.customerId,
+      orderId: params.orderId,
+      delta: points,
+      reason: "Compra",
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) return; // ya acreditado por otro proceso
+    throw error;
+  }
 }

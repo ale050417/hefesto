@@ -66,12 +66,17 @@ export function FilamentForm({
   async function submit() {
     setErr(null);
     setBusy(true);
-    const res = await saveFilamentAction(form, filament?.id);
-    setBusy(false);
-    if (!res.ok) return setErr(res.error.message);
-    toast(edit ? "Filamento actualizado" : "Filamento agregado", "success");
-    onDone?.();
-    router.refresh();
+    try {
+      const res = await saveFilamentAction(form, filament?.id);
+      if (!res.ok) return setErr(res.error.message);
+      toast(edit ? "Filamento actualizado" : "Filamento agregado", "success");
+      onDone?.();
+      router.refresh();
+    } catch {
+      setErr("No se pudo guardar. Intentá de nuevo.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

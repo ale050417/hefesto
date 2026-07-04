@@ -73,9 +73,14 @@ export default async function ProductPage({ params }: Params) {
 
   return (
     <div className="store-wrap py-10">
+      {/* JSON.stringify no escapa "</script>": si un texto del producto lo
+          contuviera, cortaría el tag e inyectaría HTML. Escapar "<" lo hace
+          inofensivo y el JSON-LD sigue siendo válido (Cap. 14). */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(productJsonLd) }}
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(productJsonLd).replace(/</g, "\\u003c"),
+        }}
       />
       <nav className="text-dim text-sm">
         <Link href="/" className="hover:text-fg">

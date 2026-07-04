@@ -67,12 +67,17 @@ export function CouponForm({
       expiresAt: form.expiresAt,
       isActive: form.isActive,
     };
-    const res = await saveCouponAction(payload, coupon?.id);
-    setBusy(false);
-    if (!res.ok) return setErr(res.error.message);
-    toast(edit ? "Cupón actualizado" : "Cupón creado", "success");
-    onDone?.();
-    router.refresh();
+    try {
+      const res = await saveCouponAction(payload, coupon?.id);
+      if (!res.ok) return setErr(res.error.message);
+      toast(edit ? "Cupón actualizado" : "Cupón creado", "success");
+      onDone?.();
+      router.refresh();
+    } catch {
+      setErr("No se pudo guardar. Intentá de nuevo.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

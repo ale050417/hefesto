@@ -28,12 +28,17 @@ export function CalcConfigButton({ config }: { config: CalcConfig }) {
   async function submit() {
     setErr(null);
     setBusy(true);
-    const res = await saveCalcConfigAction(form);
-    setBusy(false);
-    if (!res.ok) return setErr(res.error.message);
-    toast("Configuración guardada", "success");
-    setOpen(false);
-    router.refresh();
+    try {
+      const res = await saveCalcConfigAction(form);
+      if (!res.ok) return setErr(res.error.message);
+      toast("Configuración guardada", "success");
+      setOpen(false);
+      router.refresh();
+    } catch {
+      setErr("No se pudo guardar. Intentá de nuevo.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   const fields: Array<[keyof typeof form, string]> = [

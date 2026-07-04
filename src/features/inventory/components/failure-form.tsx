@@ -59,26 +59,30 @@ export function FailureForm({
     }
     setBusy(true);
     const payload = { ...form, deducted: edit ? undefined : deduct };
-    if (edit && failure?.id) {
-      const res = await updateFailureAction(failure.id, payload);
-      setBusy(false);
-      if (!res.ok) return setErr(res.error.message);
-      toast("Falla actualizada", "success");
-    } else {
-      const res = await registerFailureAction(payload);
-      setBusy(false);
-      if (!res.ok) return setErr(res.error.message);
-      if (res.data && !res.data.deducted && deduct) {
-        toast(
-          "Falla registrada (no se encontró un filamento de ese material/color para descontar).",
-          "default",
-        );
+    try {
+      if (edit && failure?.id) {
+        const res = await updateFailureAction(failure.id, payload);
+        if (!res.ok) return setErr(res.error.message);
+        toast("Falla actualizada", "success");
       } else {
-        toast("Falla registrada", "success");
+        const res = await registerFailureAction(payload);
+        if (!res.ok) return setErr(res.error.message);
+        if (res.data && !res.data.deducted && deduct) {
+          toast(
+            "Falla registrada (no se encontró un filamento de ese material/color para descontar).",
+            "default",
+          );
+        } else {
+          toast("Falla registrada", "success");
+        }
       }
+      onDone?.();
+      router.refresh();
+    } catch {
+      setErr("No se pudo guardar. Intentá de nuevo.");
+    } finally {
+      setBusy(false);
     }
-    onDone?.();
-    router.refresh();
   }
 
   return (

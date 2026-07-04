@@ -13,14 +13,19 @@ export function OrderStatusManager({
   status,
   trackingCode,
   internalNote,
+  canCancelRefund = false,
 }: {
   orderId: string;
   status: OrderStatus;
   trackingCode: string | null;
   internalNote: string | null;
+  /** Cancelar/reembolsar es solo admin; el servidor lo re-chequea igual. */
+  canCancelRefund?: boolean;
 }) {
   const router = useRouter();
-  const next = ORDER_TRANSITIONS[status];
+  const next = ORDER_TRANSITIONS[status].filter(
+    (s) => canCancelRefund || (s !== "cancelled" && s !== "refunded"),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tracking, setTracking] = useState(trackingCode ?? "");

@@ -177,6 +177,35 @@
     outline-offset: 2px;
     border-radius: 2px;
   }
+
+  /* Cursor pointer en TODO lo clickeable (que se entienda que se puede tocar). */
+  button:not(:disabled),
+  a[href],
+  summary,
+  select,
+  [role="button"],
+  [role="switch"],
+  [role="tab"],
+  [role="option"],
+  .chip,
+  .tab,
+  .nav-item,
+  .switch,
+  .season-card,
+  .accent-custom,
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="radio"]),
+  input[type="checkbox"],
+  input[type="radio"],
+  input[type="color"],
+  input[type="range"],
+  input[type="file"] {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 /* Eyebrow tipográfico (Cap. 7.4) */

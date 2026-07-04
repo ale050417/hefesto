@@ -63,6 +63,18 @@ function loadEnv(): Env {
       `Variables de entorno inválidas. Revisá tu .env.local:\n${detalle}`,
     );
   }
+  // NEXT_PUBLIC_SITE_URL tiene default localhost para no romper dev, pero en
+  // producción olvidarla rompe silenciosamente las back_urls de MercadoPago,
+  // el sitemap y los links de los emails. Avisamos fuerte (checklist Fase 11).
+  if (
+    process.env.NODE_ENV === "production" &&
+    !process.env.NEXT_PUBLIC_SITE_URL
+  ) {
+    console.error(
+      "[env] NEXT_PUBLIC_SITE_URL no está configurada: MercadoPago, sitemap y " +
+        "emails van a apuntar a localhost. Configurala en Vercel.",
+    );
+  }
   return parsed.data;
 }
 

@@ -29,16 +29,10 @@ export function Modal({
 
   if (!open) return null;
   return (
-    <div
-      className="modal-backdrop"
-      onClick={onClose}
-      role="dialog"
-      aria-modal="true"
-    >
-      <div
-        className={cn("modal", size === "lg" && "modal-lg")}
-        onClick={(e) => e.stopPropagation()}
-      >
+    // No cierra al hacer click afuera (evita perder lo cargado por accidente).
+    // Se cierra con la X o con Escape.
+    <div className="modal-backdrop" role="dialog" aria-modal="true">
+      <div className={cn("modal", size === "lg" && "modal-lg")}>
         {title ? (
           <div className="modal-head">
             <h3 className="text-fg font-display text-lg">{title}</h3>
@@ -46,7 +40,7 @@ export function Modal({
               type="button"
               onClick={onClose}
               aria-label="Cerrar"
-              className="text-dim hover:text-fg text-xl leading-none"
+              className="text-dim hover:text-fg cursor-pointer text-xl leading-none"
             >
               ✕
             </button>

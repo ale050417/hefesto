@@ -1,3 +1,4 @@
+import { InvalidTransitionError } from "@/core/errors";
 import type {
   CreatePreferenceParams,
   CreatedPreference,
@@ -95,13 +96,24 @@ export async function confirmOrderPayment(
   if (!order) throw new OrderError("NOT_FOUND", "No encontramos el pedido.");
   if (order.status !== "pending_payment") return order;
 
-  const updated = await deps.markPaid({
-    orderId: order.id,
-    fromStatus: "pending_payment",
-    toStatus: "confirmed",
-    paidAt: new Date(),
-    note: "Pago aprobado (MercadoPago)",
-  });
+  let updated: Order;
+  try {
+    updated = await deps.markPaid({
+      orderId: order.id,
+      fromStatus: "pending_payment",
+      toStatus: "confirmed",
+      paidAt: new Date(),
+      note: "Pago aprobado (MercadoPago)",
+    });
+  } catch (error) {
+    // Otro reintento del webhook (u otro proceso) confirmó primero: el update
+    // condicional no matcheó. Idempotencia: devolvemos el pedido como quedó.
+    if (error instanceof InvalidTransitionError) {
+      const again = await deps.getOrder(orderId);
+      if (again) return again;
+    }
+    throw error;
+  }
   try {
     await awardForOrder({
       customerId: updated.customerId,
@@ -140,10 +152,20 @@ export async function cancelPendingOrder(
   if (!order) throw new OrderError("NOT_FOUND", "No encontramos el pedido.");
   if (order.status !== "pending_payment") return order;
 
-  return deps.markCancelled({
-    orderId: order.id,
-    fromStatus: "pending_payment",
-    toStatus: "cancelled",
-    note: "Pago no iniciado (MercadoPago)",
-  });
+  try {
+    return await deps.markCancelled({
+      orderId: order.id,
+      fromStatus: "pending_payment",
+      toStatus: "cancelled",
+      note: "Pago no iniciado (MercadoPago)",
+    });
+  } catch (error) {
+    // Idempotencia ante carrera: si alguien lo movió primero, devolvemos el
+    // estado actual en vez de fallar.
+    if (error instanceof InvalidTransitionError) {
+      const again = await deps.getOrder(orderId);
+      if (again) return again;
+    }
+    throw error;
+  }
 }

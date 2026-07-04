@@ -21,13 +21,18 @@ export function CustomerNoteForm({
 
   async function save() {
     setBusy(true);
-    const res = await updateCustomerNoteAction(id, source, { note: value });
-    setBusy(false);
-    if (res.ok) {
-      toast("Nota guardada", "success");
-      router.refresh();
-    } else {
-      toast(res.error.message, "danger");
+    try {
+      const res = await updateCustomerNoteAction(id, source, { note: value });
+      if (res.ok) {
+        toast("Nota guardada", "success");
+        router.refresh();
+      } else {
+        toast(res.error.message, "danger");
+      }
+    } catch {
+      toast("No se pudo guardar. Intentá de nuevo.", "danger");
+    } finally {
+      setBusy(false);
     }
   }
 

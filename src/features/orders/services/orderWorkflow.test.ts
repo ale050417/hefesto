@@ -57,6 +57,22 @@ describe("transitionOrderStatus", () => {
     });
   });
 
+  // Auditoría 2026-07 (I2): confirmar manualmente (transferencia/efectivo)
+  // marca paid_at, igual que el webhook de MP (Cap. 11).
+  it("al confirmar marca paidAt", async () => {
+    const { deps, persist } = makeDeps("pending_payment");
+    await transitionOrderStatus("o1", "confirmed", { changedBy: "u1" }, deps);
+    const params = persist.mock.calls[0]![0];
+    expect(params.toStatus).toBe("confirmed");
+    expect(params.paidAt).toBeInstanceOf(Date);
+  });
+
+  it("las demás transiciones NO tocan paidAt", async () => {
+    const { deps, persist } = makeDeps("confirmed");
+    await transitionOrderStatus("o1", "in_production", {}, deps);
+    expect(persist.mock.calls[0]![0].paidAt).toBeUndefined();
+  });
+
   it("rechaza una transición inválida sin persistir", async () => {
     const { deps, persist } = makeDeps("pending_payment");
     await expect(

@@ -5,8 +5,7 @@ import { getCurrentUser } from "@/core/auth/session";
 import { can } from "@/core/auth/permissions";
 import { type ActionResult, toActionError } from "@/core/errors";
 import { reviewSchema } from "./schemas";
-import { createReview } from "./service";
-import { deleteReviewRow, setApproved } from "./repository";
+import { createReview, removeReview, setReviewApproved } from "./service";
 
 export async function createReviewAction(
   productId: string,
@@ -48,7 +47,7 @@ export async function approveReviewAction(id: string): Promise<ActionResult> {
       error: { code: "UNAUTHORIZED", message: "No autorizado" },
     };
   try {
-    await setApproved(id, true);
+    await setReviewApproved(id, true);
     revalidatePath("/admin/resenas");
     return { ok: true };
   } catch (error) {
@@ -63,7 +62,7 @@ export async function deleteReviewAction(id: string): Promise<ActionResult> {
       error: { code: "UNAUTHORIZED", message: "No autorizado" },
     };
   try {
-    await deleteReviewRow(id);
+    await removeReview(id);
     revalidatePath("/admin/resenas");
     return { ok: true };
   } catch (error) {

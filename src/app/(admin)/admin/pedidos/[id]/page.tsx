@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requirePermissionPage } from "@/core/auth/permissions";
+import { isAdmin, requirePermissionPage } from "@/core/auth/permissions";
 import { Badge } from "@/components/ui/badge";
 import {
   ORDER_STATUS_LABEL,
@@ -31,6 +31,9 @@ export default async function OrderDetailAdminPage({
   const order = await getOrderAdmin(id);
   if (!order) notFound();
   const messages = await getOrderMessages(order.id);
+  // Cancelar/reembolsar es solo admin (Cap. 11); la UI oculta lo que la
+  // action ya rechaza en el servidor.
+  const canCancelRefund = await isAdmin();
 
   return (
     <div>
@@ -67,6 +70,7 @@ export default async function OrderDetailAdminPage({
             status={order.status}
             trackingCode={order.trackingCode}
             internalNote={order.internalNote}
+            canCancelRefund={canCancelRefund}
           />
 
           <div className="ui-card p-4">

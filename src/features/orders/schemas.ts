@@ -66,7 +66,17 @@ export const manualSaleSchema = z.object({
         pct: z.coerce.number().min(0).max(100),
       }),
     )
-    .optional(),
+    .optional()
+    // Regla de dinero → se valida en el SERVIDOR, no solo en la UI (Cap. 11/14).
+    // Si viene un reparto, los % deben sumar 100 (tolerancia por decimales).
+    .refine(
+      (parts) => {
+        if (!parts || parts.length === 0) return true;
+        const sum = parts.reduce((acc, p) => acc + p.pct, 0);
+        return Math.abs(sum - 100) < 0.01;
+      },
+      { message: "El reparto debe sumar 100%." },
+    ),
   status: z.enum([
     "pending_payment",
     "confirmed",
@@ -80,3 +90,12 @@ export const manualSaleSchema = z.object({
 });
 
 export type ManualSaleInput = z.infer<typeof manualSaleSchema>;
+
+// Mensaje del chat del pedido (solo texto; el chat a medida, que sí acepta
+// foto, tiene SU schema en features/custom). Antes orders importaba el schema
+// de custom — cross-feature innecesario (Cap. 5). Auditoría 2026-07.
+export const orderMessageSchema = z.object({
+  body: z.string().trim().min(1, "Escribí un mensaje.").max(2000),
+});
+
+export type OrderMessageInput = z.infer<typeof orderMessageSchema>;

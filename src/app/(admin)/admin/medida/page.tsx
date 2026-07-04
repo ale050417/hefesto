@@ -13,8 +13,8 @@ import {
   getRequestWithMessages,
   listAdminRequestsWithMeta,
   requestNeedsReply,
+  type AdminRequestRow,
 } from "@/features/custom/service";
-import type { AdminRequestRow } from "@/features/custom/repository";
 import type { CustomRequestStatus } from "@/features/custom/types";
 
 export const dynamic = "force-dynamic";

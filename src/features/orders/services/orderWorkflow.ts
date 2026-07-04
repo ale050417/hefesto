@@ -13,6 +13,7 @@ export type TransitionDeps = {
     toStatus: OrderStatus;
     changedBy: string | null;
     note: string | null;
+    paidAt?: Date;
   }) => Promise<Order>;
 };
 
@@ -48,5 +49,9 @@ export async function transitionOrderStatus(
     toStatus,
     changedBy: opts.changedBy ?? null,
     note: opts.note ?? null,
+    // Confirmar = pago acreditado (Cap. 11: pending→confirmed marca paid_at).
+    // El webhook de MP lo setea por su lado; esto cubre la confirmación
+    // manual (transferencia/efectivo). Auditoría 2026-07, hallazgo I2.
+    ...(toStatus === "confirmed" ? { paidAt: new Date() } : {}),
   });
 }

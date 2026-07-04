@@ -45,15 +45,20 @@ export function CustomerForm({
   async function submit() {
     setErr(null);
     setBusy(true);
-    const res =
-      edit && customer?.id
-        ? await updateManualCustomerAction(customer.id, form)
-        : await createManualCustomerAction(form);
-    setBusy(false);
-    if (!res.ok) return setErr(res.error.message);
-    toast(edit ? "Cliente actualizado" : "Cliente creado", "success");
-    onDone?.();
-    router.refresh();
+    try {
+      const res =
+        edit && customer?.id
+          ? await updateManualCustomerAction(customer.id, form)
+          : await createManualCustomerAction(form);
+      if (!res.ok) return setErr(res.error.message);
+      toast(edit ? "Cliente actualizado" : "Cliente creado", "success");
+      onDone?.();
+      router.refresh();
+    } catch {
+      setErr("No se pudo guardar. Intentá de nuevo.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   const initial = (form.name[0] || "?").toUpperCase();

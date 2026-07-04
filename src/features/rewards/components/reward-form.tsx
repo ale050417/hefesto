@@ -66,15 +66,20 @@ export function RewardForm({
       productId: type === "product" ? form.productId : "",
       isActive: reward?.isActive ?? true,
     };
-    const res =
-      edit && reward?.id
-        ? await updateRewardAction(reward.id, payload)
-        : await createRewardAction(payload);
-    setBusy(false);
-    if (!res.ok) return setErr(res.error.message);
-    toast(edit ? "Recompensa actualizada" : "Recompensa creada", "success");
-    onDone?.();
-    router.refresh();
+    try {
+      const res =
+        edit && reward?.id
+          ? await updateRewardAction(reward.id, payload)
+          : await createRewardAction(payload);
+      if (!res.ok) return setErr(res.error.message);
+      toast(edit ? "Recompensa actualizada" : "Recompensa creada", "success");
+      onDone?.();
+      router.refresh();
+    } catch {
+      setErr("No se pudo guardar. Intentá de nuevo.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

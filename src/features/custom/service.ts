@@ -14,6 +14,9 @@ import type {
   CustomRequestStatus,
 } from "./types";
 
+// Tipo público del service (la UI no debe importar del repository — Cap. 5).
+export type { AdminRequestRow } from "./repository";
+
 // Reusamos el bucket público "products" (como settings) con prefijo "custom/".
 const CHAT_BUCKET = "products";
 

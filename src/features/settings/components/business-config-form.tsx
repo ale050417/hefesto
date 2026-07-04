@@ -52,16 +52,21 @@ export function BusinessConfigForm({
     if (form.contactEmail && !/.+@.+\..+/.test(form.contactEmail))
       return setErr("El email no es válido.");
     setBusy(true);
-    const res = await saveBusinessInfoAction({
-      ...form,
-      hours,
-      pickupEnabled: pickup,
-      deliveryEnabled: delivery,
-    });
-    setBusy(false);
-    if (!res.ok) return setErr(res.error.message);
-    toast("Datos del negocio guardados", "success");
-    router.refresh();
+    try {
+      const res = await saveBusinessInfoAction({
+        ...form,
+        hours,
+        pickupEnabled: pickup,
+        deliveryEnabled: delivery,
+      });
+      if (!res.ok) return setErr(res.error.message);
+      toast("Datos del negocio guardados", "success");
+      router.refresh();
+    } catch {
+      setErr("No se pudo guardar. Intentá de nuevo.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (

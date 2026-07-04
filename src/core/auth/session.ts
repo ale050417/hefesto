@@ -1,7 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/core/supabase/server";
-import { getProfileById } from "@/features/auth/repository";
-import type { Profile } from "@/features/auth/types";
+import { getProfileById, type Profile } from "./profile";
 
 export type CurrentUser = {
   id: string;

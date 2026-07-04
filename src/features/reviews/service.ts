@@ -39,6 +39,24 @@ export async function createReview(params: {
   });
 }
 
+/** Todas las reseñas (pendientes + publicadas) para el panel de moderación. */
+export async function listReviewsForModeration() {
+  return repo.listForModeration();
+}
+
+/** Aprueba / despublica una reseña (moderación del panel). */
+export async function setReviewApproved(
+  id: string,
+  approved: boolean,
+): Promise<void> {
+  await repo.setApproved(id, approved);
+}
+
+/** Elimina una reseña (moderación del panel). */
+export async function removeReview(id: string): Promise<void> {
+  await repo.deleteReviewRow(id);
+}
+
 export async function getProductReviewsFor(
   productId: string,
   userId: string | null,

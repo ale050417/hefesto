@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { InvalidTransitionError } from "@/core/errors";
 import type {
   CreatePreferenceParams,
   CreatedPreference,
@@ -141,6 +142,29 @@ describe("confirmOrderPayment", () => {
     await expect(confirmOrderPayment("x", deps)).rejects.toMatchObject({
       code: "NOT_FOUND",
     });
+  });
+
+  // Auditoría 2026-07 (I3): si dos reintentos del webhook corren A LA VEZ,
+  // el segundo pierde el compare-and-set (InvalidTransitionError) y debe
+  // resolver de forma idempotente devolviendo el estado actual, no fallar.
+  it("bajo carrera (otro proceso confirmó primero) devuelve el pedido sin fallar", async () => {
+    let call = 0;
+    const deps: ConfirmPaymentDeps = {
+      getOrder: async () => {
+        call += 1;
+        // 1.ª lectura: todavía pendiente; 2.ª (tras perder la carrera): confirmado.
+        return {
+          ...makeOrder(),
+          status: call === 1 ? "pending_payment" : "confirmed",
+        } as unknown as Awaited<ReturnType<ConfirmPaymentDeps["getOrder"]>>;
+      },
+      markPaid: vi.fn(async () => {
+        throw new InvalidTransitionError("El pedido cambió de estado.");
+      }),
+    };
+
+    const result = await confirmOrderPayment("order-1", deps);
+    expect(result.status).toBe("confirmed");
   });
 });
 

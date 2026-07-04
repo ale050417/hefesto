@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { type ZodError } from "zod";
 import { getCurrentUser, isStaff } from "@/core/auth/session";
-import { can } from "@/core/auth/permissions";
+import { can, isAdmin } from "@/core/auth/permissions";
 import { recordAudit } from "@/core/audit";
 import {
   type ActionResult as CoreActionResult,
@@ -15,9 +15,9 @@ import { getAmortization } from "@/features/calculator/service";
 import {
   checkoutSchema,
   manualSaleSchema,
+  orderMessageSchema,
   type CheckoutInput,
 } from "./schemas";
-import { messageSchema } from "@/features/custom/schemas";
 import { createOrder } from "./services/orderService";
 import { createManualSale } from "./services/manualSaleService";
 import { getOrderCustomerId, sendOrderMessage } from "./services/orderChat";
@@ -182,6 +182,20 @@ export async function transitionOrderAction(
   { ok: true } | { ok: false; error: { code: string; message: string } }
 > {
   if (!(await can("pedidos", "editar"))) return NOT_STAFF;
+  // Cancelar / reembolsar toca plata: SOLO admin (Cap. 8 B4, 11 y 12 del
+  // Libro: "operador no cancela/reembolsa"). Guard en servidor, no en la UI.
+  if (
+    (toStatus === "cancelled" || toStatus === "refunded") &&
+    !(await isAdmin())
+  ) {
+    return {
+      ok: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Cancelar o reembolsar pedidos es solo para administradores.",
+      },
+    };
+  }
   const user = await getCurrentUser();
   try {
     const updated = await transitionOrder(orderId, toStatus, {
@@ -256,7 +270,7 @@ export async function sendOrderMessageAction(
       ok: false,
       error: { code: "UNAUTHORIZED", message: "Iniciá sesión." },
     };
-  const parsed = messageSchema.safeParse(input);
+  const parsed = orderMessageSchema.safeParse(input);
   if (!parsed.success)
     return {
       ok: false,

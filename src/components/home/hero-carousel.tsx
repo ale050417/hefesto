@@ -68,6 +68,8 @@ type Banner = {
   cta: string;
   href: string;
   align: "left" | "center";
+  /** Imagen de fondo opcional (banner del hero o imagen del hero configurada). */
+  image?: string | null;
 };
 
 const banners: Banner[] = [
@@ -142,40 +144,62 @@ export function HeroCarousel({ slides }: { slides?: Banner[] } = {}) {
   return (
     <section className="hero-carousel">
       <div className="hc-track">
-        {data.map((b, i) => (
-          <div
-            key={i}
-            className={`hc-slide${i === idx ? "on" : ""}`}
-            aria-hidden={i !== idx}
-          >
-            <div className={`store-wrap hc-inner align-${b.align}`}>
-              <div className="hc-copy">
-                <div className="hero-tag">
-                  <Icon name="sparkles" size={15} /> Impresión 3D premium ·
-                  Hecho en Argentina
+        {data.map((b, i) => {
+          const hasImg = Boolean(b.image);
+          return (
+            <div
+              key={i}
+              className={`hc-slide ${i === idx ? "on" : ""}`}
+              aria-hidden={i !== idx}
+              style={
+                hasImg
+                  ? {
+                      backgroundImage: `linear-gradient(rgba(10,8,4,.55), rgba(10,8,4,.55)), url('${b.image}')`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                    }
+                  : undefined
+              }
+            >
+              <div className={`store-wrap hc-inner align-${b.align}`}>
+                <div
+                  className="hc-copy"
+                  style={hasImg ? { color: "#fff" } : undefined}
+                >
+                  <div className="hero-tag">
+                    <Icon name="sparkles" size={15} /> Impresión 3D premium ·
+                    Hecho en Argentina
+                  </div>
+                  <h1 className="hero-title">
+                    <HeroTitle title={b.title} />
+                  </h1>
+                  <p
+                    className="hero-sub"
+                    style={
+                      hasImg ? { color: "rgba(255,255,255,.9)" } : undefined
+                    }
+                  >
+                    {b.sub}
+                  </p>
+                  <div className="hc-cta flex flex-wrap gap-3">
+                    <Link href={b.href} className="btn btn-primary btn-lg">
+                      <Icon name="cart" size={17} /> {b.cta}
+                    </Link>
+                  </div>
+                  <div className="hero-stats">
+                    {heroStats.map((s) => (
+                      <div key={s.l} className="hero-stat">
+                        <div className="n">{s.n}</div>
+                        <div className="l">{s.l}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <h1 className="hero-title">
-                  <HeroTitle title={b.title} />
-                </h1>
-                <p className="hero-sub">{b.sub}</p>
-                <div className="hc-cta flex flex-wrap gap-3">
-                  <Link href={b.href} className="btn btn-primary btn-lg">
-                    <Icon name="cart" size={17} /> {b.cta}
-                  </Link>
-                </div>
-                <div className="hero-stats">
-                  {heroStats.map((s) => (
-                    <div key={s.l} className="hero-stat">
-                      <div className="n">{s.n}</div>
-                      <div className="l">{s.l}</div>
-                    </div>
-                  ))}
-                </div>
+                {hasImg ? null : <Cube />}
               </div>
-              <Cube />
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {count > 1 ? (
@@ -201,7 +225,7 @@ export function HeroCarousel({ slides }: { slides?: Banner[] } = {}) {
               <button
                 key={i}
                 type="button"
-                className={`hc-dot${i === idx ? "on" : ""}`}
+                className={`hc-dot ${i === idx ? "on" : ""}`}
                 onClick={() => go(i)}
                 aria-label={`Banner ${i + 1}`}
               />
