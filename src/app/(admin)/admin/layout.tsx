@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { requireStaff } from "@/core/auth/session";
 import { getAllPerms } from "@/core/auth/permissions";
 import { PermsProvider } from "@/components/auth/perms-provider";
-import { Sidebar } from "@/components/layout/sidebar";
+import { AdminShell } from "@/components/layout/admin-shell";
 
 export default async function AdminLayout({
   children,
@@ -19,12 +19,7 @@ export default async function AdminLayout({
   );
   return (
     <PermsProvider value={allPerms}>
-      <div className="flex min-h-dvh flex-col md:flex-row">
-        <Sidebar perms={verMap} />
-        <main id="main" className="admin-content">
-          {children}
-        </main>
-      </div>
+      <AdminShell perms={verMap}>{children}</AdminShell>
     </PermsProvider>
   );
 }

@@ -1605,41 +1605,104 @@ body > * {
     height: 14px;
   }
 
-  /* Admin (estilo index): sidebar + content */
-  .admin-sidebar {
-    background: var(--surface-1);
+  /* Admin: topbar móvil + sidebar off-canvas + content */
+  .admin-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+  }
+  @media (min-width: 768px) {
+    .admin-shell {
+      flex-direction: row;
+    }
+  }
+
+  /* Topbar: solo móvil (hamburguesa + marca) */
+  .admin-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+    backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border);
-    padding: 14px;
+  }
+  @media (min-width: 768px) {
+    .admin-topbar {
+      display: none;
+    }
+  }
+  .admin-burger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-md);
+    color: var(--text);
+    background: transparent;
+    border: 1px solid var(--border);
+    cursor: pointer;
+  }
+  .admin-burger:active {
+    background: var(--hover);
+  }
+
+  /* Sidebar: off-canvas por defecto (móvil), estático en desktop */
+  .admin-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 60;
+    width: min(84vw, 300px);
+    height: 100dvh;
+    background: var(--surface-1);
+    border-right: 1px solid var(--border);
+    padding: 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 0.24s ease;
+  }
+  .admin-sidebar.open {
+    transform: translateX(0);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
   }
   .admin-nav {
     display: flex;
+    flex-direction: column;
     gap: 4px;
-    overflow-x: auto;
+  }
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgba(0, 0, 0, 0.5);
   }
   @media (min-width: 768px) {
     .admin-sidebar {
+      position: sticky;
       width: 252px;
       flex-shrink: 0;
-      border-bottom: none;
-      border-right: 1px solid var(--border);
       padding: 18px 14px;
-      position: sticky;
       top: 0;
       height: 100dvh;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      overflow-y: auto;
+      transform: none;
+      box-shadow: none;
     }
-    .admin-nav {
-      flex-direction: column;
-      overflow: visible;
+    .sidebar-backdrop {
+      display: none;
     }
   }
   .admin-content {
     flex: 1;
     min-width: 0;
-    padding: 24px 16px;
+    padding: 20px 14px;
   }
   @media (min-width: 768px) {
     .admin-content {
@@ -1648,18 +1711,13 @@ body > * {
     }
   }
   .nav-section-label {
-    display: none;
-  }
-  @media (min-width: 768px) {
-    .nav-section-label {
-      display: block;
-      font-size: 10px;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--text-faint);
-      font-weight: 700;
-      padding: 14px 12px 6px;
-    }
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    font-weight: 700;
+    padding: 14px 12px 6px;
   }
   .nav-item {
     display: flex;
@@ -1922,6 +1980,104 @@ body > * {
   }
   table.tbl tbody tr:last-child td {
     border-bottom: none;
+  }
+
+  /* Móvil: las tablas marcadas con .tbl-cards se apilan como tarjetas legibles
+     (sin scroll horizontal). Cada celda usa su data-label como etiqueta. Las
+     tablas sin esta clase (ej. matrices de permisos) mantienen su scroll
+     interno contenido en .table-wrap. */
+  @media (max-width: 768px) {
+    table.tbl-cards,
+    table.tbl-cards thead,
+    table.tbl-cards tbody,
+    table.tbl-cards tr,
+    table.tbl-cards td {
+      display: block;
+      width: 100%;
+    }
+    table.tbl-cards thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+    table.tbl-cards tbody tr {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface-1);
+      padding: 4px 12px;
+      margin-bottom: 10px;
+    }
+    table.tbl-cards tbody td {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 9px 0;
+      border-bottom: 1px dashed var(--border);
+      text-align: right;
+      white-space: normal;
+    }
+    table.tbl-cards tbody tr td:last-child {
+      border-bottom: none;
+    }
+    table.tbl-cards tbody td::before {
+      content: attr(data-label);
+      color: var(--text-faint);
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-weight: 700;
+      text-align: left;
+      flex-shrink: 0;
+    }
+    /* Celda de acciones: sin etiqueta y alineada a la derecha. */
+    table.tbl-cards tbody td[data-label=""]::before {
+      content: none;
+    }
+  }
+
+  /* Touch targets cómodos en móvil (mín. ~44px) */
+  @media (max-width: 640px) {
+    .btn-icon {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 11px;
+    }
+    .chip {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+    }
+  }
+
+  /* Selección múltiple + checkbox (pedidos) */
+  .bulk-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--surface-1);
+    position: sticky;
+    top: 8px;
+    z-index: 20;
+  }
+  .ck {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--gold);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .row-sel,
+  table.tbl tbody tr.row-sel {
+    background: rgba(var(--gold-rgb), 0.06);
   }
 
   /* Favorito en la card (estilo index) */
@@ -3259,6 +3415,50 @@ body > * {
     justify-content: flex-end;
     padding: 16px 22px;
     border-top: 1px solid var(--border);
+  }
+
+  /* Móvil: el modal baja como bottom sheet (casi pantalla completa, con scroll
+     interno y footer fijo cómodo para el pulgar). */
+  @media (max-width: 640px) {
+    .modal-backdrop {
+      align-items: flex-end;
+      padding: 0;
+    }
+    .modal,
+    .modal-lg {
+      max-width: 100%;
+      max-height: 92dvh;
+      border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      animation: sheetIn 0.26s var(--ease);
+    }
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px;
+    }
+    .modal-head button {
+      min-width: 40px;
+      min-height: 40px;
+    }
+    .modal-foot {
+      position: sticky;
+      bottom: 0;
+      background: var(--surface-1);
+    }
+    .modal-foot .btn {
+      flex: 1;
+    }
+  }
+  @keyframes sheetIn {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
   }
 
   /* Toasts */

@@ -260,7 +260,17 @@ const links: NavLink[] = [
   },
 ];
 
-export function Sidebar({ perms }: { perms?: Record<string, boolean> }) {
+export function Sidebar({
+  perms,
+  open,
+  onNavigate,
+}: {
+  perms?: Record<string, boolean>;
+  /** Drawer abierto (móvil). En desktop se ignora (CSS lo fija). */
+  open?: boolean;
+  /** Se llama al tocar un link (para cerrar el drawer en móvil). */
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href);
@@ -270,8 +280,8 @@ export function Sidebar({ perms }: { perms?: Record<string, boolean> }) {
   const groups = [...new Set(visible.map((l) => l.group))];
 
   return (
-    <aside className="admin-sidebar">
-      <Link href="/admin" className="brand mb-2 px-2 py-1">
+    <aside className={cn("admin-sidebar", open && "open")}>
+      <Link href="/admin" className="brand mb-2 px-2 py-1" onClick={onNavigate}>
         <BrandMark size={30} />
         <span className="brand-name text-[15px]">
           HEFESTO<b> Admin</b>
@@ -288,6 +298,7 @@ export function Sidebar({ perms }: { perms?: Record<string, boolean> }) {
                 <Link
                   key={l.href}
                   href={l.href}
+                  onClick={onNavigate}
                   className={cn(
                     "nav-item",
                     isActive(l.href, l.exact) && "active",
@@ -303,7 +314,8 @@ export function Sidebar({ perms }: { perms?: Record<string, boolean> }) {
 
       <Link
         href="/"
-        className="text-faint hover:text-fg mt-auto hidden px-3 pt-4 text-xs transition-colors md:block"
+        onClick={onNavigate}
+        className="text-faint hover:text-fg mt-auto block px-3 pt-4 text-xs transition-colors"
       >
         ← Volver a la tienda
       </Link>
