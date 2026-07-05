@@ -53,3 +53,11 @@ export async function updateCouponRow(
   if (!row) throw new Error("No se pudo actualizar el cupón");
   return row;
 }
+
+/** Borra el cupón. Sus canjes (coupon_redemptions) cascadean por su FK. */
+export async function deleteCouponRow(
+  id: string,
+  database: Database = db,
+): Promise<void> {
+  await database.delete(coupons).where(eq(coupons.id, id));
+}

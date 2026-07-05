@@ -1,9 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "@/stores/toastStore";
 import { compactPrice } from "@/lib/format";
 import type { Coupon } from "../types";
+import { deleteCouponAction } from "../actions";
 import { CouponForm, type CouponFormData } from "./coupon-form";
 
 const dateFmt = new Intl.DateTimeFormat("es-AR", {
@@ -40,6 +44,19 @@ const EditIcon = (
     <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
   </svg>
 );
+const TrashIcon = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden
+  >
+    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
+  </svg>
+);
 
 type Status = { label: string; cls: string; faded: boolean };
 
@@ -52,8 +69,10 @@ function couponStatus(c: Coupon): Status {
 }
 
 export function CouponsAdmin({ coupons }: { coupons: Coupon[] }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CouponFormData | null>(null);
+  const [confirming, setConfirming] = useState<Coupon | null>(null);
 
   const activos = coupons.filter(
     (c) => couponStatus(c).label === "Activo",
@@ -194,6 +213,13 @@ export function CouponsAdmin({ coupons }: { coupons: Coupon[] }) {
                     >
                       {EditIcon}
                     </button>
+                    <button
+                      className="btn-icon btn-ghost text-danger"
+                      title="Eliminar"
+                      onClick={() => setConfirming(c)}
+                    >
+                      {TrashIcon}
+                    </button>
                   </span>
                 </div>
                 {c.maxUses ? (
@@ -222,6 +248,24 @@ export function CouponsAdmin({ coupons }: { coupons: Coupon[] }) {
           onCancel={() => setOpen(false)}
         />
       </Modal>
+
+      <ConfirmDialog
+        open={!!confirming}
+        onClose={() => setConfirming(null)}
+        title={
+          confirming
+            ? `¿Eliminar el cupón ${confirming.code}?`
+            : "¿Eliminar cupón?"
+        }
+        detail="Se eliminará también su historial de canjes."
+        onConfirm={async () => {
+          if (!confirming) return;
+          const res = await deleteCouponAction(confirming.id);
+          if (!res.ok) throw new Error(res.error.message);
+          toast("Cupón eliminado", "danger");
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

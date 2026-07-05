@@ -90,3 +90,21 @@ export async function toggleCouponAction(
     return { ok: false, error: toActionError(error) };
   }
 }
+
+export async function deleteCouponAction(id: string): Promise<ActionResult> {
+  if (!(await can("descuentos", "eliminar"))) return NOT_STAFF;
+  const user = await getCurrentUser();
+  try {
+    await queries.deleteCoupon(id);
+    await recordAudit({
+      actorId: user?.id ?? null,
+      action: "coupon.deleted",
+      entityType: "coupon",
+      entityId: id,
+    });
+    revalidatePath("/admin/descuentos");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}

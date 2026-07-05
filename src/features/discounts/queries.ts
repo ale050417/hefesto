@@ -51,3 +51,7 @@ export async function toggleCoupon(
 ): Promise<Coupon> {
   return repo.updateCouponRow(id, { isActive });
 }
+
+export async function deleteCoupon(id: string): Promise<void> {
+  await repo.deleteCouponRow(id);
+}
