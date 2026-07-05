@@ -2,9 +2,49 @@ import { describe, expect, it } from "vitest";
 import {
   computePrintPrice,
   computeQuote,
+  resolveCostPerKg,
   selectActiveMargin,
 } from "./calculator";
 import { marginPresetSchema } from "./schemas";
+
+// Fix auditoría 2026-07: el costo se resuelve por FILAMENTO (id), no por el
+// string material (que colapsaba PLA dorado $35.000 y PLA blanco $25.000).
+describe("resolveCostPerKg", () => {
+  const fils = [
+    { id: "f-blanco", material: "PLA", costPerKg: 25000 },
+    { id: "f-dorado", material: "PLA", costPerKg: 35000 },
+    { id: "f-petg", material: "PETG", costPerKg: 28000 },
+  ];
+
+  it("con filamentId devuelve el costo de ESE filamento (no el primero del material)", () => {
+    expect(resolveCostPerKg(fils, { filamentId: "f-dorado" })).toBe(35000);
+    expect(resolveCostPerKg(fils, { filamentId: "f-blanco" })).toBe(25000);
+  });
+
+  it("filamentId inexistente → null (nunca un 0 silencioso)", () => {
+    expect(resolveCostPerKg(fils, { filamentId: "borrado" })).toBeNull();
+  });
+
+  it("solo material (productos) → el costo MÁS CARO de ese material (conservador)", () => {
+    expect(resolveCostPerKg(fils, { material: "PLA" })).toBe(35000);
+    expect(resolveCostPerKg(fils, { material: "PETG" })).toBe(28000);
+  });
+
+  it("material sin filamentos cargados → null (el caller rechaza)", () => {
+    expect(resolveCostPerKg(fils, { material: "ABS" })).toBeNull();
+    expect(resolveCostPerKg([], { material: "PLA" })).toBeNull();
+  });
+
+  it("sin filamentId ni material → null", () => {
+    expect(resolveCostPerKg(fils, {})).toBeNull();
+  });
+
+  it("filamentId tiene prioridad sobre material", () => {
+    expect(
+      resolveCostPerKg(fils, { filamentId: "f-blanco", material: "PLA" }),
+    ).toBe(25000);
+  });
+});
 
 describe("computePrintPrice", () => {
   it("suma material + tiempo + extra y aplica margen", () => {

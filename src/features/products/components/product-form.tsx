@@ -82,7 +82,9 @@ export function ProductForm({
   // Ficha técnica (material/peso/tiempo/altura) la maneja el PriceEstimator;
   // acá guardamos su último valor para el payload.
   const [est, setEst] = useState<EstimatorValue>({
+    filamentId: null,
     material: defaultValues.material ?? "",
+    color: "",
     grams: Number(defaultValues.weightGrams) || 0,
     printMinutes: Number(defaultValues.printTimeMinutes) || 0,
     layerHeight: defaultValues.layerHeight ?? "",

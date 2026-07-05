@@ -9,6 +9,7 @@ import {
   calcConfigSchema,
   calcSaveSchema,
   marginPresetSchema,
+  quotePriceSchema,
 } from "./schemas";
 import * as service from "./service";
 
@@ -35,12 +36,25 @@ export async function saveCalcAction(
     };
   }
   try {
-    // Costo/kg resuelto en el servidor desde el material (no se confía en el cliente).
+    // Costo/kg y snapshot material/color resueltos en el servidor desde el
+    // FILAMENTO elegido (por id): dos filamentos del mismo material pueden
+    // costar distinto (fix auditoría 2026-07).
     const filaments = await listFilamentsView();
-    const costPerKg =
-      filaments.find((fm) => fm.material === parsed.data.material)?.costPerKg ??
-      0;
-    const row = await service.createCalc(parsed.data, costPerKg, user.id);
+    const filament = filaments.find((f) => f.id === parsed.data.filamentId);
+    if (!filament) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION",
+          message: "El filamento elegido ya no existe. Elegí otro.",
+        },
+      };
+    }
+    const row = await service.createCalc(
+      { ...parsed.data, material: filament.material, color: filament.color },
+      filament.costPerKg,
+      user.id,
+    );
     revalidatePath("/admin/calculadora");
     return { ok: true, data: { id: row.id } };
   } catch (error) {
@@ -101,37 +115,43 @@ export async function deleteMarginPresetAction(
 }
 
 /**
- * Cotización del OPERADOR: elige un tipo y carga gramos/horas/material; el
- * servidor resuelve el costo del material y el margen del tipo, y devuelve SOLO
- * el precio final (el % nunca llega al navegador). Requiere ver calculadora.
+ * Cotización del OPERADOR: elige un tipo y un FILAMENTO y carga gramos/horas;
+ * el servidor resuelve el costo del filamento (por id, no por nombre) y el
+ * margen del tipo, y devuelve SOLO el precio final (el % nunca llega al
+ * navegador). Requiere ver calculadora.
  */
-export async function quotePriceAction(input: {
-  presetId: string;
-  grams: number;
-  hours: number;
-  material: string;
-}): Promise<ActionResult<{ precioFinal: number }>> {
+export async function quotePriceAction(
+  input: unknown,
+): Promise<ActionResult<{ precioFinal: number }>> {
   if (!(await can("calculadora", "ver"))) return NOT_STAFF;
-  const presetId = String(input?.presetId ?? "");
-  const grams = Number(input?.grams) || 0;
-  const hours = Number(input?.hours) || 0;
-  const material = String(input?.material ?? "");
-  if (!presetId) {
+  const parsed = quotePriceSchema.safeParse(input);
+  if (!parsed.success) {
     return {
       ok: false,
-      error: { code: "VALIDATION", message: "Elegí un tipo de producto." },
+      error: {
+        code: "VALIDATION",
+        message: "Elegí un tipo de producto y un filamento.",
+      },
     };
   }
   try {
-    // Costo/kg resuelto en el servidor desde el material (no se confía en el cliente).
+    // Costo/kg resuelto en el servidor desde el filamento elegido.
     const filaments = await listFilamentsView();
-    const costPerKg =
-      filaments.find((f) => f.material === material)?.costPerKg ?? 0;
+    const filament = filaments.find((f) => f.id === parsed.data.filamentId);
+    if (!filament) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION",
+          message: "El filamento elegido ya no existe. Elegí otro.",
+        },
+      };
+    }
     const result = await service.quoteFinalPriceByPreset({
-      presetId,
-      grams,
-      hours,
-      costPerKg,
+      presetId: parsed.data.presetId,
+      grams: parsed.data.grams,
+      hours: parsed.data.hours,
+      costPerKg: filament.costPerKg,
     });
     if (!result) {
       return {

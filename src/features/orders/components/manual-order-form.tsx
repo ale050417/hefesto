@@ -42,25 +42,54 @@ export function ManualSaleForm({
     saleDate: today(),
     customerName: "",
     detail: "",
+    quantity: "1",
     total: "",
     paymentMethod: "cash" as (typeof PAYS)[number]["v"],
     status: "delivered" as (typeof STATUSES)[number]["v"],
   });
   // Datos de la calculadora para que el servidor calcule la amortización.
+  // `filamentId` identifica el filamento EXACTO (dos PLA pueden costar distinto).
   const [estData, setEstData] = useState<{
+    filamentId: string | null;
     material: string;
     grams: number;
     printMinutes: number;
   } | null>(null);
-  // Calculadora flotante (obligatoria): al "Usar precio" copia el total y guarda
-  // gramos/horas/material para la amortización.
+  // Precio UNITARIO que dio la calculadora: el total = unitario × cantidad
+  // (editable a mano igual).
+  const [unitPrice, setUnitPrice] = useState<number | null>(null);
+
+  const qtyN = Math.max(1, Math.floor(Number(form.quantity) || 1));
+
+  // Calculadora flotante (obligatoria): al "Usar precio" copia el total
+  // (unitario × cantidad) y guarda gramos/horas/filamento para la amortización.
   function handleEstUse(v: EstimatorValue) {
     setEstData({
+      filamentId: v.filamentId,
       material: v.material,
       grams: v.grams,
       printMinutes: v.printMinutes,
     });
-    if (v.price != null) setForm((f) => ({ ...f, total: String(v.price) }));
+    if (v.price != null) {
+      setUnitPrice(v.price);
+      setForm((f) => {
+        const q = Math.max(1, Math.floor(Number(f.quantity) || 1));
+        return { ...f, total: String(Math.round(v.price! * q * 100) / 100) };
+      });
+    }
+  }
+
+  // Si cambia la cantidad y hay precio unitario de la calculadora, el total se
+  // recalcula solo (sigue siendo editable a mano después).
+  function handleQtyChange(value: string) {
+    setForm((f) => {
+      const q = Math.max(1, Math.floor(Number(value) || 1));
+      const next = { ...f, quantity: value };
+      if (unitPrice != null) {
+        next.total = String(Math.round(unitPrice * q * 100) / 100);
+      }
+      return next;
+    });
   }
   // Reparto de la ganancia de ESTA venta. "current" = dividir por los socios
   // actuales (no se manda nada; lo resuelve Ganancias). "custom" = guardar este
@@ -113,6 +142,8 @@ export function ManualSaleForm({
     try {
       const res = await createManualSaleAction({
         ...form,
+        quantity: qtyN,
+        filamentId: estData.filamentId ?? "",
         material: estData.material,
         grams: estData.grams,
         printMinutes: estData.printMinutes,
@@ -173,15 +204,34 @@ export function ManualSaleForm({
         </div>
       </div>
 
-      <div className="field">
-        <label htmlFor="ms-det">Detalle / producto</label>
-        <input
-          id="ms-det"
-          className="input"
-          placeholder="Ej: 3 llaveros personalizados"
-          value={form.detail}
-          onChange={(e) => set("detail", e.target.value)}
-        />
+      <div className="grid-2">
+        <div className="field">
+          <label htmlFor="ms-det">Detalle / producto</label>
+          <input
+            id="ms-det"
+            className="input"
+            placeholder="Ej: llavero personalizado"
+            value={form.detail}
+            onChange={(e) => set("detail", e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="ms-qty">Cantidad</label>
+          <input
+            id="ms-qty"
+            type="number"
+            min={1}
+            max={9999}
+            className="input"
+            value={form.quantity}
+            onChange={(e) => handleQtyChange(e.target.value)}
+          />
+          {unitPrice != null && qtyN > 1 ? (
+            <div className="text-faint text-[11.5px]">
+              {qtyN} × ${unitPrice.toLocaleString("es-AR")} c/u
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid-2">

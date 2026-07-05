@@ -83,6 +83,39 @@ export function selectActiveMargin(
   return p ? p.marginPct : null;
 }
 
+// --- Resolución del costo de material (fix auditoría 2026-07, bug "el precio
+//     no cambia según el filamento") ---
+//
+// Antes el costo se buscaba por el string `material` (primer match): dos
+// filamentos PLA (dorado $35.000 / blanco $25.000) colapsaban en un solo
+// precio. Regla nueva, pura y testeable:
+// 1. Con `filamentId` → el costo de ESE filamento (elegido en el selector).
+// 2. Solo con `material` (productos, que no referencian un filamento único
+//    porque pueden imprimirse en varios colores) → el costo MÁS CARO de ese
+//    material: conservador, nunca subestima el costo.
+// 3. Sin match → null (el caller decide rechazar; nunca más un 0 silencioso).
+export type FilamentCostRef = {
+  id: string;
+  material: string;
+  costPerKg: number;
+};
+
+export function resolveCostPerKg(
+  filaments: FilamentCostRef[],
+  by: { filamentId?: string | null; material?: string | null },
+): number | null {
+  if (by.filamentId) {
+    const f = filaments.find((x) => x.id === by.filamentId);
+    return f ? f.costPerKg : null;
+  }
+  if (by.material) {
+    const matches = filaments.filter((x) => x.material === by.material);
+    if (matches.length === 0) return null;
+    return Math.max(...matches.map((x) => x.costPerKg));
+  }
+  return null;
+}
+
 export function computeQuote(input: QuoteInput): QuoteResult {
   const grams = clamp0(input.grams);
   const hours = clamp0(input.hours);

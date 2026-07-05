@@ -1,7 +1,11 @@
 import * as repo from "./repository";
 import { isAdmin } from "@/core/auth/permissions";
 import { listFilamentsView } from "@/features/inventory/queries";
-import { computeQuote, selectActiveMargin } from "./calculator";
+import {
+  computeQuote,
+  resolveCostPerKg,
+  selectActiveMargin,
+} from "./calculator";
 import type {
   CalcConfigInput,
   CalcSaveInput,
@@ -46,11 +50,12 @@ export async function getStats() {
 
 /**
  * Guarda un cálculo en el historial. El margen sale del TIPO elegido (resuelto
- * en el servidor, nunca del cliente); `costPerKg` lo resuelve la action desde el
- * material. Lanza si el tipo no existe o está inactivo.
+ * en el servidor, nunca del cliente); `costPerKg` y el snapshot material/color
+ * los resuelve la action desde el FILAMENTO elegido (por id, no por nombre).
+ * Lanza si el tipo no existe o está inactivo.
  */
 export async function createCalc(
-  input: CalcSaveInput,
+  input: CalcSaveInput & { material: string | null; color: string | null },
   costPerKg: number,
   userId: string | null,
 ) {
@@ -188,22 +193,40 @@ export async function quoteFinalPriceByPreset(input: {
  * y, solo si es admin, los tipos con margen. Una sola función para no repetir el
  * armado en cada página.
  */
+/**
+ * Filamento elegible en la calculadora: el precio se resuelve por ESTE id.
+ * (Fix auditoría 2026-07: antes había un mapa material→costo que colapsaba
+ * filamentos del mismo material con distinto precio.)
+ */
+export type FilamentOption = {
+  id: string;
+  material: string;
+  color: string;
+  costPerKg: number;
+};
+
 export type EstimatorContext = {
   config: CalcConfig;
-  materials: string[];
-  costMap: Record<string, number>;
+  filaments: FilamentOption[];
   presetOptions: MarginPresetOption[];
   presets: MarginPreset[];
   isAdmin: boolean;
 };
 
 /**
- * Amortización (costo de producir) desde material + gramos + horas, en el
- * servidor. Es independiente del tipo/margen: material + electricidad + desgaste
- * + margen de error (computeQuote con margen 0 → costoTotal). Para guardar el
- * costo real al crear producto/venta.
+ * Amortización (costo de producir) desde filamento/material + gramos + horas,
+ * en el servidor. Es independiente del tipo/margen: material + electricidad +
+ * desgaste + margen de error (computeQuote con margen 0 → costoTotal).
+ *
+ * Resolución del costo (auditoría 2026-07):
+ * - `filamentId` → el costo de ESE filamento (venta manual / calculadora).
+ * - solo `material` (productos multicolor) → el costo MÁS CARO del material
+ *   (conservador: nunca subestima).
+ * - material indicado pero SIN filamento cargado → devuelve 0 para que el
+ *   caller RECHACE (antes seguía con costo de material $0 en silencio).
  */
 export async function getAmortization(input: {
+  filamentId?: string | null;
   material?: string | null;
   grams: number;
   hours: number;
@@ -212,9 +235,15 @@ export async function getAmortization(input: {
     getCalcConfig(),
     listFilamentsView(),
   ]);
-  const costPerKg = input.material
-    ? (filaments.find((f) => f.material === input.material)?.costPerKg ?? 0)
-    : 0;
+  let costPerKg = 0;
+  if (input.filamentId || input.material) {
+    const resolved = resolveCostPerKg(filaments, {
+      filamentId: input.filamentId ?? null,
+      material: input.material ?? null,
+    });
+    if (resolved == null) return 0; // sin filamento que coincida → rechazar
+    costPerKg = resolved;
+  }
   const q = computeQuote({
     grams: input.grams,
     hours: input.hours,
@@ -231,18 +260,21 @@ export async function getAmortization(input: {
 
 export async function getEstimatorContext(): Promise<EstimatorContext> {
   const admin = await isAdmin();
-  const [config, filaments, presetOptions, presets] = await Promise.all([
+  const [config, rows, presetOptions, presets] = await Promise.all([
     getCalcConfig(),
     listFilamentsView(),
     listActivePresetOptions(),
     admin ? listMarginPresets() : Promise.resolve([] as MarginPreset[]),
   ]);
-  const materials = [...new Set(filaments.map((fm) => fm.material))];
-  const costMap: Record<string, number> = {};
-  for (const fm of filaments) {
-    if (!(fm.material in costMap)) costMap[fm.material] = fm.costPerKg;
-  }
-  return { config, materials, costMap, presetOptions, presets, isAdmin: admin };
+  // Cada filamento es una opción con SU precio (nada de mapa material→costo,
+  // que colapsaba filamentos del mismo material con distinto costo).
+  const filaments: FilamentOption[] = rows.map((f) => ({
+    id: f.id,
+    material: f.material,
+    color: f.color,
+    costPerKg: f.costPerKg,
+  }));
+  return { config, filaments, presetOptions, presets, isAdmin: admin };
 }
 
 export async function saveCalcConfig(input: CalcConfigInput) {

@@ -9,17 +9,29 @@ const optional = z.preprocess(
 export const calcSaveSchema = z.object({
   name: z.string().trim().min(1, "Ingresá un nombre."),
   customer: optional,
-  material: optional,
-  color: optional,
+  // El filamento CONCRETO (no el material): dos PLA de distinto color pueden
+  // costar distinto. Material/color se snapshotean en el servidor desde este id
+  // (auditoría 2026-07, fix "el precio no cambia según el filamento").
+  filamentId: z.uuid("Elegí un filamento."),
   grams: z.coerce.number().min(0),
   hours: z.coerce.number().min(0),
   // El tipo de producto define el margen (resuelto en el servidor). El cliente
-  // nunca manda el % ni el costo: se resuelven desde el tipo y el material.
+  // nunca manda el % ni el costo: se resuelven desde el tipo y el filamento.
   presetId: z.string().trim().min(1, "Elegí un tipo de producto."),
   notes: z.preprocess(emptyToUndef, z.string().trim().max(500).optional()),
 });
 
 export type CalcSaveInput = z.infer<typeof calcSaveSchema>;
+
+// Cotización del operador: mismo criterio (filamento por id, nunca por nombre).
+export const quotePriceSchema = z.object({
+  presetId: z.string().trim().min(1, "Elegí un tipo de producto."),
+  filamentId: z.uuid("Elegí un filamento."),
+  grams: z.coerce.number().min(0),
+  hours: z.coerce.number().min(0),
+});
+
+export type QuotePriceInput = z.infer<typeof quotePriceSchema>;
 
 export const calcConfigSchema = z.object({
   kwhPrice: z.coerce.number().min(0),

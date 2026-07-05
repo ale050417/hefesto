@@ -4,6 +4,25 @@ import type { ManualSaleInput } from "../schemas";
 
 export type ManualSale = typeof manualSales.$inferSelect;
 
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+/**
+ * Costos de la venta completa a partir del costo UNITARIO y la cantidad.
+ * Puro y testeable (Cap. 15: toca dinero). La calculadora cotiza UNA pieza;
+ * acá se escala: amortización total = unitaria × cantidad; ganancia = total −
+ * amortización total (nunca negativa).
+ */
+export function computeManualSaleCosts(params: {
+  unitAmortization: number;
+  total: number;
+  quantity: number;
+}): { amortization: number; profit: number } {
+  const qty = Math.max(1, Math.floor(params.quantity));
+  const amortization = round2(Math.max(0, params.unitAmortization) * qty);
+  const profit = round2(Math.max(0, params.total - amortization));
+  return { amortization, profit };
+}
+
 /**
  * Mapea la entrada validada (Zod) a la fila de la base. Puro y testeable.
  * El total se guarda como string con 2 decimales (numeric). La fecha del input
@@ -17,6 +36,7 @@ export function toManualSaleRow(
     saleDate: new Date(`${input.saleDate}T12:00:00`),
     customerName: input.customerName,
     detail: input.detail ?? null,
+    quantity: input.quantity,
     total: input.total.toFixed(2),
     amortization:
       input.amortization != null ? input.amortization.toFixed(2) : null,

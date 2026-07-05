@@ -5,10 +5,14 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
-import { FILAMENT_COLORS } from "@/features/inventory/constants";
 import { computeQuote } from "../calculator";
 import { saveCalcAction, deleteCalcAction, quotePriceAction } from "../actions";
-import type { CalcConfig, MarginPreset, MarginPresetOption } from "../service";
+import type {
+  CalcConfig,
+  FilamentOption,
+  MarginPreset,
+  MarginPresetOption,
+} from "../service";
 import type { CalcHistoryRow } from "../repository";
 
 const svg = (path: string) => (
@@ -52,8 +56,7 @@ type Stats = {
 
 export function PriceCalculator({
   config,
-  materials,
-  costMap,
+  filaments,
   history,
   stats,
   presetOptions,
@@ -61,8 +64,8 @@ export function PriceCalculator({
   isAdmin,
 }: {
   config: CalcConfig;
-  materials: string[];
-  costMap: Record<string, number>;
+  /** Filamentos elegibles: el costo sale del elegido (fix auditoría 2026-07). */
+  filaments: FilamentOption[];
   history: CalcHistoryRow[];
   stats: Stats;
   /** Tipos activos (solo nombre): para el select. */
@@ -72,12 +75,10 @@ export function PriceCalculator({
   isAdmin: boolean;
 }) {
   const router = useRouter();
-  const mats = materials.length ? materials : ["PLA"];
   const [f, setF] = useState({
     name: "",
     customer: "",
-    material: mats[0]!,
-    color: "Negro",
+    filamentId: filaments[0]?.id ?? "",
     grams: "",
     hours: "",
     minutes: "",
@@ -94,7 +95,10 @@ export function PriceCalculator({
 
   const set = (k: keyof typeof f, v: string) => setF((s) => ({ ...s, [k]: v }));
 
-  const costPerKg = costMap[f.material] ?? 0;
+  // El costo sale del FILAMENTO elegido (no de un mapa por material, que
+  // colapsaba filamentos del mismo material con distinto precio).
+  const filament = filaments.find((x) => x.id === f.filamentId) ?? null;
+  const costPerKg = filament?.costPerKg ?? 0;
   const grams = Number(f.grams) || 0;
   const totalHours = (Number(f.hours) || 0) + (Number(f.minutes) || 0) / 60;
   const hasData = grams > 0 || totalHours > 0;
@@ -124,7 +128,7 @@ export function PriceCalculator({
     let cancelled = false;
     const t = setTimeout(() => {
       if (cancelled) return;
-      if (!hasData || !f.presetId) {
+      if (!hasData || !f.presetId || !f.filamentId) {
         setOpPrice(null);
         setOpBusy(false);
         return;
@@ -134,7 +138,7 @@ export function PriceCalculator({
         presetId: f.presetId,
         grams,
         hours: totalHours,
-        material: f.material,
+        filamentId: f.filamentId,
       }).then((res) => {
         if (cancelled) return;
         setOpPrice(res.ok ? res.data.precioFinal : null);
@@ -145,19 +149,19 @@ export function PriceCalculator({
       cancelled = true;
       clearTimeout(t);
     };
-  }, [isAdmin, f.presetId, f.material, grams, totalHours, hasData]);
+  }, [isAdmin, f.presetId, f.filamentId, grams, totalHours, hasData]);
 
   async function save() {
     if (!f.name.trim())
       return toast("Ingresá un nombre para el cálculo", "danger");
     if (!hasData) return toast("Cargá gramos u horas", "danger");
     if (!f.presetId) return toast("Elegí un tipo de producto", "danger");
+    if (!f.filamentId) return toast("Elegí un filamento", "danger");
     setBusy(true);
     const res = await saveCalcAction({
       name: f.name,
       customer: f.customer,
-      material: f.material,
-      color: f.color,
+      filamentId: f.filamentId,
       grams,
       hours: totalHours,
       presetId: f.presetId,
@@ -323,45 +327,43 @@ export function PriceCalculator({
                 />
               </div>
             </div>
-            <div className="calc-input-row">
-              <div className="field">
-                <label htmlFor="ci-mat">Material</label>
-                <select
-                  id="ci-mat"
-                  className="select"
-                  value={f.material}
-                  onChange={(e) => set("material", e.target.value)}
+            <div className="field">
+              <label htmlFor="ci-fil">Filamento</label>
+              {filaments.length === 0 ? (
+                <p
+                  className="text-[12.5px]"
+                  style={{ color: "var(--warning)" }}
                 >
-                  {mats.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
+                  No hay filamentos cargados. Cargá uno en Filamentos para
+                  cotizar.
+                </p>
+              ) : (
+                <select
+                  id="ci-fil"
+                  className="select"
+                  value={f.filamentId}
+                  onChange={(e) => set("filamentId", e.target.value)}
+                >
+                  {filaments.map((x) => (
+                    <option key={x.id} value={x.id}>
+                      {x.material} · {x.color} — {formatPrice(x.costPerKg)}/kg
                     </option>
                   ))}
                 </select>
-              </div>
-              <div className="field">
-                <label htmlFor="ci-color">Color</label>
-                <select
-                  id="ci-color"
-                  className="select"
-                  value={f.color}
-                  onChange={(e) => set("color", e.target.value)}
-                >
-                  {FILAMENT_COLORS.map((c) => (
-                    <option key={c.n} value={c.n}>
-                      {c.n}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              )}
             </div>
             <div
               className="text-[12px]"
-              style={{ color: "var(--success)", marginTop: -6 }}
+              style={{
+                color: costPerKg ? "var(--success)" : "var(--warning)",
+                marginTop: -6,
+              }}
             >
-              {costPerKg
-                ? `Filamento ${f.material}: ${formatPrice(costPerKg)}/kg`
-                : `Sin costo/kg cargado para ${f.material} (cargalo en Filamentos).`}
+              {filament
+                ? costPerKg
+                  ? `${filament.material} ${filament.color}: ${formatPrice(costPerKg)}/kg`
+                  : `${filament.material} ${filament.color} no tiene costo/kg (editalo en Filamentos).`
+                : "Elegí un filamento para calcular el costo del material."}
             </div>
             <div className="field">
               <label className="flex items-center justify-between">

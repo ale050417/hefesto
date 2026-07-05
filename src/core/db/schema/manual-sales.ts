@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   index,
+  integer,
   jsonb,
   numeric,
   pgTable,
@@ -23,6 +24,10 @@ export const manualSales = pgTable(
     saleDate: timestamp("sale_date", { withTimezone: true }).notNull(),
     customerName: text("customer_name").notNull(),
     detail: text("detail"),
+    // Cantidad de unidades de la venta (fix auditoría 2026-07: antes 80
+    // unidades se cargaban una por una o multiplicando a mano). El total es de
+    // TODA la venta; la amortización guardada también (unitaria × cantidad).
+    quantity: integer("quantity").notNull().default(1),
     total: numeric("total", { precision: 12, scale: 2 }).notNull(),
     // Costos cargados con la calculadora: amortización (costo) y ganancia
     // (total − amortización). La ganancia es lo que se reparte entre socios.
@@ -44,6 +49,7 @@ export const manualSales = pgTable(
   },
   (t) => [
     check("manual_sales_total_positive", sql`${t.total} > 0`),
+    check("manual_sales_quantity_positive", sql`${t.quantity} > 0`),
     index("manual_sales_date_idx").on(t.saleDate),
   ],
 );

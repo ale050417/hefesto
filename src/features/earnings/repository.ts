@@ -192,7 +192,13 @@ export async function getDeliveredManualSales(
   }));
 }
 
-/** Mapa material → costo/kg (primer filamento de ese material). */
+/**
+ * Mapa material → costo/kg. Los items del pedido solo guardan el material del
+ * producto (no un filamento concreto), así que si hay varios filamentos del
+ * mismo material con distinto precio se toma el MÁS CARO: conservador, la
+ * ganancia mostrada nunca queda inflada (fix auditoría 2026-07 — antes ganaba
+ * el "primer" filamento arbitrario).
+ */
 export async function getFilamentCostByMaterial(
   database: Database = db,
 ): Promise<Map<string, number>> {
@@ -201,7 +207,9 @@ export async function getFilamentCostByMaterial(
     .from(filaments);
   const map = new Map<string, number>();
   for (const r of rows) {
-    if (!map.has(r.material)) map.set(r.material, Number(r.cost));
+    const cost = Number(r.cost);
+    const prev = map.get(r.material);
+    if (prev == null || cost > prev) map.set(r.material, cost);
   }
   return map;
 }

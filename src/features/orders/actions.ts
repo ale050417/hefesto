@@ -19,7 +19,10 @@ import {
   type CheckoutInput,
 } from "./schemas";
 import { createOrder } from "./services/orderService";
-import { createManualSale } from "./services/manualSaleService";
+import {
+  computeManualSaleCosts,
+  createManualSale,
+} from "./services/manualSaleService";
 import { getOrderCustomerId, sendOrderMessage } from "./services/orderChat";
 import { notifyCustomer } from "@/features/notifications/service";
 import { awardForOrder } from "@/features/rewards/service";
@@ -133,26 +136,34 @@ export async function createManualSaleAction(
     };
   }
   // Amortización (costo) obligatoria: se calcula en el servidor desde
-  // gramos/horas/material. La ganancia (total − amort) es lo que se reparte.
-  const amort = await getAmortization({
+  // gramos/horas y el FILAMENTO elegido (por id; `material` queda de fallback
+  // para cargas viejas). La calculadora cotiza UNA pieza: acá se escala por la
+  // cantidad. La ganancia (total − amort total) es lo que se reparte.
+  const unitAmort = await getAmortization({
+    filamentId: parsed.data.filamentId ?? null,
     material: parsed.data.material ?? null,
     grams: parsed.data.grams ?? 0,
     hours: (parsed.data.printMinutes ?? 0) / 60,
   });
-  if (!(amort > 0)) {
+  if (!(unitAmort > 0)) {
     return {
       ok: false,
       error: {
         code: "VALIDATION",
         message:
-          "Cargá la amortización con la calculadora (gramos/horas y material).",
+          "Cargá la amortización con la calculadora (gramos/horas y filamento).",
       },
     };
   }
+  const costs = computeManualSaleCosts({
+    unitAmortization: unitAmort,
+    total: parsed.data.total,
+    quantity: parsed.data.quantity,
+  });
   const withCosts = {
     ...parsed.data,
-    amortization: Math.round(amort * 100) / 100,
-    profit: Math.round(Math.max(0, parsed.data.total - amort) * 100) / 100,
+    amortization: costs.amortization,
+    profit: costs.profit,
   };
   try {
     const sale = await createManualSale(withCosts, user?.id ?? null);

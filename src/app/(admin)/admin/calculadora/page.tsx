@@ -28,11 +28,14 @@ export default async function CalculatorPage() {
       admin ? listMarginPresets() : Promise.resolve([]),
     ]);
 
-  const materials = [...new Set(filaments.map((f) => f.material))];
-  const costMap: Record<string, number> = {};
-  for (const f of filaments) {
-    if (!(f.material in costMap)) costMap[f.material] = f.costPerKg;
-  }
+  // Cada filamento con SU costo (fix auditoría 2026-07: el mapa material→costo
+  // colapsaba filamentos del mismo material con distinto precio).
+  const filamentOptions = filaments.map((f) => ({
+    id: f.id,
+    material: f.material,
+    color: f.color,
+    costPerKg: f.costPerKg,
+  }));
 
   return (
     <div className="view grid gap-5">
@@ -81,8 +84,7 @@ export default async function CalculatorPage() {
 
       <PriceCalculator
         config={config}
-        materials={materials}
-        costMap={costMap}
+        filaments={filamentOptions}
         history={history}
         stats={stats}
         presetOptions={presetOptions}

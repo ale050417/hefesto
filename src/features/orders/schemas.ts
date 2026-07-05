@@ -45,8 +45,22 @@ export const manualSaleSchema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().trim().max(300).optional(),
   ),
+  // Cantidad de unidades (fix auditoría 2026-07: 80 unidades = un registro).
+  // El total es de TODA la venta; la amortización se multiplica en el servidor.
+  quantity: z.coerce
+    .number()
+    .int("La cantidad debe ser un número entero.")
+    .min(1, "La cantidad mínima es 1.")
+    .max(9999)
+    .default(1),
   total: z.coerce.number().positive("Ingresá el total cobrado."),
-  // Datos para calcular la amortización (costo) en el servidor.
+  // Datos para calcular la amortización (costo) en el servidor. `filamentId`
+  // identifica el filamento exacto (dos PLA pueden costar distinto);
+  // `material` queda como fallback para cargas viejas.
+  filamentId: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.uuid().optional(),
+  ),
   material: z.preprocess(
     (v) => (v === "" ? undefined : v),
     z.string().trim().max(60).optional(),

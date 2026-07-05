@@ -4,13 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { formatPrice } from "@/lib/format";
 import { computeQuote } from "../calculator";
 import { quotePriceAction } from "../actions";
-import type { CalcConfig, MarginPreset, MarginPresetOption } from "../service";
+import type {
+  CalcConfig,
+  FilamentOption,
+  MarginPreset,
+  MarginPresetOption,
+} from "../service";
 
 // Solo trabajamos estas dos alturas de capa.
 export const LAYER_HEIGHTS = ["0.20 mm", "0.40 mm"] as const;
 
 export type EstimatorValue = {
+  /** Filamento elegido (null si no hay filamentos cargados). */
+  filamentId: string | null;
   material: string;
+  color: string;
   grams: number;
   printMinutes: number;
   layerHeight: string;
@@ -19,16 +27,24 @@ export type EstimatorValue = {
   price: number | null;
 };
 
+/** Etiqueta del selector: "PLA · Dorado — $35.000/kg". */
+function filamentLabel(f: FilamentOption): string {
+  return `${f.material} · ${f.color} — ${formatPrice(f.costPerKg)}/kg`;
+}
+
 /**
  * Motor de precio de la calculadora, embebible en el alta de producto y en el
  * pedido manual. Admin: calcula en el cliente y muestra el desglose. Operador:
  * el precio lo da el servidor (no ve margen ni costos). Reporta el resultado por
  * `onChange` para que el formulario que lo embeba lo use (precio / total).
+ *
+ * Fix auditoría 2026-07: se elige un FILAMENTO (id), no un material. Dos
+ * filamentos del mismo material pueden costar distinto (PLA dorado ≠ PLA
+ * blanco) y antes el precio no cambiaba al elegir uno u otro.
  */
 export function PriceEstimator({
   config,
-  materials,
-  costMap,
+  filaments,
   presetOptions,
   presets,
   isAdmin,
@@ -36,12 +52,12 @@ export function PriceEstimator({
   onChange,
 }: {
   config: CalcConfig;
-  materials: string[];
-  costMap: Record<string, number>;
+  filaments: FilamentOption[];
   presetOptions: MarginPresetOption[];
   presets: MarginPreset[];
   isAdmin: boolean;
   initial?: Partial<{
+    filamentId: string;
     material: string;
     grams: number;
     printMinutes: number;
@@ -50,9 +66,17 @@ export function PriceEstimator({
   }>;
   onChange?: (v: EstimatorValue) => void;
 }) {
-  const mats = materials.length ? materials : ["PLA"];
   const initMin = initial?.printMinutes ?? 0;
-  const [material, setMaterial] = useState(initial?.material || mats[0]!);
+  // Default: el filamento inicial (edición), o el primero que coincida con el
+  // material guardado (productos viejos, sin filamentId), o el primero.
+  const [filamentId, setFilamentId] = useState<string>(() => {
+    if (initial?.filamentId) return initial.filamentId;
+    if (initial?.material) {
+      const byMat = filaments.find((f) => f.material === initial.material);
+      if (byMat) return byMat.id;
+    }
+    return filaments[0]?.id ?? "";
+  });
   const [grams, setGrams] = useState(
     initial?.grams ? String(initial.grams) : "",
   );
@@ -69,10 +93,11 @@ export function PriceEstimator({
   const [opPrice, setOpPrice] = useState<number | null>(null);
   const [opBusy, setOpBusy] = useState(false);
 
+  const selected = filaments.find((f) => f.id === filamentId) ?? null;
   const gramsN = Number(grams) || 0;
   const totalMin = (Number(hours) || 0) * 60 + (Number(minutes) || 0);
   const totalHours = totalMin / 60;
-  const costPerKg = costMap[material] ?? 0;
+  const costPerKg = selected?.costPerKg ?? 0;
   const hasData = gramsN > 0 || totalMin > 0;
 
   // Margen del tipo: SOLO admin lo conoce (presets viene vacío al operador).
@@ -99,7 +124,7 @@ export function PriceEstimator({
     let cancelled = false;
     const t = setTimeout(() => {
       if (cancelled) return;
-      if (!hasData || !presetId) {
+      if (!hasData || !presetId || !filamentId) {
         setOpPrice(null);
         setOpBusy(false);
         return;
@@ -109,7 +134,7 @@ export function PriceEstimator({
         presetId,
         grams: gramsN,
         hours: totalHours,
-        material,
+        filamentId,
       }).then((res) => {
         if (cancelled) return;
         setOpPrice(res.ok ? res.data.precioFinal : null);
@@ -120,10 +145,10 @@ export function PriceEstimator({
       cancelled = true;
       clearTimeout(t);
     };
-  }, [isAdmin, presetId, material, gramsN, totalHours, hasData]);
+  }, [isAdmin, presetId, filamentId, gramsN, totalHours, hasData]);
 
   const price = isAdmin
-    ? hasData && presetId
+    ? hasData && presetId && selected
       ? q.precioFinal
       : null
     : opPrice;
@@ -134,42 +159,58 @@ export function PriceEstimator({
   useEffect(() => {
     onChangeRef.current = onChange;
   });
+  const material = selected?.material ?? "";
+  const color = selected?.color ?? "";
   useEffect(() => {
     onChangeRef.current?.({
+      filamentId: filamentId || null,
       material,
+      color,
       grams: gramsN,
       printMinutes: totalMin,
       layerHeight,
       presetId,
       price,
     });
-  }, [material, gramsN, totalMin, layerHeight, presetId, price]);
+  }, [
+    filamentId,
+    material,
+    color,
+    gramsN,
+    totalMin,
+    layerHeight,
+    presetId,
+    price,
+  ]);
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid-2">
         <div className="field">
-          <label htmlFor="pe-mat">Material</label>
-          <select
-            id="pe-mat"
-            className="select"
-            value={material}
-            onChange={(e) => setMaterial(e.target.value)}
-          >
-            {mats.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-          <div
-            className="text-[11.5px]"
-            style={{ color: costPerKg ? "var(--success)" : "var(--warning)" }}
-          >
-            {costPerKg
-              ? `${formatPrice(costPerKg)}/kg`
-              : `Sin costo/kg para ${material} (cargalo en Filamentos)`}
-          </div>
+          <label htmlFor="pe-fil">Filamento</label>
+          {filaments.length === 0 ? (
+            <p className="text-[12.5px]" style={{ color: "var(--warning)" }}>
+              No hay filamentos cargados. Cargá uno en Filamentos para cotizar.
+            </p>
+          ) : (
+            <select
+              id="pe-fil"
+              className="select"
+              value={filamentId}
+              onChange={(e) => setFilamentId(e.target.value)}
+            >
+              {filaments.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {filamentLabel(f)}
+                </option>
+              ))}
+            </select>
+          )}
+          {selected && !selected.costPerKg ? (
+            <div className="text-[11.5px]" style={{ color: "var(--warning)" }}>
+              Este filamento no tiene costo/kg cargado (editalo en Filamentos).
+            </div>
+          ) : null}
         </div>
         <div className="field">
           <label htmlFor="pe-layer">Altura de capa</label>

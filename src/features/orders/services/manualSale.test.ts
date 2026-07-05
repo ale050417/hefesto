@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { manualSaleSchema } from "../schemas";
-import { toManualSaleRow } from "./manualSaleService";
+import { computeManualSaleCosts, toManualSaleRow } from "./manualSaleService";
 
 const base = {
   saleDate: "2025-11-02",
@@ -107,16 +107,107 @@ describe("manualSaleSchema", () => {
     const r = manualSaleSchema.safeParse({ ...base, profitSplit: [] });
     expect(r.success).toBe(true);
   });
+
+  // Fix auditoría 2026-07 (bug 2): cantidad de unidades en la venta manual.
+  it("cantidad: default 1, coerce desde string, rechaza 0/negativos/decimales", () => {
+    const r = manualSaleSchema.safeParse(base);
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.quantity).toBe(1);
+
+    const r80 = manualSaleSchema.safeParse({ ...base, quantity: "80" });
+    expect(r80.success).toBe(true);
+    if (r80.success) expect(r80.data.quantity).toBe(80);
+
+    expect(manualSaleSchema.safeParse({ ...base, quantity: 0 }).success).toBe(
+      false,
+    );
+    expect(manualSaleSchema.safeParse({ ...base, quantity: -3 }).success).toBe(
+      false,
+    );
+    expect(manualSaleSchema.safeParse({ ...base, quantity: 2.5 }).success).toBe(
+      false,
+    );
+  });
+
+  it("acepta filamentId (uuid) y convierte vacío en undefined", () => {
+    const r = manualSaleSchema.safeParse({
+      ...base,
+      filamentId: "0f8b7a52-3f1e-4c9a-9d2b-1a2b3c4d5e6f",
+    });
+    expect(r.success).toBe(true);
+    const rEmpty = manualSaleSchema.safeParse({ ...base, filamentId: "" });
+    expect(rEmpty.success).toBe(true);
+    if (rEmpty.success) expect(rEmpty.data.filamentId).toBeUndefined();
+    expect(
+      manualSaleSchema.safeParse({ ...base, filamentId: "no-es-uuid" }).success,
+    ).toBe(false);
+  });
+});
+
+// La calculadora cotiza UNA pieza; la venta escala por cantidad (dinero → test).
+describe("computeManualSaleCosts", () => {
+  it("multiplica la amortización unitaria por la cantidad", () => {
+    const r = computeManualSaleCosts({
+      unitAmortization: 1500.5,
+      total: 200000,
+      quantity: 80,
+    });
+    expect(r.amortization).toBe(120040);
+    expect(r.profit).toBe(79960);
+  });
+
+  it("cantidad 1 = comportamiento anterior", () => {
+    const r = computeManualSaleCosts({
+      unitAmortization: 3200,
+      total: 12500,
+      quantity: 1,
+    });
+    expect(r.amortization).toBe(3200);
+    expect(r.profit).toBe(9300);
+  });
+
+  it("la ganancia nunca es negativa (venta a pérdida queda en 0)", () => {
+    const r = computeManualSaleCosts({
+      unitAmortization: 5000,
+      total: 8000,
+      quantity: 3,
+    });
+    expect(r.amortization).toBe(15000);
+    expect(r.profit).toBe(0);
+  });
+
+  it("sanea cantidades raras (0/decimales → al menos 1, entero)", () => {
+    expect(
+      computeManualSaleCosts({
+        unitAmortization: 100,
+        total: 1000,
+        quantity: 0,
+      }).amortization,
+    ).toBe(100);
+    expect(
+      computeManualSaleCosts({
+        unitAmortization: 100,
+        total: 1000,
+        quantity: 2.9,
+      }).amortization,
+    ).toBe(200);
+  });
 });
 
 describe("toManualSaleRow (profit_split)", () => {
   const input = {
     saleDate: "2025-11-02",
     customerName: "Juan Pérez",
+    quantity: 1,
     total: 12500,
     paymentMethod: "cash" as const,
     status: "delivered" as const,
   };
+
+  it("guarda la cantidad en la fila", () => {
+    const row = toManualSaleRow({ ...input, quantity: 80 }, null);
+    expect(row.quantity).toBe(80);
+  });
 
   it("sin reparto → profit_split null (divide por socios actuales)", () => {
     const row = toManualSaleRow(input, null);

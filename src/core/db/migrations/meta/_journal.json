@@ -239,6 +239,13 @@
       "when": 1783183046601,
       "tag": "0033_points_order_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1783219471107,
+      "tag": "0034_manual_sales_quantity",
+      "breakpoints": true
     }
   ]
 }
