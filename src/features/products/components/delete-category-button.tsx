@@ -1,49 +1,51 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "@/stores/toastStore";
 import { deleteCategoryAction } from "../actions";
 
 export function DeleteCategoryButton({
   id,
+  name,
   productCount,
 }: {
   id: string;
+  name?: string;
   productCount: number;
 }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
   const blocked = productCount > 0;
 
-  function handleDelete() {
-    if (blocked) return;
-    if (!confirm("¿Borrar esta categoría?")) return;
-    setError(null);
-    startTransition(async () => {
-      const res = await deleteCategoryAction(id);
-      if (!res.ok) setError(res.error.message);
-      router.refresh();
-    });
-  }
-
   return (
-    <div>
+    <>
       <Button
         type="button"
         variant="ghost"
         size="sm"
-        loading={isPending}
-        disabled={blocked || isPending}
+        disabled={blocked}
         title={
           blocked ? "No se puede borrar: tiene productos" : "Borrar categoría"
         }
-        onClick={handleDelete}
+        onClick={() => setOpen(true)}
       >
         Borrar
       </Button>
-      {error ? <p className="text-danger mt-1 text-xs">{error}</p> : null}
-    </div>
+
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={name ? `¿Eliminar categoría "${name}"?` : "¿Eliminar categoría?"}
+        onConfirm={async () => {
+          const res = await deleteCategoryAction(id);
+          if (!res.ok) throw new Error(res.error.message);
+          toast("Categoría eliminada", "danger");
+          router.refresh();
+        }}
+      />
+    </>
   );
 }

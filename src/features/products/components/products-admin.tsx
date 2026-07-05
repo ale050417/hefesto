@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
 import { archiveProductAction, getProductFormDataAction } from "../actions";
@@ -132,6 +133,7 @@ export function ProductsAdmin({
   const [view, setView] = useState<View>("grid");
   const [modal, setModal] = useState<ModalState>({ open: false });
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [archiving, setArchiving] = useState<AdminProductRow | null>(null);
 
   const list = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -195,22 +197,11 @@ export function ProductsAdmin({
     }
   }
 
-  async function archive(p: AdminProductRow) {
-    if (
-      !window.confirm(
-        `¿Archivar "${p.name}"? Dejará de mostrarse en la tienda.`,
-      )
-    )
-      return;
-    setPendingId(p.id);
+  async function confirmArchive(p: AdminProductRow) {
     const res = await archiveProductAction(p.id);
-    setPendingId(null);
-    if (res.ok) {
-      toast("Producto archivado", "danger");
-      router.refresh();
-    } else {
-      toast(res.error.message, "danger");
-    }
+    if (!res.ok) throw new Error(res.error.message);
+    toast("Producto archivado", "danger");
+    router.refresh();
   }
 
   const off = (p: AdminProductRow) =>
@@ -474,7 +465,7 @@ export function ProductsAdmin({
                           className="btn-icon btn-ghost"
                           title="Archivar"
                           disabled={pendingId === p.id}
-                          onClick={() => archive(p)}
+                          onClick={() => setArchiving(p)}
                         >
                           {Icon.trash}
                         </button>
@@ -536,6 +527,19 @@ export function ProductsAdmin({
           </div>
         ) : null}
       </Modal>
+
+      <ConfirmDialog
+        open={!!archiving}
+        onClose={() => setArchiving(null)}
+        title={
+          archiving ? `¿Archivar "${archiving.name}"?` : "¿Archivar producto?"
+        }
+        description="El producto dejará de mostrarse en la tienda. Podés republicarlo cuando quieras."
+        confirmLabel="Archivar"
+        onConfirm={() => {
+          if (archiving) return confirmArchive(archiving);
+        }}
+      />
     </div>
   );
 }

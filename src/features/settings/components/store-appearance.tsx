@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
 import { compressImageToWebp } from "@/lib/image-compress";
 import {
@@ -123,6 +124,7 @@ export function StoreAppearance({
   const [bannerOpen, setBannerOpen] = useState(false);
   const [bf, setBf] = useState<BannerForm>(EMPTY_BANNER);
   const [pendingId, setPendingId] = useState<string | null>(null);
+  const [confirmBanner, setConfirmBanner] = useState<StoreBanner | null>(null);
   const setB = <K extends keyof BannerForm>(k: K, v: BannerForm[K]): void =>
     setBf((f) => ({ ...f, [k]: v }));
   const bannerFileRef = useRef<HTMLInputElement>(null);
@@ -208,15 +210,11 @@ export function StoreAppearance({
     setBannerOpen(false);
     router.refresh();
   }
-  async function removeBanner(b: StoreBanner) {
-    if (!window.confirm(`¿Eliminar el banner "${b.title}"?`)) return;
-    setPendingId(b.id);
+  async function confirmRemoveBanner(b: StoreBanner) {
     const res = await deleteBannerAction(b.id);
-    setPendingId(null);
-    if (res.ok) {
-      toast("Banner eliminado", "danger");
-      router.refresh();
-    } else toast(res.error.message, "danger");
+    if (!res.ok) throw new Error(res.error.message);
+    toast("Banner eliminado", "danger");
+    router.refresh();
   }
   async function moveUp(i: number) {
     if (i <= 0) return;
@@ -525,8 +523,7 @@ export function StoreAppearance({
                     </button>
                     <button
                       className="btn-icon btn-ghost"
-                      disabled={pendingId === b.id}
-                      onClick={() => removeBanner(b)}
+                      onClick={() => setConfirmBanner(b)}
                       title="Eliminar"
                     >
                       {sIc(I.trash)}
@@ -755,6 +752,19 @@ export function StoreAppearance({
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={!!confirmBanner}
+        onClose={() => setConfirmBanner(null)}
+        title={
+          confirmBanner
+            ? `¿Eliminar el banner "${confirmBanner.title || "(sin título)"}"?`
+            : "¿Eliminar banner?"
+        }
+        onConfirm={() => {
+          if (confirmBanner) return confirmRemoveBanner(confirmBanner);
+        }}
+      />
     </div>
   );
 }

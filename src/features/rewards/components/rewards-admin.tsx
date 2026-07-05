@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
-import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
 import { KpiCard } from "@/features/reports/components/kpi-card";
 import { deleteRewardAction } from "../actions";
@@ -58,7 +58,6 @@ export function RewardsAdmin({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<RewardFormData | null>(null);
   const [toDelete, setToDelete] = useState<Reward | null>(null);
-  const [busy, setBusy] = useState(false);
 
   function openNew() {
     setEditing(null);
@@ -81,16 +80,10 @@ export function RewardsAdmin({
 
   async function confirmDelete() {
     if (!toDelete) return;
-    setBusy(true);
     const res = await deleteRewardAction(toDelete.id);
-    setBusy(false);
-    if (res.ok) {
-      toast("Recompensa eliminada", "danger");
-      setToDelete(null);
-      router.refresh();
-    } else {
-      toast(res.error.message, "danger");
-    }
+    if (!res.ok) throw new Error(res.error.message);
+    toast("Recompensa eliminada", "danger");
+    router.refresh();
   }
 
   return (
@@ -237,47 +230,15 @@ export function RewardsAdmin({
         />
       </Modal>
 
-      <Modal open={!!toDelete} onClose={() => setToDelete(null)}>
-        {toDelete ? (
-          <div className="p-2 text-center">
-            <div
-              className="kpi-ic mx-auto"
-              style={{
-                width: 54,
-                height: 54,
-                marginBottom: 16,
-                background: "rgba(217,106,90,.12)",
-                color: "var(--danger)",
-              }}
-            >
-              {TrashIcon}
-            </div>
-            <div className="section-title mb-2">
-              ¿Eliminar &quot;{toDelete.title}&quot;?
-            </div>
-            <div className="muted mx-auto max-w-[340px] text-[13.5px]">
-              Los clientes ya no podrán canjear esta recompensa.
-            </div>
-            <div className="mt-6 flex justify-center gap-3">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setToDelete(null)}
-              >
-                Cancelar
-              </Button>
-              <button
-                type="button"
-                className="btn btn-danger"
-                disabled={busy}
-                onClick={confirmDelete}
-              >
-                {busy ? "Eliminando…" : "Eliminar"}
-              </button>
-            </div>
-          </div>
-        ) : null}
-      </Modal>
+      <ConfirmDialog
+        open={!!toDelete}
+        onClose={() => setToDelete(null)}
+        title={
+          toDelete ? `¿Eliminar "${toDelete.title}"?` : "¿Eliminar recompensa?"
+        }
+        description="Los clientes ya no podrán canjear esta recompensa."
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

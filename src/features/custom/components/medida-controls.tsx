@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/stores/toastStore";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useCan } from "@/components/auth/perms-provider";
 import {
   deleteCustomRequestAction,
@@ -163,47 +164,45 @@ export function MedidaQuoteButton({
 /** Elimina la conversación (staff). Pide confirmación; el borrado es definitivo. */
 export function MedidaDeleteButton({ id }: { id: string }) {
   const router = useRouter();
-  const [pending, setPending] = useState(false);
+  const [open, setOpen] = useState(false);
   const canDelete = useCan("medida", "eliminar");
   if (!canDelete) return null;
 
-  async function onDelete() {
-    const ok = window.confirm(
-      "¿Eliminar esta conversación y todos sus mensajes? Esta acción no se puede deshacer.",
-    );
-    if (!ok) return;
-    setPending(true);
-    const res = await deleteCustomRequestAction(id);
-    setPending(false);
-    if (res.ok) {
-      toast("Conversación eliminada.", "success");
-      router.push("/admin/medida");
-      router.refresh();
-    } else {
-      toast(res.error.message, "danger");
-    }
-  }
-
   return (
-    <button
-      type="button"
-      className="btn btn-danger btn-icon btn-sm"
-      onClick={onDelete}
-      disabled={pending}
-      title="Eliminar conversación"
-      aria-label="Eliminar conversación"
-    >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden
+    <>
+      <button
+        type="button"
+        className="btn btn-danger btn-icon btn-sm"
+        onClick={() => setOpen(true)}
+        title="Eliminar conversación"
+        aria-label="Eliminar conversación"
       >
-        <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
-      </svg>
-    </button>
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
+        </svg>
+      </button>
+
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title="¿Eliminar esta conversación?"
+        description="Se eliminará la conversación y todos sus mensajes. Esta acción no se puede deshacer."
+        onConfirm={async () => {
+          const res = await deleteCustomRequestAction(id);
+          if (!res.ok) throw new Error(res.error.message);
+          toast("Conversación eliminada.", "success");
+          router.push("/admin/medida");
+          router.refresh();
+        }}
+      />
+    </>
   );
 }
