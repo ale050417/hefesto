@@ -1,4 +1,5 @@
-import type { Filament } from "./types";
+import { NotFoundError } from "@/core/errors";
+import type { Filament, PrintFailure } from "./types";
 
 // --- Lógica pura (testeable) ---
 
@@ -97,4 +98,55 @@ export async function registerFailure(
   });
 
   return { lowStock, deducted };
+}
+
+// --- deleteFailure: devuelve al stock los gramos descontados ---
+
+/** Stock tras DEVOLVER gramos al inventario (inverso de computeNewStock). */
+export function restoreStock(current: number, grams: number): number {
+  return current + grams;
+}
+
+export type DeleteFailureDeps = {
+  findFailure: (id: string) => Promise<PrintFailure | null>;
+  findFilamentById: (id: string) => Promise<Filament | null>;
+  persist: (params: {
+    failureId: string;
+    stockUpdate?: { filamentId: string; newStock: number };
+  }) => Promise<void>;
+};
+
+/**
+ * Borra una falla y DEVUELVE al stock los gramos que había descontado (decisión
+ * de Ale: el inventario siempre refleja la realidad). Solo repone si la falla
+ * había descontado (`deducted`) y el filamento todavía existe; si no, borra sin
+ * tocar stock. Devuelve cuántos gramos se repusieron (0 si no hubo reposición).
+ */
+export async function deleteFailure(
+  id: string,
+  deps: DeleteFailureDeps,
+): Promise<{ restored: number }> {
+  const failure = await deps.findFailure(id);
+  if (!failure) throw new NotFoundError("No encontramos la falla.");
+
+  let stockUpdate: { filamentId: string; newStock: number } | undefined;
+  let restored = 0;
+
+  if (failure.deducted && failure.filamentId) {
+    const filament = await deps.findFilamentById(failure.filamentId);
+    if (filament) {
+      const grams = Number(failure.gramsLost);
+      stockUpdate = {
+        filamentId: filament.id,
+        newStock: restoreStock(Number(filament.stockGrams), grams),
+      };
+      restored = grams;
+    }
+  }
+
+  await deps.persist({
+    failureId: id,
+    ...(stockUpdate ? { stockUpdate } : {}),
+  });
+  return { restored };
 }

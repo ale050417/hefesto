@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
 import { deleteFailureAction } from "../actions";
@@ -57,31 +58,20 @@ export function FailuresTable({
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState<FailureRow | null>(null);
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<FailureRow | null>(null);
 
-  async function remove(f: FailureRow) {
-    if (
-      !window.confirm(
-        `¿Eliminar la falla de ${f.pieceName || "—"}? No se puede deshacer.`,
-      )
-    )
-      return;
-    setPendingId(f.id);
+  async function confirmRemove(f: FailureRow) {
     const res = await deleteFailureAction(f.id);
-    setPendingId(null);
-    if (res.ok) {
-      toast("Falla eliminada", "danger");
-      router.refresh();
-    } else {
-      toast(res.error.message, "danger");
-    }
+    if (!res.ok) throw new Error(res.error.message);
+    toast("Falla eliminada · gramos devueltos al stock", "success");
+    router.refresh();
   }
 
   return (
     <>
       <div className="ui-card">
         <div className="table-wrap" style={{ border: "none" }}>
-          <table className="tbl">
+          <table className="tbl tbl-cards">
             <thead>
               <tr>
                 <th>Fecha</th>
@@ -97,15 +87,19 @@ export function FailuresTable({
             <tbody>
               {failures.map((f) => (
                 <tr key={f.id}>
-                  <td className="muted whitespace-nowrap">{f.createdAt}</td>
-                  <td>
+                  <td className="muted whitespace-nowrap" data-label="Fecha">
+                    {f.createdAt}
+                  </td>
+                  <td data-label="Pieza">
                     <b>{f.pieceName || "—"}</b>
                     {f.notes ? (
                       <div className="text-faint text-[11px]">{f.notes}</div>
                     ) : null}
                   </td>
-                  <td className="muted">{f.material ?? "—"}</td>
-                  <td>
+                  <td className="muted" data-label="Material">
+                    {f.material ?? "—"}
+                  </td>
+                  <td data-label="Color">
                     <span className="flex items-center gap-2 text-[12.5px]">
                       <span
                         style={{
@@ -119,16 +113,20 @@ export function FailuresTable({
                       {f.color ?? "—"}
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Gramos">
                     <b>{f.gramsLost} g</b>
                   </td>
-                  <td className="price" style={{ color: "var(--danger)" }}>
+                  <td
+                    className="price"
+                    style={{ color: "var(--danger)" }}
+                    data-label="Costo"
+                  >
                     {formatPrice(f.cost)}
                   </td>
-                  <td>
+                  <td data-label="Causa">
                     <span className="badge badge-danger">{f.reason}</span>
                   </td>
-                  <td>
+                  <td data-label="">
                     <div className="flex justify-end gap-1">
                       <button
                         className="btn-icon btn-ghost"
@@ -140,8 +138,7 @@ export function FailuresTable({
                       <button
                         className="btn-icon btn-ghost"
                         title="Eliminar"
-                        disabled={pendingId === f.id}
-                        onClick={() => remove(f)}
+                        onClick={() => setConfirming(f)}
                       >
                         {TrashIcon}
                       </button>
@@ -177,6 +174,24 @@ export function FailuresTable({
           />
         ) : null}
       </Modal>
+
+      <ConfirmDialog
+        open={!!confirming}
+        onClose={() => setConfirming(null)}
+        title={
+          confirming
+            ? `¿Eliminar la falla de ${confirming.pieceName || "—"}?`
+            : "¿Eliminar falla?"
+        }
+        detail={
+          confirming
+            ? `Se devolverán ${confirming.gramsLost} g de ${confirming.material} ${confirming.color} al stock.`
+            : undefined
+        }
+        onConfirm={() => {
+          if (confirming) return confirmRemove(confirming);
+        }}
+      />
     </>
   );
 }

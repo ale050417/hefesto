@@ -3,6 +3,7 @@
 import { type CSSProperties, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
 import { addSpoolAction, deleteFilamentAction } from "../actions";
@@ -85,6 +86,7 @@ export function FilamentsBoard({
   const [mat, setMat] = useState("all");
   const [view, setView] = useState<View>("grilla");
   const [editing, setEditing] = useState<FilamentView | null>(null);
+  const [confirming, setConfirming] = useState<FilamentView | null>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   const list = useMemo(() => {
@@ -109,22 +111,11 @@ export function FilamentsBoard({
     }
   }
 
-  async function remove(f: FilamentView) {
-    if (
-      !window.confirm(
-        `¿Eliminar ${f.material} ${f.color}? Esta acción no se puede deshacer.`,
-      )
-    )
-      return;
-    setPendingId(f.id);
+  async function confirmRemove(f: FilamentView) {
     const res = await deleteFilamentAction(f.id);
-    setPendingId(null);
-    if (res.ok) {
-      toast("Filamento eliminado", "danger");
-      router.refresh();
-    } else {
-      toast(res.error.message, "danger");
-    }
+    if (!res.ok) throw new Error(res.error.message);
+    toast("Filamento eliminado", "danger");
+    router.refresh();
   }
 
   return (
@@ -302,7 +293,7 @@ export function FilamentsBoard({
       ) : (
         <div className="ui-card">
           <div className="table-wrap" style={{ border: "none" }}>
-            <table className="tbl">
+            <table className="tbl tbl-cards">
               <thead>
                 <tr>
                   <th>Material</th>
@@ -320,10 +311,10 @@ export function FilamentsBoard({
                   const b = TABLE_BADGE[f.status];
                   return (
                     <tr key={f.id}>
-                      <td>
+                      <td data-label="Material">
                         <b>{f.material}</b>
                       </td>
-                      <td>
+                      <td data-label="Color">
                         <span className="flex items-center gap-2">
                           <span
                             style={{
@@ -337,16 +328,22 @@ export function FilamentsBoard({
                           {f.color}
                         </span>
                       </td>
-                      <td className="muted">{f.brand}</td>
-                      <td className="muted">{f.diameter}</td>
-                      <td>
+                      <td className="muted" data-label="Marca">
+                        {f.brand}
+                      </td>
+                      <td className="muted" data-label="Ø mm">
+                        {f.diameter}
+                      </td>
+                      <td data-label="Stock">
                         <b>{stockLabel(f.stockGrams)}</b>
                       </td>
-                      <td className="price">{formatPrice(f.costPerKg)}</td>
-                      <td>
+                      <td className="price" data-label="Costo/kg">
+                        {formatPrice(f.costPerKg)}
+                      </td>
+                      <td data-label="Estado">
                         <span className={`badge ${b.cls}`}>{b.label}</span>
                       </td>
-                      <td>
+                      <td data-label="">
                         <div className="flex justify-end gap-1">
                           <button
                             className="btn-icon btn-ghost"
@@ -366,8 +363,7 @@ export function FilamentsBoard({
                           <button
                             className="btn-icon btn-ghost"
                             title="Eliminar"
-                            disabled={pendingId === f.id}
-                            onClick={() => remove(f)}
+                            onClick={() => setConfirming(f)}
                           >
                             {TrashIcon}
                           </button>
@@ -406,6 +402,19 @@ export function FilamentsBoard({
           />
         ) : null}
       </Modal>
+
+      <ConfirmDialog
+        open={!!confirming}
+        onClose={() => setConfirming(null)}
+        title={
+          confirming
+            ? `¿Eliminar ${confirming.material} ${confirming.color}?`
+            : "¿Eliminar filamento?"
+        }
+        onConfirm={() => {
+          if (confirming) return confirmRemove(confirming);
+        }}
+      />
     </>
   );
 }

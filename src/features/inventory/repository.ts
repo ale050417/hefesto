@@ -99,6 +99,40 @@ export async function deleteFailureRow(
   await database.delete(printFailures).where(eq(printFailures.id, id));
 }
 
+export async function findFailureById(
+  id: string,
+  database: Database = db,
+): Promise<PrintFailure | null> {
+  const row = await database.query.printFailures.findFirst({
+    where: eq(printFailures.id, id),
+  });
+  return row ?? null;
+}
+
+/**
+ * Devuelve stock (si corresponde) y borra la falla, en UNA transacción: o se
+ * repone y borra, o no se toca nada. Espejo inverso de `registerFailureTx`.
+ */
+export async function deleteFailureTx(
+  params: {
+    failureId: string;
+    stockUpdate?: { filamentId: string; newStock: number };
+  },
+  database: Database = db,
+): Promise<void> {
+  await database.transaction(async (tx) => {
+    if (params.stockUpdate) {
+      await tx
+        .update(filaments)
+        .set({ stockGrams: String(params.stockUpdate.newStock) })
+        .where(eq(filaments.id, params.stockUpdate.filamentId));
+    }
+    await tx
+      .delete(printFailures)
+      .where(eq(printFailures.id, params.failureId));
+  });
+}
+
 /** Inserta la falla y (si corresponde) descuenta el stock, en una transacción. */
 export async function registerFailureTx(
   params: {

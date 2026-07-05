@@ -1,6 +1,11 @@
 import { NotFoundError } from "@/core/errors";
 import * as repo from "./repository";
-import { filamentStatus, isLowStock, registerFailure } from "./service";
+import {
+  deleteFailure as runDeleteFailure,
+  filamentStatus,
+  isLowStock,
+  registerFailure,
+} from "./service";
 import type { FailureInput, FilamentInput } from "./schemas";
 import type { Filament, FilamentView, PrintFailure } from "./types";
 
@@ -103,6 +108,10 @@ export async function updateFailure(
   });
 }
 
-export async function deleteFailure(id: string): Promise<void> {
-  return repo.deleteFailureRow(id);
+export async function deleteFailure(id: string): Promise<{ restored: number }> {
+  return runDeleteFailure(id, {
+    findFailure: repo.findFailureById,
+    findFilamentById: repo.findFilamentById,
+    persist: (p) => repo.deleteFailureTx(p),
+  });
 }

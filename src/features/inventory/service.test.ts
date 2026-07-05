@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   computeNewStock,
+  deleteFailure,
   filamentStatus,
   isLowStock,
   registerFailure,
+  restoreStock,
+  type DeleteFailureDeps,
   type RegisterFailureDeps,
 } from "./service";
-import type { Filament } from "./types";
+import { NotFoundError } from "@/core/errors";
+import type { Filament, PrintFailure } from "./types";
 
 const filament = {
   id: "f1",
@@ -95,5 +99,71 @@ describe("registerFailure", () => {
     expect(arg.failure.filamentId).toBeNull();
     expect(arg.failure.deducted).toBe(false);
     expect(res.deducted).toBe(false);
+  });
+});
+
+const printFailure = {
+  id: "fail-1",
+  filamentId: "f1",
+  pieceName: "Dragón",
+  material: "PLA",
+  color: "Negro",
+  gramsLost: "120.00",
+  reason: "warping",
+  notes: null,
+  deducted: true,
+  createdAt: new Date(),
+} as unknown as PrintFailure;
+
+function delDeps(f: PrintFailure | null, fil: Filament | null = filament) {
+  const persist = vi.fn<DeleteFailureDeps["persist"]>(async () => {});
+  return {
+    persist,
+    deps: {
+      findFailure: async () => f,
+      findFilamentById: async () => fil,
+      persist,
+    } as DeleteFailureDeps,
+  };
+}
+
+describe("restoreStock", () => {
+  it("suma los gramos devueltos al stock", () => {
+    expect(restoreStock(1000, 120)).toBe(1120);
+  });
+});
+
+describe("deleteFailure", () => {
+  it("devuelve los gramos al stock cuando la falla los había descontado", async () => {
+    const { deps: d, persist } = delDeps(printFailure);
+    const res = await deleteFailure("fail-1", d);
+    expect(persist.mock.calls[0]![0].stockUpdate).toEqual({
+      filamentId: "f1",
+      newStock: 1120, // 1000 + 120
+    });
+    expect(res.restored).toBe(120);
+  });
+
+  it("no toca el stock si la falla no había descontado (deducted false)", async () => {
+    const { deps: d, persist } = delDeps({
+      ...printFailure,
+      deducted: false,
+    } as PrintFailure);
+    const res = await deleteFailure("fail-1", d);
+    expect(persist.mock.calls[0]![0].stockUpdate).toBeUndefined();
+    expect(res.restored).toBe(0);
+  });
+
+  it("no repone si el filamento ya no existe", async () => {
+    const { deps: d, persist } = delDeps(printFailure, null);
+    const res = await deleteFailure("fail-1", d);
+    expect(persist.mock.calls[0]![0].stockUpdate).toBeUndefined();
+    expect(res.restored).toBe(0);
+  });
+
+  it("lanza NotFound si la falla no existe y NO persiste", async () => {
+    const { deps: d, persist } = delDeps(null);
+    await expect(deleteFailure("x", d)).rejects.toBeInstanceOf(NotFoundError);
+    expect(persist).not.toHaveBeenCalled();
   });
 });

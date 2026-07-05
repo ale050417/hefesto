@@ -135,9 +135,19 @@ export async function updateFailureAction(
 
 export async function deleteFailureAction(id: string): Promise<ActionResult> {
   if (!(await can("fallas", "eliminar"))) return NOT_STAFF;
+  const user = await getCurrentUser();
   try {
-    await queries.deleteFailure(id);
+    // Borrar una falla DEVUELVE al stock los gramos que había descontado.
+    const { restored } = await queries.deleteFailure(id);
+    await recordAudit({
+      actorId: user?.id ?? null,
+      action: "inventory.failure_deleted",
+      entityType: "filament",
+      entityId: null,
+      metadata: { restoredGrams: restored },
+    });
     revalidatePath("/admin/fallas");
+    revalidatePath("/admin/filamentos");
     return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
