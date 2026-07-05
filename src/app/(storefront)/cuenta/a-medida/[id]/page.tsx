@@ -8,6 +8,8 @@ import { ChatThread } from "@/features/custom/components/chat-thread";
 import { ApproveQuote } from "@/features/custom/components/approve-quote";
 import { CustomStatusBadge } from "@/features/custom/components/status-badge";
 import { getRequestWithMessages } from "@/features/custom/service";
+import { CUSTOM_ORDERS_ENABLED } from "@/features/custom/config";
+import { UnderConstruction } from "@/components/shared/under-construction";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +20,13 @@ export default async function CustomRequestDetail({
 }) {
   const { id } = await params;
   const user = await requireUser(`/cuenta/a-medida/${id}`);
+  if (!CUSTOM_ORDERS_ENABLED) {
+    return (
+      <AccountShell>
+        <UnderConstruction title="Pedidos a medida" />
+      </AccountShell>
+    );
+  }
 
   let data;
   try {

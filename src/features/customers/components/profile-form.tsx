@@ -65,7 +65,7 @@ export function ProfileForm({
           <input className="input" {...register("phone")} />
         </div>
       </div>
-      <Button type="submit" disabled={isSubmitting}>
+      <Button type="submit" loading={isSubmitting}>
         <svg
           viewBox="0 0 24 24"
           fill="none"

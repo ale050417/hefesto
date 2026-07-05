@@ -385,7 +385,7 @@ export function ManualSaleForm({
         >
           Cancelar
         </Button>
-        <Button type="button" onClick={submit} disabled={busy}>
+        <Button type="button" onClick={submit} loading={busy}>
           {busy ? "Registrando…" : "Registrar venta"}
         </Button>
       </div>

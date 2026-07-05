@@ -320,7 +320,7 @@ export function ProductionBoard({
             >
               Cancelar
             </Button>
-            <Button type="button" onClick={addPrinter} disabled={busy}>
+            <Button type="button" onClick={addPrinter} loading={busy}>
               {busy ? "Conectando…" : "Conectar"}
             </Button>
           </div>
@@ -368,7 +368,7 @@ export function ProductionBoard({
             >
               Cancelar
             </Button>
-            <Button type="button" onClick={addJob} disabled={busy}>
+            <Button type="button" onClick={addJob} loading={busy}>
               {busy ? "Encolando…" : "Encolar"}
             </Button>
           </div>

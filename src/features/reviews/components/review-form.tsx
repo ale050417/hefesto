@@ -75,7 +75,7 @@ export function ReviewForm({
         onChange={(e) => setComment(e.target.value)}
         placeholder="Contanos qué te pareció (opcional)"
       />
-      <Button type="submit" disabled={busy}>
+      <Button type="submit" loading={busy}>
         Enviar reseña
       </Button>
     </form>

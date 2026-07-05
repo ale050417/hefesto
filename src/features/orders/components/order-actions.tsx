@@ -60,6 +60,7 @@ export function OrderActions({
           type="button"
           variant="danger"
           size="sm"
+          loading={isPending}
           disabled={!canDelete || isPending}
           title={
             canDelete

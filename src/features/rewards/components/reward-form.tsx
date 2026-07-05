@@ -196,7 +196,7 @@ export function RewardForm({
         <Button type="button" variant="secondary" onClick={() => onCancel?.()}>
           Cancelar
         </Button>
-        <Button type="button" onClick={submit} disabled={busy}>
+        <Button type="button" onClick={submit} loading={busy}>
           {busy ? "Guardando…" : edit ? "Guardar" : "Crear recompensa"}
         </Button>
       </div>

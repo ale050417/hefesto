@@ -284,7 +284,7 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
             />
             Usar como principal
           </label>
-          <Button type="submit" size="sm" disabled={isSubmitting}>
+          <Button type="submit" size="sm" loading={isSubmitting}>
             {editId ? "Guardar cambios" : "Guardar dirección"}
           </Button>
         </form>

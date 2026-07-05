@@ -224,7 +224,7 @@ export function ProfitSharesEditor({
           >
             Igualar al 100%
           </button>
-          <Button type="button" size="sm" onClick={save} disabled={busy}>
+          <Button type="button" size="sm" onClick={save} loading={busy}>
             {busy ? "Guardando…" : "Guardar reparto"}
           </Button>
         </div>

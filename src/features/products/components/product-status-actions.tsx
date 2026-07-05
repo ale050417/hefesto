@@ -30,14 +30,21 @@ export function ProductStatusActions({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Qué botón está corriendo, para mostrar el spinner solo en ese.
+  const [pendingAction, setPendingAction] = useState<
+    "publish" | "archive" | null
+  >(null);
 
   function run(
+    key: "publish" | "archive",
     action: () => Promise<{ ok: boolean; error?: { message: string } }>,
   ) {
     setError(null);
+    setPendingAction(key);
     startTransition(async () => {
       const res = await action();
       if (!res.ok && res.error) setError(res.error.message);
+      setPendingAction(null);
       router.refresh();
     });
   }
@@ -54,7 +61,10 @@ export function ProductStatusActions({
             type="button"
             size="sm"
             disabled={isPending}
-            onClick={() => run(() => publishProductAction(productId))}
+            loading={pendingAction === "publish"}
+            onClick={() =>
+              run("publish", () => publishProductAction(productId))
+            }
           >
             Publicar
           </Button>
@@ -65,7 +75,10 @@ export function ProductStatusActions({
             variant="outline"
             size="sm"
             disabled={isPending}
-            onClick={() => run(() => archiveProductAction(productId))}
+            loading={pendingAction === "archive"}
+            onClick={() =>
+              run("archive", () => archiveProductAction(productId))
+            }
           >
             Archivar
           </Button>

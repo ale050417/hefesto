@@ -430,7 +430,7 @@ export function RolesManager({
               <Button
                 type="button"
                 variant="danger"
-                disabled={pendingId === removeTarget.id}
+                loading={pendingId === removeTarget.id}
                 onClick={confirmRemove}
               >
                 Quitar acceso
@@ -481,7 +481,7 @@ export function RolesManager({
               <Button
                 type="button"
                 variant="danger"
-                disabled={pendingId === deleteRole.id}
+                loading={pendingId === deleteRole.id}
                 onClick={confirmDeleteRole}
               >
                 Borrar rol
@@ -558,7 +558,7 @@ function InviteModal({
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="button" onClick={submit} disabled={busy}>
+          <Button type="button" onClick={submit} loading={busy}>
             {busy ? "Creando…" : "Crear acceso"}
           </Button>
         </>

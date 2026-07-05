@@ -26,16 +26,19 @@ export function OrderStatusManager({
   const next = ORDER_TRANSITIONS[status].filter(
     (s) => canCancelRefund || (s !== "cancelled" && s !== "refunded"),
   );
-  const [busy, setBusy] = useState(false);
+  // `pending` marca QUÉ acción está corriendo: el estado destino (para el
+  // spinner en ese botón) o "meta" al guardar tracking/nota. null = libre.
+  const [pending, setPending] = useState<OrderStatus | "meta" | null>(null);
+  const busy = pending !== null;
   const [error, setError] = useState<string | null>(null);
   const [tracking, setTracking] = useState(trackingCode ?? "");
   const [note, setNote] = useState(internalNote ?? "");
 
   async function go(to: OrderStatus) {
-    setBusy(true);
+    setPending(to);
     setError(null);
     const res = await transitionOrderAction(orderId, to);
-    setBusy(false);
+    setPending(null);
     if (!res.ok) {
       setError(res.error.message);
       return;
@@ -44,13 +47,13 @@ export function OrderStatusManager({
   }
 
   async function saveMeta() {
-    setBusy(true);
+    setPending("meta");
     setError(null);
     const res = await updateOrderMetaAction(orderId, {
       trackingCode: tracking.trim() || null,
       internalNote: note.trim() || null,
     });
-    setBusy(false);
+    setPending(null);
     if (!res.ok) {
       setError(res.error.message);
       return;
@@ -80,6 +83,7 @@ export function OrderStatusManager({
                   s === "cancelled" || s === "refunded" ? "danger" : "primary"
                 }
                 disabled={busy}
+                loading={pending === s}
                 onClick={() => go(s)}
               >
                 {ORDER_STATUS_LABEL[s]}
@@ -111,6 +115,7 @@ export function OrderStatusManager({
           size="sm"
           variant="secondary"
           disabled={busy}
+          loading={pending === "meta"}
           onClick={saveMeta}
         >
           Guardar

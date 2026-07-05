@@ -153,7 +153,7 @@ export function ShippingSettingsForm({
           )}
         </div>
 
-        <Button type="button" onClick={submit} disabled={busy}>
+        <Button type="button" onClick={submit} loading={busy}>
           {busy ? "Guardando…" : "Guardar envíos"}
         </Button>
       </div>

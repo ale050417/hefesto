@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/core/auth/session";
+import { CUSTOM_ORDERS_ENABLED } from "@/features/custom/config";
+import { UnderConstruction } from "@/components/shared/under-construction";
 import { AppError } from "@/core/errors";
 import { formatPrice } from "@/lib/format";
 import { AccountShell } from "@/features/customers/components/account-shell";
@@ -46,6 +48,16 @@ export default async function CustomRequestsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const user = await requireUser("/cuenta/a-medida");
+  if (!CUSTOM_ORDERS_ENABLED) {
+    return (
+      <AccountShell>
+        <UnderConstruction
+          title="Pedidos a medida"
+          description="Estamos afinando el flujo de encargos personalizados. Muy pronto vas a poder pedir tu presupuesto por acá."
+        />
+      </AccountShell>
+    );
+  }
   const sp = await searchParams;
   const showNew = first(sp.new) === "1";
   const requests = await listCustomerRequests(user.id);

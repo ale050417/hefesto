@@ -14,14 +14,15 @@ export function ReviewModeration({
   isApproved: boolean;
 }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<"approve" | "delete" | null>(null);
+  const busy = pending !== null;
   const canEdit = useCan("resenas", "editar");
   const canDelete = useCan("resenas", "eliminar");
 
-  async function run(fn: () => Promise<unknown>) {
-    setBusy(true);
+  async function run(key: "approve" | "delete", fn: () => Promise<unknown>) {
+    setPending(key);
     await fn();
-    setBusy(false);
+    setPending(null);
     router.refresh();
   }
 
@@ -35,7 +36,8 @@ export function ReviewModeration({
         <Button
           size="sm"
           disabled={busy}
-          onClick={() => run(() => approveReviewAction(id))}
+          loading={pending === "approve"}
+          onClick={() => run("approve", () => approveReviewAction(id))}
         >
           Aprobar
         </Button>
@@ -45,7 +47,8 @@ export function ReviewModeration({
           size="sm"
           variant="danger"
           disabled={busy}
-          onClick={() => run(() => deleteReviewAction(id))}
+          loading={pending === "delete"}
+          onClick={() => run("delete", () => deleteReviewAction(id))}
         >
           Eliminar
         </Button>

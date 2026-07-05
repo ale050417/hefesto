@@ -34,6 +34,7 @@ export function DeleteCategoryButton({
         type="button"
         variant="ghost"
         size="sm"
+        loading={isPending}
         disabled={blocked || isPending}
         title={
           blocked ? "No se puede borrar: tiene productos" : "Borrar categoría"

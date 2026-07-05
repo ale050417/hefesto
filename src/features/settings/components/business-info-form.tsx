@@ -146,7 +146,7 @@ export function BusinessInfoForm({
         </div>
       </div>
       <div>
-        <Button type="submit" variant="primary" disabled={pending}>
+        <Button type="submit" variant="primary" loading={pending}>
           {pending ? "Guardando…" : "Guardar configuración"}
         </Button>
       </div>

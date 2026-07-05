@@ -126,7 +126,7 @@ export function CostSettingsButton({ settings }: { settings: CostSettings }) {
             >
               Cancelar
             </Button>
-            <Button type="button" onClick={submit} disabled={busy}>
+            <Button type="button" onClick={submit} loading={busy}>
               {busy ? "Guardando…" : "Guardar"}
             </Button>
           </div>

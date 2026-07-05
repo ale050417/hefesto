@@ -271,7 +271,7 @@ export function BusinessConfigForm({
             {err}
           </p>
         ) : null}
-        <Button type="button" onClick={submit} disabled={busy}>
+        <Button type="button" onClick={submit} loading={busy}>
           {busy ? "Guardando…" : "Guardar cambios"}
         </Button>
       </div>

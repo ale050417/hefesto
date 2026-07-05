@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { type ZodError } from "zod";
 import { getCurrentUser, isStaff } from "@/core/auth/session";
@@ -217,40 +218,49 @@ export async function transitionOrderAction(
       changedBy: user?.id ?? null,
       note: note ?? null,
     });
-    try {
-      await notifyOrderStatus(updated);
-    } catch (mailError) {
-      console.error("[email] no se pudo notificar el estado:", mailError);
-    }
-    try {
-      await notifyCustomer({
-        customerId: updated.customerId,
-        title: `Tu pedido ${updated.orderNumber} cambió de estado`,
-        body: `Ahora está: ${ORDER_STATUS_LABEL[updated.status]}.`,
-        link: `/cuenta/pedidos/${updated.orderNumber}`,
-      });
-    } catch (notifError) {
-      console.error("[notif] no se pudo crear la notificación:", notifError);
-    }
-    if (updated.status === "confirmed") {
-      try {
-        await awardForOrder({
-          customerId: updated.customerId,
-          orderId: updated.id,
-          orderTotal: Number(updated.total),
-        });
-      } catch (rwErr) {
-        console.error("[rewards] no se pudieron otorgar puntos:", rwErr);
-      }
-    }
     revalidatePath(`/admin/pedidos/${orderId}`);
     revalidatePath("/admin/pedidos");
-    await recordAudit({
-      actorId: user?.id ?? null,
-      action: "order.status_changed",
-      entityType: "order",
-      entityId: orderId,
-      metadata: { toStatus, ...(note ? { note } : {}) },
+    // Efectos secundarios NO críticos (email, notificación, puntos, auditoría):
+    // se corren DESPUÉS de responder (after()) para que "guardar" no espere
+    // viajes de red que no cambian lo que ve el admin. Cada uno atrapa su error.
+    after(async () => {
+      try {
+        await notifyOrderStatus(updated);
+      } catch (mailError) {
+        console.error("[email] no se pudo notificar el estado:", mailError);
+      }
+      try {
+        await notifyCustomer({
+          customerId: updated.customerId,
+          title: `Tu pedido ${updated.orderNumber} cambió de estado`,
+          body: `Ahora está: ${ORDER_STATUS_LABEL[updated.status]}.`,
+          link: `/cuenta/pedidos/${updated.orderNumber}`,
+        });
+      } catch (notifError) {
+        console.error("[notif] no se pudo crear la notificación:", notifError);
+      }
+      if (updated.status === "confirmed") {
+        try {
+          await awardForOrder({
+            customerId: updated.customerId,
+            orderId: updated.id,
+            orderTotal: Number(updated.total),
+          });
+        } catch (rwErr) {
+          console.error("[rewards] no se pudieron otorgar puntos:", rwErr);
+        }
+      }
+      try {
+        await recordAudit({
+          actorId: user?.id ?? null,
+          action: "order.status_changed",
+          entityType: "order",
+          entityId: orderId,
+          metadata: { toStatus, ...(note ? { note } : {}) },
+        });
+      } catch (auditError) {
+        console.error("[audit] no se pudo registrar el cambio:", auditError);
+      }
     });
     return { ok: true };
   } catch (error) {

@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { requirePermissionPage } from "@/core/auth/permissions";
+import { CUSTOM_ORDERS_ENABLED } from "@/features/custom/config";
+import { UnderConstruction } from "@/components/shared/under-construction";
 import { AppError } from "@/core/errors";
 import { formatPrice } from "@/lib/format";
 import { ChatThread } from "@/features/custom/components/chat-thread";
@@ -94,6 +96,22 @@ export default async function AdminCustomPage({
   searchParams: Promise<SearchParams>;
 }) {
   await requirePermissionPage("medida", "ver");
+  if (!CUSTOM_ORDERS_ENABLED) {
+    return (
+      <div>
+        <div className="page-head">
+          <div>
+            <div className="eyebrow">Operación</div>
+            <h1 className="page-title">Pedidos a medida</h1>
+          </div>
+        </div>
+        <UnderConstruction
+          title="Pedidos a medida"
+          description="El módulo de encargos personalizados está en preparación. Lo activamos cuando el flujo esté listo para producción."
+        />
+      </div>
+    );
+  }
   const sp = await searchParams;
   const filter = FILTERS.some((f) => f.key === first(sp.f))
     ? first(sp.f)!
