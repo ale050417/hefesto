@@ -31,7 +31,11 @@ import {
   cancelPendingOrder,
   startMercadoPagoPayment,
 } from "./services/paymentService";
-import { setOrderMeta, transitionOrder } from "./services/orderAdminService";
+import {
+  deleteOrderAdmin,
+  setOrderMeta,
+  transitionOrder,
+} from "./services/orderAdminService";
 import { notifyOrderStatus } from "./services/orderEmails";
 import type { OrderStatus } from "./types";
 
@@ -265,6 +269,43 @@ export async function updateOrderMetaAction(
   try {
     await setOrderMeta(orderId, fields);
     revalidatePath(`/admin/pedidos/${orderId}`);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+/**
+ * Admin: elimina un pedido creado por error. Destructivo y toca plata/puntos,
+ * así que SOLO admin (igual criterio que cancelar/reembolsar, Cap. 11). La
+ * regla de qué estados son borrables la valida el service en el servidor.
+ */
+export async function deleteOrderAction(
+  orderId: string,
+): Promise<
+  { ok: true } | { ok: false; error: { code: string; message: string } }
+> {
+  if (!(await isAdmin())) {
+    return {
+      ok: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Eliminar pedidos es solo para administradores.",
+      },
+    };
+  }
+  const user = await getCurrentUser();
+  try {
+    await deleteOrderAdmin(orderId);
+    await recordAudit({
+      actorId: user?.id ?? null,
+      action: "order.deleted",
+      entityType: "order",
+      entityId: orderId,
+    });
+    revalidatePath("/admin/pedidos");
+    revalidatePath("/admin/ganancias");
+    revalidatePath("/admin/reportes");
     return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };

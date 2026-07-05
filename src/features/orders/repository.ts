@@ -257,6 +257,19 @@ export async function updateOrderMeta(
   return row;
 }
 
+/**
+ * Borra un pedido por id. Las tablas hijas se resuelven por sus FK:
+ * items / historial / mensajes cascadean; puntos y canje de cupón se nulean
+ * (onDelete definido en el schema, Cap. 5). La regla de QUÉ pedido se puede
+ * borrar vive en el service, no acá.
+ */
+export async function deleteOrder(
+  id: string,
+  database: Database = db,
+): Promise<void> {
+  await database.delete(orders).where(eq(orders.id, id));
+}
+
 /** Conteo de pedidos por estado (para los chips del panel). */
 export async function countOrdersByStatus(
   database: Database = db,

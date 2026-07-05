@@ -1,6 +1,7 @@
 import { NotFoundError, ValidationError } from "@/core/errors";
 import {
   countOrdersByStatus,
+  deleteOrder,
   findOrderById,
   findOrderDetailForAdmin,
   findOrdersForAdmin,
@@ -8,6 +9,22 @@ import {
 } from "../repository";
 import { transitionOrderStatus } from "./orderWorkflow";
 import type { OrderListItem, OrderStatus } from "../types";
+
+/**
+ * Estados en los que un pedido NUNCA tocó plata real y por eso se puede borrar:
+ * quedó pendiente de pago (creado por error / abandonado) o fue cancelado.
+ * Un pedido pagado/confirmado en adelante NO se borra: se cancela o reembolsa,
+ * porque borrarlo dejaría puntos otorgados huérfanos y alteraría reportes y
+ * el reparto de ganancias (Cap. 8, 11).
+ */
+export const DELETABLE_ORDER_STATUSES: readonly OrderStatus[] = [
+  "pending_payment",
+  "cancelled",
+];
+
+export function canDeleteOrder(status: OrderStatus): boolean {
+  return DELETABLE_ORDER_STATUSES.includes(status);
+}
 
 export async function listOrdersAdmin(opts: {
   status?: OrderStatus;
@@ -67,6 +84,23 @@ export async function transitionOrder(
     }
   }
   return transitionOrderStatus(orderId, toStatus, opts);
+}
+
+/**
+ * Borra un pedido creado por error. Regla de negocio (validada en el servidor):
+ * solo se puede borrar si nunca tocó plata (ver DELETABLE_ORDER_STATUSES). La
+ * autorización (solo admin) se hace en la action.
+ */
+export async function deleteOrderAdmin(orderId: string): Promise<void> {
+  const order = await findOrderById(orderId);
+  if (!order) throw new NotFoundError("No encontramos el pedido.");
+  if (!canDeleteOrder(order.status)) {
+    throw new ValidationError(
+      "Solo se pueden eliminar pedidos pendientes de pago o cancelados. " +
+        "Cancelá el pedido antes de eliminarlo.",
+    );
+  }
+  await deleteOrder(orderId);
 }
 
 export async function getOrderStatusCounts() {

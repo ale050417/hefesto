@@ -7,8 +7,12 @@ import {
   ORDER_STATUS_VARIANT,
 } from "@/features/orders/constants";
 import { OrderStatusManager } from "@/features/orders/components/order-status-manager";
+import { OrderActions } from "@/features/orders/components/order-actions";
 import { OrderSummary } from "@/features/orders/components/order-summary";
-import { getOrderAdmin } from "@/features/orders/services/orderAdminService";
+import {
+  canDeleteOrder,
+  getOrderAdmin,
+} from "@/features/orders/services/orderAdminService";
 import { getOrderMessages } from "@/features/orders/services/orderChat";
 import { OrderChat } from "@/features/orders/components/order-chat";
 import { cn } from "@/lib/utils";
@@ -72,6 +76,14 @@ export default async function OrderDetailAdminPage({
             internalNote={order.internalNote}
             canCancelRefund={canCancelRefund}
           />
+
+          {canCancelRefund ? (
+            <OrderActions
+              orderId={order.id}
+              orderNumber={order.orderNumber}
+              canDelete={canDeleteOrder(order.status)}
+            />
+          ) : null}
 
           <div className="ui-card p-4">
             <h3 className="text-fg font-display mb-2 text-sm">Cliente</h3>
