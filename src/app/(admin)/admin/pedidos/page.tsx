@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requirePermissionPage } from "@/core/auth/permissions";
+import { isAdmin, requirePermissionPage } from "@/core/auth/permissions";
 import { Pagination } from "@/components/shared/pagination";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,6 +15,7 @@ import { listManualSales } from "@/features/orders/services/manualSaleService";
 import { listProfitShares } from "@/features/earnings/service";
 import { getEstimatorContext } from "@/features/calculator/service";
 import { CargarVentaButton } from "@/features/orders/components/cargar-venta-button";
+import { OrdersAdminList } from "@/features/orders/components/orders-admin-list";
 import type { OrderStatus } from "@/features/orders/types";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,7 @@ export default async function PedidosAdminPage({
   searchParams: Promise<SearchParams>;
 }) {
   await requirePermissionPage("pedidos", "ver");
+  const admin = await isAdmin();
   const sp = await searchParams;
   const statusParam = first(sp.status);
   const status = STATUSES.includes(statusParam as OrderStatus)
@@ -115,68 +117,7 @@ export default async function PedidosAdminPage({
           No hay pedidos con este filtro.
         </div>
       ) : (
-        <div className="ui-card overflow-hidden">
-          <div className="table-wrap" style={{ border: "none" }}>
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>Pedido</th>
-                  <th>Cliente</th>
-                  <th>Pago</th>
-                  <th>Estado</th>
-                  <th className="text-right">Total</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.items.map((o) => (
-                  <tr key={o.id}>
-                    <td>
-                      <b className="font-display text-fg tracking-wide">
-                        {o.orderNumber}
-                      </b>
-                      <div className="text-faint text-[11.5px]">
-                        {dateFmt.format(o.createdAt)}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="avatar"
-                          style={{ width: 30, height: 30, fontSize: 11 }}
-                        >
-                          {(o.customerName?.[0] ?? "?").toUpperCase()}
-                        </span>
-                        <span className="text-dim">
-                          {o.customerName ?? "—"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="text-dim">
-                      {PAYMENT_METHOD_LABEL[o.paymentMethod]}
-                    </td>
-                    <td>
-                      <Badge variant={ORDER_STATUS_VARIANT[o.status]}>
-                        {ORDER_STATUS_LABEL[o.status]}
-                      </Badge>
-                    </td>
-                    <td className="text-fg text-right">
-                      {formatPrice(o.total)}
-                    </td>
-                    <td className="text-right">
-                      <Link
-                        href={`/admin/pedidos/${o.id}`}
-                        className="text-primary hover:underline"
-                      >
-                        Ver
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <OrdersAdminList items={result.items} isAdmin={admin} />
       )}
 
       <Pagination
@@ -193,7 +134,7 @@ export default async function PedidosAdminPage({
           </div>
           <div className="ui-card overflow-hidden">
             <div className="table-wrap" style={{ border: "none" }}>
-              <table className="tbl">
+              <table className="tbl tbl-cards">
                 <thead>
                   <tr>
                     <th>Fecha</th>
@@ -207,20 +148,27 @@ export default async function PedidosAdminPage({
                 <tbody>
                   {manualSales.map((s) => (
                     <tr key={s.id}>
-                      <td className="text-dim whitespace-nowrap">
+                      <td
+                        className="text-dim whitespace-nowrap"
+                        data-label="Fecha"
+                      >
                         {dateFmt.format(s.saleDate)}
                       </td>
-                      <td className="text-fg">{s.customerName}</td>
-                      <td className="text-dim">{s.detail ?? "—"}</td>
-                      <td className="text-dim">
+                      <td className="text-fg" data-label="Cliente">
+                        {s.customerName}
+                      </td>
+                      <td className="text-dim" data-label="Detalle">
+                        {s.detail ?? "—"}
+                      </td>
+                      <td className="text-dim" data-label="Pago">
                         {PAYMENT_METHOD_LABEL[s.paymentMethod]}
                       </td>
-                      <td>
+                      <td data-label="Estado">
                         <Badge variant={ORDER_STATUS_VARIANT[s.status]}>
                           {ORDER_STATUS_LABEL[s.status]}
                         </Badge>
                       </td>
-                      <td className="text-fg text-right">
+                      <td className="text-fg text-right" data-label="Total">
                         {formatPrice(Number(s.total))}
                       </td>
                     </tr>

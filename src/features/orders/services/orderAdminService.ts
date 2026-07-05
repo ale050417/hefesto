@@ -10,22 +10,6 @@ import {
 import { transitionOrderStatus } from "./orderWorkflow";
 import type { OrderListItem, OrderStatus } from "../types";
 
-/**
- * Estados en los que un pedido NUNCA tocó plata real y por eso se puede borrar:
- * quedó pendiente de pago (creado por error / abandonado) o fue cancelado.
- * Un pedido pagado/confirmado en adelante NO se borra: se cancela o reembolsa,
- * porque borrarlo dejaría puntos otorgados huérfanos y alteraría reportes y
- * el reparto de ganancias (Cap. 8, 11).
- */
-export const DELETABLE_ORDER_STATUSES: readonly OrderStatus[] = [
-  "pending_payment",
-  "cancelled",
-];
-
-export function canDeleteOrder(status: OrderStatus): boolean {
-  return DELETABLE_ORDER_STATUSES.includes(status);
-}
-
 export async function listOrdersAdmin(opts: {
   status?: OrderStatus;
   page: number;
@@ -87,20 +71,32 @@ export async function transitionOrder(
 }
 
 /**
- * Borra un pedido creado por error. Regla de negocio (validada en el servidor):
- * solo se puede borrar si nunca tocó plata (ver DELETABLE_ORDER_STATUSES). La
- * autorización (solo admin) se hace en la action.
+ * Borra un pedido de forma permanente (hard delete) en CUALQUIER estado
+ * (incluye pagados/entregados y pedidos mal creados, duplicados o de prueba).
+ * El borrado es transaccional y revierte puntos y usos de cupón
+ * (ver repository.deleteOrder). La autorización (solo admin) se valida en la
+ * action; acá solo chequeamos que el pedido exista.
  */
 export async function deleteOrderAdmin(orderId: string): Promise<void> {
   const order = await findOrderById(orderId);
   if (!order) throw new NotFoundError("No encontramos el pedido.");
-  if (!canDeleteOrder(order.status)) {
-    throw new ValidationError(
-      "Solo se pueden eliminar pedidos pendientes de pago o cancelados. " +
-        "Cancelá el pedido antes de eliminarlo.",
-    );
-  }
   await deleteOrder(orderId);
+}
+
+/**
+ * Borra varios pedidos de una (limpieza de pedidos mal creados / de prueba).
+ * Ignora los que ya no existen y devuelve cuántos se borraron realmente. Cada
+ * pedido se borra en su propia transacción (ver repository.deleteOrder).
+ */
+export async function deleteOrdersAdmin(orderIds: string[]): Promise<number> {
+  let deleted = 0;
+  for (const id of orderIds) {
+    const order = await findOrderById(id);
+    if (!order) continue;
+    await deleteOrder(id);
+    deleted += 1;
+  }
+  return deleted;
 }
 
 export async function getOrderStatusCounts() {

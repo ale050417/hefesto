@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/format";
 import {
@@ -9,7 +10,15 @@ import type { ShippingAddress } from "../schemas";
 import type { OrderWithItems } from "../types";
 
 // Componente presentacional (server): muestra el pedido ya leído de la base.
-export function OrderSummary({ order }: { order: OrderWithItems }) {
+// `action` es un slot opcional que se renderiza al lado del Total (ej. el botón
+// de eliminar pedido, solo para admin).
+export function OrderSummary({
+  order,
+  action,
+}: {
+  order: OrderWithItems;
+  action?: ReactNode;
+}) {
   const shipping = order.shippingAddress as ShippingAddress | null;
 
   return (
@@ -57,9 +66,14 @@ export function OrderSummary({ order }: { order: OrderWithItems }) {
               </span>
             </div>
           ) : null}
-          <div className="flex justify-between text-base font-medium">
+          <div className="flex items-center justify-between text-base font-medium">
             <span className="text-fg">Total</span>
-            <span className="text-fg">{formatPrice(Number(order.total))}</span>
+            <span className="flex items-center gap-2">
+              <span className="text-fg">
+                {formatPrice(Number(order.total))}
+              </span>
+              {action}
+            </span>
           </div>
         </div>
       </section>

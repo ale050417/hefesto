@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { NotFoundError, ValidationError } from "@/core/errors";
+import { NotFoundError } from "@/core/errors";
 import type { Order, OrderStatus } from "../types";
 
 // Mockeamos el repository (única puerta a la DB): así testeamos la REGLA de
@@ -20,69 +20,69 @@ vi.mock("../repository", () => ({
 
 vi.mock("./orderWorkflow", () => ({ transitionOrderStatus: vi.fn() }));
 
-import { canDeleteOrder, deleteOrderAdmin } from "./orderAdminService";
+import { deleteOrderAdmin, deleteOrdersAdmin } from "./orderAdminService";
 
 function order(status: OrderStatus): Order {
   return { id: "o1", status } as unknown as Order;
 }
+
+// Todos los estados de un pedido: el borrado total debe funcionar en TODOS
+// (incluye pagados/entregados y pedidos mal creados). La reversa de puntos/
+// cupón vive en repository.deleteOrder (transaccional).
+const ALL_STATUSES: OrderStatus[] = [
+  "pending_payment",
+  "confirmed",
+  "in_production",
+  "ready",
+  "shipped",
+  "delivered",
+  "cancelled",
+  "refunded",
+];
 
 afterEach(() => {
   mockFindOrderById.mockReset();
   mockDeleteOrder.mockReset();
 });
 
-describe("canDeleteOrder", () => {
-  it("permite borrar solo pedidos que nunca tocaron plata", () => {
-    expect(canDeleteOrder("pending_payment")).toBe(true);
-    expect(canDeleteOrder("cancelled")).toBe(true);
-  });
-
-  it("rechaza cualquier estado con plata de por medio", () => {
-    for (const s of [
-      "confirmed",
-      "in_production",
-      "ready",
-      "shipped",
-      "delivered",
-      "refunded",
-    ] as OrderStatus[]) {
-      expect(canDeleteOrder(s)).toBe(false);
+describe("deleteOrderAdmin", () => {
+  it("borra un pedido en CUALQUIER estado (hard delete)", async () => {
+    for (const status of ALL_STATUSES) {
+      mockFindOrderById.mockResolvedValueOnce(order(status));
+      await deleteOrderAdmin("o1");
+      expect(mockDeleteOrder).toHaveBeenCalledWith("o1");
+      mockDeleteOrder.mockClear();
     }
   });
-});
 
-describe("deleteOrderAdmin", () => {
-  it("borra un pedido pendiente de pago", async () => {
-    mockFindOrderById.mockResolvedValue(order("pending_payment"));
-    await deleteOrderAdmin("o1");
-    expect(mockDeleteOrder).toHaveBeenCalledWith("o1");
-  });
-
-  it("borra un pedido cancelado", async () => {
-    mockFindOrderById.mockResolvedValue(order("cancelled"));
-    await deleteOrderAdmin("o1");
-    expect(mockDeleteOrder).toHaveBeenCalledWith("o1");
-  });
-
-  it("rechaza borrar un pedido pagado y NO toca la base", async () => {
-    mockFindOrderById.mockResolvedValue(order("confirmed"));
-    await expect(deleteOrderAdmin("o1")).rejects.toBeInstanceOf(
-      ValidationError,
-    );
-    expect(mockDeleteOrder).not.toHaveBeenCalled();
-  });
-
-  it("rechaza borrar un pedido entregado y NO toca la base", async () => {
-    mockFindOrderById.mockResolvedValue(order("delivered"));
-    await expect(deleteOrderAdmin("o1")).rejects.toBeInstanceOf(
-      ValidationError,
-    );
-    expect(mockDeleteOrder).not.toHaveBeenCalled();
-  });
-
-  it("lanza NotFound si el pedido no existe", async () => {
+  it("lanza NotFound si el pedido no existe y NO toca la base", async () => {
     mockFindOrderById.mockResolvedValue(null);
     await expect(deleteOrderAdmin("x")).rejects.toBeInstanceOf(NotFoundError);
     expect(mockDeleteOrder).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteOrdersAdmin", () => {
+  it("borra todos los pedidos existentes y devuelve la cantidad", async () => {
+    mockFindOrderById.mockResolvedValue(order("confirmed"));
+    const deleted = await deleteOrdersAdmin(["a", "b", "c"]);
+    expect(deleted).toBe(3);
+    expect(mockDeleteOrder).toHaveBeenCalledTimes(3);
+    expect(mockDeleteOrder).toHaveBeenCalledWith("a");
+    expect(mockDeleteOrder).toHaveBeenCalledWith("b");
+    expect(mockDeleteOrder).toHaveBeenCalledWith("c");
+  });
+
+  it("ignora los pedidos que ya no existen (no rompe) y cuenta solo los borrados", async () => {
+    mockFindOrderById
+      .mockResolvedValueOnce(order("pending_payment")) // a: existe
+      .mockResolvedValueOnce(null) // b: ya no está
+      .mockResolvedValueOnce(order("delivered")); // c: existe
+    const deleted = await deleteOrdersAdmin(["a", "b", "c"]);
+    expect(deleted).toBe(2);
+    expect(mockDeleteOrder).toHaveBeenCalledTimes(2);
+    expect(mockDeleteOrder).toHaveBeenCalledWith("a");
+    expect(mockDeleteOrder).toHaveBeenCalledWith("c");
+    expect(mockDeleteOrder).not.toHaveBeenCalledWith("b");
   });
 });

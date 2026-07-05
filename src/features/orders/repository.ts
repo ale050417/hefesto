@@ -7,6 +7,7 @@ import {
   orderItems,
   orderStatusHistory,
   orders,
+  pointTransactions,
 } from "@/core/db/schema";
 import type {
   NewOrder,
@@ -258,16 +259,44 @@ export async function updateOrderMeta(
 }
 
 /**
- * Borra un pedido por id. Las tablas hijas se resuelven por sus FK:
- * items / historial / mensajes cascadean; puntos y canje de cupón se nulean
- * (onDelete definido en el schema, Cap. 5). La regla de QUÉ pedido se puede
- * borrar vive en el service, no acá.
+ * Borra un pedido por id de forma permanente y ATÓMICA, revirtiendo lo que el
+ * pedido había generado (Cap. 11/15). Todo en una transacción: o se revierte y
+ * borra todo, o no se toca nada.
+ *
+ * 1) Cupones: por cada redención del pedido bajamos `usedCount` del cupón (sin
+ *    pasar de 0) y borramos la redención, así el uso queda libre de nuevo.
+ * 2) Puntos: borramos las transacciones de puntos del pedido. El saldo se
+ *    calcula sumando `delta` (no hay saldo cacheado), así que borrarlas devuelve
+ *    el saldo al estado previo; sin esto, la FK las dejaría con order_id = null
+ *    inflando el saldo del cliente.
+ * 3) Pedido: ítems, historial y chat cascadean por su FK (onDelete: cascade);
+ *    print_jobs queda con order_id = null (histórico de producción).
+ *
+ * La regla de QUIÉN puede borrar (solo admin) vive en la action; la de que el
+ * pedido exista, en el service.
  */
 export async function deleteOrder(
   id: string,
   database: Database = db,
 ): Promise<void> {
-  await database.delete(orders).where(eq(orders.id, id));
+  await database.transaction(async (tx) => {
+    const redemptions = await tx
+      .select({ couponId: couponRedemptions.couponId })
+      .from(couponRedemptions)
+      .where(eq(couponRedemptions.orderId, id));
+    for (const r of redemptions) {
+      if (!r.couponId) continue;
+      await tx
+        .update(coupons)
+        .set({ usedCount: sql`greatest(${coupons.usedCount} - 1, 0)` })
+        .where(eq(coupons.id, r.couponId));
+    }
+    await tx.delete(couponRedemptions).where(eq(couponRedemptions.orderId, id));
+
+    await tx.delete(pointTransactions).where(eq(pointTransactions.orderId, id));
+
+    await tx.delete(orders).where(eq(orders.id, id));
+  });
 }
 
 /** Conteo de pedidos por estado (para los chips del panel). */

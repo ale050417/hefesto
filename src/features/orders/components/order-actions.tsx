@@ -1,81 +1,80 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { toast } from "@/stores/toastStore";
+import { cn } from "@/lib/utils";
 import { deleteOrderAction } from "../actions";
 
+const TrashIcon = (
+  <svg
+    viewBox="0 0 24 24"
+    width={16}
+    height={16}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden
+  >
+    <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
+  </svg>
+);
+
 /**
- * Sección "Acciones" del detalle de pedido (solo admin). Hoy: eliminar un
- * pedido creado por error. El botón se deshabilita cuando el estado no permite
- * el borrado; el servidor re-valida igual (canDeleteOrder en el service).
+ * Botón para ELIMINAR un pedido de forma permanente (hard delete), en cualquier
+ * estado. Solo se renderiza para admin (quien lo monta decide). Abre el modal de
+ * confirmación estándar; la action re-valida el rol en el servidor.
+ *
+ * Se usa igual en la tabla, en las tarjetas móviles y en el detalle, siempre al
+ * lado del Total.
  */
-export function OrderActions({
+export function DeleteOrderButton({
   orderId,
   orderNumber,
-  canDelete,
+  redirectTo,
+  onDeleted,
+  className,
 }: {
   orderId: string;
   orderNumber: string;
-  /** true solo para pedidos pendientes de pago o cancelados. */
-  canDelete: boolean;
+  /** Si se pasa, navega ahí tras borrar (ej. volver a la lista desde el detalle). */
+  redirectTo?: string;
+  /** Callback tras borrar (ej. limpiar la selección en la tabla). */
+  onDeleted?: () => void;
+  className?: string;
 }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
-
-  function handleDelete() {
-    if (!canDelete) return;
-    if (
-      !confirm(
-        `¿Eliminar el pedido ${orderNumber}? Esta acción no se puede deshacer.`,
-      )
-    ) {
-      return;
-    }
-    setError(null);
-    startTransition(async () => {
-      const res = await deleteOrderAction(orderId);
-      if (!res.ok) {
-        setError(res.error.message);
-        return;
-      }
-      router.push("/admin/pedidos");
-      router.refresh();
-    });
-  }
+  const [open, setOpen] = useState(false);
 
   return (
-    <div className="ui-card space-y-3 p-4">
-      <h3 className="text-fg font-display text-sm">Acciones</h3>
+    <>
+      <button
+        type="button"
+        className={cn("btn-icon btn-ghost text-danger", className)}
+        title={`Eliminar pedido ${orderNumber}`}
+        aria-label={`Eliminar pedido ${orderNumber}`}
+        onClick={() => setOpen(true)}
+      >
+        {TrashIcon}
+      </button>
 
-      {error ? (
-        <p className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
-          {error}
-        </p>
-      ) : null}
-
-      <div>
-        <Button
-          type="button"
-          variant="danger"
-          size="sm"
-          loading={isPending}
-          disabled={!canDelete || isPending}
-          title={
-            canDelete
-              ? "Eliminar pedido"
-              : "Solo se pueden eliminar pedidos pendientes de pago o cancelados"
-          }
-          onClick={handleDelete}
-        >
-          Eliminar pedido
-        </Button>
-        <p className="text-faint mt-2 text-xs">
-          Solo pedidos pendientes de pago o cancelados. Para uno pagado,
-          cancelalo primero.
-        </p>
-      </div>
-    </div>
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`¿Eliminar pedido ${orderNumber}?`}
+        detail="Se eliminarán también sus ítems, historial y chat. Los puntos y el uso de cupón que haya generado se revierten."
+        onConfirm={async () => {
+          const res = await deleteOrderAction(orderId);
+          if (!res.ok) throw new Error(res.error.message);
+          toast("Pedido eliminado", "danger");
+          onDeleted?.();
+          if (redirectTo) router.push(redirectTo);
+          router.refresh();
+        }}
+      />
+    </>
   );
 }

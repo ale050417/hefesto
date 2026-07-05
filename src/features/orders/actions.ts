@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import { type ZodError } from "zod";
+import { z, type ZodError } from "zod";
 import { getCurrentUser, isStaff } from "@/core/auth/session";
 import { can, isAdmin } from "@/core/auth/permissions";
 import { recordAudit } from "@/core/audit";
@@ -34,6 +34,7 @@ import {
 } from "./services/paymentService";
 import {
   deleteOrderAdmin,
+  deleteOrdersAdmin,
   setOrderMeta,
   transitionOrder,
 } from "./services/orderAdminService";
@@ -317,6 +318,55 @@ export async function deleteOrderAction(
     revalidatePath("/admin/ganancias");
     revalidatePath("/admin/reportes");
     return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+const deleteOrdersSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(200),
+});
+
+/**
+ * Admin: elimina VARIOS pedidos de una (limpieza de pedidos mal creados /
+ * duplicados / de prueba). Mismo criterio que el borrado individual: destructivo
+ * y toca plata/puntos, así que SOLO admin. Valida los ids con Zod en el servidor.
+ */
+export async function deleteOrdersAction(
+  ids: string[],
+): Promise<
+  | { ok: true; deleted: number }
+  | { ok: false; error: { code: string; message: string } }
+> {
+  if (!(await isAdmin())) {
+    return {
+      ok: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Eliminar pedidos es solo para administradores.",
+      },
+    };
+  }
+  const parsed = deleteOrdersSchema.safeParse({ ids });
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION", message: "Selección de pedidos inválida." },
+    };
+  }
+  const user = await getCurrentUser();
+  try {
+    const deleted = await deleteOrdersAdmin(parsed.data.ids);
+    await recordAudit({
+      actorId: user?.id ?? null,
+      action: "order.bulk_deleted",
+      entityType: "order",
+      metadata: { count: deleted, ids: parsed.data.ids },
+    });
+    revalidatePath("/admin/pedidos");
+    revalidatePath("/admin/ganancias");
+    revalidatePath("/admin/reportes");
+    return { ok: true, deleted };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
   }
