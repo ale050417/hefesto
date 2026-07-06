@@ -19,11 +19,18 @@ import * as schema from "./schema";
  * singleton guardado en `globalThis`.
  */
 function makeClient() {
+  // En serverless (Vercel prod) cada instancia abre su propio pool; con muchas
+  // instancias, un `max` alto agota el pooler de Supabase → `statement timeout`
+  // (57014) hasta en queries triviales. En producción usamos max:1 (el pooler
+  // en modo transacción ya multiplexa muchas instancias sobre pocos backends).
+  // En dev, con el singleton de HMR hay UN cliente: un pool chico da paralelismo
+  // (Promise.all) sin fugas.
+  const isProd = process.env.NODE_ENV === "production";
   return postgres(env.DATABASE_URL, {
     prepare: false,
     idle_timeout: 20,
     max_lifetime: 60 * 30,
-    max: 10,
+    max: isProd ? 1 : 5,
     connect_timeout: 15,
   });
 }
