@@ -17,6 +17,9 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   // Publishable key de Supabase (sistema nuevo de claves; antes "anon").
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1),
+  // Teléfono de WhatsApp (FAB de contacto / links wa.me). Opcional: sin él, el
+  // botón de WhatsApp simplemente no se muestra (ver lib/site.ts).
+  NEXT_PUBLIC_WHATSAPP_PHONE: z.string().optional(),
 
   // --- Secretas (solo servidor, NUNCA al navegador) ---
   // Secret key de Supabase (sistema nuevo; antes "service_role").

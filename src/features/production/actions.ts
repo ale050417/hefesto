@@ -4,26 +4,39 @@ import { revalidatePath } from "next/cache";
 import { can } from "@/core/auth/permissions";
 import { type ActionResult, toActionError } from "@/core/errors";
 import * as service from "./service";
-import type { JobStatus, PrinterStatus } from "./repository";
+import {
+  addJobSchema,
+  addPrinterSchema,
+  idSchema,
+  jobStatusSchema,
+  printerStatusSchema,
+} from "./schemas";
 
 const NOT_STAFF: ActionResult = {
   ok: false,
   error: { code: "UNAUTHORIZED", message: "No autorizado" },
 };
 
+function validationError(message: string): ActionResult {
+  return { ok: false, error: { code: "VALIDATION", message } };
+}
+
 export async function addPrinterAction(
   name: string,
   model: string,
 ): Promise<ActionResult> {
   if (!(await can("produccion", "crear"))) return NOT_STAFF;
-  const trimmed = name.trim();
-  if (trimmed.length < 2)
-    return {
-      ok: false,
-      error: { code: "VALIDATION", message: "Nombre inválido." },
-    };
+  const parsed = addPrinterSchema.safeParse({ name, model });
+  if (!parsed.success) {
+    return validationError(
+      parsed.error.issues[0]?.message ?? "Datos inválidos.",
+    );
+  }
   try {
-    await service.createPrinter({ name: trimmed, model: model.trim() || null });
+    await service.createPrinter({
+      name: parsed.data.name,
+      model: parsed.data.model.trim() || null,
+    });
     revalidatePath("/admin/produccion");
     return { ok: true };
   } catch (e) {
@@ -33,11 +46,16 @@ export async function addPrinterAction(
 
 export async function setPrinterStatusAction(
   id: string,
-  status: PrinterStatus,
+  status: string,
 ): Promise<ActionResult> {
   if (!(await can("produccion", "editar"))) return NOT_STAFF;
+  const idOk = idSchema.safeParse(id);
+  const statusOk = printerStatusSchema.safeParse(status);
+  if (!idOk.success || !statusOk.success) {
+    return validationError("Impresora o estado inválido.");
+  }
   try {
-    await service.setPrinterStatus(id, status);
+    await service.setPrinterStatus(idOk.data, statusOk.data);
     revalidatePath("/admin/produccion");
     return { ok: true };
   } catch (e) {
@@ -50,14 +68,17 @@ export async function addJobAction(
   printerId: string,
 ): Promise<ActionResult> {
   if (!(await can("produccion", "crear"))) return NOT_STAFF;
-  const trimmed = title.trim();
-  if (trimmed.length < 2)
-    return {
-      ok: false,
-      error: { code: "VALIDATION", message: "Título inválido." },
-    };
+  const parsed = addJobSchema.safeParse({ title, printerId });
+  if (!parsed.success) {
+    return validationError(
+      parsed.error.issues[0]?.message ?? "Datos inválidos.",
+    );
+  }
   try {
-    await service.createJob({ title: trimmed, printerId: printerId || null });
+    await service.createJob({
+      title: parsed.data.title,
+      printerId: parsed.data.printerId || null,
+    });
     revalidatePath("/admin/produccion");
     return { ok: true };
   } catch (e) {
@@ -67,11 +88,16 @@ export async function addJobAction(
 
 export async function setJobStatusAction(
   id: string,
-  status: JobStatus,
+  status: string,
 ): Promise<ActionResult> {
   if (!(await can("produccion", "editar"))) return NOT_STAFF;
+  const idOk = idSchema.safeParse(id);
+  const statusOk = jobStatusSchema.safeParse(status);
+  if (!idOk.success || !statusOk.success) {
+    return validationError("Trabajo o estado inválido.");
+  }
   try {
-    await service.setJobStatus(id, status);
+    await service.setJobStatus(idOk.data, statusOk.data);
     revalidatePath("/admin/produccion");
     return { ok: true };
   } catch (e) {

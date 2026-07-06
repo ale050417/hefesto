@@ -288,9 +288,10 @@ export async function updateOrderMetaAction(
 }
 
 /**
- * Admin: elimina un pedido creado por error. Destructivo y toca plata/puntos,
- * así que SOLO admin (igual criterio que cancelar/reembolsar, Cap. 11). La
- * regla de qué estados son borrables la valida el service en el servidor.
+ * Admin: elimina un pedido de forma permanente (hard delete, cualquier estado).
+ * Destructivo y toca plata/puntos, así que SOLO admin (igual criterio que
+ * cancelar/reembolsar, Cap. 11). El service valida que el pedido exista y el
+ * repository revierte puntos/cupón de forma transaccional antes de borrar.
  */
 export async function deleteOrderAction(
   orderId: string,
