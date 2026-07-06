@@ -55,7 +55,7 @@ export async function Header() {
           </span>
         </Link>
 
-        <div className="store-search-wrap hidden sm:block">
+        <div className="store-search-wrap">
           <SearchBox />
         </div>
 

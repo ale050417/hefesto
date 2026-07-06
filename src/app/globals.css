@@ -42,6 +42,11 @@
   --glow-gold:
     0 0 0 1px rgba(var(--gold-rgb), 0.25), 0 8px 30px var(--gold-glow);
 
+  /* Altura del header sticky de tienda. En desktop es una fila (64px); en móvil
+     crece a dos filas (marca+acciones / buscador) y se sobreescribe abajo. El
+     .store-subnav usa esta variable para su offset, así nunca se desalinea. */
+  --header-h: 64px;
+
   /* --- Z-index (Cap. 7.8): nunca a mano --- */
   --z-dropdown: 100;
   --z-sticky: 200;
@@ -532,7 +537,7 @@ body > * {
     position: sticky;
     top: 0;
     z-index: var(--z-sticky);
-    height: 64px;
+    min-height: 64px;
     display: flex;
     align-items: center;
     gap: 14px;
@@ -3835,7 +3840,7 @@ body > * {
   /* Segunda barra: navegación de tienda */
   .store-subnav {
     position: sticky;
-    top: 64px;
+    top: var(--header-h);
     z-index: calc(var(--z-sticky) - 1);
     border-bottom: 1px solid var(--border);
     background: color-mix(in srgb, var(--bg) 86%, transparent);
@@ -3946,15 +3951,29 @@ body > * {
     background: var(--hover);
   }
 
-  /* ====== Header en móvil: que no se amontone ====== */
-  @media (max-width: 600px) {
-    .topbar {
-      height: 58px;
-      padding: 0 12px;
-      gap: 8px;
+  /* ====== Header de tienda en móvil: DOS FILAS, sin overflow ======
+     Fila 1: marca (izq) + acciones críticas (der). Fila 2: buscador full-width.
+     El header deja de tener altura fija y crece; el .store-subnav sigue a
+     --header-h para no desalinearse. flex-wrap garantiza cero scroll horizontal. */
+  @media (max-width: 767px) {
+    :root {
+      /* Dos filas: acciones (~44) + buscador (~46) + paddings/gap ≈ 114px.
+         Si al probar en 360/390px aparece un hilo o solape entre header y
+         subnav, ajustar SOLO este valor. */
+      --header-h: 114px;
     }
-    .store-subnav {
-      top: 58px;
+    .topbar {
+      flex-wrap: wrap;
+      min-height: 60px;
+      padding: 8px 12px;
+      gap: 8px 10px;
+    }
+    /* El buscador baja a su propia fila, ancho completo. */
+    .store-search-wrap {
+      order: 3;
+      flex-basis: 100%;
+      max-width: none;
+      margin: 0;
     }
     .brand {
       gap: 8px;
@@ -3966,21 +3985,24 @@ body > * {
       font-size: 15px;
       letter-spacing: 0.03em;
     }
+    /* Acciones pegadas a la derecha de la fila 1. */
     .store-actions {
+      margin-left: auto;
       gap: 2px;
     }
+    /* Touch targets ≥44px (el ícono visual no cambia). */
     .topbar .icon-btn {
-      width: 32px;
-      height: 32px;
+      width: 44px;
+      height: 44px;
     }
-    /* El link "Panel" como ícono compacto: que no empuje el resto */
     .store-actions .store-nav-link {
-      padding: 6px 8px;
+      padding: 8px 10px;
       font-size: 12.5px;
     }
   }
   @media (max-width: 380px) {
-    /* Pantallas muy chicas: dejamos solo el isotipo */
+    /* Pantallas muy chicas: dejamos solo el isotipo (el buscador full-width
+       de la fila 2 sigue permitiendo buscar). */
     .brand-name {
       display: none;
     }
