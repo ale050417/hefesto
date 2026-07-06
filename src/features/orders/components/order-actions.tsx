@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
 import { cn } from "@/lib/utils";
@@ -76,5 +77,56 @@ export function DeleteOrderButton({
         }}
       />
     </>
+  );
+}
+
+/**
+ * Card "Acciones" del detalle del pedido (pedido del dueño, 2026-07): zona de
+ * peligro explícita en el aside, en vez de un iconito escondido. Solo se monta
+ * para admin (quien la renderiza decide); la action re-valida el rol igual.
+ */
+export function OrderActionsCard({
+  orderId,
+  orderNumber,
+}: {
+  orderId: string;
+  orderNumber: string;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="ui-card space-y-3 p-4">
+      <h3 className="text-fg font-display text-sm">Acciones</h3>
+      <p className="text-faint text-xs leading-relaxed">
+        Eliminar borra el pedido completo (ítems, historial y chat) y revierte
+        los puntos y el uso de cupón que haya generado. Reportes y Ganancias
+        dejan de contarlo. No se puede deshacer.
+      </p>
+      <Button
+        type="button"
+        variant="danger"
+        size="sm"
+        className="w-full"
+        onClick={() => setOpen(true)}
+      >
+        {TrashIcon}
+        Eliminar pedido
+      </Button>
+
+      <ConfirmDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        title={`¿Eliminar pedido ${orderNumber}?`}
+        detail="Se eliminarán también sus ítems, historial y chat. Los puntos y el uso de cupón que haya generado se revierten."
+        onConfirm={async () => {
+          const res = await deleteOrderAction(orderId);
+          if (!res.ok) throw new Error(res.error.message);
+          toast("Pedido eliminado", "danger");
+          router.push("/admin/pedidos");
+          router.refresh();
+        }}
+      />
+    </div>
   );
 }

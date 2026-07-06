@@ -7,7 +7,7 @@ import {
   ORDER_STATUS_VARIANT,
 } from "@/features/orders/constants";
 import { OrderStatusManager } from "@/features/orders/components/order-status-manager";
-import { DeleteOrderButton } from "@/features/orders/components/order-actions";
+import { OrderActionsCard } from "@/features/orders/components/order-actions";
 import { OrderSummary } from "@/features/orders/components/order-summary";
 import { getOrderAdmin } from "@/features/orders/services/orderAdminService";
 import { getOrderMessages } from "@/features/orders/services/orderChat";
@@ -56,18 +56,7 @@ export default async function OrderDetailAdminPage({
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-6">
-          <OrderSummary
-            order={order}
-            action={
-              canCancelRefund ? (
-                <DeleteOrderButton
-                  orderId={order.id}
-                  orderNumber={order.orderNumber}
-                  redirectTo="/admin/pedidos"
-                />
-              ) : null
-            }
-          />
+          <OrderSummary order={order} />
           <section className="ui-card p-5">
             <h3 className="text-fg font-display mb-3 text-sm">
               Mensajes con el cliente
@@ -84,6 +73,15 @@ export default async function OrderDetailAdminPage({
             internalNote={order.internalNote}
             canCancelRefund={canCancelRefund}
           />
+
+          {/* Sección Acciones (zona de peligro): solo admin la ve; la action
+              re-valida el rol en el servidor igual. */}
+          {canCancelRefund ? (
+            <OrderActionsCard
+              orderId={order.id}
+              orderNumber={order.orderNumber}
+            />
+          ) : null}
 
           <div className="ui-card p-4">
             <h3 className="text-fg font-display mb-2 text-sm">Cliente</h3>
