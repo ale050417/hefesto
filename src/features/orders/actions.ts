@@ -17,6 +17,7 @@ import {
   checkoutSchema,
   manualSaleSchema,
   orderMessageSchema,
+  orderStatusSchema,
   type CheckoutInput,
 } from "./schemas";
 import { createOrder } from "./services/orderService";
@@ -24,6 +25,7 @@ import {
   computeManualSaleCosts,
   createManualSale,
   deleteManualSale,
+  updateManualSaleStatus,
 } from "./services/manualSaleService";
 import { getOrderCustomerId, sendOrderMessage } from "./services/orderChat";
 import { notifyCustomer } from "@/features/notifications/service";
@@ -404,6 +406,45 @@ export async function deleteManualSaleAction(
     revalidatePath("/admin/pedidos");
     revalidatePath("/admin/ganancias");
     revalidatePath("/admin/reportes");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+/**
+ * Staff: cambia el estado de una venta manual (mismos 8 estados que un pedido).
+ * Solo reetiqueta el registro; el impacto en facturación/ganancias lo resuelven
+ * reportes/ganancias por estado. Valida rol + payload en el servidor.
+ */
+export async function updateManualSaleStatusAction(
+  saleId: string,
+  status: unknown,
+): Promise<
+  { ok: true } | { ok: false; error: { code: string; message: string } }
+> {
+  if (!(await can("pedidos", "editar"))) return NOT_STAFF;
+  const idOk = z.string().uuid().safeParse(saleId);
+  const statusOk = orderStatusSchema.safeParse(status);
+  if (!idOk.success || !statusOk.success) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION", message: "Venta o estado inválido." },
+    };
+  }
+  const user = await getCurrentUser();
+  try {
+    await updateManualSaleStatus(idOk.data, statusOk.data);
+    revalidatePath("/admin/pedidos");
+    revalidatePath("/admin/ganancias");
+    revalidatePath("/admin/reportes");
+    await recordAudit({
+      actorId: user?.id ?? null,
+      action: "manual_sale.status_changed",
+      entityType: "manual_sale",
+      entityId: saleId,
+      metadata: { status: statusOk.data },
+    });
     return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };

@@ -1,5 +1,18 @@
 import { z } from "zod";
 
+// Los 8 estados del pedido (mismo enum que la DB). Compartido: venta manual al
+// crear/editar y validación de transiciones. Fuente única para no desincronizar.
+export const orderStatusSchema = z.enum([
+  "pending_payment",
+  "confirmed",
+  "in_production",
+  "ready",
+  "shipped",
+  "delivered",
+  "cancelled",
+  "refunded",
+]);
+
 // Dirección de envío: snapshot que se guarda con el pedido (jsonb).
 export const shippingAddressSchema = z.object({
   fullName: z.string().min(2, "Ingresá tu nombre y apellido."),
@@ -91,16 +104,7 @@ export const manualSaleSchema = z.object({
       },
       { message: "El reparto debe sumar 100%." },
     ),
-  status: z.enum([
-    "pending_payment",
-    "confirmed",
-    "in_production",
-    "ready",
-    "shipped",
-    "delivered",
-    "cancelled",
-    "refunded",
-  ]),
+  status: orderStatusSchema,
 });
 
 export type ManualSaleInput = z.infer<typeof manualSaleSchema>;

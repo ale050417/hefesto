@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { isAdmin, requirePermissionPage } from "@/core/auth/permissions";
+import { can, isAdmin, requirePermissionPage } from "@/core/auth/permissions";
 import { Pagination } from "@/components/shared/pagination";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -17,6 +17,7 @@ import { getEstimatorContext } from "@/features/calculator/service";
 import { CargarVentaButton } from "@/features/orders/components/cargar-venta-button";
 import { OrdersAdminList } from "@/features/orders/components/orders-admin-list";
 import { DeleteManualSaleButton } from "@/features/orders/components/delete-manual-sale-button";
+import { ManualSaleStatusSelect } from "@/features/orders/components/manual-sale-status-select";
 import type { OrderStatus } from "@/features/orders/types";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -40,7 +41,10 @@ export default async function PedidosAdminPage({
   searchParams: Promise<SearchParams>;
 }) {
   await requirePermissionPage("pedidos", "ver");
-  const admin = await isAdmin();
+  const [admin, canEdit] = await Promise.all([
+    isAdmin(),
+    can("pedidos", "editar"),
+  ]);
   const sp = await searchParams;
   const statusParam = first(sp.status);
   const status = STATUSES.includes(statusParam as OrderStatus)
@@ -165,9 +169,13 @@ export default async function PedidosAdminPage({
                         {PAYMENT_METHOD_LABEL[s.paymentMethod]}
                       </td>
                       <td data-label="Estado">
-                        <Badge variant={ORDER_STATUS_VARIANT[s.status]}>
-                          {ORDER_STATUS_LABEL[s.status]}
-                        </Badge>
+                        {canEdit ? (
+                          <ManualSaleStatusSelect id={s.id} status={s.status} />
+                        ) : (
+                          <Badge variant={ORDER_STATUS_VARIANT[s.status]}>
+                            {ORDER_STATUS_LABEL[s.status]}
+                          </Badge>
+                        )}
                       </td>
                       <td className="text-fg text-right" data-label="Total">
                         <span className="inline-flex items-center justify-end gap-1">

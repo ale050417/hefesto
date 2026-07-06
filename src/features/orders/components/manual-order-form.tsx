@@ -7,6 +7,8 @@ import { EstimatorModalButton } from "@/features/calculator/components/estimator
 import type { EstimatorValue } from "@/features/calculator/components/price-estimator";
 import type { EstimatorContext } from "@/features/calculator/service";
 import { createManualSaleAction } from "../actions";
+import { ORDER_STATUS_LABEL } from "../constants";
+import type { OrderStatus } from "../types";
 
 const PAYS = [
   { v: "cash", l: "Efectivo" },
@@ -14,13 +16,20 @@ const PAYS = [
   { v: "mercadopago", l: "MercadoPago" },
 ] as const;
 
-const STATUSES = [
-  { v: "delivered", l: "Entregado" },
-  { v: "shipped", l: "Enviado" },
-  { v: "ready", l: "Listo" },
-  { v: "pending_payment", l: "Pendiente" },
-  { v: "cancelled", l: "Cancelado" },
-] as const;
+// Los 8 estados de un pedido, en el orden de la máquina de estados (Cap. 11).
+// Se derivan de ORDER_STATUS_LABEL para no desincronizar con la sección Pedidos.
+const STATUS_ORDER = [
+  "pending_payment",
+  "confirmed",
+  "in_production",
+  "ready",
+  "shipped",
+  "delivered",
+  "cancelled",
+  "refunded",
+] as const satisfies readonly OrderStatus[];
+
+const STATUSES = STATUS_ORDER.map((v) => ({ v, l: ORDER_STATUS_LABEL[v] }));
 
 const today = () => new Date().toISOString().slice(0, 10);
 

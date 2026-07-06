@@ -72,6 +72,20 @@ export async function listManualSales(): Promise<ManualSale[]> {
 }
 
 /**
+ * Cambia el estado de una venta manual (mismos 8 estados que un pedido). Solo
+ * reetiqueta el registro histórico: NO dispara emails/puntos/tracking (la venta
+ * manual está fuera del flujo de checkout). Qué cuenta como facturación/reparto
+ * lo deciden reportes (SALES_STATUSES) y ganancias (solo `delivered`), así que
+ * el estado impacta ahí automáticamente. La autorización se valida en la action.
+ */
+export async function updateManualSaleStatus(
+  id: string,
+  status: ManualSale["status"],
+): Promise<void> {
+  await db.update(manualSales).set({ status }).where(eq(manualSales.id, id));
+}
+
+/**
  * Borra una venta manual (cargada mal / duplicada). No tiene hijos ni toca
  * puntos/cupón/filamento: solo deja de sumar a facturación, ganancias y
  * reportes. La autorización (solo admin) se valida en la action.
