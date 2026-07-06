@@ -23,6 +23,7 @@ import { createOrder } from "./services/orderService";
 import {
   computeManualSaleCosts,
   createManualSale,
+  deleteManualSale,
 } from "./services/manualSaleService";
 import { getOrderCustomerId, sendOrderMessage } from "./services/orderChat";
 import { notifyCustomer } from "@/features/notifications/service";
@@ -367,6 +368,42 @@ export async function deleteOrdersAction(
     revalidatePath("/admin/ganancias");
     revalidatePath("/admin/reportes");
     return { ok: true, deleted };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+/**
+ * Admin: elimina una venta manual (cargada mal / duplicada / de prueba).
+ * Destructivo y afecta facturación/ganancias/reportes, así que SOLO admin.
+ */
+export async function deleteManualSaleAction(
+  saleId: string,
+): Promise<
+  { ok: true } | { ok: false; error: { code: string; message: string } }
+> {
+  if (!(await isAdmin())) {
+    return {
+      ok: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Eliminar ventas es solo para administradores.",
+      },
+    };
+  }
+  const user = await getCurrentUser();
+  try {
+    await deleteManualSale(saleId);
+    await recordAudit({
+      actorId: user?.id ?? null,
+      action: "manual_sale.deleted",
+      entityType: "manual_sale",
+      entityId: saleId,
+    });
+    revalidatePath("/admin/pedidos");
+    revalidatePath("/admin/ganancias");
+    revalidatePath("/admin/reportes");
+    return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
   }

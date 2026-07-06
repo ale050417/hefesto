@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { db } from "@/core/db";
 import { manualSales } from "@/core/db/schema";
 import type { ManualSaleInput } from "../schemas";
@@ -68,4 +69,13 @@ export async function listManualSales(): Promise<ManualSale[]> {
   return db.query.manualSales.findMany({
     orderBy: (m, { desc }) => [desc(m.saleDate)],
   });
+}
+
+/**
+ * Borra una venta manual (cargada mal / duplicada). No tiene hijos ni toca
+ * puntos/cupón/filamento: solo deja de sumar a facturación, ganancias y
+ * reportes. La autorización (solo admin) se valida en la action.
+ */
+export async function deleteManualSale(id: string): Promise<void> {
+  await db.delete(manualSales).where(eq(manualSales.id, id));
 }

@@ -16,6 +16,7 @@ import { listProfitShares } from "@/features/earnings/service";
 import { getEstimatorContext } from "@/features/calculator/service";
 import { CargarVentaButton } from "@/features/orders/components/cargar-venta-button";
 import { OrdersAdminList } from "@/features/orders/components/orders-admin-list";
+import { DeleteManualSaleButton } from "@/features/orders/components/delete-manual-sale-button";
 import type { OrderStatus } from "@/features/orders/types";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -169,7 +170,15 @@ export default async function PedidosAdminPage({
                         </Badge>
                       </td>
                       <td className="text-fg text-right" data-label="Total">
-                        {formatPrice(Number(s.total))}
+                        <span className="inline-flex items-center justify-end gap-1">
+                          {formatPrice(Number(s.total))}
+                          {admin ? (
+                            <DeleteManualSaleButton
+                              id={s.id}
+                              label={s.customerName}
+                            />
+                          ) : null}
+                        </span>
                       </td>
                     </tr>
                   ))}
