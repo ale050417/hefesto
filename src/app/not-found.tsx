@@ -1,5 +1,10 @@
 import Link from "next/link";
 
+// El 404 global se renderiza dentro del layout raíz, que incluye <ThemeApplier/>
+// (lee tema/marca de la base). Lo hacemos dinámico para que no se pre-renderice
+// en el build y no dependa de la base. (Cap. 16)
+export const dynamic = "force-dynamic";
+
 /** Fallback global de 404 (rutas fuera del storefront). */
 export default function NotFound() {
   return (
