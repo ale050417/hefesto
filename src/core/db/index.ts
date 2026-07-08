@@ -39,6 +39,10 @@ function makeClient() {
     // no lo agotan, pero un max alto sí lo haría.
     max: isProd ? 3 : 5,
     connect_timeout: 15,
+    // Supabase exige SSL en la conexión al pooler. Sin esto, postgres-js
+    // conecta en texto plano y Supabase rechaza con "SSL connection is
+    // required" (XX000/ESSLREQUIRED) — así se cayó todo el sitio hoy.
+    ssl: "require",
     // Red de seguridad: si una query queda colgada esperando que el cliente
     // lea el resultado (ej. la app se cuelga/crashea a mitad de camino), sin
     // esto Postgres la deja viva PARA SIEMPRE. Con max:1 en producción, esa
