@@ -32,6 +32,17 @@ function makeClient() {
     max_lifetime: 60 * 30,
     max: isProd ? 1 : 5,
     connect_timeout: 15,
+    // Red de seguridad: si una query queda colgada esperando que el cliente
+    // lea el resultado (ej. la app se cuelga/crashea a mitad de camino), sin
+    // esto Postgres la deja viva PARA SIEMPRE. Con max:1 en producción, esa
+    // única conexión quedaría tomada y todo el sitio se cuelga hasta que
+    // alguien la mate a mano (nos pasó: pid colgado 5+ min en "ClientRead").
+    // Con este límite, Postgres aborta la query sola a los 20s y libera la
+    // conexión para la siguiente request.
+    connection: {
+      statement_timeout: 20000,
+      idle_in_transaction_session_timeout: 20000,
+    },
   });
 }
 
