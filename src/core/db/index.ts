@@ -30,7 +30,14 @@ function makeClient() {
     prepare: false,
     idle_timeout: 20,
     max_lifetime: 60 * 30,
-    max: isProd ? 1 : 5,
+    // max:1 obligaba a que las queries en paralelo (Promise.all de la home,
+    // por ejemplo) se encolaran una por una en la ÚNICA conexión → sumaban
+    // sus tiempos en vez de correr juntas, y eso fue lo que disparó el
+    // timeout de 10s en la home. Con max:3 sí corren en paralelo de verdad.
+    // Sigue siendo bajo a propósito: con el pooler de Supabase en modo
+    // transacción (200 conexiones, pool de 15) varias instancias con max:3
+    // no lo agotan, pero un max alto sí lo haría.
+    max: isProd ? 3 : 5,
     connect_timeout: 15,
     // Red de seguridad: si una query queda colgada esperando que el cliente
     // lea el resultado (ej. la app se cuelga/crashea a mitad de camino), sin
