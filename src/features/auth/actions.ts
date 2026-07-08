@@ -12,13 +12,16 @@ import { clearMustChangePassword } from "./repository";
 import { loginSchema, registerSchema, resetRequestSchema } from "./schemas";
 
 type Result = { ok: true } | { ok: false; error: string };
+type LoginResult =
+  | { ok: true; isStaff: boolean }
+  | { ok: false; error: string };
 
-const TOO_MANY: Result = {
-  ok: false,
+const TOO_MANY = {
+  ok: false as const,
   error: "Demasiados intentos. Esperá un minuto.",
 };
 
-export async function loginAction(input: unknown): Promise<Result> {
+export async function loginAction(input: unknown): Promise<LoginResult> {
   const ip = await getClientIp();
   if (!rateLimit(`login:${ip}`, { limit: 5, windowMs: 60_000 }).ok) {
     return TOO_MANY;
@@ -28,7 +31,11 @@ export async function loginAction(input: unknown): Promise<Result> {
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error) return { ok: false, error: "Email o contraseña incorrectos" };
-  return { ok: true };
+  // Rol recién logueado: si es staff, el cliente lo manda directo a /admin.
+  const user = await getCurrentUser();
+  const isStaff =
+    user?.profile?.role === "admin" || user?.profile?.role === "operator";
+  return { ok: true, isStaff };
 }
 
 export async function registerAction(input: unknown): Promise<Result> {

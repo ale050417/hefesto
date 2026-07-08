@@ -1,4 +1,3 @@
-import { unstable_cache } from "next/cache";
 import { listFilamentsView } from "@/features/inventory/queries";
 import { listOrdersAdmin } from "@/features/orders/services/orderAdminService";
 import * as repo from "./repository";
@@ -88,7 +87,7 @@ export async function getSalesCsv(from: Date, to: Date): Promise<string> {
 }
 
 /** Datos del panel de Reportes (espejo del index): KPIs + series + breakdown. */
-const getReportsOverviewRaw = async (year: number) => {
+export async function getReportsOverview(year: number) {
   const prevYear = year - 1;
   const [
     kpis,
@@ -116,14 +115,4 @@ const getReportsOverviewRaw = async (year: number) => {
     topProducts,
     bySource,
   };
-};
-
-// Cache de 60s: Reportes es una pantalla de análisis, no necesita ser al
-// segundo. El dato queda a lo sumo 60s viejo y se re-consulta solo, sin pegarle
-// a la base en cada visita. (Solo pantallas de análisis; NUNCA las de cargar/
-// editar donde esperás verlo al instante.)
-export const getReportsOverview = unstable_cache(
-  getReportsOverviewRaw,
-  ["reports:overview"],
-  { revalidate: 60 },
-);
+}

@@ -30,8 +30,16 @@ import type {
 } from "./types";
 
 // Cacheado por request: Header, Footer, Home y el FAB lo piden sin duplicar query.
+// Resiliente: se lee en CADA página; si la base está lenta/saturada y la query
+// falla, NO tumbamos la tienda con un 500 — caemos a valores por defecto y la
+// página carga igual (sin branding custom). El error queda logueado.
 export const getBrandSettings = cache(async (): Promise<BrandSettings> => {
-  const s = await getSettings();
+  let s: Awaited<ReturnType<typeof getSettings>> = null;
+  try {
+    s = await getSettings();
+  } catch (e) {
+    console.error("[settings] no se pudo leer business_settings:", e);
+  }
   return {
     logoUrl: s?.logoUrl ?? null,
     heroImageUrl: s?.heroImageUrl ?? null,

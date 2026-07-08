@@ -29,7 +29,9 @@ export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
       setFormError(res.error);
       return;
     }
-    router.push(redirectTo);
+    // Staff van directo al panel; el resto respeta redirectTo (o home).
+    const dest = res.isStaff && redirectTo === "/" ? "/admin" : redirectTo;
+    router.push(dest);
     router.refresh();
   });
 

@@ -16,41 +16,25 @@ export type CurrentUser = {
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const supabase = await createClient();
-
-  // Verificación LOCAL del token (getClaims): valida la firma/expiración del JWT
-  // sin ida y vuelta a Supabase en CADA request. El middleware ya refrescó y
-  // validó la sesión contra el server, así que acá alcanza con leer los claims
-  // (mucho menos latencia por navegación y por cada router.refresh()). Si por lo
-  // que sea getClaims no devuelve nada, caemos a getUser() (red) para no romper.
-  let id: string | null = null;
-  let email: string | null = null;
-  try {
-    const { data } = await supabase.auth.getClaims();
-    const claims = data?.claims as { sub?: string; email?: string } | undefined;
-    if (claims?.sub) {
-      id = claims.sub;
-      email = typeof claims.email === "string" ? claims.email : null;
-    }
-  } catch {
-    // ignoramos y probamos con getUser abajo
-  }
-  if (!id) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return null;
-    id = user.id;
-    email = user.email ?? null;
-  }
+  // getUser() valida la sesión contra Supabase. Si la sesión es inválida o el
+  // refresh token quedó viejo (refresh_token_not_found), NO es un error fatal:
+  // simplemente no hay usuario. Devolvemos null limpio en vez de propagar el
+  // error (evita ruido y reintentos que cuelgan el render). El middleware ya
+  // limpia la cookie mala en el próximo request.
+  // getUser() LANZA si el refresh token quedó inválido (no solo devuelve error),
+  // así que lo atrapamos: sesión inválida = sin usuario (null), sin propagar.
+  const result = await supabase.auth.getUser().catch(() => null);
+  const user = result?.data.user ?? null;
+  if (!user) return null;
 
   let profile: Profile | null = null;
   try {
-    profile = await getProfileById(id);
-  } catch (error) {
+    profile = await getProfileById(user.id);
+  } catch (e) {
     // No tumbamos el sitio si falla la lectura del perfil (ej. falta migrar).
-    console.error("[auth] no se pudo leer el profile:", error);
+    console.error("[auth] no se pudo leer el profile:", e);
   }
-  return { id, email, profile };
+  return { id: user.id, email: user.email ?? null, profile };
 });
 
 import { redirect } from "next/navigation";

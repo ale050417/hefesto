@@ -25,10 +25,14 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  // Refresca la sesión (renueva tokens) en cada request.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Refresca la sesión (renueva tokens) en cada request. Si el refresh token
+  // quedó viejo/inválido, getUser() LANZA (AuthApiError refresh_token_not_found)
+  // en vez de devolver error: lo atrapamos y seguimos como "sin sesión". SIN
+  // este try/catch, el error sin atrapar deja el request sin respuesta y la
+  // página QUEDA COLGADA (el navegador manda la cookie vieja). El SSR client ya
+  // escribió las cookies limpias en `response` vía setAll.
+  const result = await supabase.auth.getUser().catch(() => null);
+  const user = result?.data.user ?? null;
 
   // Candado 1: sin sesión no se entra al panel (la autorización por rol la
   // hace el layout de /admin en el servidor).
