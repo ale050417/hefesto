@@ -6,6 +6,7 @@ import { ProductGrid } from "@/features/products/components/product-grid";
 import { getHomeData } from "@/features/products/services/catalogService";
 import { Newsletter } from "@/features/cart/components/newsletter";
 import { HeroCarousel } from "@/components/home/hero-carousel";
+import { withTimeout } from "@/core/db/with-timeout";
 import {
   getActiveBanners,
   getBrandSettings,
@@ -244,8 +245,15 @@ function ProductSection({
 }
 
 export default async function Home() {
+  // Si la DB queda colgada (ver core/db/with-timeout.ts), preferimos que la
+  // home falle rápido (10s) a que quede "cargando" hasta que Vercel mate la
+  // función a los 300s.
   const [{ featured, latest, onSale, categories }, banners, brand] =
-    await Promise.all([getHomeData(), getActiveBanners(), getBrandSettings()]);
+    await withTimeout(
+      Promise.all([getHomeData(), getActiveBanners(), getBrandSettings()]),
+      10_000,
+      "Home: getHomeData + getActiveBanners + getBrandSettings",
+    );
   const show = (id: string) => sectionOn(brand.homeSections, id);
 
   const slides = banners.map((b) => ({

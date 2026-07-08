@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/core/supabase/server";
+import { withTimeout } from "@/core/db/with-timeout";
 import { getProfileById, type Profile } from "./profile";
 
 export type CurrentUser = {
@@ -29,7 +30,14 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
   let profile: Profile | null = null;
   try {
-    profile = await getProfileById(user.id);
+    // Si la conexión a la DB queda colgada (ver core/db/with-timeout.ts),
+    // no dejamos la página esperando 300s: seguimos sin perfil (como si
+    // hubiera fallado la lectura) y el layout decide qué hacer.
+    profile = await withTimeout(
+      getProfileById(user.id),
+      10_000,
+      "getProfileById",
+    );
   } catch (e) {
     // No tumbamos el sitio si falla la lectura del perfil (ej. falta migrar).
     console.error("[auth] no se pudo leer el profile:", e);
