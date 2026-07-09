@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lt, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { db } from "@/core/db";
 import {
   categories,
@@ -95,6 +95,8 @@ export async function getReportKpis(
     .where(
       and(
         eq(profiles.role, "customer"),
+        // El personal con rol de equipo no cuenta como cliente nuevo.
+        isNull(profiles.roleId),
         gte(profiles.createdAt, yearStart),
         lt(profiles.createdAt, yearEnd),
       ),

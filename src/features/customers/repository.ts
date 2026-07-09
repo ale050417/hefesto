@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/core/db";
 import { addresses, manualCustomers, orders, profiles } from "@/core/db/schema";
 import type { Address, ManualCustomer, Order, Profile } from "./types";
@@ -35,12 +35,17 @@ export async function updateProfileRow(
 
 /* ===================== Panel admin: clientes ===================== */
 
-/** Todos los clientes registrados (rol customer), más nuevos primero. */
+/**
+ * Todos los clientes registrados, más nuevos primero. Doble filtro:
+ * rol `customer` (el enum-portón) Y sin rol de equipo asignado (`role_id`).
+ * Así el personal del taller (Equipo de gestión) NUNCA aparece como cliente,
+ * aunque su enum haya quedado en customer (pedido de Ale, 2026-07-09).
+ */
 export async function listCustomerProfiles(
   database: Database = db,
 ): Promise<Profile[]> {
   return database.query.profiles.findMany({
-    where: eq(profiles.role, "customer"),
+    where: and(eq(profiles.role, "customer"), isNull(profiles.roleId)),
     orderBy: (p, { desc: d }) => [d(p.createdAt)],
   });
 }
