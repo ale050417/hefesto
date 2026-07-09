@@ -25,6 +25,7 @@ function makeClient() {
     max_lifetime: 60 * 30,
     max: 10,
     connect_timeout: 15,
+    ssl: "require",
   });
 }
 
