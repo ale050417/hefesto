@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requirePermissionPage } from "@/core/auth/permissions";
+import { ImportSales } from "@/features/orders/components/import-sales";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Importar ventas" };
@@ -22,16 +23,7 @@ export default async function ImportarVentasPage() {
         </div>
       </div>
 
-      <div className="ui-card max-w-2xl p-6">
-        <p className="text-dim text-sm leading-relaxed">
-          la funcion esta en construcción.
-        </p>
-        <ul className="text-dim mt-3 flex list-disc flex-col gap-2 pl-5 text-sm">
-          <li>
-            <b className="text-fg">Dependencia para Excel (.xlsx):</b>
-          </li>
-        </ul>
-      </div>
+      <ImportSales />
     </div>
   );
 }

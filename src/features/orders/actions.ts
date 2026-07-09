@@ -43,6 +43,11 @@ import {
 } from "./services/orderAdminService";
 import { notifyOrderStatus } from "./services/orderEmails";
 import type { OrderStatus } from "./types";
+import {
+  parseImportRow,
+  IMPORT_MAX_ROWS,
+  type ImportFieldKey,
+} from "./import-sales";
 
 type ActionResult =
   | { ok: true; orderNumber: string; redirectUrl?: string }
@@ -488,4 +493,131 @@ export async function sendOrderMessageAction(
   } catch (error) {
     return { ok: false, error: toActionError(error) };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Importación masiva de ventas manuales desde Excel/CSV (/admin/pedidos/importar)
+// ---------------------------------------------------------------------------
+
+export type ImportSalesResult = {
+  imported: number;
+  failed: Array<{ row: number; message: string }>;
+};
+
+/**
+ * Importa ventas manuales por lote. El cliente manda las FILAS CRUDAS de la
+ * planilla + el mapeo de columnas; acá se re-normaliza y re-valida TODO en el
+ * servidor (no se confía en el preview del cliente, Cap. 11/14). Las filas
+ * inválidas no bloquean a las válidas: se importa lo que está bien y se
+ * devuelve el detalle de lo que falló, fila por fila.
+ *
+ * Costo (regla "nunca 0 silencioso"): por fila, si hay gramos+material se
+ * calcula con la calculadora (como el form); si no, se usa el costo unitario
+ * de la planilla; sin ninguno de los dos, la fila falla.
+ */
+export async function importManualSalesAction(input: {
+  rows: unknown[][];
+  mapping: Record<ImportFieldKey, number>;
+  /** Número de fila de la planilla de la primera fila de datos (para mensajes). */
+  firstRowNumber?: number;
+}): Promise<CoreActionResult<ImportSalesResult>> {
+  if (!(await can("pedidos", "crear"))) return NOT_STAFF;
+  const user = await getCurrentUser();
+
+  if (!Array.isArray(input?.rows) || input.rows.length === 0) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION", message: "La planilla no tiene filas." },
+    };
+  }
+  if (input.rows.length > IMPORT_MAX_ROWS) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: `Máximo ${IMPORT_MAX_ROWS} filas por importación (mandá la planilla en partes).`,
+      },
+    };
+  }
+
+  const firstRow = input.firstRowNumber ?? 2; // fila 1 = encabezados
+  let imported = 0;
+  const failed: Array<{ row: number; message: string }> = [];
+
+  for (let i = 0; i < input.rows.length; i++) {
+    const rowNumber = firstRow + i;
+    const parsed = parseImportRow(input.rows[i] ?? [], input.mapping);
+    if (!parsed.ok) {
+      failed.push({ row: rowNumber, message: parsed.errors.join(" ") });
+      continue;
+    }
+    const row = parsed.data;
+    try {
+      // Costo unitario: calculado (gramos+material) o explícito de la planilla.
+      let unitAmort = 0;
+      if ((row.grams ?? 0) > 0 && row.material) {
+        unitAmort = await getAmortization({
+          filamentId: null,
+          material: row.material,
+          grams: row.grams ?? 0,
+          hours: (row.printMinutes ?? 0) / 60,
+        });
+      }
+      if (!(unitAmort > 0)) unitAmort = row.unitCost ?? 0;
+      if (!(unitAmort > 0)) {
+        failed.push({
+          row: rowNumber,
+          message:
+            "No se pudo resolver el costo (¿el material existe en la calculadora?).",
+        });
+        continue;
+      }
+      const costs = computeManualSaleCosts({
+        unitAmortization: unitAmort,
+        total: row.total,
+        quantity: row.quantity,
+      });
+      await createManualSale(
+        {
+          saleDate: row.saleDate,
+          customerName: row.customerName,
+          detail: row.detail,
+          quantity: row.quantity,
+          total: row.total,
+          material: row.material,
+          grams: row.grams,
+          printMinutes: row.printMinutes,
+          amortization: costs.amortization,
+          profit: costs.profit,
+          paymentMethod: row.paymentMethod,
+          status: row.status,
+        },
+        user?.id ?? null,
+      );
+      imported++;
+    } catch (error) {
+      failed.push({
+        row: rowNumber,
+        message:
+          error instanceof Error
+            ? error.message
+            : "No se pudo guardar la fila.",
+      });
+    }
+  }
+
+  if (imported > 0) {
+    revalidatePath("/admin/pedidos");
+    revalidatePath("/admin/ganancias");
+    revalidatePath("/admin/reportes");
+    await recordAudit({
+      actorId: user?.id ?? null,
+      action: "manual_sale.imported",
+      entityType: "manual_sale",
+      entityId: null,
+      metadata: { imported, failedCount: failed.length },
+    });
+  }
+
+  return { ok: true, data: { imported, failed } };
 }
