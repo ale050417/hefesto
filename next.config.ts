@@ -5,7 +5,11 @@ import type { NextConfig } from "next";
 // documentada en el relevamiento (definir CSP con nonce).
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "X-Frame-Options", value: "DENY" },
+  // SAMEORIGIN (no DENY): la vista previa del admin embebe la PROPIA tienda en
+  // un iframe (Fase 7). Sitios de terceros siguen sin poder framearnos
+  // (anti-clickjacking); el refuerzo moderno es frame-ancestors 'self' (abajo).
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-DNS-Prefetch-Control", value: "on" },
   {
