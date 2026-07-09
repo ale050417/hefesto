@@ -1,4 +1,11 @@
-import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  type AnyPgColumn,
+} from "drizzle-orm/pg-core";
 
 export const categories = pgTable("categories", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -7,6 +14,11 @@ export const categories = pgTable("categories", {
   icon: text("icon"),
   color: text("color"),
   sortOrder: integer("sort_order").notNull().default(0),
+  // Subcategorías (1 nivel): null = categoría raíz. RESTRICT: no se borra un
+  // padre con hijas. La regla "el padre debe ser raíz" vive en el servicio.
+  parentId: uuid("parent_id").references((): AnyPgColumn => categories.id, {
+    onDelete: "restrict",
+  }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
