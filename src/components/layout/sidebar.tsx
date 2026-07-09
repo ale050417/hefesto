@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "./brand-mark";
+import { ThemeSwitcher } from "./theme-switcher";
 
 const icons: Record<string, React.ReactNode> = {
   panel: (
@@ -312,13 +313,17 @@ export function Sidebar({
         ))}
       </nav>
 
-      <Link
-        href="/"
-        onClick={onNavigate}
-        className="text-faint hover:text-fg mt-auto block px-3 pt-4 text-xs transition-colors"
-      >
-        ← Volver a la tienda
-      </Link>
+      <div className="mt-auto flex items-center justify-between gap-2 px-3 pt-4">
+        <Link
+          href="/"
+          onClick={onNavigate}
+          className="text-faint hover:text-fg text-xs transition-colors"
+        >
+          ← Volver a la tienda
+        </Link>
+        {/* Tema claro / oscuro / cálido (igual que en la tienda) */}
+        <ThemeSwitcher />
+      </div>
     </aside>
   );
 }

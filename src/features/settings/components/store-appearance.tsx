@@ -599,7 +599,15 @@ export function StoreAppearance({
           </div>
           <span className="badge badge-success">En vivo</span>
         </div>
-        <StoreLivePreview version={previewVersion} />
+        <StoreLivePreview
+          version={previewVersion}
+          draft={{
+            name: form.name,
+            slogan: form.slogan,
+            accent: seasonActive ? SEASONS[form.season].accent : form.accent,
+            sections,
+          }}
+        />
         <a
           className="btn btn-secondary btn-block"
           href="/"

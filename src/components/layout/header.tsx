@@ -46,10 +46,10 @@ export async function Header() {
             <BrandMark size={38} />
           )}
           <span className="brand-col">
-            <span className="brand-name">
+            <span className="brand-name" data-preview-name>
               HEFESTO<b> 3D</b>
             </span>
-            <span className="brand-sub">
+            <span className="brand-sub" data-preview-slogan>
               {brand.slogan || "Forjado en capas"}
             </span>
           </span>

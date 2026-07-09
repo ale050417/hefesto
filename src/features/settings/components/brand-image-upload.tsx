@@ -57,14 +57,20 @@ export function BrandImageUpload({
       <h3 className="text-fg font-display mb-1 text-base">{label}</h3>
       <p className="text-dim mb-4 text-sm">{hint}</p>
 
-      <div className="bg-surface-2 border-surface-3 relative mb-4 flex aspect-video items-center justify-center overflow-hidden rounded-lg border">
+      {/* Preview compacta: el logo se ve a tamaño razonable (no gigante);
+          el hero mantiene proporción 16:9 pero acotado en alto. */}
+      <div
+        className="bg-surface-2 border-surface-3 relative mb-4 flex items-center justify-center overflow-hidden rounded-lg border"
+        style={{ height: kind === "logo" ? 120 : 180 }}
+      >
         {url ? (
           <Image
             src={url}
             alt={label}
             fill
-            sizes="(max-width: 768px) 100vw, 480px"
+            sizes="(max-width: 768px) 60vw, 320px"
             className="object-contain"
+            style={{ padding: 12 }}
           />
         ) : (
           <span className="text-faint text-sm">Sin imagen</span>

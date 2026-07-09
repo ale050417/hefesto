@@ -11,6 +11,7 @@ import {
   getBrandSettings,
 } from "@/features/settings/service";
 import { sectionOn } from "@/features/settings/home-sections";
+import { PreviewBridge } from "@/features/settings/components/preview-bridge";
 import { CountUp } from "@/components/home/count-up";
 import type { ProductView } from "@/features/products/types";
 
@@ -243,10 +244,21 @@ function ProductSection({
   );
 }
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // Modo preview (iframe del admin): se renderizan TODAS las secciones y el
+  // PreviewBridge aplica el borrador (mostrar/ocultar, acento, textos) en vivo.
+  const isPreview = "_preview" in (await searchParams);
   const [{ featured, latest, onSale, categories }, banners, brand] =
     await Promise.all([getHomeData(), getActiveBanners(), getBrandSettings()]);
-  const show = (id: string) => sectionOn(brand.homeSections, id);
+  const show = (id: string) => isPreview || sectionOn(brand.homeSections, id);
+  const previewHidden = (id: string) =>
+    isPreview && !sectionOn(brand.homeSections, id)
+      ? ({ display: "none" } as const)
+      : undefined;
 
   const slides = banners.map((b) => ({
     title: b.title,
@@ -274,7 +286,11 @@ export default async function Home() {
       <HeroCarousel slides={slides} />
 
       {show("trustBar") ? (
-        <section className="trust-bar">
+        <section
+          data-home-section="trustBar"
+          style={previewHidden("trustBar")}
+          className="trust-bar"
+        >
           <div className="store-wrap">
             <div className="trust-grid">
               {trust.map((t) => (
@@ -294,7 +310,11 @@ export default async function Home() {
       ) : null}
 
       {categories.length > 0 && show("categorias") ? (
-        <section className="store-section">
+        <section
+          data-home-section="categorias"
+          style={previewHidden("categorias")}
+          className="store-section"
+        >
           <div className="store-wrap">
             <div className="sec-head">
               <div>
@@ -355,16 +375,22 @@ export default async function Home() {
       ) : null}
 
       {show("nuevos") ? (
-        <ProductSection
-          eyebrow="Recién salidos"
-          title="Nuevos lanzamientos"
-          products={latest}
-          href="/catalogo"
-        />
+        <div data-home-section="nuevos" style={previewHidden("nuevos")}>
+          <ProductSection
+            eyebrow="Recién salidos"
+            title="Nuevos lanzamientos"
+            products={latest}
+            href="/catalogo"
+          />
+        </div>
       ) : null}
 
       {show("stats") ? (
-        <section className="store-section pt-0">
+        <section
+          data-home-section="stats"
+          style={previewHidden("stats")}
+          className="store-section pt-0"
+        >
           <div className="store-wrap">
             <div className="sec-head flex-col items-center text-center">
               <div>
@@ -394,7 +420,11 @@ export default async function Home() {
       ) : null}
 
       {onSale.length > 0 && show("ofertas") ? (
-        <section className="store-section pt-0">
+        <section
+          data-home-section="ofertas"
+          style={previewHidden("ofertas")}
+          className="store-section pt-0"
+        >
           <div className="store-wrap">
             <div
               className="ui-card p-8"
@@ -428,7 +458,11 @@ export default async function Home() {
       ) : null}
 
       {show("materiales") ? (
-        <section className="store-section pt-0">
+        <section
+          data-home-section="materiales"
+          style={previewHidden("materiales")}
+          className="store-section pt-0"
+        >
           <div className="store-wrap">
             <div className="sec-head">
               <div>
@@ -465,15 +499,24 @@ export default async function Home() {
       ) : null}
 
       {show("masVendidos") ? (
-        <ProductSection
-          eyebrow="Favoritos del público"
-          title="Más vendidos"
-          products={featured}
-        />
+        <div
+          data-home-section="masVendidos"
+          style={previewHidden("masVendidos")}
+        >
+          <ProductSection
+            eyebrow="Favoritos del público"
+            title="Más vendidos"
+            products={featured}
+          />
+        </div>
       ) : null}
 
       {show("galeria") ? (
-        <section className="store-section pt-0">
+        <section
+          data-home-section="galeria"
+          style={previewHidden("galeria")}
+          className="store-section pt-0"
+        >
           <div className="store-wrap">
             <div className="sec-head">
               <div>
@@ -512,7 +555,11 @@ export default async function Home() {
       ) : null}
 
       {show("comoFunciona") ? (
-        <section className="store-section pt-0">
+        <section
+          data-home-section="comoFunciona"
+          style={previewHidden("comoFunciona")}
+          className="store-section pt-0"
+        >
           <div className="store-wrap">
             <div className="sec-head flex-col items-center text-center">
               <div>
@@ -534,7 +581,11 @@ export default async function Home() {
       ) : null}
 
       {show("testimonios") ? (
-        <section className="store-section pt-0">
+        <section
+          data-home-section="testimonios"
+          style={previewHidden("testimonios")}
+          className="store-section pt-0"
+        >
           <div className="store-wrap">
             <div className="sec-head">
               <div>
@@ -563,7 +614,12 @@ export default async function Home() {
       ) : null}
 
       {show("faq") ? (
-        <section id="faq" className="store-section pt-0">
+        <section
+          data-home-section="faq"
+          style={previewHidden("faq")}
+          id="faq"
+          className="store-section pt-0"
+        >
           <div className="store-wrap">
             <div className="faq-grid">
               <div className="faq-intro">
@@ -596,7 +652,11 @@ export default async function Home() {
       ) : null}
 
       {show("pedidoMedida") ? (
-        <section className="store-section pt-0">
+        <section
+          data-home-section="pedidoMedida"
+          style={previewHidden("pedidoMedida")}
+          className="store-section pt-0"
+        >
           <div className="store-wrap">
             <div
               className="ui-card cust-cta overflow-hidden"
@@ -673,6 +733,7 @@ export default async function Home() {
       ) : null}
 
       <Newsletter />
+      {isPreview ? <PreviewBridge /> : null}
     </div>
   );
 }

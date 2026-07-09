@@ -1,16 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  PREVIEW_MSG,
+  PREVIEW_READY_MSG,
+  type PreviewDraft,
+} from "./preview-bridge";
 
 /**
  * Vista previa REAL de la tienda (Fase 7): un iframe de la portada del
- * cliente, tal cual está publicada. Reemplaza al mockup dibujado a mano, que
- * "se parecía" pero no era la tienda. Se recarga sola después de cada
- * guardado (prop `version`) y a demanda con el botón.
+ * cliente. Dos modos combinados:
+ *  - Publicado: el iframe muestra lo que ve el cliente; se recarga al guardar
+ *    (prop `version`) y a demanda con el botón.
+ *  - Borrador EN VIVO: cada cambio del form (secciones, acento, nombre,
+ *    eslogan) se manda por postMessage al PreviewBridge dentro del iframe,
+ *    que lo aplica al instante SIN tocar lo publicado.
  */
-export function StoreLivePreview({ version }: { version: number }) {
+function postDraft(
+  iframe: HTMLIFrameElement | null,
+  draft: PreviewDraft | undefined,
+) {
+  if (!iframe?.contentWindow || !draft) return;
+  iframe.contentWindow.postMessage(
+    { type: PREVIEW_MSG, draft },
+    window.location.origin,
+  );
+}
+
+export function StoreLivePreview({
+  version,
+  draft,
+}: {
+  version: number;
+  draft?: PreviewDraft;
+}) {
   // El iframe se remonta cuando cambia `version` (guardado) o `stamp` (botón).
   const [stamp, setStamp] = useState(0);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const draftRef = useRef<PreviewDraft | undefined>(undefined);
+
+  // Ref con el último borrador (solo se toca dentro de efectos).
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
+
+  // El iframe avisa cuando está listo (carga inicial y cada recarga).
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin) return;
+      const data = e.data as { type?: string };
+      if (data?.type === PREVIEW_READY_MSG) {
+        postDraft(iframeRef.current, draftRef.current);
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  // Cambios del borrador → al iframe (con un mini debounce anti-ráfaga).
+  useEffect(() => {
+    const t = setTimeout(() => postDraft(iframeRef.current, draft), 120);
+    return () => clearTimeout(t);
+  }, [draft]);
 
   return (
     <div className="ui-card" style={{ padding: 0, overflow: "hidden" }}>
@@ -59,9 +110,10 @@ export function StoreLivePreview({ version }: { version: number }) {
       </div>
       <div style={{ position: "relative", height: 460, overflow: "hidden" }}>
         <iframe
+          ref={iframeRef}
           key={`${version}:${stamp}`}
           src={`/?_preview=${version}-${stamp}`}
-          title="Vista previa de la tienda (estado publicado)"
+          title="Vista previa de la tienda"
           style={{
             width: "200%",
             height: "200%",
@@ -75,8 +127,9 @@ export function StoreLivePreview({ version }: { version: number }) {
         className="text-faint border-t px-3 py-2 text-[11.5px]"
         style={{ borderColor: "var(--border)" }}
       >
-        Esta es la tienda REAL con el estado publicado actual: lo que ves acá es
-        exactamente lo que ve el cliente. Se actualiza al guardar.
+        Lo que tocás en el form se refleja acá al instante como BORRADOR; la
+        tienda real no cambia hasta que guardes. Al guardar, se recarga con lo
+        publicado.
       </p>
     </div>
   );

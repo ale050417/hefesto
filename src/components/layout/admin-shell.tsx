@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { Sidebar } from "./sidebar";
 import { BrandMark } from "./brand-mark";
+import { ThemeSwitcher } from "./theme-switcher";
 
 /**
  * Estructura del panel con navegación móvil real: topbar con hamburguesa +
@@ -65,6 +66,10 @@ export function AdminShell({
             HEFESTO<b> Admin</b>
           </span>
         </Link>
+        {/* Tema claro / oscuro / cálido, igual que en la tienda */}
+        <span className="ml-auto">
+          <ThemeSwitcher />
+        </span>
       </header>
 
       <Sidebar
