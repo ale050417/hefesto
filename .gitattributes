@@ -1,0 +1,11 @@
+# Normalización de finales de línea: el repo guarda LF siempre.
+# Evita que el editor en Windows marque archivos enteros como modificados.
+* text=auto eol=lf
+
+# Binarios: no tocar
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.woff2 binary
