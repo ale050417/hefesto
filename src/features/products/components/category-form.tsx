@@ -48,12 +48,15 @@ function IconSvg({ name }: { name: string }) {
 export function CategoryForm({
   category,
   parents = [],
+  defaultParentId,
   onDone,
   onCancel,
 }: {
   category?: CategoryFormData;
   /** Categorías raíz elegibles como padre (sin la propia). */
   parents?: ParentOption[];
+  /** Padre preseleccionado al crear desde el "+ Sub" de una tarjeta. */
+  defaultParentId?: string;
   onDone?: () => void;
   onCancel?: () => void;
 }) {
@@ -62,7 +65,9 @@ export function CategoryForm({
   const [name, setName] = useState(category?.name ?? "");
   const [icon, setIcon] = useState<string>(category?.icon ?? CAT_ICONS[0]);
   const [color, setColor] = useState<string>(category?.color ?? CAT_COLORS[0]!);
-  const [parentId, setParentId] = useState<string>(category?.parentId ?? "");
+  const [parentId, setParentId] = useState<string>(
+    category?.parentId ?? defaultParentId ?? "",
+  );
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const parentOptions = parents.filter((c) => c.id !== category?.id);

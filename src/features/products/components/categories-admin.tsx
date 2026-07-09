@@ -70,17 +70,30 @@ export function CategoriesAdmin({
     list.push(c);
     byParent.set(c.parentId, list);
   }
-  const ordered = roots.flatMap((r) => [r, ...(byParent.get(r.id) ?? [])]);
-  const parentName = (id: string | null) =>
-    id ? (categories.find((c) => c.id === id)?.name ?? null) : null;
   const parentOptions = roots.map(({ id, name }) => ({ id, name }));
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryFormData | null>(null);
+  const [newParentId, setNewParentId] = useState<string | null>(null);
+  // Desplegable de subcategorías por tarjeta (rediseño Fase 6).
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const [toDelete, setToDelete] = useState<CategoryWithCount | null>(null);
   const [busy, setBusy] = useState(false);
 
   function openNew() {
     setEditing(null);
+    setNewParentId(null);
+    setFormOpen(true);
+  }
+  function openNewChild(parentId: string) {
+    setEditing(null);
+    setNewParentId(parentId);
     setFormOpen(true);
   }
   function openEdit(c: CategoryWithCount) {
@@ -144,9 +157,11 @@ export function CategoriesAdmin({
           <div className="text-dim">No hay categorías. Creá la primera.</div>
         </div>
       ) : (
-        <div className="grid-3">
-          {ordered.map((c) => {
+        <div className="grid-3" style={{ alignItems: "start" }}>
+          {roots.map((c) => {
             const color = c.color ?? "#888";
+            const children = byParent.get(c.id) ?? [];
+            const open = expanded.has(c.id);
             return (
               <div
                 key={c.id}
@@ -156,9 +171,9 @@ export function CategoriesAdmin({
                 <div style={{ height: 6, background: color }} />
                 <div style={{ padding: 18 }}>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
                       <div
-                        className="kpi-ic"
+                        className="kpi-ic shrink-0"
                         style={{
                           width: 46,
                           height: 46,
@@ -168,26 +183,20 @@ export function CategoriesAdmin({
                       >
                         <IconSvg name={c.icon} size={21} />
                       </div>
-                      <div>
-                        <div className="text-[16px] font-bold">{c.name}</div>
+                      <div className="min-w-0">
+                        <div className="truncate text-[16px] font-bold">
+                          {c.name}
+                        </div>
                         <div className="text-faint text-[12px]">
                           {c.productCount}{" "}
                           {c.productCount === 1 ? "producto" : "productos"}
-                          {parentName(c.parentId) ? (
-                            <span
-                              className="ml-1 rounded-full px-2 py-0.5 text-[11px]"
-                              style={{
-                                background: "rgba(var(--gold-rgb), .12)",
-                                color: "var(--gold-deep)",
-                              }}
-                            >
-                              Sub de {parentName(c.parentId)}
-                            </span>
-                          ) : null}
+                          {children.length > 0
+                            ? ` · ${children.length} sub`
+                            : ""}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex shrink-0 items-center gap-1">
                       <button
                         className="btn-icon btn-ghost"
                         title="Editar"
@@ -197,13 +206,131 @@ export function CategoriesAdmin({
                       </button>
                       <button
                         className="btn-icon btn-ghost"
-                        title="Eliminar"
+                        title={
+                          children.length > 0
+                            ? "Tiene subcategorías: borralas primero"
+                            : "Eliminar"
+                        }
                         onClick={() => setToDelete(c)}
                       >
                         {TrashIcon}
                       </button>
                     </div>
                   </div>
+
+                  <div
+                    className="mt-3 flex items-center justify-between border-t pt-3"
+                    style={{ borderColor: "var(--border)" }}
+                  >
+                    <button
+                      type="button"
+                      className="text-dim hover:text-fg flex items-center gap-1.5 text-[12.5px] font-medium"
+                      onClick={() => toggleExpanded(c.id)}
+                      disabled={children.length === 0}
+                      aria-expanded={open}
+                    >
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                        style={{
+                          transform: open ? "rotate(90deg)" : "none",
+                          transition: "transform .15s ease",
+                          opacity: children.length === 0 ? 0.4 : 1,
+                        }}
+                      >
+                        <path d="m9 18 6-6-6-6" />
+                      </svg>
+                      {children.length === 0
+                        ? "Sin subcategorías"
+                        : `${children.length} subcategoría${children.length === 1 ? "" : "s"}`}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-dim hover:text-fg flex items-center gap-1 text-[12px]"
+                      title={`Nueva subcategoría de ${c.name}`}
+                      onClick={() => openNewChild(c.id)}
+                    >
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        aria-hidden
+                      >
+                        <path d="M12 5v14M5 12h14" />
+                      </svg>
+                      Sub
+                    </button>
+                  </div>
+
+                  {open && children.length > 0 ? (
+                    <ul
+                      className="mt-2 flex flex-col overflow-hidden rounded-lg"
+                      style={{ background: "var(--surface-2)" }}
+                    >
+                      {children.map((child) => {
+                        const childColor = child.color ?? color;
+                        return (
+                          <li
+                            key={child.id}
+                            className="flex items-center justify-between gap-2 border-b px-3 py-2 last:border-0"
+                            style={{ borderColor: "var(--border)" }}
+                          >
+                            <div className="flex min-w-0 items-center gap-2.5">
+                              <span
+                                className="kpi-ic shrink-0"
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  background: `${childColor}22`,
+                                  color: childColor,
+                                }}
+                              >
+                                <IconSvg name={child.icon} size={14} />
+                              </span>
+                              <div className="min-w-0">
+                                <div className="truncate text-[13px] font-semibold">
+                                  {child.name}
+                                </div>
+                                <div className="text-faint text-[11px]">
+                                  {child.productCount}{" "}
+                                  {child.productCount === 1
+                                    ? "producto"
+                                    : "productos"}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 items-center">
+                              <button
+                                className="btn-icon btn-ghost"
+                                title="Editar"
+                                onClick={() => openEdit(child)}
+                              >
+                                {EditIcon}
+                              </button>
+                              <button
+                                className="btn-icon btn-ghost"
+                                title="Eliminar"
+                                onClick={() => setToDelete(child)}
+                              >
+                                {TrashIcon}
+                              </button>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : null}
                 </div>
               </div>
             );
@@ -214,12 +341,19 @@ export function CategoriesAdmin({
       <Modal
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        title={editing ? "Editar categoría" : "Nueva categoría"}
+        title={
+          editing
+            ? "Editar categoría"
+            : newParentId
+              ? "Nueva subcategoría"
+              : "Nueva categoría"
+        }
         size="lg"
       >
         <CategoryForm
           category={editing ?? undefined}
           parents={parentOptions}
+          defaultParentId={newParentId ?? undefined}
           onDone={() => setFormOpen(false)}
           onCancel={() => setFormOpen(false)}
         />
