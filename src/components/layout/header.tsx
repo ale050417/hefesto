@@ -60,7 +60,9 @@ export async function Header() {
         </div>
 
         <div className="store-actions">
-          <ThemeSwitcher compact />
+          <span className="store-theme">
+            <ThemeSwitcher compact />
+          </span>
           {/* Secundarias: en mobile viven dentro de Mi cuenta (CSS las oculta) */}
           <span className="store-extra-actions">
             <FavButton />

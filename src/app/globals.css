@@ -4729,3 +4729,80 @@ td[role="checkbox"]:focus-visible .check {
     min-height: 44px;
   }
 }
+
+/* ============================================================
+   Header mobile v2 (2026-07-09): logo solo ícono, buscador
+   SIEMPRE expandido (flex), acciones mínimas según sesión.
+   Pisa las reglas del bloque anterior (cascada, mismo media).
+   ============================================================ */
+
+/* La fila de tema del menú de usuario solo aparece en mobile. */
+.user-menu-theme {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  /* 1) Logo: solo el isotipo, sin textos. */
+  .store-topbar .brand-col {
+    display: none;
+  }
+
+  /* 2) Buscador siempre expandido ocupando el espacio flexible. */
+  .store-search-wrap {
+    flex: 1;
+    min-width: 0;
+  }
+  .store-search .ss-input {
+    width: 100%;
+    transition: none;
+    padding-inline-end: 12px;
+  }
+
+  /* 3) Favoritos y carrito visibles (logueado); notificaciones no. */
+  .store-extra-actions {
+    display: inline-flex;
+  }
+  .store-extra-actions .notif-wrap {
+    display: none;
+  }
+
+  /* 4) Tema y divisor fuera del header (el tema vive en el menú de usuario). */
+  .store-theme,
+  .hdr-divider {
+    display: none;
+  }
+  .user-menu-theme {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* 5) Una sola fila prolija. */
+  .store-topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+
+  /* 6) Chip de usuario compacto: solo avatar (abre el menú igual). */
+  .user-chip .user-chip-info,
+  .user-chip .user-chip-caret {
+    display: none;
+  }
+  .user-chip {
+    min-width: 44px;
+    justify-content: center;
+  }
+
+  /* Iniciar sesión compacto para deslogueados. */
+  .store-cta {
+    padding: 8px 12px;
+    font-size: 12.5px;
+    min-height: 44px;
+    white-space: nowrap;
+  }
+}

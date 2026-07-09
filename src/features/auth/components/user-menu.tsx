@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { ThemeSwitcher } from "@/components/layout/theme-switcher";
 import { cn } from "@/lib/utils";
 import { logoutAction } from "@/features/auth/actions";
 
@@ -104,6 +105,12 @@ export function UserMenu({
                 <div className="user-menu-name">{name}</div>
                 {email ? <div className="user-menu-email">{email}</div> : null}
               </div>
+            </div>
+
+            {/* En mobile el switch de tema vive acá (en el header no entra) */}
+            <div className="user-menu-theme">
+              <span className="text-dim text-[12px]">Tema</span>
+              <ThemeSwitcher />
             </div>
 
             <div className="user-menu-items">
