@@ -60,20 +60,13 @@ export async function Header() {
         </div>
 
         <div className="store-actions">
-          <ThemeSwitcher />
-          <FavButton />
-          {user ? <NotificationBell /> : null}
+          <ThemeSwitcher compact />
+          {/* Secundarias: en mobile viven dentro de Mi cuenta (CSS las oculta) */}
+          <span className="store-extra-actions">
+            <FavButton />
+            {user ? <NotificationBell /> : null}
+          </span>
           <CartButton />
-
-          {isStaff ? (
-            <Link
-              href="/admin"
-              className="store-nav-link"
-              style={{ color: "var(--gold-bright)" }}
-            >
-              Panel
-            </Link>
-          ) : null}
 
           {user ? (
             <UserMenu
@@ -81,6 +74,7 @@ export async function Header() {
               email={user.email}
               points={points}
               isClient={isClient}
+              isStaff={isStaff}
             />
           ) : (
             <AuthTrigger />

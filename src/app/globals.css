@@ -4636,3 +4636,96 @@ td[role="checkbox"]:focus-visible .check {
     transition: none;
   }
 }
+
+/* ============================================================
+   Header de la tienda — rediseño sobrio (2026-07-09).
+   Una fila principal compacta, buscador contenido, acciones
+   agrupadas y promo finita/cerrable. Mobile: mínimo + buscador
+   expandible al foco. (Los ítems Pedidos/Cuenta/Panel viven en
+   el menú de usuario; el switch de tema es un botón que cicla.)
+   ============================================================ */
+
+.store-topbar {
+  min-height: 64px;
+}
+.store-topbar .brand-sub {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  opacity: 0.65;
+}
+.store-search-wrap {
+  max-width: 360px;
+  margin-inline: auto;
+}
+.store-actions {
+  gap: 8px;
+}
+.store-extra-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Promo: banda finita con botón de cierre */
+.store-banner {
+  position: relative;
+  padding-block: 4px;
+  font-size: 12px;
+}
+.store-banner-close {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.7;
+  cursor: pointer;
+}
+.store-banner-close:hover {
+  opacity: 1;
+}
+
+@media (max-width: 1200px) {
+  .store-topbar .brand-sub {
+    display: none;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  .store-search-wrap {
+    max-width: 260px;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Ultra minimalista: logo + búsqueda + carrito + usuario. */
+  .store-extra-actions {
+    display: none;
+  }
+  /* Buscador: pastilla colapsada que se expande al tocar (foco). */
+  .store-search-wrap {
+    max-width: none;
+    margin-inline: 0;
+  }
+  .store-search .ss-input {
+    width: 44px;
+    min-height: 44px;
+    padding-inline-end: 0;
+    transition: width 0.2s ease;
+  }
+  .store-search:focus-within .ss-input {
+    width: 100%;
+    padding-inline-end: 12px;
+  }
+  /* Touch targets cómodos */
+  .store-actions a,
+  .store-actions button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

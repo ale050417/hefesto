@@ -11,6 +11,8 @@ type UserMenuProps = {
   /** Saldo de puntos. Solo se muestra en el chip para clientes; null para staff. */
   points: number | null;
   isClient: boolean;
+  /** Muestra el acceso al panel dentro del menú (staff). */
+  isStaff?: boolean;
 };
 
 const svgProps = {
@@ -40,7 +42,13 @@ function Chevron() {
   );
 }
 
-export function UserMenu({ name, email, points, isClient }: UserMenuProps) {
+export function UserMenu({
+  name,
+  email,
+  points,
+  isClient,
+  isStaff = false,
+}: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -99,6 +107,21 @@ export function UserMenu({ name, email, points, isClient }: UserMenuProps) {
             </div>
 
             <div className="user-menu-items">
+              {isStaff ? (
+                <Link
+                  href="/admin"
+                  className="dropdown-item"
+                  onClick={close}
+                  role="menuitem"
+                  style={{ color: "var(--gold-bright)" }}
+                >
+                  <svg {...svgProps}>
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M3 9h18M9 21V9" />
+                  </svg>
+                  Panel de gestión
+                </Link>
+              ) : null}
               <Link
                 href="/cuenta"
                 className="dropdown-item"

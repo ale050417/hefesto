@@ -11,7 +11,12 @@ const THEMES: { value: Theme; label: string; icon: string }[] = [
   { value: "warm", label: "Cálido", icon: "✦" },
 ];
 
-export function ThemeSwitcher() {
+export function ThemeSwitcher({
+  compact = false,
+}: {
+  /** true = un solo botón que va ciclando claro → oscuro → cálido. */
+  compact?: boolean;
+} = {}) {
   const mounted = useMounted();
   const [override, setOverride] = useState<Theme | null>(null);
   const current: Theme =
@@ -29,6 +34,23 @@ export function ThemeSwitcher() {
     } catch {
       /* ignore */
     }
+  }
+
+  if (compact) {
+    const idx = THEMES.findIndex((t) => t.value === current);
+    const active = THEMES[idx === -1 ? 0 : idx]!;
+    const next = THEMES[(idx + 1) % THEMES.length]!;
+    return (
+      <button
+        type="button"
+        onClick={() => apply(next.value)}
+        title={`Tema: ${active.label} (tocar para ${next.label.toLowerCase()})`}
+        aria-label={`Cambiar tema (actual: ${active.label})`}
+        className="bg-surface-2 border-surface-3 text-dim hover:text-fg inline-flex h-9 w-9 items-center justify-center rounded-full border text-sm transition-colors"
+      >
+        {active.icon}
+      </button>
+    );
   }
 
   return (

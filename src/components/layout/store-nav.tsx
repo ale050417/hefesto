@@ -63,38 +63,6 @@ const links: NavLink[] = [
       </svg>
     ),
   },
-  {
-    href: "/cuenta/pedidos",
-    label: "Mis pedidos",
-    push: true,
-    icon: (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <path d="m7.5 4.27 9 5.15M21 8.5v7l-9 5-9-5v-7l9-5z" />
-        <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
-      </svg>
-    ),
-  },
-  {
-    href: "/cuenta",
-    label: "Mi cuenta",
-    exact: true,
-    icon: (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <path d="M20 21a8 8 0 1 0-16 0" />
-        <circle cx="12" cy="7" r="4" />
-      </svg>
-    ),
-  },
 ];
 
 export function StoreNav() {
