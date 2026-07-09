@@ -1,8 +1,13 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { env } from "@/core/config/env";
+import {
+  fetchWithTimeout,
+  SUPABASE_ADMIN_FETCH_TIMEOUT_MS,
+} from "./fetch-with-timeout";
 
 // Cliente admin (service role): SOLO servidor. Saltea RLS; nunca exponer.
 // Se crea de forma perezosa para no romper el build (que no tiene secretos).
+// Timeout de red más alto (60 s): este cliente sube imágenes a Storage.
 let client: SupabaseClient | null = null;
 
 export function getSupabaseAdmin(): SupabaseClient {
@@ -10,7 +15,10 @@ export function getSupabaseAdmin(): SupabaseClient {
     client = createClient(
       env.NEXT_PUBLIC_SUPABASE_URL,
       env.SUPABASE_SERVICE_ROLE_KEY,
-      { auth: { persistSession: false } },
+      {
+        auth: { persistSession: false },
+        global: { fetch: fetchWithTimeout(SUPABASE_ADMIN_FETCH_TIMEOUT_MS) },
+      },
     );
   }
   return client;
