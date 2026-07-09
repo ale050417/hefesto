@@ -71,18 +71,11 @@ export function CategoriesAdmin({
     byParent.set(c.parentId, list);
   }
   const parentOptions = roots.map(({ id, name }) => ({ id, name }));
+  const subCount = categories.length - roots.length;
+  const totalProducts = categories.reduce((acc, c) => acc + c.productCount, 0);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryFormData | null>(null);
   const [newParentId, setNewParentId] = useState<string | null>(null);
-  // Desplegable de subcategorías por tarjeta (rediseño Fase 6).
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const toggleExpanded = (id: string) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
   const [toDelete, setToDelete] = useState<CategoryWithCount | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -157,185 +150,194 @@ export function CategoriesAdmin({
           <div className="text-dim">No hay categorías. Creá la primera.</div>
         </div>
       ) : (
-        <div className="grid-3" style={{ alignItems: "start" }}>
-          {roots.map((c) => {
-            const color = c.color ?? "#888";
-            const children = byParent.get(c.id) ?? [];
-            const open = expanded.has(c.id);
-            return (
-              <div
-                key={c.id}
-                className="ui-card card-hover"
-                style={{ padding: 0, overflow: "hidden" }}
-              >
-                <div style={{ height: 6, background: color }} />
-                <div style={{ padding: 18 }}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div
-                        className="kpi-ic shrink-0"
-                        style={{
-                          width: 46,
-                          height: 46,
-                          background: `${color}22`,
-                          color,
-                        }}
-                      >
-                        <IconSvg name={c.icon} size={21} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="truncate text-[16px] font-bold">
-                          {c.name}
-                        </div>
-                        <div className="text-faint text-[12px]">
-                          {c.productCount}{" "}
-                          {c.productCount === 1 ? "producto" : "productos"}
-                          {children.length > 0
-                            ? ` · ${children.length} sub`
-                            : ""}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        className="btn-icon btn-ghost"
-                        title="Editar"
-                        onClick={() => openEdit(c)}
-                      >
-                        {EditIcon}
-                      </button>
-                      <button
-                        className="btn-icon btn-ghost"
-                        title={
-                          children.length > 0
-                            ? "Tiene subcategorías: borralas primero"
-                            : "Eliminar"
-                        }
-                        onClick={() => setToDelete(c)}
-                      >
-                        {TrashIcon}
-                      </button>
-                    </div>
-                  </div>
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="chip">
+              {roots.length} categoría{roots.length === 1 ? "" : "s"}
+            </span>
+            <span className="chip">
+              {subCount} subcategoría{subCount === 1 ? "" : "s"}
+            </span>
+            <span className="chip">
+              {totalProducts} producto{totalProducts === 1 ? "" : "s"}{" "}
+              categorizados
+            </span>
+          </div>
 
+          <div className="grid-3" style={{ alignItems: "start" }}>
+            {roots.map((c) => {
+              const color = c.color ?? "#888";
+              const children = byParent.get(c.id) ?? [];
+              return (
+                <div
+                  key={c.id}
+                  className="ui-card card-hover"
+                  style={{ padding: 0, overflow: "hidden" }}
+                >
+                  {/* Cabecera tintada con el color de la categoría */}
                   <div
-                    className="mt-3 flex items-center justify-between border-t pt-3"
-                    style={{ borderColor: "var(--border)" }}
+                    style={{
+                      padding: "16px 18px 14px",
+                      background: `linear-gradient(135deg, ${color}2e, ${color}0a 55%, transparent)`,
+                      borderBottom: "1px solid var(--border)",
+                    }}
                   >
-                    <button
-                      type="button"
-                      className="text-dim hover:text-fg flex items-center gap-1.5 text-[12.5px] font-medium"
-                      onClick={() => toggleExpanded(c.id)}
-                      disabled={children.length === 0}
-                      aria-expanded={open}
-                    >
-                      <svg
-                        width="13"
-                        height="13"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden
-                        style={{
-                          transform: open ? "rotate(90deg)" : "none",
-                          transition: "transform .15s ease",
-                          opacity: children.length === 0 ? 0.4 : 1,
-                        }}
-                      >
-                        <path d="m9 18 6-6-6-6" />
-                      </svg>
-                      {children.length === 0
-                        ? "Sin subcategorías"
-                        : `${children.length} subcategoría${children.length === 1 ? "" : "s"}`}
-                    </button>
-                    <button
-                      type="button"
-                      className="text-dim hover:text-fg flex items-center gap-1 text-[12px]"
-                      title={`Nueva subcategoría de ${c.name}`}
-                      onClick={() => openNewChild(c.id)}
-                    >
-                      <svg
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        aria-hidden
-                      >
-                        <path d="M12 5v14M5 12h14" />
-                      </svg>
-                      Sub
-                    </button>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div
+                          className="kpi-ic shrink-0"
+                          style={{
+                            width: 48,
+                            height: 48,
+                            background: `${color}26`,
+                            color,
+                            boxShadow: `0 0 0 1px ${color}33`,
+                          }}
+                        >
+                          <IconSvg name={c.icon} size={22} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="truncate text-[16.5px] font-bold">
+                            {c.name}
+                          </div>
+                          <div className="text-faint text-[12px]">
+                            {c.productCount}{" "}
+                            {c.productCount === 1 ? "producto" : "productos"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          className="btn-icon btn-ghost"
+                          title="Editar"
+                          onClick={() => openEdit(c)}
+                        >
+                          {EditIcon}
+                        </button>
+                        <button
+                          className="btn-icon btn-ghost"
+                          title={
+                            children.length > 0
+                              ? "Tiene subcategorías: borralas primero"
+                              : "Eliminar"
+                          }
+                          onClick={() => setToDelete(c)}
+                        >
+                          {TrashIcon}
+                        </button>
+                      </div>
+                    </div>
                   </div>
 
-                  {open && children.length > 0 ? (
-                    <ul
-                      className="mt-2 flex flex-col overflow-hidden rounded-lg"
-                      style={{ background: "var(--surface-2)" }}
-                    >
-                      {children.map((child) => {
-                        const childColor = child.color ?? color;
-                        return (
-                          <li
-                            key={child.id}
-                            className="flex items-center justify-between gap-2 border-b px-3 py-2 last:border-0"
-                            style={{ borderColor: "var(--border)" }}
-                          >
-                            <div className="flex min-w-0 items-center gap-2.5">
-                              <span
-                                className="kpi-ic shrink-0"
-                                style={{
-                                  width: 28,
-                                  height: 28,
-                                  background: `${childColor}22`,
-                                  color: childColor,
-                                }}
-                              >
-                                <IconSvg name={child.icon} size={14} />
-                              </span>
-                              <div className="min-w-0">
-                                <div className="truncate text-[13px] font-semibold">
+                  {/* Subcategorías SIEMPRE visibles (preview total del árbol) */}
+                  <div style={{ padding: "12px 18px 16px" }}>
+                    <div className="flex items-center justify-between">
+                      <span
+                        className="text-faint text-[11px] font-semibold"
+                        style={{
+                          textTransform: "uppercase",
+                          letterSpacing: ".08em",
+                        }}
+                      >
+                        Subcategorías
+                        {children.length > 0 ? ` (${children.length})` : ""}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-dim hover:text-fg flex items-center gap-1 text-[12px] font-medium"
+                        title={`Nueva subcategoría de ${c.name}`}
+                        onClick={() => openNewChild(c.id)}
+                      >
+                        <svg
+                          width="12"
+                          height="12"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          aria-hidden
+                        >
+                          <path d="M12 5v14M5 12h14" />
+                        </svg>
+                        Sub
+                      </button>
+                    </div>
+
+                    {children.length === 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => openNewChild(c.id)}
+                        className="text-faint hover:text-dim mt-2 w-full rounded-lg py-2.5 text-[12px]"
+                        style={{ border: "1px dashed var(--border)" }}
+                      >
+                        + Agregar la primera subcategoría
+                      </button>
+                    ) : (
+                      <ul className="mt-2 flex flex-col gap-1.5">
+                        {children.map((child) => {
+                          const childColor = child.color ?? color;
+                          return (
+                            <li
+                              key={child.id}
+                              className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2"
+                              style={{
+                                background: "var(--surface-2)",
+                                border: "1px solid var(--border)",
+                              }}
+                            >
+                              <div className="flex min-w-0 items-center gap-2.5">
+                                <span
+                                  className="kpi-ic shrink-0"
+                                  style={{
+                                    width: 28,
+                                    height: 28,
+                                    background: `${childColor}22`,
+                                    color: childColor,
+                                  }}
+                                >
+                                  <IconSvg name={child.icon} size={14} />
+                                </span>
+                                <span className="truncate text-[13px] font-semibold">
                                   {child.name}
-                                </div>
-                                <div className="text-faint text-[11px]">
-                                  {child.productCount}{" "}
-                                  {child.productCount === 1
-                                    ? "producto"
-                                    : "productos"}
-                                </div>
+                                </span>
+                                <span
+                                  className="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
+                                  style={{
+                                    background: `${childColor}1e`,
+                                    color: childColor,
+                                  }}
+                                >
+                                  {child.productCount}
+                                </span>
                               </div>
-                            </div>
-                            <div className="flex shrink-0 items-center">
-                              <button
-                                className="btn-icon btn-ghost"
-                                title="Editar"
-                                onClick={() => openEdit(child)}
-                              >
-                                {EditIcon}
-                              </button>
-                              <button
-                                className="btn-icon btn-ghost"
-                                title="Eliminar"
-                                onClick={() => setToDelete(child)}
-                              >
-                                {TrashIcon}
-                              </button>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : null}
+                              <div className="flex shrink-0 items-center">
+                                <button
+                                  className="btn-icon btn-ghost"
+                                  title="Editar"
+                                  onClick={() => openEdit(child)}
+                                >
+                                  {EditIcon}
+                                </button>
+                                <button
+                                  className="btn-icon btn-ghost"
+                                  title="Eliminar"
+                                  onClick={() => setToDelete(child)}
+                                >
+                                  {TrashIcon}
+                                </button>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       <Modal
