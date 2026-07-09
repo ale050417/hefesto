@@ -20,6 +20,7 @@ import {
   PRINTER_STATUS_VARIANT,
 } from "../constants";
 import type { JobRow, JobStatus, Printer, PrinterStatus } from "../repository";
+import { runAction } from "@/lib/run-action";
 
 const PRINTER_STATES: PrinterStatus[] = [
   "idle",
@@ -71,7 +72,9 @@ export function ProductionBoard({
 
   async function addPrinter() {
     setBusy(true);
-    const res = await addPrinterAction(pName, pModel);
+    const res = await runAction(() => addPrinterAction(pName, pModel), {
+      silent: true,
+    });
     setBusy(false);
     if (!res.ok) return toast(res.error.message, "danger");
     toast("Impresora conectada", "success");
@@ -83,7 +86,9 @@ export function ProductionBoard({
 
   async function addJob() {
     setBusy(true);
-    const res = await addJobAction(jTitle, jPrinter);
+    const res = await runAction(() => addJobAction(jTitle, jPrinter), {
+      silent: true,
+    });
     setBusy(false);
     if (!res.ok) return toast(res.error.message, "danger");
     toast("Trabajo encolado", "success");
@@ -94,13 +99,17 @@ export function ProductionBoard({
   }
 
   async function changePrinter(id: string, status: PrinterStatus) {
-    const res = await setPrinterStatusAction(id, status);
+    const res = await runAction(() => setPrinterStatusAction(id, status), {
+      silent: true,
+    });
     if (res.ok) router.refresh();
     else toast(res.error.message, "danger");
   }
 
   async function changeJob(id: string, status: JobStatus) {
-    const res = await setJobStatusAction(id, status);
+    const res = await runAction(() => setJobStatusAction(id, status), {
+      silent: true,
+    });
     if (res.ok) router.refresh();
     else toast(res.error.message, "danger");
   }

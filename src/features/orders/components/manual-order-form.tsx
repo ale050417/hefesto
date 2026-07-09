@@ -9,6 +9,7 @@ import type { EstimatorContext } from "@/features/calculator/service";
 import { createManualSaleAction } from "../actions";
 import { ORDER_STATUS_LABEL } from "../constants";
 import type { OrderStatus } from "../types";
+import { runAction } from "@/lib/run-action";
 
 const PAYS = [
   { v: "cash", l: "Efectivo" },
@@ -149,15 +150,19 @@ export function ManualSaleForm({
             .map((p) => ({ name: p.name.trim(), pct: Number(p.pct) }))
         : undefined;
     try {
-      const res = await createManualSaleAction({
-        ...form,
-        quantity: qtyN,
-        filamentId: estData.filamentId ?? "",
-        material: estData.material,
-        grams: estData.grams,
-        printMinutes: estData.printMinutes,
-        profitSplit,
-      });
+      const res = await runAction(
+        () =>
+          createManualSaleAction({
+            ...form,
+            quantity: qtyN,
+            filamentId: estData.filamentId ?? "",
+            material: estData.material,
+            grams: estData.grams,
+            printMinutes: estData.printMinutes,
+            profitSplit,
+          }),
+        { silent: true },
+      );
       if (!res.ok) return setErr(res.error.message);
       if (onDone) {
         onDone();

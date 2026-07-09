@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { updateProfileAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 type Values = { fullName: string; phone: string };
 
@@ -27,7 +28,9 @@ export function ProfileForm({
   const onSubmit = handleSubmit(async (values) => {
     setMsg(null);
     setErr(null);
-    const res = await updateProfileAction(values);
+    const res = await runAction(() => updateProfileAction(values), {
+      silent: true,
+    });
     if (!res.ok) {
       setErr(res.error.message);
       return;

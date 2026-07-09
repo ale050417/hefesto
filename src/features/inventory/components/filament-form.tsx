@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { saveFilamentAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 import {
   FILAMENT_BRANDS,
   FILAMENT_COLORS,
@@ -67,7 +68,10 @@ export function FilamentForm({
     setErr(null);
     setBusy(true);
     try {
-      const res = await saveFilamentAction(form, filament?.id);
+      const res = await runAction(
+        () => saveFilamentAction(form, filament?.id),
+        { silent: true },
+      );
       if (!res.ok) return setErr(res.error.message);
       toast(edit ? "Filamento actualizado" : "Filamento agregado", "success");
       onDone?.();

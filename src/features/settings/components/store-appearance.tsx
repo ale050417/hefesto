@@ -19,7 +19,8 @@ import { SEASONS, type SeasonKey } from "../seasons";
 import { HOME_SECTIONS, sectionOn } from "../home-sections";
 import type { BusinessSettings, StoreBanner } from "../types";
 import { BrandImageUpload } from "./brand-image-upload";
-import { StorePreview } from "./store-preview";
+import { StoreLivePreview } from "./store-live-preview";
+import { runAction } from "@/lib/run-action";
 
 const ACCENTS = [
   "#C9A84C",
@@ -97,6 +98,9 @@ export function StoreAppearance({
   banners: StoreBanner[];
 }) {
   const router = useRouter();
+  // Fase 7: el iframe de la vista previa se recarga con cada guardado.
+  const [previewVersion, setPreviewVersion] = useState(0);
+  const bumpPreview = () => setPreviewVersion((v) => v + 1);
   const [form, setForm] = useState({
     accent: settings?.accentColor ?? "#C9A84C",
     name: settings?.storeName ?? "",
@@ -137,7 +141,9 @@ export function StoreAppearance({
     const compact = await compressImageToWebp(file, 1600);
     const fd = new FormData();
     fd.set("file", compact);
-    const res = await uploadBannerImageAction(fd);
+    const res = await runAction(() => uploadBannerImageAction(fd), {
+      silent: true,
+    });
     setImgBusy(false);
     if (bannerFileRef.current) bannerFileRef.current.value = "";
     if (!res.ok) return toast(res.error.message, "danger");
@@ -168,6 +174,7 @@ export function StoreAppearance({
     if (!a.ok || !b.ok) return toast("No se pudo guardar", "danger");
     toast("Apariencia guardada y publicada", "success");
     router.refresh();
+    bumpPreview();
   }
 
   function openNewBanner() {
@@ -202,19 +209,25 @@ export function StoreAppearance({
       sortOrder: bf.sortOrder,
     };
     const res = bf.id
-      ? await updateBannerAction(bf.id, payload)
-      : await createBannerAction(payload);
+      ? await runAction(() => updateBannerAction(bf.id!, payload), {
+          silent: true,
+        })
+      : await runAction(() => createBannerAction(payload), { silent: true });
     setBusy(false);
     if (!res.ok) return toast(res.error.message, "danger");
     toast(bf.id ? "Banner actualizado" : "Banner agregado", "success");
     setBannerOpen(false);
     router.refresh();
+    bumpPreview();
   }
   async function confirmRemoveBanner(b: StoreBanner) {
-    const res = await deleteBannerAction(b.id);
+    const res = await runAction(() => deleteBannerAction(b.id), {
+      silent: true,
+    });
     if (!res.ok) throw new Error(res.error.message);
     toast("Banner eliminado", "danger");
     router.refresh();
+    bumpPreview();
   }
   async function moveUp(i: number) {
     if (i <= 0) return;
@@ -227,6 +240,7 @@ export function StoreAppearance({
     ]);
     setPendingId(null);
     router.refresh();
+    bumpPreview();
   }
 
   return (
@@ -585,13 +599,7 @@ export function StoreAppearance({
           </div>
           <span className="badge badge-success">En vivo</span>
         </div>
-        <StorePreview
-          accent={seasonActive ? SEASONS[form.season].accent : form.accent}
-          name={form.name || "HEFESTO 3D"}
-          slogan={form.slogan || "Forjado en capas"}
-          banner={banners.find((b) => b.isActive) ?? null}
-          sections={sections}
-        />
+        <StoreLivePreview version={previewVersion} />
         <a
           className="btn btn-secondary btn-block"
           href="/"

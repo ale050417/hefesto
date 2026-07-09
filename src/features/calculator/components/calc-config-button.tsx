@@ -8,6 +8,7 @@ import { toast } from "@/stores/toastStore";
 import { useCan } from "@/components/auth/perms-provider";
 import { saveCalcConfigAction } from "../actions";
 import type { CalcConfig } from "../service";
+import { runAction } from "@/lib/run-action";
 
 export function CalcConfigButton({ config }: { config: CalcConfig }) {
   const router = useRouter();
@@ -29,7 +30,9 @@ export function CalcConfigButton({ config }: { config: CalcConfig }) {
     setErr(null);
     setBusy(true);
     try {
-      const res = await saveCalcConfigAction(form);
+      const res = await runAction(() => saveCalcConfigAction(form), {
+        silent: true,
+      });
       if (!res.ok) return setErr(res.error.message);
       toast("Configuración guardada", "success");
       setOpen(false);

@@ -10,6 +10,7 @@ import type { EstimatorValue } from "@/features/calculator/components/price-esti
 import type { EstimatorContext } from "@/features/calculator/service";
 import { createProductAction, updateProductAction } from "../actions";
 import type { Category } from "../types";
+import { runAction } from "@/lib/run-action";
 
 export type ProductFormValues = {
   name: string;
@@ -138,8 +139,10 @@ export function ProductForm({
     };
     const result =
       mode === "create"
-        ? await createProductAction(payload)
-        : await updateProductAction(productId ?? "", payload);
+        ? await runAction(() => createProductAction(payload), { silent: true })
+        : await runAction(() => updateProductAction(productId ?? "", payload), {
+            silent: true,
+          });
 
     if (!result.ok) {
       setFormError(result.error.message);
@@ -222,11 +225,27 @@ export function ProductForm({
           <option value="" disabled>
             Elegí una categoría
           </option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
+          {[...categories]
+            .sort((a, b) => {
+              // Raíces primero (por nombre) con sus hijas debajo (Fase 6).
+              const ka = a.parentId
+                ? `${categories.find((x) => x.id === a.parentId)?.name ?? ""}›${a.name}`
+                : a.name;
+              const kb = b.parentId
+                ? `${categories.find((x) => x.id === b.parentId)?.name ?? ""}›${b.name}`
+                : b.name;
+              return ka.localeCompare(kb);
+            })
+            .map((c) => {
+              const parent = c.parentId
+                ? categories.find((x) => x.id === c.parentId)?.name
+                : null;
+              return (
+                <option key={c.id} value={c.id}>
+                  {parent ? `${parent} › ${c.name}` : c.name}
+                </option>
+              );
+            })}
         </select>
         {errors.categoryId ? (
           <p className="text-danger text-xs">{errors.categoryId.message}</p>

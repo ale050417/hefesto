@@ -12,6 +12,7 @@ import {
 } from "../actions";
 import { CUSTOM_STATUS_LABEL, CUSTOM_TRANSITIONS } from "../transitions";
 import type { CustomRequestStatus } from "../types";
+import { runAction } from "@/lib/run-action";
 
 /**
  * Select de estado en el header del chat. Respeta la máquina de estados:
@@ -37,7 +38,9 @@ export function MedidaStatusSelect({
     const to = e.target.value as CustomRequestStatus;
     if (to === status) return;
     setPending(true);
-    const res = await transitionCustomRequestAction(id, to);
+    const res = await runAction(() => transitionCustomRequestAction(id, to), {
+      silent: true,
+    });
     setPending(false);
     if (res.ok) {
       toast(`Estado: ${CUSTOM_STATUS_LABEL[to]}`, "success");
@@ -91,7 +94,10 @@ export function MedidaQuoteButton({
 
   async function submit() {
     setPending(true);
-    const res = await quoteCustomRequestAction(id, { amount });
+    const res = await runAction(
+      () => quoteCustomRequestAction(id, { amount }),
+      { silent: true },
+    );
     setPending(false);
     if (res.ok) {
       toast("Cotización enviada al cliente.", "success");
@@ -196,7 +202,9 @@ export function MedidaDeleteButton({ id }: { id: string }) {
         title="¿Eliminar esta conversación?"
         description="Se eliminará la conversación y todos sus mensajes. Esta acción no se puede deshacer."
         onConfirm={async () => {
-          const res = await deleteCustomRequestAction(id);
+          const res = await runAction(() => deleteCustomRequestAction(id), {
+            silent: true,
+          });
           if (!res.ok) throw new Error(res.error.message);
           toast("Conversación eliminada.", "success");
           router.push("/admin/medida");

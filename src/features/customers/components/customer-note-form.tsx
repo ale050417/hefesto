@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { updateCustomerNoteAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 export function CustomerNoteForm({
   id,
@@ -22,7 +23,10 @@ export function CustomerNoteForm({
   async function save() {
     setBusy(true);
     try {
-      const res = await updateCustomerNoteAction(id, source, { note: value });
+      const res = await runAction(
+        () => updateCustomerNoteAction(id, source, { note: value }),
+        { silent: true },
+      );
       if (res.ok) {
         toast("Nota guardada", "success");
         router.refresh();

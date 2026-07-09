@@ -12,6 +12,7 @@ import {
   updateAddressAction,
 } from "../actions";
 import type { Address } from "../types";
+import { runAction } from "@/lib/run-action";
 
 type Values = {
   label: string;
@@ -46,8 +47,10 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
   const onSubmit = handleSubmit(async (values) => {
     setErr(null);
     const res = editId
-      ? await updateAddressAction(editId, values)
-      : await addAddressAction(values);
+      ? await runAction(() => updateAddressAction(editId, values), {
+          silent: true,
+        })
+      : await runAction(() => addAddressAction(values), { silent: true });
     if (!res.ok) {
       setErr(res.error.message);
       return;
@@ -80,12 +83,12 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
   }
 
   async function del(id: string) {
-    await deleteAddressAction(id);
+    await runAction(() => deleteAddressAction(id), { silent: true });
     router.refresh();
   }
 
   async function makeDefault(id: string) {
-    await setDefaultAddressAction(id);
+    await runAction(() => setDefaultAddressAction(id), { silent: true });
     router.refresh();
   }
 

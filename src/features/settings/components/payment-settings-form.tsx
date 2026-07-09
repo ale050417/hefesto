@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { savePaymentSettingsAction } from "../actions";
 import type { PaymentSettings } from "../types";
+import { runAction } from "@/lib/run-action";
 
 const ic = (path: string) => (
   <svg
@@ -50,7 +51,9 @@ export function PaymentSettingsForm({
   async function submit() {
     setBusy(true);
     try {
-      const res = await savePaymentSettingsAction(form);
+      const res = await runAction(() => savePaymentSettingsAction(form), {
+        silent: true,
+      });
       if (!res.ok) return toast(res.error.message, "danger");
       toast("Métodos de pago guardados", "success");
       router.refresh();

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { requestPasswordResetAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 type Values = { email: string };
 
@@ -20,7 +21,7 @@ export function ResetForm() {
   } = useForm<Values>({ defaultValues: { email: "" } });
 
   const onSubmit = handleSubmit(async (values) => {
-    await requestPasswordResetAction(values);
+    await runAction(() => requestPasswordResetAction(values), { silent: true });
     setDone(true);
   });
 

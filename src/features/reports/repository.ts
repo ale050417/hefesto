@@ -6,6 +6,7 @@ import {
   manualSales,
   orderItems,
   orders,
+  printFailures,
   products,
   profiles,
 } from "@/core/db/schema";
@@ -257,4 +258,176 @@ export async function getSalesForCsv(
     .from(orders)
     .where(and(gte(orders.createdAt, from), lte(orders.createdAt, to)))
     .orderBy(desc(orders.createdAt));
+}
+
+// ---------------------------------------------------------------------------
+// Ventas manuales en el pipeline de métricas (Fase 5 del plan integral).
+// Mismo criterio de estados que la tienda (SALES_STATUSES) para que una venta
+// manual "cuente" exactamente igual que una de la tienda.
+// ---------------------------------------------------------------------------
+
+/** Facturación y cantidad de ventas manuales (histórico, para el dashboard). */
+export async function getManualKpis(
+  database: Database = db,
+): Promise<{ revenue: number; count: number }> {
+  const [row] = await database
+    .select({
+      revenue: sql<number>`coalesce(sum(${manualSales.total}), 0)::float8`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(manualSales)
+    .where(inArray(manualSales.status, SALES_STATUSES));
+  return { revenue: row?.revenue ?? 0, count: row?.count ?? 0 };
+}
+
+/** KPIs de ventas manuales del año: facturación, ventas y unidades. */
+export async function getManualYearKpis(
+  year: number,
+  database: Database = db,
+): Promise<{ revenue: number; count: number; units: number }> {
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const yearEnd = new Date(Date.UTC(year + 1, 0, 1));
+  const [row] = await database
+    .select({
+      revenue: sql<number>`coalesce(sum(${manualSales.total}), 0)::float8`,
+      count: sql<number>`count(*)::int`,
+      units: sql<number>`coalesce(sum(${manualSales.quantity}), 0)::int`,
+    })
+    .from(manualSales)
+    .where(
+      and(
+        inArray(manualSales.status, SALES_STATUSES),
+        gte(manualSales.saleDate, yearStart),
+        lt(manualSales.saleDate, yearEnd),
+      ),
+    );
+  return {
+    revenue: row?.revenue ?? 0,
+    count: row?.count ?? 0,
+    units: row?.units ?? 0,
+  };
+}
+
+/** Ingresos de ventas manuales por mes (1-12) de un año. */
+export async function getManualMonthlyRevenue(
+  year: number,
+  database: Database = db,
+): Promise<number[]> {
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const yearEnd = new Date(Date.UTC(year + 1, 0, 1));
+  const rows = await database
+    .select({
+      m: sql<number>`extract(month from ${manualSales.saleDate})::int`,
+      total: sql<number>`coalesce(sum(${manualSales.total}), 0)::float8`,
+    })
+    .from(manualSales)
+    .where(
+      and(
+        inArray(manualSales.status, SALES_STATUSES),
+        gte(manualSales.saleDate, yearStart),
+        lt(manualSales.saleDate, yearEnd),
+      ),
+    )
+    .groupBy(sql`1`);
+  const out = Array(12).fill(0) as number[];
+  for (const r of rows) {
+    if (r.m >= 1 && r.m <= 12) out[r.m - 1] = Number(r.total);
+  }
+  return out;
+}
+
+/** Ingresos de ventas manuales por día desde una fecha. */
+export async function getManualRevenueByDay(
+  since: Date,
+  database: Database = db,
+): Promise<Array<{ day: string; total: number }>> {
+  return database
+    .select({
+      day: sql<string>`to_char(date_trunc('day', ${manualSales.saleDate}), 'YYYY-MM-DD')`,
+      total: sql<number>`coalesce(sum(${manualSales.total}), 0)::float8`,
+    })
+    .from(manualSales)
+    .where(
+      and(
+        inArray(manualSales.status, SALES_STATUSES),
+        gte(manualSales.saleDate, since),
+      ),
+    )
+    .groupBy(sql`1`)
+    .orderBy(sql`1`);
+}
+
+// ---------------------------------------------------------------------------
+// Consumo de filamento (Fase 5): gramos usados y costo asociado.
+// Fuentes disponibles hoy:
+//  - print_failures: gramos PERDIDOS reales por filamento (exacto).
+//  - ventas de tienda: gramos ESTIMADOS = peso del producto × unidades
+//    (por material; las ventas manuales no guardan gramos → no se estiman).
+// ---------------------------------------------------------------------------
+
+/** Gramos perdidos en fallas por filamento (con costo al precio actual). */
+export async function getFailureConsumption(
+  year: number,
+  database: Database = db,
+): Promise<
+  Array<{ material: string; color: string; grams: number; cost: number }>
+> {
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const yearEnd = new Date(Date.UTC(year + 1, 0, 1));
+  return database
+    .select({
+      material: sql<string>`coalesce(${printFailures.material}, ${filaments.material}, 'Otro')`,
+      color: sql<string>`coalesce(${printFailures.color}, ${filaments.color}, '—')`,
+      grams: sql<number>`coalesce(sum(${printFailures.gramsLost}), 0)::float8`,
+      cost: sql<number>`coalesce(sum(${printFailures.gramsLost} * coalesce(${filaments.costPerKg}, 0) / 1000), 0)::float8`,
+    })
+    .from(printFailures)
+    .leftJoin(filaments, eq(printFailures.filamentId, filaments.id))
+    .where(
+      and(
+        gte(printFailures.createdAt, yearStart),
+        lt(printFailures.createdAt, yearEnd),
+      ),
+    )
+    .groupBy(sql`1, 2`)
+    .orderBy(sql`3 desc`);
+}
+
+/** Gramos estimados consumidos por ventas de tienda, por material. */
+export async function getSalesGramsByMaterial(
+  year: number,
+  database: Database = db,
+): Promise<Array<{ material: string; grams: number }>> {
+  const yearStart = new Date(Date.UTC(year, 0, 1));
+  const yearEnd = new Date(Date.UTC(year + 1, 0, 1));
+  return database
+    .select({
+      material: sql<string>`coalesce(${products.material}, 'Otro')`,
+      grams: sql<number>`coalesce(sum(coalesce(${products.weightGrams}, 0) * ${orderItems.quantity}), 0)::float8`,
+    })
+    .from(orderItems)
+    .innerJoin(orders, eq(orderItems.orderId, orders.id))
+    .innerJoin(products, eq(orderItems.productId, products.id))
+    .where(
+      and(
+        inArray(orders.status, SALES_STATUSES),
+        gte(orders.createdAt, yearStart),
+        lt(orders.createdAt, yearEnd),
+      ),
+    )
+    .groupBy(sql`1`)
+    .orderBy(sql`2 desc`);
+}
+
+/** Costo promedio por kg de cada material (según filamentos cargados). */
+export async function getAvgCostPerMaterial(
+  database: Database = db,
+): Promise<Array<{ material: string; costPerKg: number }>> {
+  return database
+    .select({
+      material: filaments.material,
+      costPerKg: sql<number>`coalesce(avg(${filaments.costPerKg}), 0)::float8`,
+    })
+    .from(filaments)
+    .groupBy(filaments.material);
 }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { saveBusinessInfoAction } from "../actions";
 import type { BusinessSettings } from "../types";
+import { runAction } from "@/lib/run-action";
 
 const labelCls = "mb-1 block text-xs font-medium text-dim";
 
@@ -21,16 +22,20 @@ export function BusinessInfoForm({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     setPending(true);
-    const res = await saveBusinessInfoAction({
-      storeName: String(fd.get("storeName") ?? ""),
-      slogan: String(fd.get("slogan") ?? ""),
-      description: String(fd.get("description") ?? ""),
-      whatsapp: String(fd.get("whatsapp") ?? ""),
-      contactEmail: String(fd.get("contactEmail") ?? ""),
-      addressText: String(fd.get("addressText") ?? ""),
-      instagram: String(fd.get("instagram") ?? ""),
-      facebook: String(fd.get("facebook") ?? ""),
-    });
+    const res = await runAction(
+      () =>
+        saveBusinessInfoAction({
+          storeName: String(fd.get("storeName") ?? ""),
+          slogan: String(fd.get("slogan") ?? ""),
+          description: String(fd.get("description") ?? ""),
+          whatsapp: String(fd.get("whatsapp") ?? ""),
+          contactEmail: String(fd.get("contactEmail") ?? ""),
+          addressText: String(fd.get("addressText") ?? ""),
+          instagram: String(fd.get("instagram") ?? ""),
+          facebook: String(fd.get("facebook") ?? ""),
+        }),
+      { silent: true },
+    );
     setPending(false);
     if (res.ok) {
       toast("Configuración guardada", "success");

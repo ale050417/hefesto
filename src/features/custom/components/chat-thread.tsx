@@ -10,6 +10,8 @@ import {
   uploadCustomChatImageAction,
 } from "../actions";
 import type { CustomMessage } from "../types";
+import { runAction } from "@/lib/run-action";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 type Props = {
   requestId: string;
@@ -26,6 +28,11 @@ export function ChatThread({
   disabled,
 }: Props) {
   const router = useRouter();
+  // Tiempo real (Fase 10): mensajes nuevos del hilo refrescan la vista.
+  useRealtimeRefresh({
+    table: "custom_messages",
+    filter: `request_id=eq.${requestId}`,
+  });
   const [body, setBody] = useState("");
   const [pending, setPending] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -36,7 +43,10 @@ export function ChatThread({
     const value = body.trim();
     if (!value) return;
     setPending(true);
-    const res = await sendCustomMessageAction(requestId, { body: value });
+    const res = await runAction(
+      () => sendCustomMessageAction(requestId, { body: value }),
+      { silent: true, overlay: false },
+    );
     setPending(false);
     if (res.ok) {
       setBody("");
@@ -54,17 +64,24 @@ export function ChatThread({
     const fd = new FormData();
     fd.set("requestId", requestId);
     fd.set("file", file);
-    const up = await uploadCustomChatImageAction(fd);
+    const up = await runAction(() => uploadCustomChatImageAction(fd), {
+      silent: true,
+      overlay: false,
+    });
     if (!up.ok) {
       setUploading(false);
       toast(up.error.message, "danger");
       return;
     }
     // Enviamos la foto como mensaje, usando el texto actual como epígrafe.
-    const res = await sendCustomMessageAction(requestId, {
-      body: body.trim(),
-      imageUrl: up.data.url,
-    });
+    const res = await runAction(
+      () =>
+        sendCustomMessageAction(requestId, {
+          body: body.trim(),
+          imageUrl: up.data.url,
+        }),
+      { silent: true, overlay: false },
+    );
     setUploading(false);
     if (res.ok) {
       setBody("");

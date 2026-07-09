@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { registerAction } from "../actions";
+import { PasswordStrengthMeter } from "./password-strength-meter";
+import { runAction } from "@/lib/run-action";
 
 type Values = {
   fullName: string;
@@ -22,6 +24,7 @@ export function RegisterForm() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<Values>({
     defaultValues: {
@@ -34,9 +37,9 @@ export function RegisterForm() {
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
-    const res = await registerAction(values);
+    const res = await runAction(() => registerAction(values), { silent: true });
     if (!res.ok) {
-      setFormError(res.error);
+      setFormError(res.error.message);
       return;
     }
     setDone(true);
@@ -93,6 +96,7 @@ export function RegisterForm() {
           className={field}
           {...register("password")}
         />
+        <PasswordStrengthMeter password={watch("password")} />
         {errors.password ? (
           <p className="text-danger mt-1 text-xs">{errors.password.message}</p>
         ) : null}

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { createReviewAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 export function ReviewForm({
   productId,
@@ -27,7 +28,10 @@ export function ReviewForm({
     }
     setBusy(true);
     setErr(null);
-    const res = await createReviewAction(productId, slug, { rating, comment });
+    const res = await runAction(
+      () => createReviewAction(productId, slug, { rating, comment }),
+      { silent: true },
+    );
     setBusy(false);
     if (!res.ok) {
       setErr(res.error.message);

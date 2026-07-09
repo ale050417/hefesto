@@ -7,6 +7,7 @@ import { transitionOrderAction, updateOrderMetaAction } from "../actions";
 import { ORDER_STATUS_LABEL } from "../constants";
 import { ORDER_TRANSITIONS } from "../transitions";
 import type { OrderStatus } from "../types";
+import { runAction } from "@/lib/run-action";
 
 export function OrderStatusManager({
   orderId,
@@ -37,7 +38,9 @@ export function OrderStatusManager({
   async function go(to: OrderStatus) {
     setPending(to);
     setError(null);
-    const res = await transitionOrderAction(orderId, to);
+    const res = await runAction(() => transitionOrderAction(orderId, to), {
+      silent: true,
+    });
     setPending(null);
     if (!res.ok) {
       setError(res.error.message);
@@ -49,10 +52,14 @@ export function OrderStatusManager({
   async function saveMeta() {
     setPending("meta");
     setError(null);
-    const res = await updateOrderMetaAction(orderId, {
-      trackingCode: tracking.trim() || null,
-      internalNote: note.trim() || null,
-    });
+    const res = await runAction(
+      () =>
+        updateOrderMetaAction(orderId, {
+          trackingCode: tracking.trim() || null,
+          internalNote: note.trim() || null,
+        }),
+      { silent: true },
+    );
     setPending(null);
     if (!res.ok) {
       setError(res.error.message);

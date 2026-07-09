@@ -9,6 +9,7 @@ import { formatPrice } from "@/lib/format";
 import { deleteFailureAction } from "../actions";
 import { filColor } from "../constants";
 import { FailureForm } from "./failure-form";
+import { runAction } from "@/lib/run-action";
 
 export type FailureRow = {
   id: string;
@@ -61,7 +62,9 @@ export function FailuresTable({
   const [confirming, setConfirming] = useState<FailureRow | null>(null);
 
   async function confirmRemove(f: FailureRow) {
-    const res = await deleteFailureAction(f.id);
+    const res = await runAction(() => deleteFailureAction(f.id), {
+      silent: true,
+    });
     if (!res.ok) throw new Error(res.error.message);
     toast("Falla eliminada · gramos devueltos al stock", "success");
     router.refresh();

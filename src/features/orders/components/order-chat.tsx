@@ -7,6 +7,8 @@ import { toast } from "@/stores/toastStore";
 import { cn } from "@/lib/utils";
 import type { OrderMessage } from "../messages.repository";
 import { sendOrderMessageAction } from "../actions";
+import { runAction } from "@/lib/run-action";
+import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 
 type Props = {
   orderId: string;
@@ -16,6 +18,11 @@ type Props = {
 
 export function OrderChat({ orderId, messages, viewerIsStaff }: Props) {
   const router = useRouter();
+  // Tiempo real (Fase 10): mensajes nuevos del pedido refrescan la vista.
+  useRealtimeRefresh({
+    table: "order_messages",
+    filter: `order_id=eq.${orderId}`,
+  });
   const [body, setBody] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -24,7 +31,10 @@ export function OrderChat({ orderId, messages, viewerIsStaff }: Props) {
     const value = body.trim();
     if (!value) return;
     setPending(true);
-    const res = await sendOrderMessageAction(orderId, { body: value });
+    const res = await runAction(
+      () => sendOrderMessageAction(orderId, { body: value }),
+      { silent: true, overlay: false },
+    );
     setPending(false);
     if (res.ok) {
       setBody("");

@@ -5,6 +5,7 @@ import { UnderConstruction } from "@/components/shared/under-construction";
 import { AppError } from "@/core/errors";
 import { formatPrice } from "@/lib/format";
 import { ChatThread } from "@/features/custom/components/chat-thread";
+import { RealtimeRefresher } from "@/components/shared/realtime-refresher";
 import { CustomStatusBadge } from "@/features/custom/components/status-badge";
 import {
   MedidaDeleteButton,
@@ -165,6 +166,8 @@ export default async function AdminCustomPage({
 
   return (
     <div className="view grid gap-5">
+      {/* Tiempo real (Fase 10): un mensaje nuevo refresca la bandeja */}
+      <RealtimeRefresher table="custom_messages" />
       <div className="page-head">
         <div className="flex items-center gap-3">
           <span

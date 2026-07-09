@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
 import { cn } from "@/lib/utils";
 import { deleteOrderAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 const TrashIcon = (
   <svg
@@ -67,7 +68,9 @@ export function DeleteOrderButton({
         title={`¿Eliminar pedido ${orderNumber}?`}
         detail="Se eliminarán también sus ítems, historial y chat. Los puntos y el uso de cupón que haya generado se revierten."
         onConfirm={async () => {
-          const res = await deleteOrderAction(orderId);
+          const res = await runAction(() => deleteOrderAction(orderId), {
+            silent: true,
+          });
           if (!res.ok) throw new Error(res.error.message);
           toast("Pedido eliminado", "danger");
           onDeleted?.();

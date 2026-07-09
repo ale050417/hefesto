@@ -1,6 +1,7 @@
 import {
   countImages,
   countProductsInCategory,
+  countChildCategories,
   deleteCategoryRow,
   deleteImageRow,
   findAllForAdmin,
@@ -365,13 +366,42 @@ export async function getCategoryAdmin(id: string): Promise<Category | null> {
   return findCategoryById(id);
 }
 
+/** Regla de subcategorías (1 nivel): el padre debe existir y ser raíz. */
+async function assertValidParent(
+  parentId: string | null | undefined,
+  selfId?: string,
+): Promise<void> {
+  if (!parentId) return;
+  if (selfId && parentId === selfId) {
+    throw new Error("Una categoría no puede ser su propio padre.");
+  }
+  const parent = await findCategoryById(parentId);
+  if (!parent) throw new Error("La categoría padre no existe.");
+  if (parent.parentId) {
+    throw new Error(
+      "Solo hay un nivel de subcategorías: elegí una categoría raíz como padre.",
+    );
+  }
+  if (selfId) {
+    // Un padre con hijas no puede convertirse en hija (dejaría 2 niveles).
+    const children = await countChildCategories(selfId);
+    if (children > 0) {
+      throw new Error(
+        "Esta categoría tiene subcategorías: no puede ser hija de otra.",
+      );
+    }
+  }
+}
+
 export async function createCategory(input: CategoryInput): Promise<Category> {
+  await assertValidParent(input.parentId);
   return insertCategory({
     name: input.name,
     slug: input.slug,
     icon: input.icon ?? null,
     color: input.color ?? null,
     sortOrder: input.sortOrder,
+    parentId: input.parentId ?? null,
   });
 }
 
@@ -379,23 +409,31 @@ export async function updateCategory(
   id: string,
   input: CategoryInput,
 ): Promise<Category> {
+  await assertValidParent(input.parentId, id);
   const row = await updateCategoryRow(id, {
     name: input.name,
     slug: input.slug,
     icon: input.icon ?? null,
     color: input.color ?? null,
     sortOrder: input.sortOrder,
+    parentId: input.parentId ?? null,
   });
   if (!row) throw new Error("Categoría no encontrada");
   return row;
 }
 
-/** Borra una categoría. Regla: no se puede si tiene productos. */
+/** Borra una categoría. Reglas: sin productos y sin subcategorías. */
 export async function deleteCategory(id: string): Promise<void> {
   const count = await countProductsInCategory(id);
   if (count > 0) {
     throw new Error(
       `No se puede borrar: la categoría tiene ${count} producto(s). Reasignalos primero.`,
+    );
+  }
+  const children = await countChildCategories(id);
+  if (children > 0) {
+    throw new Error(
+      `No se puede borrar: tiene ${children} subcategoría(s). Borralas o reasignalas primero.`,
     );
   }
   await deleteCategoryRow(id);

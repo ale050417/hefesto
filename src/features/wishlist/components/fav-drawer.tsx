@@ -17,6 +17,7 @@ import {
   toggleWishlistAction,
 } from "../actions";
 import { useWishlistStore } from "../store";
+import { runAction } from "@/lib/run-action";
 
 export function FavDrawer() {
   const open = useUiStore((s) => s.favOpen);
@@ -61,7 +62,10 @@ export function FavDrawer() {
   const remove = async (p: ProductView) => {
     setInWishlist(p.id, false);
     setItems((prev) => prev.filter((x) => x.id !== p.id));
-    await toggleWishlistAction(p.id);
+    await runAction(() => toggleWishlistAction(p.id), {
+      silent: true,
+      overlay: false,
+    });
   };
 
   const addAll = () => {
@@ -83,7 +87,10 @@ export function FavDrawer() {
   const clearAll = async () => {
     setItems([]);
     setIds([]);
-    await clearMyWishlistAction();
+    await runAction(() => clearMyWishlistAction(), {
+      silent: true,
+      overlay: false,
+    });
   };
 
   return (

@@ -17,6 +17,7 @@ import {
 } from "../actions";
 import { PERM_ACTIONS, PERM_MODULES } from "@/core/auth/perm-defs";
 import type { Role, TeamMember } from "../types";
+import { runAction } from "@/lib/run-action";
 
 /* ---------- íconos inline ---------- */
 const ic = (path: string) => (
@@ -79,7 +80,10 @@ export function RolesManager({
 
   async function assign(userId: string, roleId: string) {
     setPendingId(userId);
-    const res = await assignMemberRoleAction({ userId, roleId });
+    const res = await runAction(
+      () => assignMemberRoleAction({ userId, roleId }),
+      { silent: true },
+    );
     setPendingId(null);
     if (res.ok) {
       toast("Rol actualizado", "success");
@@ -89,7 +93,9 @@ export function RolesManager({
 
   async function resend(userId: string) {
     setPendingId(userId);
-    const res = await resendInviteAction({ userId });
+    const res = await runAction(() => resendInviteAction({ userId }), {
+      silent: true,
+    });
     setPendingId(null);
     if (res.ok) {
       setCreds(res.data);
@@ -100,7 +106,10 @@ export function RolesManager({
   async function confirmRemove() {
     if (!removeTarget) return;
     setPendingId(removeTarget.id);
-    const res = await removeTeamMemberAction({ userId: removeTarget.id });
+    const res = await runAction(
+      () => removeTeamMemberAction({ userId: removeTarget.id }),
+      { silent: true },
+    );
     setPendingId(null);
     setRemoveTarget(null);
     if (res.ok) {
@@ -112,7 +121,9 @@ export function RolesManager({
   async function confirmDeleteRole() {
     if (!deleteRole) return;
     setPendingId(deleteRole.id);
-    const res = await deleteRoleAction({ id: deleteRole.id });
+    const res = await runAction(() => deleteRoleAction({ id: deleteRole.id }), {
+      silent: true,
+    });
     setPendingId(null);
     setDeleteRole(null);
     if (res.ok) {
@@ -542,7 +553,10 @@ function InviteModal({
     if (!/.+@.+\..+/.test(email)) return setErr("Ingresá un email válido.");
     if (!roleId) return setErr("Elegí un rol.");
     setBusy(true);
-    const res = await inviteTeamMemberAction({ fullName, email, roleId });
+    const res = await runAction(
+      () => inviteTeamMemberAction({ fullName, email, roleId }),
+      { silent: true },
+    );
     setBusy(false);
     if (!res.ok) return setErr(res.error.message);
     onCreated(res.data);
@@ -736,8 +750,13 @@ function RoleModal({
     const clean: Record<string, string[]> = {};
     for (const [m, a] of Object.entries(perms)) if (a.length) clean[m] = a;
     const res = role
-      ? await updateRoleAction({ id: role.id, name, permissions: clean })
-      : await createRoleAction({ name, permissions: clean });
+      ? await runAction(
+          () => updateRoleAction({ id: role.id, name, permissions: clean }),
+          { silent: true },
+        )
+      : await runAction(() => createRoleAction({ name, permissions: clean }), {
+          silent: true,
+        });
     setBusy(false);
     if (!res.ok) return setErr(res.error.message);
     toast(role ? "Rol actualizado" : "Rol creado", "success");

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/layout/brand-mark";
 import { createClient } from "@/core/supabase/browser";
 import { loginAction, registerAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 type Mode = "login" | "register";
 
@@ -95,9 +96,11 @@ export function AuthDialog({
     setError(null);
     setPending(true);
     if (isLogin) {
-      const res = await loginAction({ email, password });
+      const res = await runAction(() => loginAction({ email, password }), {
+        silent: true,
+      });
       setPending(false);
-      if (!res.ok) return setError(res.error);
+      if (!res.ok) return setError(res.error.message);
       onClose();
       window.location.reload();
     } else {
@@ -105,14 +108,18 @@ export function AuthDialog({
         setPending(false);
         return setError("Las contraseñas no coinciden.");
       }
-      const res = await registerAction({
-        fullName,
-        email,
-        password,
-        confirmPassword: confirm,
-      });
+      const res = await runAction(
+        () =>
+          registerAction({
+            fullName,
+            email,
+            password,
+            confirmPassword: confirm,
+          }),
+        { silent: true },
+      );
       setPending(false);
-      if (!res.ok) return setError(res.error);
+      if (!res.ok) return setError(res.error.message);
       setRegistered(true);
     }
   }

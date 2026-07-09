@@ -7,6 +7,7 @@ import {
   inArray,
   isNotNull,
   ne,
+  or,
   sql,
   type SQL,
 } from "drizzle-orm";
@@ -47,13 +48,26 @@ export async function findPublished(
   if (filter.q) conditions.push(ilike(products.name, `%${filter.q}%`));
 
   if (filter.category) {
+    // Filtrar por una categoría incluye sus subcategorías (Fase 6): ids cuya
+    // slug coincide O cuyo padre tiene esa slug.
     conditions.push(
       inArray(
         products.categoryId,
         database
           .select({ id: categories.id })
           .from(categories)
-          .where(eq(categories.slug, filter.category)),
+          .where(
+            or(
+              eq(categories.slug, filter.category),
+              inArray(
+                categories.parentId,
+                database
+                  .select({ id: categories.id })
+                  .from(categories)
+                  .where(eq(categories.slug, filter.category)),
+              ),
+            ),
+          ),
       ),
     );
   }
@@ -398,6 +412,7 @@ export async function listCategoriesWithCount(
       color: categories.color,
       sortOrder: categories.sortOrder,
       createdAt: categories.createdAt,
+      parentId: categories.parentId,
       productCount: sql<number>`count(${products.id})::int`,
     })
     .from(categories)
@@ -420,4 +435,16 @@ export async function findByIds(
       variants: true,
     },
   });
+}
+
+/** Cantidad de subcategorías de una categoría (regla de borrado, Fase 6). */
+export async function countChildCategories(
+  parentId: string,
+  database: Database = db,
+): Promise<number> {
+  const [row] = await database
+    .select({ count: sql<number>`count(*)::int` })
+    .from(categories)
+    .where(eq(categories.parentId, parentId));
+  return row?.count ?? 0;
 }

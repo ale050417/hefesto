@@ -14,6 +14,7 @@ import type {
   MarginPresetOption,
 } from "../service";
 import type { CalcHistoryRow } from "../repository";
+import { runAction } from "@/lib/run-action";
 
 const svg = (path: string) => (
   <svg
@@ -158,15 +159,19 @@ export function PriceCalculator({
     if (!f.presetId) return toast("Elegí un tipo de producto", "danger");
     if (!f.filamentId) return toast("Elegí un filamento", "danger");
     setBusy(true);
-    const res = await saveCalcAction({
-      name: f.name,
-      customer: f.customer,
-      filamentId: f.filamentId,
-      grams,
-      hours: totalHours,
-      presetId: f.presetId,
-      notes: f.notes,
-    });
+    const res = await runAction(
+      () =>
+        saveCalcAction({
+          name: f.name,
+          customer: f.customer,
+          filamentId: f.filamentId,
+          grams,
+          hours: totalHours,
+          presetId: f.presetId,
+          notes: f.notes,
+        }),
+      { silent: true },
+    );
     setBusy(false);
     if (!res.ok) return toast(res.error.message, "danger");
     toast("Presupuesto guardado en el historial", "success");
@@ -184,7 +189,7 @@ export function PriceCalculator({
 
   async function remove(id: string) {
     setPendingId(id);
-    const res = await deleteCalcAction(id);
+    const res = await runAction(() => deleteCalcAction(id), { silent: true });
     setPendingId(null);
     if (res.ok) {
       toast("Cálculo eliminado", "danger");

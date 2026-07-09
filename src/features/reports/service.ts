@@ -22,6 +22,58 @@ export function fillDailySeries(
   return out;
 }
 
+/**
+ * Suma dos series diarias {day,total} (tienda + manual). Pura y testeable:
+ * así una venta manual impacta la curva exactamente igual que una de tienda.
+ */
+export function sumDailySeries(
+  a: Array<{ day: string; total: number }>,
+  b: Array<{ day: string; total: number }>,
+): Array<{ day: string; total: number }> {
+  const map = new Map<string, number>();
+  for (const r of a) map.set(r.day, (map.get(r.day) ?? 0) + Number(r.total));
+  for (const r of b) map.set(r.day, (map.get(r.day) ?? 0) + Number(r.total));
+  return [...map.entries()]
+    .map(([day, total]) => ({ day, total }))
+    .sort((x, y) => (x.day < y.day ? -1 : 1));
+}
+
+/** Suma dos arrays de 12 meses, posición a posición. */
+export function sumMonthly(a: number[], b: number[]): number[] {
+  return Array.from({ length: 12 }, (_v, i) => (a[i] ?? 0) + (b[i] ?? 0));
+}
+
+export type ConsumptionRow = {
+  material: string;
+  color: string | null;
+  grams: number;
+  cost: number;
+  source: "fallas" | "ventas";
+};
+
+/**
+ * Combina el consumo estimado por ventas (gramos por material) con el costo
+ * promedio por kg de ese material. Pura y testeable (toca dinero).
+ */
+export function combineSalesConsumption(
+  grams: Array<{ material: string; grams: number }>,
+  costs: Array<{ material: string; costPerKg: number }>,
+): ConsumptionRow[] {
+  const costMap = new Map(costs.map((c) => [c.material, c.costPerKg]));
+  return grams
+    .filter((g) => g.grams > 0)
+    .map((g) => ({
+      material: g.material,
+      color: null,
+      grams: Number(g.grams),
+      // pesos = gramos × (costo/kg ÷ 1000), redondeado a 2 decimales
+      cost:
+        Math.round((Number(g.grams) * (costMap.get(g.material) ?? 0)) / 10) /
+        100,
+      source: "ventas" as const,
+    }));
+}
+
 /** CSV de ventas (función pura, testeable). */
 export function buildSalesCsv(
   rows: Array<{
@@ -49,16 +101,27 @@ export async function getDashboardData(days = 30) {
   since.setDate(since.getDate() - (days - 1));
   since.setHours(0, 0, 0, 0);
 
-  const [kpis, revenueRows, recent, filaments] = await Promise.all([
-    repo.getKpiRows(),
-    repo.getRevenueByDay(since),
-    listOrdersAdmin({ page: 1, pageSize: 6 }),
-    listFilamentsView(),
-  ]);
+  const [kpis, manualKpis, revenueRows, manualRows, recent, filaments] =
+    await Promise.all([
+      repo.getKpiRows(),
+      repo.getManualKpis(),
+      repo.getRevenueByDay(since),
+      repo.getManualRevenueByDay(since),
+      listOrdersAdmin({ page: 1, pageSize: 6 }),
+      listFilamentsView(),
+    ]);
 
   return {
-    kpis,
-    revenueSeries: fillDailySeries(revenueRows, days),
+    // Las ventas manuales cuentan igual que las de tienda (Fase 5).
+    kpis: {
+      ...kpis,
+      revenue: kpis.revenue + manualKpis.revenue,
+      salesCount: kpis.salesCount + manualKpis.count,
+    },
+    revenueSeries: fillDailySeries(
+      sumDailySeries(revenueRows, manualRows),
+      days,
+    ),
     recentOrders: recent.items,
     lowStock: filaments.filter((f) => f.lowStock),
   };
@@ -69,14 +132,19 @@ export async function getReportsData(days = 30) {
   since.setDate(since.getDate() - (days - 1));
   since.setHours(0, 0, 0, 0);
 
-  const [revenueRows, topProducts, categoryBreakdown] = await Promise.all([
-    repo.getRevenueByDay(since),
-    repo.getTopProducts(8),
-    repo.getCategoryBreakdown(),
-  ]);
+  const [revenueRows, manualRows, topProducts, categoryBreakdown] =
+    await Promise.all([
+      repo.getRevenueByDay(since),
+      repo.getManualRevenueByDay(since),
+      repo.getTopProducts(8),
+      repo.getCategoryBreakdown(),
+    ]);
 
   return {
-    revenueSeries: fillDailySeries(revenueRows, days),
+    revenueSeries: fillDailySeries(
+      sumDailySeries(revenueRows, manualRows),
+      days,
+    ),
     topProducts,
     categoryBreakdown,
   };
@@ -92,29 +160,59 @@ const getReportsOverviewRaw = async (year: number) => {
   const prevYear = year - 1;
   const [
     kpis,
+    manualKpis,
     monthsCurrent,
+    manualMonths,
     monthsPrev,
+    manualMonthsPrev,
     categoryBreakdown,
     topProducts,
     bySource,
+    failureConsumption,
+    salesGrams,
+    materialCosts,
   ] = await Promise.all([
     repo.getReportKpis(year),
+    repo.getManualYearKpis(year),
     repo.getMonthlyRevenue(year),
+    repo.getManualMonthlyRevenue(year),
     repo.getMonthlyRevenue(prevYear),
+    repo.getManualMonthlyRevenue(prevYear),
     repo.getCategoryBreakdown(),
     repo.getTopProducts(6),
     repo.getRevenueBySource(year),
+    repo.getFailureConsumption(year),
+    repo.getSalesGramsByMaterial(year),
+    repo.getAvgCostPerMaterial(),
   ]);
+
+  const consumption: ConsumptionRow[] = [
+    ...combineSalesConsumption(salesGrams, materialCosts),
+    ...failureConsumption.map((f) => ({
+      material: f.material,
+      color: f.color,
+      grams: Number(f.grams),
+      cost: Number(f.cost),
+      source: "fallas" as const,
+    })),
+  ];
 
   return {
     year,
     prevYear,
-    kpis,
-    monthsCurrent,
-    monthsPrev,
+    // Ventas manuales integradas al mismo pipeline que la tienda (Fase 5).
+    kpis: {
+      ...kpis,
+      revenue: kpis.revenue + manualKpis.revenue,
+      salesCount: kpis.salesCount + manualKpis.count,
+      unitsSold: kpis.unitsSold + manualKpis.units,
+    },
+    monthsCurrent: sumMonthly(monthsCurrent, manualMonths),
+    monthsPrev: sumMonthly(monthsPrev, manualMonthsPrev),
     categoryBreakdown,
     topProducts,
     bySource,
+    consumption,
   };
 };
 

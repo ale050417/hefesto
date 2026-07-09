@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { registerFailureAction, updateFailureAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 import {
   FAIL_REASONS,
   FILAMENT_COLORS,
@@ -61,11 +62,16 @@ export function FailureForm({
     const payload = { ...form, deducted: edit ? undefined : deduct };
     try {
       if (edit && failure?.id) {
-        const res = await updateFailureAction(failure.id, payload);
+        const res = await runAction(
+          () => updateFailureAction(failure!.id!, payload),
+          { silent: true },
+        );
         if (!res.ok) return setErr(res.error.message);
         toast("Falla actualizada", "success");
       } else {
-        const res = await registerFailureAction(payload);
+        const res = await runAction(() => registerFailureAction(payload), {
+          silent: true,
+        });
         if (!res.ok) return setErr(res.error.message);
         if (res.data && !res.data.deducted && deduct) {
           toast(

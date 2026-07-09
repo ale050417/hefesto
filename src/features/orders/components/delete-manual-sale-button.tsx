@@ -6,6 +6,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
 import { cn } from "@/lib/utils";
 import { deleteManualSaleAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 const TrashIcon = (
   <svg
@@ -59,7 +60,9 @@ export function DeleteManualSaleButton({
         title={label ? `¿Eliminar la venta de ${label}?` : "¿Eliminar venta?"}
         description="Se elimina de forma permanente y deja de sumar a facturación, ganancias y reportes."
         onConfirm={async () => {
-          const res = await deleteManualSaleAction(id);
+          const res = await runAction(() => deleteManualSaleAction(id), {
+            silent: true,
+          });
           if (!res.ok) throw new Error(res.error.message);
           toast("Venta eliminada", "danger");
           router.refresh();

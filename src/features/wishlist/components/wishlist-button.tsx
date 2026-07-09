@@ -5,6 +5,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { toggleWishlistAction } from "../actions";
 import { useWishlistStore } from "../store";
+import { runAction } from "@/lib/run-action";
 
 export function WishlistButton({ productId }: { productId: string }) {
   const router = useRouter();
@@ -18,7 +19,11 @@ export function WishlistButton({ productId }: { productId: string }) {
     e.stopPropagation();
     if (busy) return;
     setBusy(true);
-    const res = await toggleWishlistAction(productId);
+    // El action devuelve un shape propio no discriminado; lo fijamos acá.
+    const res = (await runAction(() => toggleWishlistAction(productId), {
+      silent: true,
+      overlay: false,
+    })) as { ok: boolean; inWishlist?: boolean; needsAuth?: boolean };
     setBusy(false);
     if (res.needsAuth) {
       router.push("/ingresar?redirect=/catalogo");

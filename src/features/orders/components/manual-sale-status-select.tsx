@@ -6,6 +6,7 @@ import { toast } from "@/stores/toastStore";
 import { ORDER_STATUS_LABEL } from "../constants";
 import type { OrderStatus } from "../types";
 import { updateManualSaleStatusAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 // Mismo orden que la máquina de estados de pedidos (Cap. 11).
 const STATUS_ORDER: OrderStatus[] = [
@@ -39,7 +40,9 @@ export function ManualSaleStatusSelect({
     const prev = value;
     setValue(next);
     setBusy(true);
-    const res = await updateManualSaleStatusAction(id, next);
+    const res = await runAction(() => updateManualSaleStatusAction(id, next), {
+      silent: true,
+    });
     setBusy(false);
     if (!res.ok) {
       setValue(prev);

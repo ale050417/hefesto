@@ -10,6 +10,7 @@ import {
 } from "../actions";
 import { CUSTOM_STATUS_LABEL, CUSTOM_TRANSITIONS } from "../transitions";
 import type { CustomRequest } from "../types";
+import { runAction } from "@/lib/run-action";
 
 export function AdminManager({ request }: { request: CustomRequest }) {
   const router = useRouter();
@@ -20,7 +21,10 @@ export function AdminManager({ request }: { request: CustomRequest }) {
   async function quote(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
-    const res = await quoteCustomRequestAction(request.id, { amount });
+    const res = await runAction(
+      () => quoteCustomRequestAction(request.id, { amount }),
+      { silent: true },
+    );
     setPending(false);
     if (res.ok) {
       toast("Cotización enviada al cliente.", "success");
@@ -32,7 +36,10 @@ export function AdminManager({ request }: { request: CustomRequest }) {
 
   async function move(to: CustomRequest["status"]) {
     setPending(true);
-    const res = await transitionCustomRequestAction(request.id, to);
+    const res = await runAction(
+      () => transitionCustomRequestAction(request.id, to),
+      { silent: true },
+    );
     setPending(false);
     if (res.ok) {
       toast(`Estado: ${CUSTOM_STATUS_LABEL[to]}`, "success");

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { saveCostSettingsAction } from "../actions";
 import type { CostSettings } from "../economics";
+import { runAction } from "@/lib/run-action";
 
 export function CostSettingsButton({ settings }: { settings: CostSettings }) {
   const router = useRouter();
@@ -27,7 +28,9 @@ export function CostSettingsButton({ settings }: { settings: CostSettings }) {
     setErr(null);
     setBusy(true);
     try {
-      const res = await saveCostSettingsAction(form);
+      const res = await runAction(() => saveCostSettingsAction(form), {
+        silent: true,
+      });
       if (!res.ok) return setErr(res.error.message);
       toast("Config de costos guardada", "success");
       setOpen(false);

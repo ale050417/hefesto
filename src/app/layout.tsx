@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Orbitron, Sora } from "next/font/google";
 import { siteName, siteUrl } from "@/lib/site";
 import { Toaster } from "@/components/ui/toaster";
+import { ActionOverlay } from "@/components/shared/action-overlay";
 import { ThemeApplier } from "@/features/settings/components/theme-applier";
 import "./globals.css";
 
@@ -64,6 +65,7 @@ export default function RootLayout({
         <ThemeApplier />
         {children}
         <Toaster />
+        <ActionOverlay />
       </body>
     </html>
   );

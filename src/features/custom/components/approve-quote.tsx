@@ -5,13 +5,16 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { approveQuoteAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 export function ApproveQuote({ requestId }: { requestId: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   async function accept() {
     setPending(true);
-    const res = await approveQuoteAction(requestId);
+    const res = await runAction(() => approveQuoteAction(requestId), {
+      silent: true,
+    });
     setPending(false);
     if (res.ok) {
       toast("¡Cotización aceptada! Coordinamos el pago.", "success");

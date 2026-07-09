@@ -9,6 +9,7 @@ import { KpiCard } from "@/features/reports/components/kpi-card";
 import { deleteRewardAction } from "../actions";
 import { REWARD_TYPES, type RewardTypeKey } from "../reward-types";
 import type { Reward } from "../service";
+import { runAction } from "@/lib/run-action";
 import {
   RewardForm,
   type ProductOption,
@@ -80,7 +81,9 @@ export function RewardsAdmin({
 
   async function confirmDelete() {
     if (!toDelete) return;
-    const res = await deleteRewardAction(toDelete.id);
+    const res = await runAction(() => deleteRewardAction(toDelete.id), {
+      silent: true,
+    });
     if (!res.ok) throw new Error(res.error.message);
     toast("Recompensa eliminada", "danger");
     router.refresh();

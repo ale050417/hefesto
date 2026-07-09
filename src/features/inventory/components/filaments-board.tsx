@@ -10,6 +10,7 @@ import { addSpoolAction, deleteFilamentAction } from "../actions";
 import { filColor } from "../constants";
 import type { FilamentView } from "../types";
 import { FilamentForm } from "./filament-form";
+import { runAction } from "@/lib/run-action";
 
 type View = "grilla" | "lista";
 
@@ -101,7 +102,7 @@ export function FilamentsBoard({
 
   async function addSpool(id: string) {
     setPendingId(id);
-    const res = await addSpoolAction(id);
+    const res = await runAction(() => addSpoolAction(id), { silent: true });
     setPendingId(null);
     if (res.ok) {
       toast("+1 carrete agregado", "success");
@@ -112,7 +113,9 @@ export function FilamentsBoard({
   }
 
   async function confirmRemove(f: FilamentView) {
-    const res = await deleteFilamentAction(f.id);
+    const res = await runAction(() => deleteFilamentAction(f.id), {
+      silent: true,
+    });
     if (!res.ok) throw new Error(res.error.message);
     toast("Filamento eliminado", "danger");
     router.refresh();

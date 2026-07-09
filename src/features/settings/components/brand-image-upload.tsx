@@ -6,6 +6,7 @@ import { useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { compressImageToWebp } from "@/lib/image-compress";
 import { uploadBrandImageAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 export function BrandImageUpload({
   kind,
@@ -38,7 +39,9 @@ export function BrandImageUpload({
     const fd = new FormData();
     fd.set("kind", kind);
     fd.set("file", compact);
-    const res = await uploadBrandImageAction(fd);
+    const res = await runAction(() => uploadBrandImageAction(fd), {
+      silent: true,
+    });
     setBusy(false);
     if (inputRef.current) inputRef.current.value = "";
     if (!res.ok) {

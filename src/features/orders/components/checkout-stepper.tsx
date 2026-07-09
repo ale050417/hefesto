@@ -12,6 +12,7 @@ import { selectSubtotal, useCartStore } from "@/stores/cartStore";
 import { createOrderAction } from "../actions";
 import type { ShippingAddress } from "../schemas";
 import type { PaymentMethod } from "../types";
+import { runAction } from "@/lib/run-action";
 
 const field =
   "w-full rounded-md border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-fg";
@@ -100,18 +101,22 @@ export function CheckoutStepper({ mpEnabled = true }: { mpEnabled?: boolean }) {
   const confirm = async () => {
     setSubmitting(true);
     setFormError(null);
-    const res = await createOrderAction({
-      items: items.map((i) => ({
-        productId: i.productId,
-        slug: i.slug,
-        variantId: i.variantId,
-        color: i.color,
-        quantity: i.quantity,
-      })),
-      paymentMethod: payment,
-      shippingAddress: getValues(),
-      ...(appliedCoupon ? { couponCode: appliedCoupon.code } : {}),
-    });
+    const res = await runAction(
+      () =>
+        createOrderAction({
+          items: items.map((i) => ({
+            productId: i.productId,
+            slug: i.slug,
+            variantId: i.variantId,
+            color: i.color,
+            quantity: i.quantity,
+          })),
+          paymentMethod: payment,
+          shippingAddress: getValues(),
+          ...(appliedCoupon ? { couponCode: appliedCoupon.code } : {}),
+        }),
+      { silent: true },
+    );
     if (!res.ok) {
       setFormError(res.error.message);
       setSubmitting(false);

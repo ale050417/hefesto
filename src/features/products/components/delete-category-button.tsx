@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
 import { deleteCategoryAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 export function DeleteCategoryButton({
   id,
@@ -40,7 +41,9 @@ export function DeleteCategoryButton({
         onClose={() => setOpen(false)}
         title={name ? `¿Eliminar categoría "${name}"?` : "¿Eliminar categoría?"}
         onConfirm={async () => {
-          const res = await deleteCategoryAction(id);
+          const res = await runAction(() => deleteCategoryAction(id), {
+            silent: true,
+          });
           if (!res.ok) throw new Error(res.error.message);
           toast("Categoría eliminada", "danger");
           router.refresh();

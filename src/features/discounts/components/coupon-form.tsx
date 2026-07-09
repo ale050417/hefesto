@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { saveCouponAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 export type CouponFormData = {
   id?: string;
@@ -68,7 +69,9 @@ export function CouponForm({
       isActive: form.isActive,
     };
     try {
-      const res = await saveCouponAction(payload, coupon?.id);
+      const res = await runAction(() => saveCouponAction(payload, coupon?.id), {
+        silent: true,
+      });
       if (!res.ok) return setErr(res.error.message);
       toast(edit ? "Cupón actualizado" : "Cupón creado", "success");
       onDone?.();

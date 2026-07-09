@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { createCategoryAction, updateCategoryAction } from "../actions";
 import { CAT_COLORS, CAT_ICONS, catIconPath } from "../category-icons";
+import { runAction } from "@/lib/run-action";
 
 export type CategoryFormData = {
   id?: string;
@@ -14,7 +15,11 @@ export type CategoryFormData = {
   icon: string | null;
   color: string | null;
   sortOrder: number;
+  parentId?: string | null;
 };
+
+/** Opción de padre para el select (solo categorías raíz). */
+export type ParentOption = { id: string; name: string };
 
 function slugify(text: string): string {
   return text
@@ -42,10 +47,13 @@ function IconSvg({ name }: { name: string }) {
 
 export function CategoryForm({
   category,
+  parents = [],
   onDone,
   onCancel,
 }: {
   category?: CategoryFormData;
+  /** Categorías raíz elegibles como padre (sin la propia). */
+  parents?: ParentOption[];
   onDone?: () => void;
   onCancel?: () => void;
 }) {
@@ -54,8 +62,10 @@ export function CategoryForm({
   const [name, setName] = useState(category?.name ?? "");
   const [icon, setIcon] = useState<string>(category?.icon ?? CAT_ICONS[0]);
   const [color, setColor] = useState<string>(category?.color ?? CAT_COLORS[0]!);
+  const [parentId, setParentId] = useState<string>(category?.parentId ?? "");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const parentOptions = parents.filter((c) => c.id !== category?.id);
 
   async function submit() {
     setErr(null);
@@ -67,12 +77,18 @@ export function CategoryForm({
       icon,
       color,
       sortOrder: String(category?.sortOrder ?? 0),
+      parentId: parentId || null,
     };
     try {
       const res =
         edit && category?.id
-          ? await updateCategoryAction(category.id, payload)
-          : await createCategoryAction(payload);
+          ? await runAction(
+              () => updateCategoryAction(category!.id!, payload),
+              { silent: true },
+            )
+          : await runAction(() => createCategoryAction(payload), {
+              silent: true,
+            });
       if (!res.ok) return setErr(res.error.message);
       toast(edit ? "Categoría actualizada" : "Categoría creada", "success");
       onDone?.();
@@ -108,6 +124,26 @@ export function CategoryForm({
             onChange={(e) => setName(e.target.value)}
           />
         </div>
+      </div>
+
+      <div className="field">
+        <label htmlFor="cat-parent">Categoría padre (opcional)</label>
+        <select
+          id="cat-parent"
+          className="input"
+          value={parentId}
+          onChange={(e) => setParentId(e.target.value)}
+        >
+          <option value="">— Ninguna (categoría raíz) —</option>
+          {parentOptions.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-faint mt-1 text-[11.5px]">
+          Un solo nivel: las subcategorías no pueden tener hijas.
+        </p>
       </div>
 
       <div className="field">

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { exportSalesCsvAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 export function ExportCsvButton({ days }: { days: number }) {
   const [busy, setBusy] = useState(false);
@@ -12,9 +13,9 @@ export function ExportCsvButton({ days }: { days: number }) {
     const to = new Date();
     const from = new Date();
     from.setDate(from.getDate() - days);
-    const res = await exportSalesCsvAction(
-      from.toISOString(),
-      to.toISOString(),
+    const res = await runAction(
+      () => exportSalesCsvAction(from.toISOString(), to.toISOString()),
+      { silent: true },
     );
     setBusy(false);
     if (!res.ok) return;

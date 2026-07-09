@@ -16,6 +16,7 @@ import {
 import type { OrderListItem } from "../types";
 import { deleteOrdersAction } from "../actions";
 import { DeleteOrderButton } from "./order-actions";
+import { runAction } from "@/lib/run-action";
 
 const dateFmt = new Intl.DateTimeFormat("es-AR", { dateStyle: "medium" });
 
@@ -62,7 +63,9 @@ export function OrdersAdminList({
 
   async function confirmBulkDelete() {
     const list = [...selected];
-    const res = await deleteOrdersAction(list);
+    const res = await runAction(() => deleteOrdersAction(list), {
+      silent: true,
+    });
     if (!res.ok) throw new Error(res.error.message);
     toast(
       `${res.deleted} pedido${res.deleted === 1 ? "" : "s"} eliminado${

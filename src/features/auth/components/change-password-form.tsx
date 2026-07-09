@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { changePasswordAction } from "../actions";
+import { runAction } from "@/lib/run-action";
+import { PasswordStrengthMeter } from "./password-strength-meter";
 
 const labelCls = "mb-1 block text-xs font-medium text-dim";
 
@@ -57,17 +59,21 @@ export function ChangePasswordForm() {
     e.preventDefault();
     if (!valid) return;
     setPending(true);
-    const res = await changePasswordAction({
-      password,
-      confirmPassword: confirm,
-    });
+    const res = await runAction(
+      () =>
+        changePasswordAction({
+          password,
+          confirmPassword: confirm,
+        }),
+      { silent: true },
+    );
     setPending(false);
     if (res.ok) {
       toast("Contraseña actualizada", "success");
       setPassword("");
       setConfirm("");
     } else {
-      toast(res.error, "danger");
+      toast(res.error.message, "danger");
     }
   }
 
@@ -95,6 +101,7 @@ export function ChangePasswordForm() {
             aria-invalid={password.length > 0 && !longEnough}
             required
           />
+          <PasswordStrengthMeter password={password} />
         </div>
         <div>
           <label className={labelCls} htmlFor="confirmPassword">

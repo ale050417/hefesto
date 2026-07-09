@@ -4534,3 +4534,80 @@ body > * {
     }
   }
 }
+
+/* ============================================================
+   Fase 9 (plan integral 2026-07): pulido visual transversal.
+   Sombras sutiles consistentes + micro-transiciones LIVIANAS
+   (solo opacity/transform/box-shadow: no fuerzan reflow y van
+   bien en gama baja). Respetan prefers-reduced-motion.
+   ============================================================ */
+
+/* Modales: entrada suave (fade + leve escala) en vez de aparición seca. */
+.modal-backdrop {
+  animation: hef-fade-in 0.16s ease-out;
+}
+.modal {
+  animation: hef-pop-in 0.18s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+@keyframes hef-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes hef-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Cards y botones: transición y profundidad consistentes. */
+.ui-card {
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+.card-hover:hover {
+  box-shadow: var(--shadow-pop);
+}
+.btn {
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.chip {
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+/* Toasts: entrada desde abajo, sutil. */
+.toast {
+  animation: hef-pop-in 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-backdrop,
+  .modal,
+  .toast {
+    animation: none;
+  }
+  .ui-card,
+  .btn,
+  .chip {
+    transition: none;
+  }
+}

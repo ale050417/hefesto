@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { saveShippingSettingsAction } from "../actions";
 import type { ShippingSettings } from "../types";
+import { runAction } from "@/lib/run-action";
 
 type Zone = { name: string; price: string };
 
@@ -36,14 +37,18 @@ export function ShippingSettingsForm({
   async function submit() {
     setBusy(true);
     try {
-      const res = await saveShippingSettingsAction({
-        city,
-        freeOver: Number(freeOver) || 0,
-        outMsg,
-        zones: zones
-          .filter((z) => z.name.trim())
-          .map((z) => ({ name: z.name, price: Number(z.price) || 0 })),
-      });
+      const res = await runAction(
+        () =>
+          saveShippingSettingsAction({
+            city,
+            freeOver: Number(freeOver) || 0,
+            outMsg,
+            zones: zones
+              .filter((z) => z.name.trim())
+              .map((z) => ({ name: z.name, price: Number(z.price) || 0 })),
+          }),
+        { silent: true },
+      );
       if (!res.ok) return toast(res.error.message, "danger");
       toast("Envíos guardados", "success");
       router.refresh();

@@ -97,6 +97,11 @@ export type ProductInput = z.infer<typeof productInputSchema>;
 // Validación de alta/edición de categoría (admin).
 export const categoryInputSchema = z.object({
   name: z.string().min(1, "El nombre es obligatorio").max(80),
+  // Subcategoría: id del padre o null (raíz). "" del form se normaliza a null.
+  parentId: z.preprocess(
+    (v) => (v === "" || v == null ? null : v),
+    z.uuid("Categoría padre inválida").nullable(),
+  ),
   slug: z
     .string()
     .min(1, "El slug es obligatorio")

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { saveBusinessInfoAction } from "../actions";
 import type { BusinessSettings } from "../types";
+import { runAction } from "@/lib/run-action";
 
 type Hour = { label: string; from: string; to: string; on: boolean };
 const DEFAULT_HOURS: Hour[] = [
@@ -53,12 +54,16 @@ export function BusinessConfigForm({
       return setErr("El email no es válido.");
     setBusy(true);
     try {
-      const res = await saveBusinessInfoAction({
-        ...form,
-        hours,
-        pickupEnabled: pickup,
-        deliveryEnabled: delivery,
-      });
+      const res = await runAction(
+        () =>
+          saveBusinessInfoAction({
+            ...form,
+            hours,
+            pickupEnabled: pickup,
+            deliveryEnabled: delivery,
+          }),
+        { silent: true },
+      );
       if (!res.ok) return setErr(res.error.message);
       toast("Datos del negocio guardados", "success");
       router.refresh();

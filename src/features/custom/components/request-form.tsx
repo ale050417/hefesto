@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { createCustomRequestAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 export function RequestForm() {
   const router = useRouter();
@@ -14,12 +15,16 @@ export function RequestForm() {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     setPending(true);
-    const res = await createCustomRequestAction({
-      title: String(fd.get("title") ?? ""),
-      description: String(fd.get("description") ?? ""),
-      referenceImageUrl: String(fd.get("referenceImageUrl") ?? ""),
-      budget: String(fd.get("budget") ?? ""),
-    });
+    const res = await runAction(
+      () =>
+        createCustomRequestAction({
+          title: String(fd.get("title") ?? ""),
+          description: String(fd.get("description") ?? ""),
+          referenceImageUrl: String(fd.get("referenceImageUrl") ?? ""),
+          budget: String(fd.get("budget") ?? ""),
+        }),
+      { silent: true },
+    );
     setPending(false);
     if (res.ok) {
       toast("Solicitud enviada. Te vamos a cotizar pronto.", "success");

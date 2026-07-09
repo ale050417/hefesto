@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  isAcceptablePassword,
+  PASSWORD_POLICY_MESSAGE,
+} from "./password-strength";
 
 export const loginSchema = z.object({
   email: z.email("Email inválido"),
@@ -9,7 +13,10 @@ export const registerSchema = z
   .object({
     fullName: z.string().min(1, "Ingresá tu nombre").max(120),
     email: z.email("Email inválido"),
-    password: z.string().min(8, "Mínimo 8 caracteres"),
+    password: z
+      .string()
+      .min(8, "Mínimo 8 caracteres")
+      .refine(isAcceptablePassword, PASSWORD_POLICY_MESSAGE),
     confirmPassword: z.string().min(1, "Repetí la contraseña"),
   })
   .refine((d) => d.password === d.confirmPassword, {

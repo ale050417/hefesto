@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { validateCouponAction } from "@/features/discounts/actions";
 import { formatPrice } from "@/lib/format";
 import { selectSubtotal, useCartStore } from "@/stores/cartStore";
+import { runAction } from "@/lib/run-action";
 
 export function CouponInput() {
   const subtotal = useCartStore(selectSubtotal);
@@ -18,10 +19,14 @@ export function CouponInput() {
     if (!code.trim()) return;
     setBusy(true);
     setErr(null);
-    const res = await validateCouponAction(code.trim(), subtotal);
+    const res = await runAction(
+      () => validateCouponAction(code.trim(), subtotal),
+      { silent: true },
+    );
     setBusy(false);
     if (!res.ok) {
-      setErr(res.error);
+      // El action del carrito usa error:string; las fallas sintetizadas, objeto.
+      setErr(typeof res.error === "string" ? res.error : res.error.message);
       return;
     }
     setCoupon({ code: res.code, discount: res.discount });

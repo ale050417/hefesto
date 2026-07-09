@@ -12,6 +12,7 @@ import {
   uploadProductImageAction,
 } from "../actions";
 import type { ProductImage } from "../types";
+import { runAction } from "@/lib/run-action";
 
 export function ImageUpload({
   productId,
@@ -38,7 +39,9 @@ export function ImageUpload({
         const fd = new FormData();
         fd.set("productId", productId);
         fd.set("file", compact);
-        const res = await uploadProductImageAction(fd);
+        const res = await runAction(() => uploadProductImageAction(fd), {
+          silent: true,
+        });
         if (!res.ok) setError(res.error.message);
       }
       if (inputRef.current) inputRef.current.value = "";
@@ -50,7 +53,9 @@ export function ImageUpload({
   function handleDelete(imageId: string) {
     setError(null);
     startTransition(async () => {
-      const res = await deleteProductImageAction(imageId);
+      const res = await runAction(() => deleteProductImageAction(imageId), {
+        silent: true,
+      });
       if (!res.ok) setError(res.error.message);
       router.refresh();
       onChanged?.();
@@ -60,7 +65,10 @@ export function ImageUpload({
   function handlePrimary(imageId: string) {
     setError(null);
     startTransition(async () => {
-      const res = await setPrimaryImageAction(productId, imageId);
+      const res = await runAction(
+        () => setPrimaryImageAction(productId, imageId),
+        { silent: true },
+      );
       if (!res.ok) setError(res.error.message);
       router.refresh();
       onChanged?.();

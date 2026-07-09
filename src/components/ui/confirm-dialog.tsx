@@ -1,17 +1,22 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Modal } from "./modal";
 import { Button } from "./button";
+import { runAction } from "@/lib/run-action";
 
 /**
  * Diálogo de confirmación para acciones destructivas (borrar). Patrón único de
  * toda la app: ícono danger, título "¿Eliminar X?", texto "no se puede deshacer"
- * y botones Cancelar / Eliminar. Reemplaza al `confirm()` nativo.
+ * y botones Cancelar / Eliminar.
  *
  * La acción real la pasa el que lo usa en `onConfirm`: si esa promesa lanza, el
  * mensaje se muestra inline y el diálogo NO se cierra; si resuelve, se cierra.
- * Así el llamador se ocupa del toast/refresh y el diálogo del loading/error.
+ *
+ * Anti-cuelgue (RC2 del diagnóstico): la acción corre vía `runAction`, que
+ * muestra el overlay bloqueante de la "H", tiene timeout y SIEMPRE libera la
+ * UI (finally). Por eso este diálogo ya no puede quedar imposible de cerrar:
+ * si la acción no vuelve, a los 20 s aparece el error y todo se desbloquea.
  */
 export function ConfirmDialog({
   open,
@@ -22,6 +27,7 @@ export function ConfirmDialog({
   detail,
   confirmLabel = "Eliminar",
   cancelLabel = "Cancelar",
+  busyLabel = "Eliminando…",
 }: {
   open: boolean;
   onClose: () => void;
@@ -34,26 +40,33 @@ export function ConfirmDialog({
   detail?: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
+  /** Texto del overlay mientras corre la acción. */
+  busyLabel?: string;
 }) {
   const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [busy, setBusy] = useState(false);
 
-  function handleConfirm() {
+  async function handleConfirm() {
     setError(null);
-    startTransition(async () => {
-      try {
+    setBusy(true);
+    // silent: el error se muestra inline en el diálogo (no como toast).
+    const res = await runAction(
+      async () => {
         await onConfirm();
-        onClose();
-      } catch (e) {
-        setError(
-          e instanceof Error ? e.message : "No se pudo completar la acción.",
-        );
-      }
-    });
+        return { ok: true as const, data: undefined };
+      },
+      { label: busyLabel, silent: true },
+    );
+    setBusy(false);
+    if (res.ok) {
+      onClose();
+    } else {
+      setError(res.error.message);
+    }
   }
 
   function handleClose() {
-    if (isPending) return; // no cerrar mientras borra
+    if (busy) return; // el overlay ya bloquea; esto evita cierres en carrera
     setError(null);
     onClose();
   }
@@ -70,7 +83,7 @@ export function ConfirmDialog({
             variant="ghost"
             size="sm"
             onClick={handleClose}
-            disabled={isPending}
+            disabled={busy}
           >
             {cancelLabel}
           </Button>
@@ -78,7 +91,7 @@ export function ConfirmDialog({
             type="button"
             variant="danger"
             size="sm"
-            loading={isPending}
+            disabled={busy}
             onClick={handleConfirm}
           >
             {confirmLabel}

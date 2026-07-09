@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { createRewardAction, updateRewardAction } from "../actions";
 import { REWARD_TYPES, type RewardTypeKey } from "../reward-types";
+import { runAction } from "@/lib/run-action";
 
 export type RewardFormData = {
   id?: string;
@@ -69,8 +70,12 @@ export function RewardForm({
     try {
       const res =
         edit && reward?.id
-          ? await updateRewardAction(reward.id, payload)
-          : await createRewardAction(payload);
+          ? await runAction(() => updateRewardAction(reward!.id!, payload), {
+              silent: true,
+            })
+          : await runAction(() => createRewardAction(payload), {
+              silent: true,
+            });
       if (!res.ok) return setErr(res.error.message);
       toast(edit ? "Recompensa actualizada" : "Recompensa creada", "success");
       onDone?.();

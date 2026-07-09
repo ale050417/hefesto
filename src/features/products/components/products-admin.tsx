@@ -18,6 +18,7 @@ import type { EstimatorContext } from "@/features/calculator/service";
 import { ProductForm, type ProductFormValues } from "./product-form";
 import { ImageUpload } from "./image-upload";
 import { ProductStatusActions } from "./product-status-actions";
+import { runAction } from "@/lib/run-action";
 
 const EMPTY_DEFAULTS: ProductFormValues = {
   name: "",
@@ -148,7 +149,9 @@ export function ProductsAdmin({
 
   async function openEdit(id: string) {
     setPendingId(id);
-    const res = await getProductFormDataAction(id);
+    const res = await runAction(() => getProductFormDataAction(id), {
+      silent: true,
+    });
     setPendingId(null);
     if (!res.ok) return toast(res.error.message, "danger");
     setModal({
@@ -164,7 +167,9 @@ export function ProductsAdmin({
 
   // Tras crear, pasamos el mismo modal a edición (para subir imágenes).
   async function handleSaved(id: string) {
-    const res = await getProductFormDataAction(id);
+    const res = await runAction(() => getProductFormDataAction(id), {
+      silent: true,
+    });
     if (!res.ok) {
       setModal({ open: false });
       router.refresh();
@@ -183,7 +188,10 @@ export function ProductsAdmin({
 
   async function reloadEdit() {
     if (!modal.open || modal.mode !== "edit") return;
-    const res = await getProductFormDataAction(modal.productId);
+    const res = await runAction(
+      () => getProductFormDataAction(modal.productId),
+      { silent: true },
+    );
     if (res.ok) {
       setModal({
         open: true,
@@ -198,7 +206,9 @@ export function ProductsAdmin({
   }
 
   async function confirmArchive(p: AdminProductRow) {
-    const res = await archiveProductAction(p.id);
+    const res = await runAction(() => archiveProductAction(p.id), {
+      silent: true,
+    });
     if (!res.ok) throw new Error(res.error.message);
     toast("Producto archivado", "danger");
     router.refresh();

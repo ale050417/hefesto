@@ -4,6 +4,7 @@ import { ExportCsvButton } from "@/features/reports/components/export-csv-button
 import { KpiCard } from "@/features/reports/components/kpi-card";
 import { MonthlyBars } from "@/features/reports/components/monthly-bars";
 import { CategoryDonut } from "@/features/reports/components/category-donut";
+import { FilamentConsumption } from "@/features/reports/components/filament-consumption";
 import { getReportsOverview } from "@/features/reports/service";
 import { compactPrice, formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -45,6 +46,7 @@ export default async function ReportesPage({
     categoryBreakdown,
     topProducts,
     bySource,
+    consumption,
   } = await getReportsOverview(year);
 
   const avgTicket =
@@ -166,7 +168,10 @@ export default async function ReportesPage({
           <div className="flex flex-col gap-3">
             {topProducts.map((p) => (
               <div key={p.name} className="flex items-center gap-3">
-                <div className="text-fg w-44 shrink-0 truncate text-[13px]">
+                <div
+                  className="text-fg shrink-0 truncate text-[13px]"
+                  style={{ width: "clamp(96px, 28vw, 176px)" }}
+                >
                   {p.name}
                 </div>
                 <div className="bg-surface-2 h-3 flex-1 overflow-hidden rounded-full">
@@ -187,6 +192,8 @@ export default async function ReportesPage({
           </div>
         )}
       </div>
+
+      <FilamentConsumption rows={consumption} />
     </div>
   );
 }

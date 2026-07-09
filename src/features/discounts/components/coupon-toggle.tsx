@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { toggleCouponAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 export function CouponToggle({
   id,
@@ -17,7 +18,7 @@ export function CouponToggle({
 
   async function toggle() {
     setBusy(true);
-    await toggleCouponAction(id, !isActive);
+    await runAction(() => toggleCouponAction(id, !isActive), { silent: true });
     setBusy(false);
     router.refresh();
   }

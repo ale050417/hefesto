@@ -9,6 +9,7 @@ import { deleteCategoryAction } from "../actions";
 import { catIconPath } from "../category-icons";
 import type { CategoryWithCount } from "../types";
 import { CategoryForm, type CategoryFormData } from "./category-form";
+import { runAction } from "@/lib/run-action";
 
 function IconSvg({ name, size }: { name: string | null; size?: number }) {
   return (
@@ -60,6 +61,19 @@ export function CategoriesAdmin({
   categories: CategoryWithCount[];
 }) {
   const router = useRouter();
+  // Subcategorías (Fase 6): mostramos cada raíz seguida de sus hijas.
+  const roots = categories.filter((c) => !c.parentId);
+  const byParent = new Map<string, CategoryWithCount[]>();
+  for (const c of categories) {
+    if (!c.parentId) continue;
+    const list = byParent.get(c.parentId) ?? [];
+    list.push(c);
+    byParent.set(c.parentId, list);
+  }
+  const ordered = roots.flatMap((r) => [r, ...(byParent.get(r.id) ?? [])]);
+  const parentName = (id: string | null) =>
+    id ? (categories.find((c) => c.id === id)?.name ?? null) : null;
+  const parentOptions = roots.map(({ id, name }) => ({ id, name }));
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryFormData | null>(null);
   const [toDelete, setToDelete] = useState<CategoryWithCount | null>(null);
@@ -77,6 +91,7 @@ export function CategoriesAdmin({
       icon: c.icon,
       color: c.color,
       sortOrder: c.sortOrder,
+      parentId: c.parentId,
     });
     setFormOpen(true);
   }
@@ -84,7 +99,9 @@ export function CategoriesAdmin({
   async function confirmDelete() {
     if (!toDelete) return;
     setBusy(true);
-    const res = await deleteCategoryAction(toDelete.id);
+    const res = await runAction(() => deleteCategoryAction(toDelete.id), {
+      silent: true,
+    });
     setBusy(false);
     if (res.ok) {
       toast("Categoría eliminada", "danger");
@@ -128,7 +145,7 @@ export function CategoriesAdmin({
         </div>
       ) : (
         <div className="grid-3">
-          {categories.map((c) => {
+          {ordered.map((c) => {
             const color = c.color ?? "#888";
             return (
               <div
@@ -156,6 +173,17 @@ export function CategoriesAdmin({
                         <div className="text-faint text-[12px]">
                           {c.productCount}{" "}
                           {c.productCount === 1 ? "producto" : "productos"}
+                          {parentName(c.parentId) ? (
+                            <span
+                              className="ml-1 rounded-full px-2 py-0.5 text-[11px]"
+                              style={{
+                                background: "rgba(var(--gold-rgb), .12)",
+                                color: "var(--gold-deep)",
+                              }}
+                            >
+                              Sub de {parentName(c.parentId)}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -191,6 +219,7 @@ export function CategoriesAdmin({
       >
         <CategoryForm
           category={editing ?? undefined}
+          parents={parentOptions}
           onDone={() => setFormOpen(false)}
           onCancel={() => setFormOpen(false)}
         />

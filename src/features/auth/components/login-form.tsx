@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { loginAction } from "../actions";
+import { runAction } from "@/lib/run-action";
 
 type Values = { email: string; password: string };
 
@@ -24,9 +25,9 @@ export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
-    const res = await loginAction(values);
+    const res = await runAction(() => loginAction(values), { silent: true });
     if (!res.ok) {
-      setFormError(res.error);
+      setFormError(res.error.message);
       return;
     }
     router.push(redirectTo);

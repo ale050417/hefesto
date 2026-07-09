@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
+import { runAction } from "@/lib/run-action";
 import {
   createManualCustomerAction,
   updateManualCustomerAction,
@@ -48,8 +49,13 @@ export function CustomerForm({
     try {
       const res =
         edit && customer?.id
-          ? await updateManualCustomerAction(customer.id, form)
-          : await createManualCustomerAction(form);
+          ? await runAction(
+              () => updateManualCustomerAction(customer!.id!, form),
+              { silent: true },
+            )
+          : await runAction(() => createManualCustomerAction(form), {
+              silent: true,
+            });
       if (!res.ok) return setErr(res.error.message);
       toast(edit ? "Cliente actualizado" : "Cliente creado", "success");
       onDone?.();

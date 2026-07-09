@@ -9,6 +9,7 @@ import { compactPrice } from "@/lib/format";
 import type { Coupon } from "../types";
 import { deleteCouponAction } from "../actions";
 import { CouponForm, type CouponFormData } from "./coupon-form";
+import { runAction } from "@/lib/run-action";
 
 const dateFmt = new Intl.DateTimeFormat("es-AR", {
   day: "numeric",
@@ -260,7 +261,9 @@ export function CouponsAdmin({ coupons }: { coupons: Coupon[] }) {
         detail="Se eliminará también su historial de canjes."
         onConfirm={async () => {
           if (!confirming) return;
-          const res = await deleteCouponAction(confirming.id);
+          const res = await runAction(() => deleteCouponAction(confirming.id), {
+            silent: true,
+          });
           if (!res.ok) throw new Error(res.error.message);
           toast("Cupón eliminado", "danger");
           router.refresh();
