@@ -4611,3 +4611,28 @@ body > * {
     transition: none;
   }
 }
+
+/* Checkboxes de la tabla de permisos (fix visual 2026-07-09): caja única para
+   ambos estados, tick que aparece con transición, hover y foco visibles. */
+.check svg {
+  transform: scale(0.5);
+  transition: transform 0.15s ease;
+}
+.check.on svg {
+  transform: scale(1);
+}
+td[role="checkbox"] {
+  outline: none;
+}
+td[role="checkbox"]:hover .check {
+  border-color: var(--gold);
+}
+td[role="checkbox"]:focus-visible .check {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(var(--gold-rgb), 0.22);
+}
+@media (prefers-reduced-motion: reduce) {
+  .check svg {
+    transition: none;
+  }
+}

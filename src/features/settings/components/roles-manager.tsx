@@ -385,7 +385,7 @@ export function RolesManager({
                             className={`check${on ? "on" : ""}`}
                             style={{ margin: "0 auto" }}
                           >
-                            {on ? ic(I.check) : null}
+                            {ic(I.check)}
                           </div>
                         </td>
                       );
@@ -848,6 +848,13 @@ function RoleModal({
                             userSelect: "none",
                           }}
                           onClick={() => toggle(mid, a)}
+                          onKeyDown={(e) => {
+                            if (e.key === " " || e.key === "Enter") {
+                              e.preventDefault();
+                              toggle(mid, a);
+                            }
+                          }}
+                          tabIndex={0}
                           role="checkbox"
                           aria-checked={on}
                           aria-label={`${ml}: ${a}`}
@@ -857,7 +864,7 @@ function RoleModal({
                             style={{ margin: "0 auto" }}
                             aria-hidden
                           >
-                            {on ? ic(I.check) : null}
+                            {ic(I.check)}
                           </span>
                         </td>
                       );
