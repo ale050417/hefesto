@@ -20,4 +20,7 @@ BEGIN
     current_user,
     '30s'
   );
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE NOTICE 'sin permiso para ALTER ROLE %: correr los ALTER ROLE a mano en el SQL Editor', current_user;
 END $$;
