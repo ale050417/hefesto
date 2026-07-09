@@ -4806,3 +4806,23 @@ td[role="checkbox"]:focus-visible .check {
     white-space: nowrap;
   }
 }
+
+/* Header mobile v2.1: buscador centrado en el medio, acciones pegadas a la
+   esquina derecha (login/carrito), logo a la izquierda. */
+@media (max-width: 767px) {
+  .store-topbar {
+    padding-inline: 10px;
+  }
+  .store-search-wrap {
+    display: flex;
+    justify-content: center;
+  }
+  .store-search {
+    width: 100%;
+    max-width: min(62vw, 280px);
+  }
+  .store-actions {
+    margin-left: auto;
+    gap: 6px;
+  }
+}
