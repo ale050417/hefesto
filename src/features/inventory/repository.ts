@@ -98,13 +98,6 @@ export async function updateFailureRow(
   return row;
 }
 
-export async function deleteFailureRow(
-  id: string,
-  database: Database = db,
-): Promise<void> {
-  await database.delete(printFailures).where(eq(printFailures.id, id));
-}
-
 export async function findFailureById(
   id: string,
   database: Database = db,

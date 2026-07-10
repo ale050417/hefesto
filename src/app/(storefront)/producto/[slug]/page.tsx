@@ -38,12 +38,18 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function ProductPage({ params }: Params) {
   const { slug } = await params;
-  const product = await getProductBySlug(slug);
+  // Antes: 4 awaits secuenciales (waterfall). Ahora 2 tandas paralelas; el
+  // producto además se dedupea con generateMetadata (React cache en el service).
+  const [product, user] = await Promise.all([
+    getProductBySlug(slug),
+    getCurrentUser(),
+  ]);
   if (!product) notFound();
 
-  const related = await getRelatedProducts(slug);
-  const user = await getCurrentUser();
-  const reviews = await getProductReviewsFor(product.id, user?.id ?? null);
+  const [related, reviews] = await Promise.all([
+    getRelatedProducts(slug),
+    getProductReviewsFor(product.id, user?.id ?? null),
+  ]);
 
   // Solo lo que le interesa al cliente. Nada técnico (gramos, tiempo de
   // impresión, material, altura de capa): eso es interno del taller.

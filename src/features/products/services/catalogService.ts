@@ -25,6 +25,7 @@ import {
   updateCategoryRow,
   updateProductRow,
 } from "../repository";
+import { cache } from "react";
 import { randomUUID } from "node:crypto";
 import { deleteObject, optimizeImage, uploadObject } from "@/core/storage";
 import {
@@ -113,11 +114,16 @@ export async function listProducts(
   };
 }
 
+// Dedupe POR REQUEST (React cache): la página de producto pide el mismo slug
+// tres veces (generateMetadata + page + relacionados). Con esto la base se
+// consulta UNA vez por request; entre requests no cachea nada (dato fresco).
+const findBySlugCached = cache(findBySlug);
+
 /** Detalle de un producto publicado (o null para 404). */
 export async function getProductBySlug(
   slug: string,
 ): Promise<ProductDetailView | null> {
-  const p = await findBySlug(slug);
+  const p = await findBySlugCached(slug);
   if (!p) return null;
   return {
     ...toProductView(p),
@@ -150,7 +156,7 @@ export async function getRelatedProducts(
   slug: string,
   limit = 4,
 ): Promise<ProductView[]> {
-  const product = await findBySlug(slug);
+  const product = await findBySlugCached(slug);
   if (!product) return [];
   const related = await findRelated({
     productId: product.id,
