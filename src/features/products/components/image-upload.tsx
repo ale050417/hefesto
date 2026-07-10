@@ -12,6 +12,7 @@ import {
 } from "../actions";
 import type { ProductImage } from "../types";
 import { runAction } from "@/lib/run-action";
+import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 export function ImageUpload({
   productId,
@@ -25,6 +26,14 @@ export function ImageUpload({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
+  // Patrón único de eliminación (modo toast; el error se ve como toast).
+  const { deleteResource: removeImage } = useDeleteResource({
+    action: (imageId: string) => deleteProductImageAction(imageId),
+    successMessage: "Imagen eliminada",
+    notify: "toast",
+    label: "Eliminando imagen…",
+    onDeleted: () => onChanged?.(),
+  });
   const [isPending, startTransition] = useTransition();
 
   function handleUpload(fileList: FileList | null) {
@@ -49,13 +58,7 @@ export function ImageUpload({
 
   function handleDelete(imageId: string) {
     setError(null);
-    startTransition(async () => {
-      const res = await runAction(() => deleteProductImageAction(imageId), {
-        silent: true,
-      });
-      if (!res.ok) setError(res.error.message);
-      onChanged?.();
-    });
+    void removeImage(imageId);
   }
 
   function handlePrimary(imageId: string) {

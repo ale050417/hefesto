@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
@@ -15,7 +14,7 @@ import {
 import type { OrderListItem } from "../types";
 import { deleteOrdersAction } from "../actions";
 import { DeleteOrderButton } from "./order-actions";
-import { runAction } from "@/lib/run-action";
+import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 const dateFmt = new Intl.DateTimeFormat("es-AR", { dateStyle: "medium" });
 
@@ -59,19 +58,18 @@ export function OrdersAdminList({
     });
   }
 
-  async function confirmBulkDelete() {
-    const list = [...selected];
-    const res = await runAction(() => deleteOrdersAction(list), {
-      silent: true,
-    });
-    if (!res.ok) throw new Error(res.error.message);
-    toast(
-      `${res.deleted} pedido${res.deleted === 1 ? "" : "s"} eliminado${
-        res.deleted === 1 ? "" : "s"
+  // Patrón único de eliminación, en LOTE: una sola action con todos los ids.
+  const { deleteResource: removeOrders } = useDeleteResource<string[]>({
+    action: (ids) => deleteOrdersAction(ids),
+    successMessage: (ids) =>
+      `${ids.length} pedido${ids.length === 1 ? "" : "s"} eliminado${
+        ids.length === 1 ? "" : "s"
       }`,
-      "danger",
-    );
-    setSelected(new Set());
+    onDeleted: () => setSelected(new Set()),
+  });
+
+  async function confirmBulkDelete() {
+    await removeOrders([...selected]);
   }
 
   return (

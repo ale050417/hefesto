@@ -17,6 +17,7 @@ import {
 import { PERM_ACTIONS, PERM_MODULES } from "@/core/auth/perm-defs";
 import type { Role, TeamMember } from "../types";
 import { runAction } from "@/lib/run-action";
+import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 /* ---------- íconos inline ---------- */
 const ic = (path: string) => (
@@ -99,31 +100,30 @@ export function RolesManager({
     } else toast(res.error.message, "danger");
   }
 
+  // Patrón único de eliminación (modo toast: los confirms son modales propios).
+  const { deleteResource: removeMember } = useDeleteResource({
+    action: (userId: string) => removeTeamMemberAction({ userId }),
+    successMessage: "Acceso revocado",
+    notify: "toast",
+    label: "Quitando acceso…",
+    onDeleted: () => setRemoveTarget(null),
+  });
+  const { deleteResource: removeRole } = useDeleteResource({
+    action: (roleId: string) => deleteRoleAction({ id: roleId }),
+    successMessage: "Rol eliminado",
+    notify: "toast",
+    label: "Eliminando rol…",
+    onDeleted: () => setDeleteRole(null),
+  });
+
   async function confirmRemove() {
     if (!removeTarget) return;
-    setPendingId(removeTarget.id);
-    const res = await runAction(
-      () => removeTeamMemberAction({ userId: removeTarget.id }),
-      { silent: true },
-    );
-    setPendingId(null);
-    setRemoveTarget(null);
-    if (res.ok) {
-      toast("Acceso revocado", "danger");
-    } else toast(res.error.message, "danger");
+    await removeMember(removeTarget.id);
   }
 
   async function confirmDeleteRole() {
     if (!deleteRole) return;
-    setPendingId(deleteRole.id);
-    const res = await runAction(() => deleteRoleAction({ id: deleteRole.id }), {
-      silent: true,
-    });
-    setPendingId(null);
-    setDeleteRole(null);
-    if (res.ok) {
-      toast("Rol eliminado", "danger");
-    } else toast(res.error.message, "danger");
+    await removeRole(deleteRole.id);
   }
 
   const roleMemberCount = (roleId: string) =>
@@ -430,12 +430,7 @@ export function RolesManager({
               >
                 Cancelar
               </Button>
-              <Button
-                type="button"
-                variant="danger"
-                loading={pendingId === removeTarget.id}
-                onClick={confirmRemove}
-              >
+              <Button type="button" variant="danger" onClick={confirmRemove}>
                 Quitar acceso
               </Button>
             </>

@@ -14,6 +14,7 @@ import type {
 } from "../service";
 import type { CalcHistoryRow } from "../repository";
 import { runAction } from "@/lib/run-action";
+import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 const svg = (path: string) => (
   <svg
@@ -87,7 +88,6 @@ export function PriceCalculator({
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"fecha" | "precio" | "nombre">("fecha");
-  const [pendingId, setPendingId] = useState<string | null>(null);
   // Precio que calcula el servidor para el operador (sin exponer el margen).
   const [opPrice, setOpPrice] = useState<number | null>(null);
   const [opBusy, setOpBusy] = useState(false);
@@ -184,15 +184,15 @@ export function PriceCalculator({
     }));
   }
 
+  // Patrón único de eliminación (modo toast; overlay "Eliminando…").
+  const { deleteResource: removeCalc, busyId: pendingId } = useDeleteResource({
+    action: (id: string) => deleteCalcAction(id),
+    successMessage: "Cálculo eliminado",
+    notify: "toast",
+  });
+
   async function remove(id: string) {
-    setPendingId(id);
-    const res = await runAction(() => deleteCalcAction(id), { silent: true });
-    setPendingId(null);
-    if (res.ok) {
-      toast("Cálculo eliminado", "danger");
-    } else {
-      toast(res.error.message, "danger");
-    }
+    await removeCalc(id);
   }
 
   const filtered = useMemo(() => {

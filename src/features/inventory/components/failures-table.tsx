@@ -3,12 +3,11 @@
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
 import { deleteFailureAction } from "../actions";
 import { filColor } from "../constants";
 import { FailureForm } from "./failure-form";
-import { runAction } from "@/lib/run-action";
+import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 export type FailureRow = {
   id: string;
@@ -59,13 +58,12 @@ export function FailuresTable({
   const [editing, setEditing] = useState<FailureRow | null>(null);
   const [confirming, setConfirming] = useState<FailureRow | null>(null);
 
-  async function confirmRemove(f: FailureRow) {
-    const res = await runAction(() => deleteFailureAction(f.id), {
-      silent: true,
-    });
-    if (!res.ok) throw new Error(res.error.message);
-    toast("Falla eliminada · gramos devueltos al stock", "success");
-  }
+  // Patrón único de eliminación (serializa, toast garantizado).
+  const { deleteResource: removeFailure } = useDeleteResource({
+    action: (failureId: string) => deleteFailureAction(failureId),
+    successMessage: "Falla eliminada · gramos devueltos al stock",
+    successTone: "success",
+  });
 
   return (
     <>
@@ -189,7 +187,7 @@ export function FailuresTable({
             : undefined
         }
         onConfirm={() => {
-          if (confirming) return confirmRemove(confirming);
+          if (confirming) return removeFailure(confirming.id);
         }}
       />
     </>

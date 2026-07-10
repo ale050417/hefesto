@@ -51,7 +51,7 @@ export async function runAction<R extends { ok: boolean }>(
   const { begin, end } = useActionOverlayStore.getState();
   const showOverlay = opts?.overlay !== false;
   const timeoutMs = opts?.timeoutMs ?? ACTION_TIMEOUT_MS;
-  if (showOverlay) begin(opts?.label);
+  if (showOverlay) begin(opts?.label ?? "Procesando…");
 
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_resolve, reject) => {

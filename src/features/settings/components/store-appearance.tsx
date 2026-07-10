@@ -20,6 +20,7 @@ import type { BusinessSettings, StoreBanner } from "../types";
 import { BrandImageUpload } from "./brand-image-upload";
 import { StoreLivePreview } from "./store-live-preview";
 import { runAction } from "@/lib/run-action";
+import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 const ACCENTS = [
   "#C9A84C",
@@ -216,14 +217,12 @@ export function StoreAppearance({
     setBannerOpen(false);
     bumpPreview();
   }
-  async function confirmRemoveBanner(b: StoreBanner) {
-    const res = await runAction(() => deleteBannerAction(b.id), {
-      silent: true,
-    });
-    if (!res.ok) throw new Error(res.error.message);
-    toast("Banner eliminado", "danger");
-    bumpPreview();
-  }
+  // Patrón único de eliminación: serializa + toast + preview tras confirmar.
+  const { deleteResource: removeBanner } = useDeleteResource({
+    action: (bannerId: string) => deleteBannerAction(bannerId),
+    successMessage: "Banner eliminado",
+    onDeleted: () => bumpPreview(),
+  });
   async function moveUp(i: number) {
     if (i <= 0) return;
     const cur = banners[i]!;
@@ -772,7 +771,7 @@ export function StoreAppearance({
             : "¿Eliminar banner?"
         }
         onConfirm={() => {
-          if (confirmBanner) return confirmRemoveBanner(confirmBanner);
+          if (confirmBanner) return removeBanner(confirmBanner.id);
         }}
       />
     </div>

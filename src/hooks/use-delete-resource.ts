@@ -21,8 +21,11 @@ function messageOf(result: ResultLike): string {
  * Patrón ÚNICO de eliminación (bug 2026-07-10: borrados sin feedback o con
  * estado inconsistente). Para CUALQUIER sección garantiza:
  *
- *  - await REAL de la Server Action, vía `runAction` (timeout 20 s, overlay,
+ *  - await REAL de la Server Action, vía `runAction` (timeout 20 s,
  *    normalización de errores de red — nunca una promesa colgada);
+ *  - el overlay de la "H" como indicador único: en modo diálogo lo pone
+ *    ConfirmDialog (con su busyLabel "Eliminando…"); en modo toast lo pone
+ *    este hook (label configurable). Nada de spinners en botones;
  *  - SERIALIZACIÓN: una eliminación a la vez. Clics rápidos no encolan ni
  *    pisan estado: el segundo intento avisa y espera a la confirmación;
  *  - feedback SIEMPRE: toast al confirmar el backend; el fallo se LANZA
@@ -44,38 +47,52 @@ function messageOf(result: ResultLike): string {
 export function useDeleteResource<T = string>(opts: {
   /** Server Action de borrado (DEBE hacer revalidatePath de su vista). */
   action: (target: T) => Promise<ResultLike>;
-  successMessage: string;
+  /** Toast de éxito (fijo o calculado a partir del objetivo). */
+  successMessage: string | ((target: T) => string);
+  /** Tono del toast de éxito ("danger" = rojo de borrado, el estándar). */
+  successTone?: "danger" | "success";
   /** "throw" (default, para ConfirmDialog) | "toast" (flujos sin diálogo). */
   notify?: "throw" | "toast";
+  /** Texto del overlay en modo toast (default "Eliminando…"). */
+  label?: string;
   onDeleted?: (target: T) => void;
 }) {
   const [busyId, setBusyId] = useState<T | null>(null);
   const inFlight = useRef(false);
+  const toastMode = opts.notify === "toast";
 
-  async function deleteResource(target: T): Promise<boolean> {
+  async function deleteResource(target: T): Promise<void> {
     if (inFlight.current) {
       const msg = "Hay una eliminación en curso. Esperá a que termine.";
-      if (opts.notify === "toast") {
+      if (toastMode) {
         toast(msg, "danger");
-        return false;
+        return;
       }
       throw new Error(msg);
     }
     inFlight.current = true;
     setBusyId(target);
     try {
-      const res = await runAction(() => opts.action(target), { silent: true });
+      const res = await runAction(() => opts.action(target), {
+        silent: true,
+        // En modo diálogo el overlay + "Eliminando…" ya los pone ConfirmDialog.
+        overlay: toastMode,
+        ...(toastMode ? { label: opts.label ?? "Eliminando…" } : {}),
+      });
       if (!res.ok) {
         const message = messageOf(res);
-        if (opts.notify === "toast") {
+        if (toastMode) {
           toast(message, "danger");
-          return false;
+          return;
         }
         throw new Error(message);
       }
-      toast(opts.successMessage, "danger");
+      const msg =
+        typeof opts.successMessage === "function"
+          ? opts.successMessage(target)
+          : opts.successMessage;
+      toast(msg, opts.successTone ?? "danger");
       opts.onDeleted?.(target);
-      return true;
     } finally {
       inFlight.current = false;
       setBusyId(null);

@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { toast } from "@/stores/toastStore";
 import { cn } from "@/lib/utils";
 import { deleteManualSaleAction } from "../actions";
-import { runAction } from "@/lib/run-action";
+import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 const TrashIcon = (
   <svg
@@ -39,6 +38,10 @@ export function DeleteManualSaleButton({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const { deleteResource: deleteSale } = useDeleteResource({
+    action: (saleId: string) => deleteManualSaleAction(saleId),
+    successMessage: "Venta eliminada",
+  });
 
   return (
     <>
@@ -57,13 +60,7 @@ export function DeleteManualSaleButton({
         onClose={() => setOpen(false)}
         title={label ? `¿Eliminar la venta de ${label}?` : "¿Eliminar venta?"}
         description="Se elimina de forma permanente y deja de sumar a facturación, ganancias y reportes."
-        onConfirm={async () => {
-          const res = await runAction(() => deleteManualSaleAction(id), {
-            silent: true,
-          });
-          if (!res.ok) throw new Error(res.error.message);
-          toast("Venta eliminada", "danger");
-        }}
+        onConfirm={() => deleteSale(id)}
       />
     </>
   );

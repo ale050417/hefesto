@@ -1,6 +1,5 @@
 import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
-import { Spinner } from "./spinner";
 
 type Variant = "primary" | "secondary" | "outline" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg" | "icon";
@@ -54,19 +53,14 @@ export function Button({
         className,
       )}
       // Mientras carga queda deshabilitado (evita doble submit) pero seguimos
-      // marcando aria-busy para lectores de pantalla.
+      // marcando aria-busy para lectores de pantalla. El indicador visual de
+      // carga es el overlay global de la "H" (runAction) — decisión 2026-07-10:
+      // un solo loader en toda la app, nada de spinners por botón.
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       {...props}
     >
-      {loading ? (
-        <span className="inline-flex items-center gap-2" style={{ opacity: 1 }}>
-          <Spinner size={size === "lg" ? 18 : 15} />
-          {children}
-        </span>
-      ) : (
-        children
-      )}
+      {children}
     </button>
   );
 }

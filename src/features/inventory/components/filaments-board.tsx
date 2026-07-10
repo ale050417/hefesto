@@ -10,6 +10,7 @@ import { filColor } from "../constants";
 import type { FilamentView } from "../types";
 import { FilamentForm } from "./filament-form";
 import { runAction } from "@/lib/run-action";
+import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 type View = "grilla" | "lista";
 
@@ -109,13 +110,11 @@ export function FilamentsBoard({
     }
   }
 
-  async function confirmRemove(f: FilamentView) {
-    const res = await runAction(() => deleteFilamentAction(f.id), {
-      silent: true,
-    });
-    if (!res.ok) throw new Error(res.error.message);
-    toast("Filamento eliminado", "danger");
-  }
+  // Patrón único de eliminación (serializa, toast garantizado).
+  const { deleteResource: removeFilament } = useDeleteResource({
+    action: (filamentId: string) => deleteFilamentAction(filamentId),
+    successMessage: "Filamento eliminado",
+  });
 
   return (
     <>
@@ -411,7 +410,7 @@ export function FilamentsBoard({
             : "¿Eliminar filamento?"
         }
         onConfirm={() => {
-          if (confirming) return confirmRemove(confirming);
+          if (confirming) return removeFilament(confirming.id);
         }}
       />
     </>

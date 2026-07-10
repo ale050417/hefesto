@@ -13,6 +13,7 @@ import {
 import { CUSTOM_STATUS_LABEL, CUSTOM_TRANSITIONS } from "../transitions";
 import type { CustomRequestStatus } from "../types";
 import { runAction } from "@/lib/run-action";
+import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 /**
  * Select de estado en el header del chat. Respeta la máquina de estados:
@@ -166,6 +167,12 @@ export function MedidaQuoteButton({
 /** Elimina la conversación (staff). Pide confirmación; el borrado es definitivo. */
 export function MedidaDeleteButton({ id }: { id: string }) {
   const router = useRouter();
+  const { deleteResource: deleteRequest } = useDeleteResource({
+    action: (requestId: string) => deleteCustomRequestAction(requestId),
+    successMessage: "Conversación eliminada.",
+    successTone: "success",
+    onDeleted: () => router.push("/admin/medida"),
+  });
   const [open, setOpen] = useState(false);
   const canDelete = useCan("medida", "eliminar");
   if (!canDelete) return null;
@@ -197,14 +204,7 @@ export function MedidaDeleteButton({ id }: { id: string }) {
         onClose={() => setOpen(false)}
         title="¿Eliminar esta conversación?"
         description="Se eliminará la conversación y todos sus mensajes. Esta acción no se puede deshacer."
-        onConfirm={async () => {
-          const res = await runAction(() => deleteCustomRequestAction(id), {
-            silent: true,
-          });
-          if (!res.ok) throw new Error(res.error.message);
-          toast("Conversación eliminada.", "success");
-          router.push("/admin/medida");
-        }}
+        onConfirm={() => deleteRequest(id)}
       />
     </>
   );

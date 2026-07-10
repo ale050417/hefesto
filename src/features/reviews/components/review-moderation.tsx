@@ -38,7 +38,7 @@ export function ReviewModeration({
   async function approve() {
     setApproving(true);
     const res = await runAction(() => approveReviewAction(id), {
-      overlay: false,
+      label: "Aprobando…",
     });
     setApproving(false);
     if (res.ok) toast("Reseña aprobada", "success");
@@ -71,7 +71,7 @@ export function ReviewModeration({
         onClose={() => setConfirming(false)}
         title="¿Eliminar la reseña?"
         description="Se elimina de forma permanente y deja de contar para el puntaje del producto."
-        onConfirm={() => deleteResource(id).then(() => undefined)}
+        onConfirm={() => deleteResource(id)}
       />
     </div>
   );

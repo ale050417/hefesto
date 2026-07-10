@@ -18,6 +18,7 @@ import { ProductForm, type ProductFormValues } from "./product-form";
 import { ImageUpload } from "./image-upload";
 import { ProductStatusActions } from "./product-status-actions";
 import { runAction } from "@/lib/run-action";
+import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 const EMPTY_DEFAULTS: ProductFormValues = {
   name: "",
@@ -202,13 +203,11 @@ export function ProductsAdmin({
     }
   }
 
-  async function confirmArchive(p: AdminProductRow) {
-    const res = await runAction(() => archiveProductAction(p.id), {
-      silent: true,
-    });
-    if (!res.ok) throw new Error(res.error.message);
-    toast("Producto archivado", "danger");
-  }
+  // Mismo patrón que las eliminaciones (archivar es el "borrado" de productos).
+  const { deleteResource: archiveProduct } = useDeleteResource({
+    action: (id: string) => archiveProductAction(id),
+    successMessage: "Producto archivado",
+  });
 
   const off = (p: AdminProductRow) =>
     p.salePrice ? Math.round((1 - p.salePrice / p.price) * 100) : 0;
@@ -548,7 +547,7 @@ export function ProductsAdmin({
         description="El producto dejará de mostrarse en la tienda. Podés republicarlo cuando quieras."
         confirmLabel="Archivar"
         onConfirm={() => {
-          if (archiving) return confirmArchive(archiving);
+          if (archiving) return archiveProduct(archiving.id);
         }}
       />
     </div>

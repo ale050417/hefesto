@@ -3,10 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { toast } from "@/stores/toastStore";
 import { cn } from "@/lib/utils";
 import { deleteOrderAction } from "../actions";
-import { runAction } from "@/lib/run-action";
+import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 const TrashIcon = (
   <svg
@@ -48,6 +47,16 @@ export function DeleteOrderButton({
   className?: string;
 }) {
   const router = useRouter();
+  // Patrón único de eliminación (hooks/use-delete-resource): serializa,
+  // toast garantizado y navegación recién tras confirmar el backend.
+  const { deleteResource: deleteOrder } = useDeleteResource({
+    action: (id: string) => deleteOrderAction(id),
+    successMessage: "Pedido eliminado",
+    onDeleted: () => {
+      onDeleted?.();
+      if (redirectTo) router.push(redirectTo);
+    },
+  });
   const [open, setOpen] = useState(false);
 
   return (
@@ -67,15 +76,7 @@ export function DeleteOrderButton({
         onClose={() => setOpen(false)}
         title={`¿Eliminar pedido ${orderNumber}?`}
         detail="Se eliminarán también sus ítems, historial y chat. Los puntos y el uso de cupón que haya generado se revierten."
-        onConfirm={async () => {
-          const res = await runAction(() => deleteOrderAction(orderId), {
-            silent: true,
-          });
-          if (!res.ok) throw new Error(res.error.message);
-          toast("Pedido eliminado", "danger");
-          onDeleted?.();
-          if (redirectTo) router.push(redirectTo);
-        }}
+        onConfirm={() => deleteOrder(orderId)}
       />
     </>
   );

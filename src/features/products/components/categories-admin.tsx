@@ -3,12 +3,11 @@
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
-import { toast } from "@/stores/toastStore";
 import { deleteCategoryAction } from "../actions";
 import { catIconPath } from "../category-icons";
 import type { CategoryWithCount } from "../types";
 import { CategoryForm, type CategoryFormData } from "./category-form";
-import { runAction } from "@/lib/run-action";
+import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 function IconSvg({ name, size }: { name: string | null; size?: number }) {
   return (
@@ -75,7 +74,6 @@ export function CategoriesAdmin({
   const [editing, setEditing] = useState<CategoryFormData | null>(null);
   const [newParentId, setNewParentId] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<CategoryWithCount | null>(null);
-  const [busy, setBusy] = useState(false);
 
   function openNew() {
     setEditing(null);
@@ -100,19 +98,18 @@ export function CategoriesAdmin({
     setFormOpen(true);
   }
 
+  // Patrón único de eliminación (modo toast: el confirm es el modal propio).
+  const { deleteResource: removeCategory, deleting: deletingCategory } =
+    useDeleteResource({
+      action: (id: string) => deleteCategoryAction(id),
+      successMessage: "Categoría eliminada",
+      notify: "toast",
+      onDeleted: () => setToDelete(null),
+    });
+
   async function confirmDelete() {
     if (!toDelete) return;
-    setBusy(true);
-    const res = await runAction(() => deleteCategoryAction(toDelete.id), {
-      silent: true,
-    });
-    setBusy(false);
-    if (res.ok) {
-      toast("Categoría eliminada", "danger");
-      setToDelete(null);
-    } else {
-      toast(res.error.message, "danger");
-    }
+    await removeCategory(toDelete.id);
   }
 
   return (
@@ -393,10 +390,10 @@ export function CategoriesAdmin({
                 <button
                   type="button"
                   className="btn btn-danger"
-                  disabled={busy}
+                  disabled={deletingCategory}
                   onClick={confirmDelete}
                 >
-                  {busy ? "Eliminando…" : "Eliminar"}
+                  {deletingCategory ? "Eliminando…" : "Eliminar"}
                 </button>
               ) : null}
             </div>
