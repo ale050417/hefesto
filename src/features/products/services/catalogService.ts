@@ -25,6 +25,7 @@ import {
   updateCategoryRow,
   updateProductRow,
 } from "../repository";
+import { unstable_cache } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { deleteObject, optimizeImage, uploadObject } from "@/core/storage";
 import {
@@ -100,9 +101,9 @@ export async function quickSearch(
   return items.map(toProductView);
 }
 
-export async function listProducts(
+const listProductsUncached = async (
   filter: ProductFilter,
-): Promise<CatalogPage> {
+): Promise<CatalogPage> => {
   const { items, total } = await findPublished(filter);
   return {
     items: items.map(toProductView),
@@ -111,6 +112,20 @@ export async function listProducts(
     pageSize: filter.pageSize,
     totalPages: Math.max(1, Math.ceil(total / filter.pageSize)),
   };
+};
+
+// Catálogo cacheado 60 s POR COMBINACIÓN de filtros (la key incluye el filtro
+// serializado). Igual que la home: evita pegarle a la base en cada visita/scroll
+// con el pool acotado. Se refresca solo cada 60 s (cambios del admin: ≤60 s).
+export async function listProducts(
+  filter: ProductFilter,
+): Promise<CatalogPage> {
+  const cached = unstable_cache(
+    () => listProductsUncached(filter),
+    ["catalog-list", JSON.stringify(filter)],
+    { revalidate: 60 },
+  );
+  return cached();
 }
 
 /** Detalle de un producto publicado (o null para 404). */
@@ -141,9 +156,13 @@ export async function getProductBySlug(
 }
 
 /** Categorías para filtros y navegación. */
-export async function listCategories(): Promise<Category[]> {
-  return findCategories();
-}
+// Categorías cacheadas 60 s: se leen en el footer (TODAS las páginas), la home
+// y el catálogo, y casi no cambian. Quita una query por render en toda la app.
+export const listCategories = unstable_cache(
+  async (): Promise<Category[]> => findCategories(),
+  ["categories-public"],
+  { revalidate: 60 },
+);
 
 /** Productos relacionados (misma categoría) a partir del slug. */
 export async function getRelatedProducts(
@@ -161,7 +180,13 @@ export async function getRelatedProducts(
 }
 
 /** Datos para la Home: destacados, nuevos, ofertas y categorías. */
-export async function getHomeData(): Promise<HomeData> {
+// Vidriera cacheada 60 s (estabilización 2026-07): la home es la página más
+// visitada y disparaba 4 queries EN CADA visita (force-dynamic). Con el pool
+// acotado eso saturaba las conexiones. La vidriera no cambia cada segundo, así
+// que se sirve una foto fresca-cada-60s y el 99 % de las visitas no toca la
+// base. Un producto nuevo/editado aparece en la vidriera en ≤60 s (en /admin es
+// instantáneo). Next 16 cambió la API de tags, por eso usamos expiración simple.
+const getHomeDataUncached = async (): Promise<HomeData> => {
   const section = (extra: Record<string, unknown>) =>
     productFilterSchema.parse({ pageSize: 8, ...extra });
 
@@ -178,12 +203,19 @@ export async function getHomeData(): Promise<HomeData> {
     onSale: onSale.items.map(toProductView),
     categories,
   };
-}
+};
+
+export const getHomeData = unstable_cache(getHomeDataUncached, ["home-data"], {
+  revalidate: 60,
+});
 
 /** Materiales disponibles para el filtro del catálogo. */
-export async function listMaterials(): Promise<string[]> {
-  return findMaterials();
-}
+// Materiales cacheados 60 s (facetas del catálogo; casi estáticos).
+export const listMaterials = unstable_cache(
+  async (): Promise<string[]> => findMaterials(),
+  ["materials-public"],
+  { revalidate: 60 },
+);
 
 /** Slugs publicados (para el sitemap). */
 export async function listPublishedSlugs(): Promise<

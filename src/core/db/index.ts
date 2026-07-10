@@ -23,7 +23,11 @@ function makeClient() {
     prepare: false,
     idle_timeout: 20,
     max_lifetime: 60 * 30,
-    max: 10,
+    // Serverless + pooler de Supabase (PgBouncer): el pooler YA multiplexa, así
+    // que cada instancia debe tomar POCAS conexiones. Con `max` alto, varias
+    // instancias warm × 10 agotan el pool del proyecto y el render server-side
+    // queda esperando conexión → 503 "Algo salió mal" (estabilización 2026-07).
+    max: 3,
     connect_timeout: 15,
     ssl: "require",
   });

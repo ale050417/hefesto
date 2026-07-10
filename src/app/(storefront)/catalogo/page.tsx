@@ -11,6 +11,9 @@ import {
 } from "@/features/products/services/catalogService";
 
 export const dynamic = "force-dynamic";
+// Red de seguridad: la base está lejos; damos aire a la función para que la
+// latencia no corte un render que estaba por resolver (estabilización 2026-07).
+export const maxDuration = 30;
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
