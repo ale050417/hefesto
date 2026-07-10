@@ -29,7 +29,7 @@ const TOO_MANY: Result = {
 
 export async function loginAction(input: unknown): Promise<Result> {
   const ip = await getClientIp();
-  if (!rateLimit(`login:${ip}`, { limit: 5, windowMs: 60_000 }).ok) {
+  if (!(await rateLimit(`login:${ip}`, { limit: 5, windowMs: 60_000 })).ok) {
     return TOO_MANY;
   }
   const parsed = loginSchema.safeParse(input);
@@ -53,7 +53,7 @@ export async function loginAction(input: unknown): Promise<Result> {
 
 export async function registerAction(input: unknown): Promise<Result> {
   const ip = await getClientIp();
-  if (!rateLimit(`register:${ip}`, { limit: 5, windowMs: 60_000 }).ok) {
+  if (!(await rateLimit(`register:${ip}`, { limit: 5, windowMs: 60_000 })).ok) {
     return TOO_MANY;
   }
   const parsed = registerSchema.safeParse(input);
@@ -94,7 +94,7 @@ export async function requestPasswordResetAction(
   input: unknown,
 ): Promise<Result> {
   const ip = await getClientIp();
-  if (!rateLimit(`reset:${ip}`, { limit: 3, windowMs: 60_000 }).ok) {
+  if (!(await rateLimit(`reset:${ip}`, { limit: 3, windowMs: 60_000 })).ok) {
     return TOO_MANY;
   }
   const parsed = resetRequestSchema.safeParse(input);
@@ -132,7 +132,7 @@ export async function changePasswordAction(input: unknown): Promise<Result> {
       error: { code: "UNAUTHORIZED", message: "Iniciá sesión." },
     };
   const ip = await getClientIp();
-  if (!rateLimit(`changepw:${ip}`, { limit: 5, windowMs: 60_000 }).ok) {
+  if (!(await rateLimit(`changepw:${ip}`, { limit: 5, windowMs: 60_000 })).ok) {
     return TOO_MANY;
   }
   const parsed = changePasswordSchema.safeParse(input);

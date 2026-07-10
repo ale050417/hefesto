@@ -38,3 +38,4 @@ export * from "./calc-margin-presets";
 export * from "./store-banners";
 export * from "./payment-settings";
 export * from "./shipping-settings";
+export * from "./rate-limits";

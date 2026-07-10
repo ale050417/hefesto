@@ -281,6 +281,13 @@
       "when": 1783302400000,
       "tag": "0039_filament_movements",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1783303000000,
+      "tag": "0040_rate_limits",
+      "breakpoints": true
     }
   ]
 }

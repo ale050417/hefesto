@@ -33,7 +33,7 @@ export async function validateCouponAction(
   { ok: true; code: string; discount: number } | { ok: false; error: string }
 > {
   const ip = await getClientIp();
-  if (!rateLimit(`coupon:${ip}`, { limit: 20, windowMs: 60_000 }).ok) {
+  if (!(await rateLimit(`coupon:${ip}`, { limit: 20, windowMs: 60_000 })).ok) {
     return { ok: false, error: "Demasiados intentos. Esperá un momento." };
   }
   const coupon = await queries.getCouponByCode(code);
