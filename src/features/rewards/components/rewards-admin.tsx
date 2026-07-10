@@ -111,7 +111,7 @@ export function RewardsAdmin({
           label="Recompensas"
           value={String(rewards.length)}
           delta="catálogo"
-          tint="#9B7BD4"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={ic(
@@ -120,21 +120,21 @@ export function RewardsAdmin({
           label="Puntos en circulación"
           value={String(stats.inCirculation)}
           delta="de clientes"
-          tint="#C9A84C"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={ic('<path d="M20 6 9 17l-5-5"/>')}
           label="Canjes realizados"
           value={String(stats.redemptions)}
           delta="histórico"
-          tint="#4CB782"
+          tint="var(--success)"
         />
         <KpiCard
           icon={ic('<path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/>')}
           label="Puntos canjeados"
           value={String(stats.pointsRedeemed)}
           delta="total"
-          tint="#5A9CD9"
+          tint="var(--gold)"
         />
       </div>
 

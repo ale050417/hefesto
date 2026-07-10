@@ -129,7 +129,7 @@ export function ProductionBoard({
           icon={ic(PRINTER_PATH)}
           label="Impresoras imprimiendo"
           value={`${printing}/${printers.length}`}
-          tint="#5A9CD9"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={ic(
@@ -137,7 +137,7 @@ export function ProductionBoard({
           )}
           label="Trabajos en cola"
           value={String(queued)}
-          tint="#C9A84C"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={ic(
@@ -146,13 +146,13 @@ export function ProductionBoard({
           label="En mantenimiento"
           value={String(maint)}
           up={false}
-          tint="#D9A441"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={ic('<path d="M20 6 9 17l-5-5"/>')}
           label="Trabajos terminados"
           value={String(done)}
-          tint="#4CB782"
+          tint="var(--success)"
         />
       </div>
 

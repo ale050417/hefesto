@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "./brand-mark";
 import { ThemeSwitcher } from "./theme-switcher";
+import { AdminNotificationBell } from "@/features/notifications/components/admin-notification-bell";
 
 const icons: Record<string, React.ReactNode> = {
   panel: (
@@ -282,12 +283,18 @@ export function Sidebar({
 
   return (
     <aside className={cn("admin-sidebar", open && "open")}>
-      <Link href="/admin" className="brand mb-2 px-2 py-1" onClick={onNavigate}>
-        <BrandMark size={30} />
-        <span className="brand-name text-[15px]">
-          HEFESTO<b> Admin</b>
+      <div className="mb-2 flex items-center justify-between gap-1">
+        <Link href="/admin" className="brand px-2 py-1" onClick={onNavigate}>
+          <BrandMark size={30} />
+          <span className="brand-name text-[15px]">
+            HEFESTO<b> Admin</b>
+          </span>
+        </Link>
+        {/* Campana del negocio: en desktop vive acá (en móvil está en la topbar). */}
+        <span className="hidden md:inline-flex">
+          <AdminNotificationBell />
         </span>
-      </Link>
+      </div>
 
       <nav className="admin-nav">
         {groups.map((g) => (

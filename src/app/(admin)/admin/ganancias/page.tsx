@@ -75,7 +75,7 @@ export default async function GananciasPage({
           label="Ingresos cobrados"
           value={compactPrice(totals.ingreso)}
           delta={`${rows.length} pedidos`}
-          tint="#5A9CD9"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={ic(
@@ -85,14 +85,14 @@ export default async function GananciasPage({
           value={compactPrice(totals.amort)}
           delta="material+luz+máquina"
           up={false}
-          tint="#D9A441"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={ic('<path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/>')}
           label="Ganancia pura"
           value={compactPrice(totals.profit)}
           delta={`${pctProfit}% del ingreso`}
-          tint="#4CB782"
+          tint="var(--success)"
         />
         <KpiCard
           icon={ic(
@@ -101,7 +101,7 @@ export default async function GananciasPage({
           label="Filamento usado"
           value={`${Math.round(totals.grams)} g`}
           delta={`${(totals.grams / 1000).toFixed(1)} kg`}
-          tint="#9B7BD4"
+          tint="var(--gold)"
         />
       </div>
 

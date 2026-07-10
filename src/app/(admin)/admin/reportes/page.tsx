@@ -86,7 +86,7 @@ export default async function ReportesPage({
           )}
           label={`Facturación ${year}`}
           value={compactPrice(kpis.revenue)}
-          tint="#C9A84C"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={ic(
@@ -94,7 +94,7 @@ export default async function ReportesPage({
           )}
           label="Ticket promedio"
           value={compactPrice(avgTicket)}
-          tint="#4CB782"
+          tint="var(--success)"
         />
         <KpiCard
           icon={ic(
@@ -102,7 +102,7 @@ export default async function ReportesPage({
           )}
           label="Unidades vendidas"
           value={String(kpis.unitsSold)}
-          tint="#5A9CD9"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={ic(
@@ -110,7 +110,7 @@ export default async function ReportesPage({
           )}
           label={`Clientes nuevos ${year}`}
           value={String(kpis.newCustomers)}
-          tint="#9B7BD4"
+          tint="var(--gold)"
         />
       </div>
 

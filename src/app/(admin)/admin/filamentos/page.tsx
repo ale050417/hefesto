@@ -56,7 +56,7 @@ export default async function FilamentosPage() {
           label="Carretes en stock"
           value={String(filaments.length)}
           delta="colores"
-          tint="#C9A84C"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={ic(
@@ -65,7 +65,7 @@ export default async function FilamentosPage() {
           label="Material total"
           value={`${(totalG / 1000).toFixed(1)} kg`}
           delta="disponible"
-          tint="#4CB782"
+          tint="var(--success)"
         />
         <KpiCard
           icon={ic(
@@ -74,7 +74,7 @@ export default async function FilamentosPage() {
           label="Valor del inventario"
           value={compactPrice(valor)}
           delta="estimado"
-          tint="#5A9CD9"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={ic(
@@ -84,7 +84,7 @@ export default async function FilamentosPage() {
           value={String(bajos + agotados)}
           delta={agotados ? `${agotados} agotados` : "a reponer"}
           up={false}
-          tint="#D96A5A"
+          tint="var(--danger)"
         />
       </div>
 

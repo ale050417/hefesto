@@ -91,25 +91,25 @@ export default async function AdminDashboard() {
           icon={<Icon name="dollar" />}
           label="Ingresos · 30 días"
           value={formatPrice(kpis.revenue)}
-          tint="#C9A84C"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={<Icon name="chart" />}
           label="Ventas"
           value={String(kpis.salesCount)}
-          tint="#4CB782"
+          tint="var(--success)"
         />
         <KpiCard
           icon={<Icon name="cart" />}
           label="Pedidos pendientes"
           value={String(kpis.pendingCount)}
-          tint="#D9A441"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={<Icon name="layers" />}
           label="Filamentos bajo stock"
           value={String(kpis.lowStockCount)}
-          tint="#5A9CD9"
+          tint="var(--gold)"
         />
       </div>
 

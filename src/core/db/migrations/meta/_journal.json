@@ -288,6 +288,13 @@
       "when": 1783303000000,
       "tag": "0040_rate_limits",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1783304000000,
+      "tag": "0041_admin_notifications",
+      "breakpoints": true
     }
   ]
 }

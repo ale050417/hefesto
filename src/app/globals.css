@@ -4801,3 +4801,98 @@ td[role="checkbox"]:focus-visible .check {
     font-size: 12.5px;
   }
 }
+
+/* ============================================================
+   Micro-interacciones (2026-07-10) — pulido "premium" sutil.
+   Todo respeta prefers-reduced-motion (bloque final del archivo).
+   ============================================================ */
+
+/* El badge (carrito / notificaciones) aparece con un pop y late si hay
+   novedades sin leer, para atraer el ojo sin ser molesto. */
+.ic-badge,
+.notif-wrap .ic-badge {
+  animation: hef-badge-pop 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+@keyframes hef-badge-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.notif-wrap .ic-badge {
+  animation:
+    hef-badge-pop 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.4),
+    hef-badge-pulse 2s ease-in-out 0.4s infinite;
+}
+@keyframes hef-badge-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--gold-rgb), 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(var(--gold-rgb), 0);
+  }
+}
+
+/* Feedback táctil: nav del admin y botones-ícono se "hunden" apenas al tocar. */
+.nav-item:active,
+.icon-btn:active,
+.btn-icon:active {
+  transform: translateY(0.5px) scale(0.97);
+}
+.nav-item {
+  transition:
+    background 0.18s,
+    color 0.18s,
+    transform 0.08s ease;
+}
+
+/* Panel de notificaciones: entrada suave desde arriba. */
+.notif-panel {
+  animation: hef-notif-in 0.2s cubic-bezier(0.2, 0.8, 0.3, 1);
+  transform-origin: top right;
+}
+@keyframes hef-notif-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Una fila nueva de notificación sin leer entra con un destello dorado. */
+.notif-item.unread {
+  animation: hef-notif-row 0.5s ease;
+}
+@keyframes hef-notif-row {
+  0% {
+    background: rgba(var(--gold-rgb), 0.14);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ic-badge,
+  .notif-wrap .ic-badge,
+  .notif-panel,
+  .notif-item.unread {
+    animation: none;
+  }
+  .nav-item:active,
+  .icon-btn:active,
+  .btn-icon:active {
+    transform: none;
+  }
+}

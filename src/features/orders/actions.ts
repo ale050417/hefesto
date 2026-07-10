@@ -28,7 +28,7 @@ import {
   updateManualSaleStatus,
 } from "./services/manualSaleService";
 import { getOrderCustomerId, sendOrderMessage } from "./services/orderChat";
-import { notifyCustomer } from "@/features/notifications/service";
+import { notifyCustomer, notifyAdmins } from "@/features/notifications/service";
 import { awardForOrder } from "@/features/rewards/service";
 import { ORDER_STATUS_LABEL } from "./constants";
 import {
@@ -99,6 +99,13 @@ export async function createOrderAction(
 
   try {
     const order = await createOrder({ ...parsed.data, customerId: user.id });
+
+    // Aviso al panel: entró un pedido nuevo (best-effort; no bloquea la venta).
+    await notifyAdmins({
+      title: "Nuevo pedido",
+      body: `${order.orderNumber} · $${Number(order.total).toLocaleString("es-AR")}`,
+      link: `/admin/pedidos/${order.id}`,
+    }).catch(() => undefined);
 
     // Solo MercadoPago necesita redirección al checkout externo. Transferencia
     // y efectivo quedan en pending_payment y van a la pantalla de éxito.
@@ -487,6 +494,14 @@ export async function sendOrderMessageAction(
       authorId: user.id,
       body: parsed.data.body,
     });
+    // Si escribió el CLIENTE, avisamos al panel (best-effort).
+    if (!staff) {
+      await notifyAdmins({
+        title: "Mensaje de un cliente",
+        body: parsed.data.body.slice(0, 90),
+        link: `/admin/pedidos/${orderId}`,
+      }).catch(() => undefined);
+    }
     revalidatePath(`/cuenta/pedidos`);
     revalidatePath(`/admin/pedidos/${orderId}`);
     return { ok: true };

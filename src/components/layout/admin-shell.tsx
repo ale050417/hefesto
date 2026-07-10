@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Sidebar } from "./sidebar";
 import { BrandMark } from "./brand-mark";
 import { ThemeSwitcher } from "./theme-switcher";
+import { AdminNotificationBell } from "@/features/notifications/components/admin-notification-bell";
 
 /**
  * Estructura del panel con navegación móvil real: topbar con hamburguesa +
@@ -66,8 +67,9 @@ export function AdminShell({
             HEFESTO<b> Admin</b>
           </span>
         </Link>
-        {/* Tema claro / oscuro / cálido, igual que en la tienda */}
-        <span className="ml-auto">
+        {/* Notificaciones del negocio + tema (igual que en la tienda) */}
+        <span className="ml-auto flex items-center gap-1">
+          <AdminNotificationBell />
           <ThemeSwitcher />
         </span>
       </header>

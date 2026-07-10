@@ -102,7 +102,7 @@ export default async function FallasPage() {
           value={String(failures.length)}
           delta="total"
           up={false}
-          tint="#D96A5A"
+          tint="var(--danger)"
         />
         <KpiCard
           icon={ic(
@@ -112,7 +112,7 @@ export default async function FallasPage() {
           value={`${(totalG / 1000).toFixed(2)} kg`}
           delta={`${totalG} g`}
           up={false}
-          tint="#D9A441"
+          tint="var(--gold)"
         />
         <KpiCard
           icon={ic(
@@ -122,7 +122,7 @@ export default async function FallasPage() {
           value={compactPrice(totalCost)}
           delta="estimado"
           up={false}
-          tint="#D96A5A"
+          tint="var(--danger)"
         />
         <KpiCard
           icon={ic(
@@ -131,7 +131,7 @@ export default async function FallasPage() {
           label="Causa más común"
           value={topReason ? topReason[0] : "—"}
           up={false}
-          tint="#9B7BD4"
+          tint="var(--gold)"
         />
       </div>
 
