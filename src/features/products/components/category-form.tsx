@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
@@ -60,7 +59,6 @@ export function CategoryForm({
   onDone?: () => void;
   onCancel?: () => void;
 }) {
-  const router = useRouter();
   const edit = !!category?.id;
   const [name, setName] = useState(category?.name ?? "");
   const [icon, setIcon] = useState<string>(category?.icon ?? CAT_ICONS[0]);
@@ -97,7 +95,6 @@ export function CategoryForm({
       if (!res.ok) return setErr(res.error.message);
       toast(edit ? "Categoría actualizada" : "Categoría creada", "success");
       onDone?.();
-      router.refresh();
     } catch {
       setErr("No se pudo guardar. Intentá de nuevo.");
     } finally {

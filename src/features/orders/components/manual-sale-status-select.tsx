@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "@/stores/toastStore";
 import { ORDER_STATUS_LABEL } from "../constants";
@@ -32,7 +31,6 @@ export function ManualSaleStatusSelect({
   id: string;
   status: OrderStatus;
 }) {
-  const router = useRouter();
   const [value, setValue] = useState<OrderStatus>(status);
   const [busy, setBusy] = useState(false);
 
@@ -50,7 +48,6 @@ export function ManualSaleStatusSelect({
       return;
     }
     toast("Estado actualizado", "success");
-    router.refresh();
   }
 
   return (

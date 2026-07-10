@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
@@ -28,7 +27,6 @@ export function CustomerForm({
   onDone?: () => void;
   onCancel?: () => void;
 }) {
-  const router = useRouter();
   const edit = !!customer?.id;
   const [form, setForm] = useState({
     name: customer?.name ?? "",
@@ -59,7 +57,6 @@ export function CustomerForm({
       if (!res.ok) return setErr(res.error.message);
       toast(edit ? "Cliente actualizado" : "Cliente creado", "success");
       onDone?.();
-      router.refresh();
     } catch {
       setErr("No se pudo guardar. Intentá de nuevo.");
     } finally {

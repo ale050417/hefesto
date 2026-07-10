@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -11,7 +10,6 @@ import type { CalcConfig } from "../service";
 import { runAction } from "@/lib/run-action";
 
 export function CalcConfigButton({ config }: { config: CalcConfig }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const canEdit = useCan("calculadora", "editar");
   const [form, setForm] = useState({
@@ -36,7 +34,6 @@ export function CalcConfigButton({ config }: { config: CalcConfig }) {
       if (!res.ok) return setErr(res.error.message);
       toast("Configuración guardada", "success");
       setOpen(false);
-      router.refresh();
     } catch {
       setErr("No se pudo guardar. Intentá de nuevo.");
     } finally {

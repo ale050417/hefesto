@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
@@ -128,7 +127,6 @@ export function ProductsAdmin({
   categories: Category[];
   estimator: EstimatorContext;
 }) {
-  const router = useRouter();
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
   const [view, setView] = useState<View>("grid");
@@ -172,7 +170,6 @@ export function ProductsAdmin({
     });
     if (!res.ok) {
       setModal({ open: false });
-      router.refresh();
       return;
     }
     setModal({
@@ -211,7 +208,6 @@ export function ProductsAdmin({
     });
     if (!res.ok) throw new Error(res.error.message);
     toast("Producto archivado", "danger");
-    router.refresh();
   }
 
   const off = (p: AdminProductRow) =>
@@ -529,7 +525,6 @@ export function ProductsAdmin({
               estimator={estimator}
               onSaved={() => {
                 toast("Producto guardado", "success");
-                router.refresh();
               }}
             />
             <div>

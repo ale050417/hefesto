@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
@@ -35,7 +34,6 @@ export function CouponForm({
   onDone?: () => void;
   onCancel?: () => void;
 }) {
-  const router = useRouter();
   const edit = !!coupon?.id;
   const [form, setForm] = useState({
     code: coupon?.code ?? "",
@@ -75,7 +73,6 @@ export function CouponForm({
       if (!res.ok) return setErr(res.error.message);
       toast(edit ? "Cupón actualizado" : "Cupón creado", "success");
       onDone?.();
-      router.refresh();
     } catch {
       setErr("No se pudo guardar. Intentá de nuevo.");
     } finally {

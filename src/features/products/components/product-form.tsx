@@ -159,13 +159,11 @@ export function ProductForm({
     const savedId = mode === "create" ? result.data.id : (productId ?? "");
     if (onSaved) {
       onSaved(savedId);
-      router.refresh();
       return;
     }
     if (mode === "create") {
       router.push(`/admin/productos/${result.data.id}/editar`);
     } else {
-      router.refresh();
     }
   });
 

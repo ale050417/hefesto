@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -24,7 +23,6 @@ const newKey = () => `tmp-${tmp++}`;
  * El operador nunca ve este botón (la página lo renderiza solo para admin).
  */
 export function MarginPresetsButton({ presets }: { presets: MarginPreset[] }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<Row[]>(() => toRows(presets));
   const [busy, setBusy] = useState(false);
@@ -80,12 +78,10 @@ export function MarginPresetsButton({ presets }: { presets: MarginPreset[] }) {
       const failed = results.find((r) => !r.ok);
       if (failed && !failed.ok) {
         toast(failed.error.message || "No se pudo guardar.", "danger");
-        router.refresh();
         return;
       }
       toast("Tipos guardados", "success");
       setOpen(false);
-      router.refresh();
     } catch {
       toast("No se pudo guardar los tipos", "danger");
     } finally {

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
@@ -20,7 +19,6 @@ export function BusinessConfigForm({
 }: {
   settings: BusinessSettings | null;
 }) {
-  const router = useRouter();
   const [form, setForm] = useState({
     storeName: settings?.storeName ?? "",
     slogan: settings?.slogan ?? "",
@@ -66,7 +64,6 @@ export function BusinessConfigForm({
       );
       if (!res.ok) return setErr(res.error.message);
       toast("Datos del negocio guardados", "success");
-      router.refresh();
     } catch {
       setErr("No se pudo guardar. Intentá de nuevo.");
     } finally {

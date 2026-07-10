@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
@@ -15,7 +14,6 @@ export function ShippingSettingsForm({
 }: {
   settings: ShippingSettings | null;
 }) {
-  const router = useRouter();
   const [city, setCity] = useState(settings?.city ?? "");
   const [freeOver, setFreeOver] = useState(
     settings?.freeOver != null ? String(Number(settings.freeOver)) : "",
@@ -51,7 +49,6 @@ export function ShippingSettingsForm({
       );
       if (!res.ok) return toast(res.error.message, "danger");
       toast("Envíos guardados", "success");
-      router.refresh();
     } catch {
       toast("No se pudo guardar. Intentá de nuevo.", "danger");
     } finally {

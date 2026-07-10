@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
@@ -34,7 +33,6 @@ export function FailureForm({
   onDone?: () => void;
   onCancel?: () => void;
 }) {
-  const router = useRouter();
   const edit = !!failure?.id;
   const matOptions =
     materials && materials.length > 0 ? materials : FILAMENT_MATERIALS;
@@ -83,7 +81,6 @@ export function FailureForm({
         }
       }
       onDone?.();
-      router.refresh();
     } catch {
       setErr("No se pudo guardar. Intentá de nuevo.");
     } finally {

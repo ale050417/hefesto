@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
@@ -75,7 +74,6 @@ export function PriceCalculator({
   presets: MarginPreset[];
   isAdmin: boolean;
 }) {
-  const router = useRouter();
   const [f, setF] = useState({
     name: "",
     customer: "",
@@ -184,7 +182,6 @@ export function PriceCalculator({
       minutes: "",
       notes: "",
     }));
-    router.refresh();
   }
 
   async function remove(id: string) {
@@ -193,7 +190,6 @@ export function PriceCalculator({
     setPendingId(null);
     if (res.ok) {
       toast("Cálculo eliminado", "danger");
-      router.refresh();
     } else {
       toast(res.error.message, "danger");
     }

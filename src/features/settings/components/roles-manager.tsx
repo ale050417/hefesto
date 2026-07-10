@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -66,7 +65,6 @@ export function RolesManager({
   canManage: boolean;
   currentUserId: string;
 }) {
-  const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [roleModal, setRoleModal] = useState<Role | "new" | null>(null);
@@ -87,7 +85,6 @@ export function RolesManager({
     setPendingId(null);
     if (res.ok) {
       toast("Rol actualizado", "success");
-      router.refresh();
     } else toast(res.error.message, "danger");
   }
 
@@ -99,7 +96,6 @@ export function RolesManager({
     setPendingId(null);
     if (res.ok) {
       setCreds(res.data);
-      router.refresh();
     } else toast(res.error.message, "danger");
   }
 
@@ -114,7 +110,6 @@ export function RolesManager({
     setRemoveTarget(null);
     if (res.ok) {
       toast("Acceso revocado", "danger");
-      router.refresh();
     } else toast(res.error.message, "danger");
   }
 
@@ -128,7 +123,6 @@ export function RolesManager({
     setDeleteRole(null);
     if (res.ok) {
       toast("Rol eliminado", "danger");
-      router.refresh();
     } else toast(res.error.message, "danger");
   }
 
@@ -405,7 +399,6 @@ export function RolesManager({
           onCreated={(c) => {
             setInviteOpen(false);
             setCreds(c);
-            router.refresh();
           }}
         />
       ) : null}
@@ -420,7 +413,6 @@ export function RolesManager({
           onClose={() => setRoleModal(null)}
           onDone={() => {
             setRoleModal(null);
-            router.refresh();
           }}
         />
       ) : null}

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
@@ -16,7 +15,6 @@ export function CustomerNoteForm({
   source: "registered" | "manual";
   note: string | null;
 }) {
-  const router = useRouter();
   const [value, setValue] = useState(note ?? "");
   const [busy, setBusy] = useState(false);
 
@@ -29,7 +27,6 @@ export function CustomerNoteForm({
       );
       if (res.ok) {
         toast("Nota guardada", "success");
-        router.refresh();
       } else {
         toast(res.error.message, "danger");
       }

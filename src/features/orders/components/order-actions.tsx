@@ -75,7 +75,6 @@ export function DeleteOrderButton({
           toast("Pedido eliminado", "danger");
           onDeleted?.();
           if (redirectTo) router.push(redirectTo);
-          router.refresh();
         }}
       />
     </>

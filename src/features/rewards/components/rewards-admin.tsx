@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
@@ -55,7 +54,6 @@ export function RewardsAdmin({
   stats: Stats;
   products: ProductOption[];
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<RewardFormData | null>(null);
   const [toDelete, setToDelete] = useState<Reward | null>(null);
@@ -86,7 +84,6 @@ export function RewardsAdmin({
     });
     if (!res.ok) throw new Error(res.error.message);
     toast("Recompensa eliminada", "danger");
-    router.refresh();
   }
 
   return (

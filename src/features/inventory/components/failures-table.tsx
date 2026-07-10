@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
@@ -57,7 +56,6 @@ export function FailuresTable({
   failures: FailureRow[];
   materials: string[];
 }) {
-  const router = useRouter();
   const [editing, setEditing] = useState<FailureRow | null>(null);
   const [confirming, setConfirming] = useState<FailureRow | null>(null);
 
@@ -67,7 +65,6 @@ export function FailuresTable({
     });
     if (!res.ok) throw new Error(res.error.message);
     toast("Falla eliminada · gramos devueltos al stock", "success");
-    router.refresh();
   }
 
   return (

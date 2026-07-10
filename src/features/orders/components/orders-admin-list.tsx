@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
@@ -32,7 +31,6 @@ export function OrdersAdminList({
   items: OrderListItem[];
   isAdmin: boolean;
 }) {
-  const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkOpen, setBulkOpen] = useState(false);
 
@@ -74,7 +72,6 @@ export function OrdersAdminList({
       "danger",
     );
     setSelected(new Set());
-    router.refresh();
   }
 
   return (

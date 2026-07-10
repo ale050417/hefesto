@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
@@ -39,7 +38,6 @@ export function DeleteManualSaleButton({
   label?: string;
   className?: string;
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
 
   return (
@@ -65,7 +63,6 @@ export function DeleteManualSaleButton({
           });
           if (!res.ok) throw new Error(res.error.message);
           toast("Venta eliminada", "danger");
-          router.refresh();
         }}
       />
     </>

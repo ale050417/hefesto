@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,7 +26,6 @@ export function ProductStatusActions({
   productId: string;
   status: ProductStatus;
 }) {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   // Qué botón está corriendo, para mostrar el spinner solo en ese.
@@ -45,7 +43,6 @@ export function ProductStatusActions({
       const res = await action();
       if (!res.ok && res.error) setError(res.error.message);
       setPendingAction(null);
-      router.refresh();
     });
   }
 

@@ -25,7 +25,6 @@ export function MedidaStatusSelect({
   id: string;
   status: CustomRequestStatus;
 }) {
-  const router = useRouter();
   const [pending, setPending] = useState(false);
   const canEdit = useCan("medida", "editar");
   const options: CustomRequestStatus[] = [
@@ -44,7 +43,6 @@ export function MedidaStatusSelect({
     setPending(false);
     if (res.ok) {
       toast(`Estado: ${CUSTOM_STATUS_LABEL[to]}`, "success");
-      router.refresh();
     } else {
       toast(res.error.message, "danger");
     }
@@ -84,7 +82,6 @@ export function MedidaQuoteButton({
   id: string;
   currentAmount?: string | null;
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState(currentAmount ?? "");
   const [pending, setPending] = useState(false);
@@ -103,7 +100,6 @@ export function MedidaQuoteButton({
       toast("Cotización enviada al cliente.", "success");
       setOpen(false);
       setAmount("");
-      router.refresh();
     } else {
       toast(res.error.message, "danger");
     }
@@ -208,7 +204,6 @@ export function MedidaDeleteButton({ id }: { id: string }) {
           if (!res.ok) throw new Error(res.error.message);
           toast("Conversación eliminada.", "success");
           router.push("/admin/medida");
-          router.refresh();
         }}
       />
     </>

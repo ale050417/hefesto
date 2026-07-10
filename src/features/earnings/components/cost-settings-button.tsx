@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -10,7 +9,6 @@ import type { CostSettings } from "../economics";
 import { runAction } from "@/lib/run-action";
 
 export function CostSettingsButton({ settings }: { settings: CostSettings }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     kwhPrice: String(settings.kwhPrice),
@@ -34,7 +32,6 @@ export function CostSettingsButton({ settings }: { settings: CostSettings }) {
       if (!res.ok) return setErr(res.error.message);
       toast("Config de costos guardada", "success");
       setOpen(false);
-      router.refresh();
     } catch {
       setErr("No se pudo guardar. Intentá de nuevo.");
     } finally {

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -97,7 +96,6 @@ export function StoreAppearance({
   settings: BusinessSettings | null;
   banners: StoreBanner[];
 }) {
-  const router = useRouter();
   // Fase 7: el iframe de la vista previa se recarga con cada guardado.
   const [previewVersion, setPreviewVersion] = useState(0);
   const bumpPreview = () => setPreviewVersion((v) => v + 1);
@@ -173,7 +171,6 @@ export function StoreAppearance({
     setBusy(false);
     if (!a.ok || !b.ok) return toast("No se pudo guardar", "danger");
     toast("Apariencia guardada y publicada", "success");
-    router.refresh();
     bumpPreview();
   }
 
@@ -217,7 +214,6 @@ export function StoreAppearance({
     if (!res.ok) return toast(res.error.message, "danger");
     toast(bf.id ? "Banner actualizado" : "Banner agregado", "success");
     setBannerOpen(false);
-    router.refresh();
     bumpPreview();
   }
   async function confirmRemoveBanner(b: StoreBanner) {
@@ -226,7 +222,6 @@ export function StoreAppearance({
     });
     if (!res.ok) throw new Error(res.error.message);
     toast("Banner eliminado", "danger");
-    router.refresh();
     bumpPreview();
   }
   async function moveUp(i: number) {
@@ -239,7 +234,6 @@ export function StoreAppearance({
       updateBannerAction(prev.id, bannerPayload(prev, cur.sortOrder)),
     ]);
     setPendingId(null);
-    router.refresh();
     bumpPreview();
   }
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { type CSSProperties, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
@@ -82,7 +81,6 @@ export function FilamentsBoard({
   filaments: FilamentView[];
   materials: string[];
 }) {
-  const router = useRouter();
   const [search, setSearch] = useState("");
   const [mat, setMat] = useState("all");
   const [view, setView] = useState<View>("grilla");
@@ -106,7 +104,6 @@ export function FilamentsBoard({
     setPendingId(null);
     if (res.ok) {
       toast("+1 carrete agregado", "success");
-      router.refresh();
     } else {
       toast(res.error.message, "danger");
     }
@@ -118,7 +115,6 @@ export function FilamentsBoard({
     });
     if (!res.ok) throw new Error(res.error.message);
     toast("Filamento eliminado", "danger");
-    router.refresh();
   }
 
   return (

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -33,7 +32,6 @@ const EMPTY: Values = {
 };
 
 export function AddressManager({ addresses }: { addresses: Address[] }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -58,7 +56,6 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
     reset(EMPTY);
     setOpen(false);
     setEditId(null);
-    router.refresh();
   });
 
   function startNew() {
@@ -84,12 +81,10 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
 
   async function del(id: string) {
     await runAction(() => deleteAddressAction(id), { silent: true });
-    router.refresh();
   }
 
   async function makeDefault(id: string) {
     await runAction(() => setDefaultAddressAction(id), { silent: true });
-    router.refresh();
   }
 
   return (

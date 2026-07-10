@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
@@ -14,7 +13,6 @@ export function ReviewForm({
   productId: string;
   slug: string;
 }) {
-  const router = useRouter();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState(false);
@@ -40,7 +38,6 @@ export function ReviewForm({
     toast("¡Gracias! Tu reseña quedó pendiente de aprobación.", "success");
     setRating(0);
     setComment("");
-    router.refresh();
   }
 
   return (

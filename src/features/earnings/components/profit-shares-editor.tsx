@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
@@ -33,7 +32,6 @@ export function ProfitSharesEditor({
   /** Si es false, se muestra read-only (sin guardar/agregar/quitar). */
   canEdit?: boolean;
 }) {
-  const router = useRouter();
   const [rows, setRows] = useState<Row[]>(
     shares.map((s) => ({
       key: s.id,
@@ -101,11 +99,9 @@ export function ProfitSharesEditor({
           failed.error.message || "No tenés permiso para esta acción.",
           "danger",
         );
-        router.refresh();
         return;
       }
       toast("Reparto guardado", "success");
-      router.refresh();
     } catch {
       toast("No se pudo guardar el reparto", "danger");
     } finally {

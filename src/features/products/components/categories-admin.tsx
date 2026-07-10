@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
@@ -60,7 +59,6 @@ export function CategoriesAdmin({
 }: {
   categories: CategoryWithCount[];
 }) {
-  const router = useRouter();
   // Subcategorías (Fase 6): mostramos cada raíz seguida de sus hijas.
   const roots = categories.filter((c) => !c.parentId);
   const byParent = new Map<string, CategoryWithCount[]>();
@@ -112,7 +110,6 @@ export function CategoriesAdmin({
     if (res.ok) {
       toast("Categoría eliminada", "danger");
       setToDelete(null);
-      router.refresh();
     } else {
       toast(res.error.message, "danger");
     }

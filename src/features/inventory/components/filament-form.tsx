@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
@@ -45,7 +44,6 @@ export function FilamentForm({
   onDone?: () => void;
   onCancel?: () => void;
 }) {
-  const router = useRouter();
   const edit = !!filament?.id;
   const init = filament ?? DEFAULTS;
   const [form, setForm] = useState({
@@ -75,7 +73,6 @@ export function FilamentForm({
       if (!res.ok) return setErr(res.error.message);
       toast(edit ? "Filamento actualizado" : "Filamento agregado", "success");
       onDone?.();
-      router.refresh();
     } catch {
       setErr("No se pudo guardar. Intentá de nuevo.");
     } finally {

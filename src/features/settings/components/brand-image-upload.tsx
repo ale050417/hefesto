@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { compressImageToWebp } from "@/lib/image-compress";
@@ -19,7 +18,6 @@ export function BrandImageUpload({
   hint: string;
   currentUrl: string | null;
 }) {
-  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [url, setUrl] = useState<string | null>(currentUrl);
   const [busy, setBusy] = useState(false);
@@ -49,7 +47,6 @@ export function BrandImageUpload({
       return;
     }
     setUrl(res.data.url);
-    router.refresh();
   }
 
   return (

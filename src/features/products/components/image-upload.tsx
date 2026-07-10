@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,7 +23,6 @@ export function ImageUpload({
   /** Aviso extra tras cada operación (para refrescar dentro de un modal). */
   onChanged?: () => void;
 }) {
-  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -45,7 +43,6 @@ export function ImageUpload({
         if (!res.ok) setError(res.error.message);
       }
       if (inputRef.current) inputRef.current.value = "";
-      router.refresh();
       onChanged?.();
     });
   }
@@ -57,7 +54,6 @@ export function ImageUpload({
         silent: true,
       });
       if (!res.ok) setError(res.error.message);
-      router.refresh();
       onChanged?.();
     });
   }
@@ -70,7 +66,6 @@ export function ImageUpload({
         { silent: true },
       );
       if (!res.ok) setError(res.error.message);
-      router.refresh();
       onChanged?.();
     });
   }

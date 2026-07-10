@@ -166,7 +166,6 @@ export function ManualSaleForm({
       if (!res.ok) return setErr(res.error.message);
       if (onDone) {
         onDone();
-        router.refresh();
       } else {
         router.push("/admin/pedidos");
       }

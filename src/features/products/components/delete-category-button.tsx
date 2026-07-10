@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -17,7 +16,6 @@ export function DeleteCategoryButton({
   name?: string;
   productCount: number;
 }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const blocked = productCount > 0;
 
@@ -46,7 +44,6 @@ export function DeleteCategoryButton({
           });
           if (!res.ok) throw new Error(res.error.message);
           toast("Categoría eliminada", "danger");
-          router.refresh();
         }}
       />
     </>

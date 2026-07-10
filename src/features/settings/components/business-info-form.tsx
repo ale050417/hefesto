@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { saveBusinessInfoAction } from "../actions";
@@ -15,7 +14,6 @@ export function BusinessInfoForm({
 }: {
   settings: BusinessSettings | null;
 }) {
-  const router = useRouter();
   const [pending, setPending] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -39,7 +37,6 @@ export function BusinessInfoForm({
     setPending(false);
     if (res.ok) {
       toast("Configuración guardada", "success");
-      router.refresh();
     } else {
       toast(res.error.message, "danger");
     }

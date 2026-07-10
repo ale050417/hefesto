@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useCan } from "@/components/auth/perms-provider";
@@ -13,7 +12,6 @@ export function ReviewModeration({
   id: string;
   isApproved: boolean;
 }) {
-  const router = useRouter();
   const [pending, setPending] = useState<"approve" | "delete" | null>(null);
   const busy = pending !== null;
   const canEdit = useCan("resenas", "editar");
@@ -23,7 +21,6 @@ export function ReviewModeration({
     setPending(key);
     await fn();
     setPending(null);
-    router.refresh();
   }
 
   if (!canEdit && !canDelete) {

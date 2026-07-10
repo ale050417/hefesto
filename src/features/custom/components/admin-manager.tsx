@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import {
@@ -13,7 +12,6 @@ import type { CustomRequest } from "../types";
 import { runAction } from "@/lib/run-action";
 
 export function AdminManager({ request }: { request: CustomRequest }) {
-  const router = useRouter();
   const [amount, setAmount] = useState("");
   const [pending, setPending] = useState(false);
   const next = CUSTOM_TRANSITIONS[request.status];
@@ -28,7 +26,6 @@ export function AdminManager({ request }: { request: CustomRequest }) {
     setPending(false);
     if (res.ok) {
       toast("Cotización enviada al cliente.", "success");
-      router.refresh();
     } else {
       toast(res.error.message, "danger");
     }
@@ -43,7 +40,6 @@ export function AdminManager({ request }: { request: CustomRequest }) {
     setPending(false);
     if (res.ok) {
       toast(`Estado: ${CUSTOM_STATUS_LABEL[to]}`, "success");
-      router.refresh();
     } else {
       toast(res.error.message, "danger");
     }

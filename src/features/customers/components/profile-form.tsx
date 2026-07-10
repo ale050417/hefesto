@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,6 @@ export function ProfileForm({
   fullName: string;
   phone: string;
 }) {
-  const router = useRouter();
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const {
@@ -36,7 +34,6 @@ export function ProfileForm({
       return;
     }
     setMsg("Datos guardados.");
-    router.refresh();
   });
 
   return (

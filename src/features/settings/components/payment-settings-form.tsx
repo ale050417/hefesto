@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
@@ -34,7 +33,6 @@ export function PaymentSettingsForm({
 }: {
   settings: PaymentSettings | null;
 }) {
-  const router = useRouter();
   const [form, setForm] = useState({
     transferEnabled: settings?.transferEnabled ?? true,
     transferAlias: settings?.transferAlias ?? "",
@@ -56,7 +54,6 @@ export function PaymentSettingsForm({
       });
       if (!res.ok) return toast(res.error.message, "danger");
       toast("Métodos de pago guardados", "success");
-      router.refresh();
     } catch {
       toast("No se pudo guardar. Intentá de nuevo.", "danger");
     } finally {

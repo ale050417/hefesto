@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
@@ -33,7 +32,6 @@ export function RewardForm({
   onDone?: () => void;
   onCancel?: () => void;
 }) {
-  const router = useRouter();
   const edit = !!reward?.id;
   const [type, setType] = useState<RewardTypeKey>(reward?.type ?? "discount");
   const [form, setForm] = useState({
@@ -79,7 +77,6 @@ export function RewardForm({
       if (!res.ok) return setErr(res.error.message);
       toast(edit ? "Recompensa actualizada" : "Recompensa creada", "success");
       onDone?.();
-      router.refresh();
     } catch {
       setErr("No se pudo guardar. Intentá de nuevo.");
     } finally {

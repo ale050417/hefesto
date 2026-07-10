@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
@@ -70,7 +69,6 @@ function couponStatus(c: Coupon): Status {
 }
 
 export function CouponsAdmin({ coupons }: { coupons: Coupon[] }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CouponFormData | null>(null);
   const [confirming, setConfirming] = useState<Coupon | null>(null);
@@ -266,7 +264,6 @@ export function CouponsAdmin({ coupons }: { coupons: Coupon[] }) {
           });
           if (!res.ok) throw new Error(res.error.message);
           toast("Cupón eliminado", "danger");
-          router.refresh();
         }}
       />
     </div>

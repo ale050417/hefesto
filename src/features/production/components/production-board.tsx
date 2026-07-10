@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
@@ -54,7 +53,6 @@ export function ProductionBoard({
   printers: Printer[];
   jobs: JobRow[];
 }) {
-  const router = useRouter();
   const [printerOpen, setPrinterOpen] = useState(false);
   const [jobOpen, setJobOpen] = useState(false);
   const [pName, setPName] = useState("");
@@ -81,7 +79,6 @@ export function ProductionBoard({
     setPName("");
     setPModel("");
     setPrinterOpen(false);
-    router.refresh();
   }
 
   async function addJob() {
@@ -95,23 +92,20 @@ export function ProductionBoard({
     setJTitle("");
     setJPrinter("");
     setJobOpen(false);
-    router.refresh();
   }
 
   async function changePrinter(id: string, status: PrinterStatus) {
     const res = await runAction(() => setPrinterStatusAction(id, status), {
       silent: true,
     });
-    if (res.ok) router.refresh();
-    else toast(res.error.message, "danger");
+    if (!res.ok) toast(res.error.message, "danger");
   }
 
   async function changeJob(id: string, status: JobStatus) {
     const res = await runAction(() => setJobStatusAction(id, status), {
       silent: true,
     });
-    if (res.ok) router.refresh();
-    else toast(res.error.message, "danger");
+    if (!res.ok) toast(res.error.message, "danger");
   }
 
   return (

@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { transitionOrderAction, updateOrderMetaAction } from "../actions";
@@ -23,7 +22,6 @@ export function OrderStatusManager({
   /** Cancelar/reembolsar es solo admin; el servidor lo re-chequea igual. */
   canCancelRefund?: boolean;
 }) {
-  const router = useRouter();
   const next = ORDER_TRANSITIONS[status].filter(
     (s) => canCancelRefund || (s !== "cancelled" && s !== "refunded"),
   );
@@ -46,7 +44,6 @@ export function OrderStatusManager({
       setError(res.error.message);
       return;
     }
-    router.refresh();
   }
 
   async function saveMeta() {
@@ -65,7 +62,6 @@ export function OrderStatusManager({
       setError(res.error.message);
       return;
     }
-    router.refresh();
   }
 
   return (
