@@ -52,6 +52,8 @@ function getPreferenceClient(): Preference {
       throw new Error("Falta configurar MERCADOPAGO_ACCESS_TOKEN.");
     }
     const config = new MercadoPagoConfig({
+      // Anti-cuelgue: si MP no responde, cortamos nosotros (no Vercel a los 300 s).
+      options: { timeout: 15_000 },
       accessToken: env.MERCADOPAGO_ACCESS_TOKEN,
     });
     preferenceClient = new Preference(config);
@@ -114,6 +116,8 @@ function getPaymentClient(): Payment {
       throw new Error("Falta configurar MERCADOPAGO_ACCESS_TOKEN.");
     }
     const config = new MercadoPagoConfig({
+      // Anti-cuelgue: si MP no responde, cortamos nosotros (no Vercel a los 300 s).
+      options: { timeout: 15_000 },
       accessToken: env.MERCADOPAGO_ACCESS_TOKEN,
     });
     paymentClient = new Payment(config);

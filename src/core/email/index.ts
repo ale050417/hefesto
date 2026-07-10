@@ -1,4 +1,5 @@
 import { env } from "@/core/config/env";
+import { withTimeout } from "@/core/async";
 
 export type SendEmailParams = { to: string; subject: string; html: string };
 
@@ -27,11 +28,15 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
   }
   const from = env.RESEND_FROM ?? "Hefesto 3D <onboarding@resend.dev>";
   const resend = await getClient();
-  const { error } = await resend.emails.send({
-    from,
-    to: params.to,
-    subject: params.subject,
-    html: params.html,
-  });
+  const { error } = await withTimeout(
+    resend.emails.send({
+      from,
+      to: params.to,
+      subject: params.subject,
+      html: params.html,
+    }),
+    10_000,
+    "Resend",
+  );
   if (error) throw new Error(`Resend: ${error.message}`);
 }
