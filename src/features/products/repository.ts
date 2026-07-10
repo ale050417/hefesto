@@ -34,9 +34,17 @@ type Database = typeof db;
 export async function findCategories(
   database: Database = db,
 ): Promise<Category[]> {
-  return database.query.categories.findMany({
-    orderBy: (c, { asc }) => [asc(c.sortOrder), asc(c.name)],
-  });
+  // Resiliente: se lee en el footer (shell del layout) y corre al prerenderizar
+  // páginas estáticas en el build. Si la base no responde, se devuelve [] en vez
+  // de romper el build/app (mismo criterio que getSettings).
+  try {
+    return await database.query.categories.findMany({
+      orderBy: (c, { asc }) => [asc(c.sortOrder), asc(c.name)],
+    });
+  } catch (error) {
+    console.error("[catalog] no se pudieron leer las categorías:", error);
+    return [];
+  }
 }
 
 /** Productos publicados, con filtros, orden y paginación. */

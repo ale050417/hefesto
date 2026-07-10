@@ -23,10 +23,19 @@ const SINGLETON_ID = 1;
 export async function getSettings(
   database: Database = db,
 ): Promise<BusinessSettings | null> {
-  const row = await database.query.businessSettings.findFirst({
-    where: eq(businessSettings.id, SINGLETON_ID),
-  });
-  return row ?? null;
+  // Resiliente: esta lectura corre en el SHELL del layout (ThemeApplier/Footer),
+  // que se ejecuta al prerenderizar páginas estáticas (p. ej. /_not-found) en el
+  // build. Si la base no responde (build sin DB, o caída puntual en runtime), se
+  // devuelve null y el shell usa sus defaults — nunca rompe el build ni la app.
+  try {
+    const row = await database.query.businessSettings.findFirst({
+      where: eq(businessSettings.id, SINGLETON_ID),
+    });
+    return row ?? null;
+  } catch (error) {
+    console.error("[settings] no se pudo leer business_settings:", error);
+    return null;
+  }
 }
 
 export async function upsertSettings(
@@ -54,6 +63,17 @@ export async function listBanners(
 }
 
 export async function listActiveBanners(
+  database: Database = db,
+): Promise<StoreBanner[]> {
+  try {
+    return await listActiveBannersRaw(database);
+  } catch (error) {
+    console.error("[settings] no se pudieron leer los banners:", error);
+    return [];
+  }
+}
+
+async function listActiveBannersRaw(
   database: Database = db,
 ): Promise<StoreBanner[]> {
   const rows = await database
