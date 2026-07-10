@@ -16,7 +16,11 @@ export function CouponToggle({
 
   async function toggle() {
     setBusy(true);
-    await runAction(() => toggleCouponAction(id, !isActive), { silent: true });
+    // Sin overlay (micro-acción) pero CON toast de error (antes el resultado
+    // se ignoraba: si fallaba, el badge quedaba igual y nadie se enteraba).
+    await runAction(() => toggleCouponAction(id, !isActive), {
+      overlay: false,
+    });
     setBusy(false);
   }
 

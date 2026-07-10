@@ -60,12 +60,19 @@ export function FavDrawer() {
   };
 
   const remove = async (p: ProductView) => {
+    // Optimista: sale de la lista YA; si el backend falla, VUELVE (rollback:
+    // restaurar el id dispara el refetch del efecto) y se avisa. Antes el
+    // resultado se ignoraba y el corazón quedaba desincronizado en silencio.
     setInWishlist(p.id, false);
     setItems((prev) => prev.filter((x) => x.id !== p.id));
-    await runAction(() => toggleWishlistAction(p.id), {
+    const res = await runAction(() => toggleWishlistAction(p.id), {
       silent: true,
       overlay: false,
     });
+    if (!res.ok) {
+      setInWishlist(p.id, true);
+      toast("No se pudo quitar de favoritos. Probá de nuevo.", "danger");
+    }
   };
 
   const addAll = () => {
@@ -85,12 +92,19 @@ export function FavDrawer() {
   };
 
   const clearAll = async () => {
+    // Optimista con rollback: si el backend falla, se restauran los ids (el
+    // efecto refetchea la lista) y se avisa.
+    const prevIds = ids;
     setItems([]);
     setIds([]);
-    await runAction(() => clearMyWishlistAction(), {
+    const res = await runAction(() => clearMyWishlistAction(), {
       silent: true,
       overlay: false,
     });
+    if (!res.ok) {
+      setIds(prevIds);
+      toast("No se pudo vaciar favoritos. Probá de nuevo.", "danger");
+    }
   };
 
   return (

@@ -21,8 +21,11 @@ export function ResetForm() {
   } = useForm<Values>({ defaultValues: { email: "" } });
 
   const onSubmit = handleSubmit(async (values) => {
-    await runAction(() => requestPasswordResetAction(values), { silent: true });
-    setDone(true);
+    // La respuesta es neutra a propósito (no revela si el email existe), pero
+    // un fallo REAL (red caída, timeout) sí se muestra: antes marcaba "listo"
+    // aunque la request nunca hubiera llegado.
+    const res = await runAction(() => requestPasswordResetAction(values));
+    if (res.ok) setDone(true);
   });
 
   if (done) {

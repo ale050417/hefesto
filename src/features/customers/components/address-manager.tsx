@@ -12,6 +12,7 @@ import {
 } from "../actions";
 import type { Address } from "../types";
 import { runAction } from "@/lib/run-action";
+import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 type Values = {
   label: string;
@@ -79,12 +80,18 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
     setOpen(true);
   }
 
-  async function del(id: string) {
-    await runAction(() => deleteAddressAction(id), { silent: true });
-  }
+  // Borrado con el patrón único (useDeleteResource): serializado, con toast
+  // de éxito y de error. Antes el resultado se IGNORABA: si el backend
+  // fallaba, la dirección seguía ahí sin ningún aviso (fallo silencioso).
+  const { deleteResource: del, busyId: deletingId } = useDeleteResource({
+    action: (id: string) => deleteAddressAction(id),
+    successMessage: "Dirección eliminada",
+    notify: "toast",
+  });
 
   async function makeDefault(id: string) {
-    await runAction(() => setDefaultAddressAction(id), { silent: true });
+    // Sin overlay (micro-acción) pero con toast de error si falla.
+    await runAction(() => setDefaultAddressAction(id), { overlay: false });
   }
 
   return (
@@ -206,6 +213,7 @@ export function AddressManager({ addresses }: { addresses: Address[] }) {
                 <button
                   type="button"
                   onClick={() => del(a.id)}
+                  disabled={deletingId !== null}
                   aria-label="Eliminar dirección"
                   className="btn btn-ghost btn-icon text-faint hover:text-danger"
                 >
