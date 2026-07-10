@@ -4826,3 +4826,36 @@ td[role="checkbox"]:focus-visible .check {
     gap: 6px;
   }
 }
+
+/* Header mobile v2.2 (verificado en vivo 2026-07-09): orden definitivo
+   logo → buscador (medio, expandido) → acciones (esquina). El bloque viejo
+   de mobile usaba `order` y mandaba el buscador al final; estos !important
+   cierran esa pelea de cascada de una vez. */
+@media (max-width: 767px) {
+  .store-topbar {
+    flex-wrap: nowrap !important;
+    gap: 8px !important;
+  }
+  .store-topbar .brand {
+    order: 0 !important;
+    flex: 0 0 auto;
+  }
+  .store-search-wrap {
+    order: 1 !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    display: flex;
+    justify-content: center;
+  }
+  .store-search {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0;
+  }
+  .store-actions {
+    order: 2 !important;
+    margin-left: 0 !important;
+    flex: 0 0 auto;
+    gap: 6px !important;
+  }
+}
