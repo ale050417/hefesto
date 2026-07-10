@@ -144,6 +144,38 @@ describe("confirmOrderPayment", () => {
     });
   });
 
+  // Stock (diseño 2026-07): el pago acreditado descuenta filamento, UNA vez.
+  it("al confirmar descuenta filamento; los reintentos idempotentes no", async () => {
+    const deductFilament = vi.fn(async () => undefined);
+    const deps: ConfirmPaymentDeps = {
+      getOrder: async () =>
+        ({ ...makeOrder(), status: "pending_payment" }) as unknown as Awaited<
+          ReturnType<ConfirmPaymentDeps["getOrder"]>
+        >,
+      markPaid: vi.fn(
+        async () =>
+          ({ ...makeOrder(), status: "confirmed" }) as unknown as Awaited<
+            ReturnType<ConfirmPaymentDeps["markPaid"]>
+          >,
+      ),
+      deductFilament,
+    };
+    await confirmOrderPayment("order-1", deps);
+    expect(deductFilament).toHaveBeenCalledExactlyOnceWith("order-1");
+
+    // Reintento del webhook: el pedido ya está confirmado → ni marca ni descuenta.
+    const depsRetry: ConfirmPaymentDeps = {
+      ...deps,
+      getOrder: async () =>
+        ({ ...makeOrder(), status: "confirmed" }) as unknown as Awaited<
+          ReturnType<ConfirmPaymentDeps["getOrder"]>
+        >,
+    };
+    deductFilament.mockClear();
+    await confirmOrderPayment("order-1", depsRetry);
+    expect(deductFilament).not.toHaveBeenCalled();
+  });
+
   // Auditoría 2026-07 (I3): si dos reintentos del webhook corren A LA VEZ,
   // el segundo pierde el compare-and-set (InvalidTransitionError) y debe
   // resolver de forma idempotente devolviendo el estado actual, no fallar.

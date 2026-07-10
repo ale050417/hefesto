@@ -8,6 +8,7 @@ import {
   updateOrderMeta,
 } from "../repository";
 import { transitionOrderStatus } from "./orderWorkflow";
+import { restoreFilamentForOrder } from "./orderInventory";
 import type { OrderListItem, OrderStatus } from "../types";
 
 export async function listOrdersAdmin(opts: {
@@ -80,6 +81,10 @@ export async function transitionOrder(
 export async function deleteOrderAdmin(orderId: string): Promise<void> {
   const order = await findOrderById(orderId);
   if (!order) throw new NotFoundError("No encontramos el pedido.");
+  // Reversa de filamento ANTES de borrar (diseño 2026-07): idempotente, así
+  // un reintento tras un fallo del borrado no repone dos veces. El ledger no
+  // tiene FK al pedido, por eso la reposición sobrevive al hard delete.
+  await restoreFilamentForOrder(orderId);
   await deleteOrder(orderId);
 }
 
@@ -93,6 +98,7 @@ export async function deleteOrdersAdmin(orderIds: string[]): Promise<number> {
   for (const id of orderIds) {
     const order = await findOrderById(id);
     if (!order) continue;
+    await restoreFilamentForOrder(id); // reversa de filamento (idempotente)
     await deleteOrder(id);
     deleted += 1;
   }

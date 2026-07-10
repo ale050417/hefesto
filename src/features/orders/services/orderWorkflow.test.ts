@@ -95,3 +95,55 @@ describe("transitionOrderStatus", () => {
     ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
+
+// Stock de filamento (diseño 2026-07): confirmar consume, cancelar/reembolsar
+// repone. Toca stock → tests en el mismo paso (Cap. 15).
+describe("transitionOrderStatus → hooks de filamento", () => {
+  function makeStockDeps(current: OrderStatus) {
+    const { deps } = makeDeps(current);
+    const deductFilament = vi.fn(async () => undefined);
+    const restoreFilament = vi.fn(async () => undefined);
+    return {
+      deps: { ...deps, deductFilament, restoreFilament } as TransitionDeps,
+      deductFilament,
+      restoreFilament,
+    };
+  }
+
+  it("al confirmar descuenta filamento (una vez, con el id del pedido)", async () => {
+    const { deps, deductFilament, restoreFilament } =
+      makeStockDeps("pending_payment");
+    await transitionOrderStatus("o1", "confirmed", {}, deps);
+    expect(deductFilament).toHaveBeenCalledExactlyOnceWith("o1");
+    expect(restoreFilament).not.toHaveBeenCalled();
+  });
+
+  it.each(["cancelled", "refunded"] as const)(
+    "al pasar a %s repone lo descontado",
+    async (toStatus) => {
+      const { deps, deductFilament, restoreFilament } =
+        makeStockDeps("confirmed");
+      await transitionOrderStatus("o1", toStatus, {}, deps);
+      expect(restoreFilament).toHaveBeenCalledExactlyOnceWith("o1");
+      expect(deductFilament).not.toHaveBeenCalled();
+    },
+  );
+
+  it("las demás transiciones no tocan stock", async () => {
+    const { deps, deductFilament, restoreFilament } =
+      makeStockDeps("confirmed");
+    await transitionOrderStatus("o1", "in_production", {}, deps);
+    expect(deductFilament).not.toHaveBeenCalled();
+    expect(restoreFilament).not.toHaveBeenCalled();
+  });
+
+  it("una transición inválida NO dispara hooks de stock", async () => {
+    const { deps, deductFilament, restoreFilament } =
+      makeStockDeps("cancelled");
+    await expect(
+      transitionOrderStatus("o1", "confirmed", {}, deps),
+    ).rejects.toBeInstanceOf(InvalidTransitionError);
+    expect(deductFilament).not.toHaveBeenCalled();
+    expect(restoreFilament).not.toHaveBeenCalled();
+  });
+});

@@ -1,10 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  applyCappedDelta,
   computeNewStock,
   deleteFailure,
   filamentStatus,
   isLowStock,
   registerFailure,
+  resolveFilamentForItem,
+  resolveFilamentForManualSale,
   restoreStock,
   type DeleteFailureDeps,
   type RegisterFailureDeps,
@@ -34,6 +37,137 @@ describe("computeNewStock", () => {
   });
   it("nunca baja de 0", () => {
     expect(computeNewStock(100, 250)).toBe(0);
+  });
+});
+
+// --- Ledger de ventas (diseño 2026-07): capping y matching (Cap. 15) ---
+
+describe("applyCappedDelta", () => {
+  it("aplica el delta completo cuando hay stock", () => {
+    expect(applyCappedDelta(1000, -150)).toEqual({
+      newStock: 850,
+      appliedDelta: -150,
+    });
+  });
+  it("nunca baja de 0 y devuelve el delta REAL aplicado", () => {
+    // Pedía -80 con 50 en stock: queda 0 y el movimiento registra -50.
+    expect(applyCappedDelta(50, -80)).toEqual({
+      newStock: 0,
+      appliedDelta: -50,
+    });
+  });
+  it("con stock 0 el delta real es 0 (movimiento marcador)", () => {
+    expect(applyCappedDelta(0, -100)).toEqual({ newStock: 0, appliedDelta: 0 });
+  });
+  it("las reposiciones suman tal cual", () => {
+    expect(applyCappedDelta(100, 50)).toEqual({
+      newStock: 150,
+      appliedDelta: 50,
+    });
+  });
+});
+
+const stockFilaments = [
+  { id: "f1", material: "PLA", color: "Negro" },
+  { id: "f2", material: "PLA", color: "Rojo" },
+  { id: "f3", material: "PETG", color: "Rojo" },
+];
+
+describe("resolveFilamentForItem (pedidos online)", () => {
+  it("matchea material del producto + color del label", () => {
+    expect(
+      resolveFilamentForItem(stockFilaments, {
+        material: "PLA",
+        variantLabel: "Rojo",
+      })?.id,
+    ).toBe("f2");
+  });
+
+  it('con label compuesto "Talle · Color" usa el color (último segmento)', () => {
+    expect(
+      resolveFilamentForItem(stockFilaments, {
+        material: "PLA",
+        variantLabel: "20 cm · Rojo",
+      })?.id,
+    ).toBe("f2");
+  });
+
+  it("es insensible a mayúsculas y espacios", () => {
+    expect(
+      resolveFilamentForItem(stockFilaments, {
+        material: "pla",
+        variantLabel: "  negro ",
+      })?.id,
+    ).toBe("f1");
+  });
+
+  it("el mismo color en otro material NO matchea (material manda)", () => {
+    expect(
+      resolveFilamentForItem(stockFilaments, {
+        material: "PETG",
+        variantLabel: "Negro",
+      }),
+    ).toBeNull();
+  });
+
+  it("sin material, sin label o sin filamento del color → null (warn, no bloquea)", () => {
+    expect(
+      resolveFilamentForItem(stockFilaments, {
+        material: null,
+        variantLabel: "Rojo",
+      }),
+    ).toBeNull();
+    expect(
+      resolveFilamentForItem(stockFilaments, {
+        material: "PLA",
+        variantLabel: null,
+      }),
+    ).toBeNull();
+    expect(
+      resolveFilamentForItem(stockFilaments, {
+        material: "PLA",
+        variantLabel: "Verde",
+      }),
+    ).toBeNull();
+  });
+
+  it("un label que es solo talle (sin color) no matchea", () => {
+    expect(
+      resolveFilamentForItem(stockFilaments, {
+        material: "PLA",
+        variantLabel: "Grande",
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("resolveFilamentForManualSale (ventas manuales)", () => {
+  it("por id elegido, directo", () => {
+    expect(
+      resolveFilamentForManualSale(stockFilaments, { filamentId: "f3" })?.id,
+    ).toBe("f3");
+  });
+
+  it("id inexistente → null (el filamento se borró)", () => {
+    expect(
+      resolveFilamentForManualSale(stockFilaments, { filamentId: "nope" }),
+    ).toBeNull();
+  });
+
+  it("por material SOLO si hay un único filamento de ese material", () => {
+    expect(
+      resolveFilamentForManualSale(stockFilaments, { material: "petg" })?.id,
+    ).toBe("f3");
+  });
+
+  it("material ambiguo (varios colores) → null: no se adivina", () => {
+    expect(
+      resolveFilamentForManualSale(stockFilaments, { material: "PLA" }),
+    ).toBeNull();
+  });
+
+  it("sin id ni material → null", () => {
+    expect(resolveFilamentForManualSale(stockFilaments, {})).toBeNull();
   });
 });
 

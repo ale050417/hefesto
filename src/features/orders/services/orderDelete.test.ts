@@ -7,6 +7,7 @@ import type { Order, OrderStatus } from "../types";
 // vitest iza el vi.mock por encima de los imports.
 const mockFindOrderById = vi.fn();
 const mockDeleteOrder = vi.fn();
+const mockRestoreFilament = vi.fn();
 
 vi.mock("../repository", () => ({
   findOrderById: (...args: unknown[]) => mockFindOrderById(...args),
@@ -19,6 +20,11 @@ vi.mock("../repository", () => ({
 }));
 
 vi.mock("./orderWorkflow", () => ({ transitionOrderStatus: vi.fn() }));
+
+// El borrado repone el filamento descontado (diseño 2026-07) vía ledger.
+vi.mock("./orderInventory", () => ({
+  restoreFilamentForOrder: (...args: unknown[]) => mockRestoreFilament(...args),
+}));
 
 import { deleteOrderAdmin, deleteOrdersAdmin } from "./orderAdminService";
 
@@ -43,6 +49,7 @@ const ALL_STATUSES: OrderStatus[] = [
 afterEach(() => {
   mockFindOrderById.mockReset();
   mockDeleteOrder.mockReset();
+  mockRestoreFilament.mockReset();
 });
 
 describe("deleteOrderAdmin", () => {
@@ -55,10 +62,23 @@ describe("deleteOrderAdmin", () => {
     }
   });
 
+  it("repone el filamento ANTES de borrar (reversa idempotente vía ledger)", async () => {
+    const calls: string[] = [];
+    mockFindOrderById.mockResolvedValue(order("confirmed"));
+    mockRestoreFilament.mockImplementation(async () => calls.push("restore"));
+    mockDeleteOrder.mockImplementation(async () => calls.push("delete"));
+
+    await deleteOrderAdmin("o1");
+
+    expect(mockRestoreFilament).toHaveBeenCalledWith("o1");
+    expect(calls).toEqual(["restore", "delete"]);
+  });
+
   it("lanza NotFound si el pedido no existe y NO toca la base", async () => {
     mockFindOrderById.mockResolvedValue(null);
     await expect(deleteOrderAdmin("x")).rejects.toBeInstanceOf(NotFoundError);
     expect(mockDeleteOrder).not.toHaveBeenCalled();
+    expect(mockRestoreFilament).not.toHaveBeenCalled();
   });
 });
 
@@ -68,6 +88,7 @@ describe("deleteOrdersAdmin", () => {
     const deleted = await deleteOrdersAdmin(["a", "b", "c"]);
     expect(deleted).toBe(3);
     expect(mockDeleteOrder).toHaveBeenCalledTimes(3);
+    expect(mockRestoreFilament).toHaveBeenCalledTimes(3); // reversa por pedido
     expect(mockDeleteOrder).toHaveBeenCalledWith("a");
     expect(mockDeleteOrder).toHaveBeenCalledWith("b");
     expect(mockDeleteOrder).toHaveBeenCalledWith("c");

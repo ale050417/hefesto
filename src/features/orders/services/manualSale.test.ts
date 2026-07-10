@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { resolveFilamentForManualSale } from "@/features/inventory/service";
+import type { Filament, NewFilamentMovement } from "@/features/inventory/types";
 import { manualSaleSchema } from "../schemas";
-import { computeManualSaleCosts, toManualSaleRow } from "./manualSaleService";
+import {
+  computeManualSaleCosts,
+  deductFilamentForManualSale,
+  toManualSaleRow,
+  type ManualSaleStockDeps,
+} from "./manualSaleService";
 
 const base = {
   saleDate: "2025-11-02",
@@ -191,6 +198,138 @@ describe("computeManualSaleCosts", () => {
         quantity: 2.9,
       }).amortization,
     ).toBe(200);
+  });
+});
+
+// Stock (diseño 2026-07): la venta manual descuenta filamento. Toca stock →
+// tests en el mismo paso (Cap. 15). Dobles puros, sin DB.
+describe("deductFilamentForManualSale", () => {
+  const filaments = [
+    { id: "f1", material: "PLA", color: "Negro" },
+    { id: "f2", material: "PLA", color: "Rojo" },
+    { id: "f3", material: "PETG", color: "Rojo" },
+  ] as unknown as Filament[];
+
+  function makeDeps(overrides: Partial<ManualSaleStockDeps> = {}) {
+    const applyDeltas = vi.fn<ManualSaleStockDeps["applyDeltas"]>(
+      async () => undefined,
+    );
+    const audit = vi.fn(async () => undefined);
+    const deps: ManualSaleStockDeps = {
+      listFilaments: async () => filaments,
+      hasMovements: async () => false,
+      applyDeltas,
+      resolveFilament: resolveFilamentForManualSale,
+      audit: audit as unknown as ManualSaleStockDeps["audit"],
+      ...overrides,
+    };
+    return { deps, applyDeltas, audit };
+  }
+
+  it("descuenta gramos (por unidad) × cantidad del filamento elegido", async () => {
+    const { deps, applyDeltas } = makeDeps();
+    const res = await deductFilamentForManualSale(
+      "s1",
+      { filamentId: "f2", grams: 50, quantity: 80 },
+      deps,
+    );
+    expect(res.deducted).toBe(true);
+    const movements = applyDeltas.mock.calls[0]![0] as NewFilamentMovement[];
+    expect(movements).toEqual([
+      {
+        filamentId: "f2",
+        material: "PLA",
+        color: "Rojo",
+        deltaGrams: -4000, // 50 g × 80
+        reason: "manual_sale",
+        refId: "s1",
+      },
+    ]);
+  });
+
+  it("sin filamentId matchea por material SOLO si hay uno único", async () => {
+    const { deps, applyDeltas } = makeDeps();
+    const res = await deductFilamentForManualSale(
+      "s1",
+      { material: "PETG", grams: 30, quantity: 2 },
+      deps,
+    );
+    expect(res.deducted).toBe(true);
+    expect(
+      (applyDeltas.mock.calls[0]![0] as NewFilamentMovement[])[0],
+    ).toMatchObject({ filamentId: "f3", deltaGrams: -60 });
+  });
+
+  it("material ambiguo → NO adivina: saltea con warning en auditoría", async () => {
+    const { deps, applyDeltas, audit } = makeDeps();
+    const res = await deductFilamentForManualSale(
+      "s1",
+      { material: "PLA", grams: 30, quantity: 1 },
+      deps,
+    );
+    expect(res.deducted).toBe(false);
+    expect(applyDeltas).not.toHaveBeenCalled();
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "inventory.manual_sale_no_deduct",
+      }),
+    );
+  });
+
+  it("con filamento/material pero sin gramos → warning (nunca 0 silencioso)", async () => {
+    const { deps, applyDeltas, audit } = makeDeps();
+    const res = await deductFilamentForManualSale(
+      "s1",
+      { filamentId: "f1", grams: 0, quantity: 1 },
+      deps,
+    );
+    expect(res.deducted).toBe(false);
+    expect(res.reason).toBe("sin gramos");
+    expect(applyDeltas).not.toHaveBeenCalled();
+    expect(audit).toHaveBeenCalled();
+  });
+
+  it("sin filamento NI material (carga histórica) → se saltea en silencio", async () => {
+    const { deps, applyDeltas, audit } = makeDeps();
+    const res = await deductFilamentForManualSale(
+      "s1",
+      { grams: 50, quantity: 1 },
+      deps,
+    );
+    expect(res.deducted).toBe(false);
+    expect(applyDeltas).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it("es idempotente: si la venta ya descontó, no repite", async () => {
+    const { deps, applyDeltas } = makeDeps({ hasMovements: async () => true });
+    const res = await deductFilamentForManualSale(
+      "s1",
+      { filamentId: "f1", grams: 50, quantity: 1 },
+      deps,
+    );
+    expect(res.deducted).toBe(false);
+    expect(applyDeltas).not.toHaveBeenCalled();
+  });
+
+  it("NUNCA lanza: un error de DB queda auditado y la venta sigue", async () => {
+    const { deps, audit } = makeDeps({
+      applyDeltas: vi.fn(async () => {
+        throw new Error("DB caída");
+      }),
+    });
+    await expect(
+      deductFilamentForManualSale(
+        "s1",
+        { filamentId: "f1", grams: 50, quantity: 1 },
+        deps,
+      ),
+    ).resolves.toMatchObject({ deducted: false });
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "inventory.manual_sale_deduct_failed",
+      }),
+    );
   });
 });
 

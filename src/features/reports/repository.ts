@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { db } from "@/core/db";
 import {
   categories,
+  filamentMovements,
   filaments,
   manualSales,
   orderItems,
@@ -395,30 +396,37 @@ export async function getFailureConsumption(
     .orderBy(sql`3 desc`);
 }
 
-/** Gramos estimados consumidos por ventas de tienda, por material. */
-export async function getSalesGramsByMaterial(
+/**
+ * Gramos REALES consumidos por ventas (tienda + manuales), por material y
+ * color, desde el ledger `filament_movements` (diseño 2026-07: reemplaza el
+ * estimado peso × unidades). Neto del año: consumos (deltas negativos de
+ * 'order'/'manual_sale') menos reposiciones ('restore' de cancelaciones/
+ * borrados). Solo muestra netos positivos. Nota: el ledger arranca vacío,
+ * así que las ventas anteriores a esta migración no aparecen acá.
+ */
+export async function getLedgerSalesConsumption(
   year: number,
   database: Database = db,
-): Promise<Array<{ material: string; grams: number }>> {
+): Promise<Array<{ material: string; color: string; grams: number }>> {
   const yearStart = new Date(Date.UTC(year, 0, 1));
   const yearEnd = new Date(Date.UTC(year + 1, 0, 1));
   return database
     .select({
-      material: sql<string>`coalesce(${products.material}, 'Otro')`,
-      grams: sql<number>`coalesce(sum(coalesce(${products.weightGrams}, 0) * ${orderItems.quantity}), 0)::float8`,
+      material: filamentMovements.material,
+      color: filamentMovements.color,
+      grams: sql<number>`coalesce(-sum(${filamentMovements.deltaGrams}), 0)::float8`,
     })
-    .from(orderItems)
-    .innerJoin(orders, eq(orderItems.orderId, orders.id))
-    .innerJoin(products, eq(orderItems.productId, products.id))
+    .from(filamentMovements)
     .where(
       and(
-        inArray(orders.status, SALES_STATUSES),
-        gte(orders.createdAt, yearStart),
-        lt(orders.createdAt, yearEnd),
+        inArray(filamentMovements.reason, ["order", "manual_sale", "restore"]),
+        gte(filamentMovements.createdAt, yearStart),
+        lt(filamentMovements.createdAt, yearEnd),
       ),
     )
-    .groupBy(sql`1`)
-    .orderBy(sql`2 desc`);
+    .groupBy(sql`1, 2`)
+    .having(sql`sum(${filamentMovements.deltaGrams}) < 0`)
+    .orderBy(sql`3 desc`);
 }
 
 /** Costo promedio por kg de cada material (según filamentos cargados). */

@@ -1,7 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/core/db";
-import { filaments, printFailures } from "@/core/db/schema";
-import type { Filament, PrintFailure } from "./types";
+import { filamentMovements, filaments, printFailures } from "@/core/db/schema";
+import type {
+  Filament,
+  FilamentMovement,
+  FilamentMovementReason,
+  NewFilamentMovement,
+  PrintFailure,
+} from "./types";
 
 type Database = typeof db;
 
@@ -130,6 +136,161 @@ export async function deleteFailureTx(
     await tx
       .delete(printFailures)
       .where(eq(printFailures.id, params.failureId));
+  });
+}
+
+// --- Ledger de movimientos de filamento (ventas ↔ stock) ---
+
+/** Movimientos originados por un pedido/venta puntual (reason + ref_id). */
+export async function findMovementsByRef(
+  reason: FilamentMovementReason,
+  refId: string,
+  database: Database = db,
+): Promise<FilamentMovement[]> {
+  return database.query.filamentMovements.findMany({
+    where: and(
+      eq(filamentMovements.reason, reason),
+      eq(filamentMovements.refId, refId),
+    ),
+  });
+}
+
+/** ¿Ya existe un movimiento con este (reason, ref_id)? Base de la idempotencia. */
+export async function existsMovementByRef(
+  reason: FilamentMovementReason,
+  refId: string,
+  database: Database = db,
+): Promise<boolean> {
+  const row = await database.query.filamentMovements.findFirst({
+    columns: { id: true },
+    where: and(
+      eq(filamentMovements.reason, reason),
+      eq(filamentMovements.refId, refId),
+    ),
+  });
+  return row != null;
+}
+
+/**
+ * Aplica N deltas de stock y registra sus movimientos, todo en UNA transacción.
+ * Reglas (diseño 2026-07, toca stock → tests en el service):
+ *  - El stock nunca baja de 0 (la tabla tiene CHECK >= 0): se aplica
+ *    GREATEST(stock + delta, 0) y el movimiento registra el delta REAL
+ *    aplicado (pedía -80 con 50 en stock → queda -50).
+ *  - Se registra el movimiento AUNQUE el delta real sea 0 (stock ya estaba en
+ *    0): el registro es el marcador de idempotencia y la traza de auditoría.
+ *  - La fila del filamento se bloquea (FOR UPDATE) para que dos ventas
+ *    concurrentes no pisen la misma lectura de stock.
+ *  - Si el filamento fue borrado en el medio, no hay stock que tocar y el
+ *    movimiento queda con filament_id null (snapshots material/color).
+ */
+export async function applyFilamentDeltasTx(
+  movements: NewFilamentMovement[],
+  database: Database = db,
+): Promise<void> {
+  if (movements.length === 0) return;
+  await database.transaction(async (tx) => {
+    for (const m of movements) {
+      const [row] = await tx
+        .select({ id: filaments.id, stockGrams: filaments.stockGrams })
+        .from(filaments)
+        .where(eq(filaments.id, m.filamentId))
+        .for("update");
+
+      let applied = 0;
+      let filamentId: string | null = null;
+      if (row) {
+        const current = Number(row.stockGrams);
+        // GREATEST(stock + delta, 0) — misma regla pura que applyCappedDelta
+        // (service), acá inline para no invertir la dependencia repo→service.
+        const newStock = Math.max(0, current + m.deltaGrams);
+        applied = newStock - current;
+        filamentId = row.id;
+        await tx
+          .update(filaments)
+          .set({ stockGrams: String(newStock) })
+          .where(eq(filaments.id, row.id));
+      }
+
+      await tx.insert(filamentMovements).values({
+        filamentId,
+        material: m.material,
+        color: m.color,
+        deltaGrams: applied.toFixed(2),
+        reason: m.reason,
+        refId: m.refId,
+      });
+    }
+  });
+}
+
+/**
+ * Reversa de un descuento (pedido cancelado/reembolsado/borrado, venta manual
+ * borrada): por cada movimiento de consumo de (reason, ref_id) devuelve los
+ * gramos REALMENTE descontados e inserta el compensatorio (reason 'restore',
+ * mismo ref_id). Idempotente: si ya hay un 'restore' para ese ref, no hace
+ * nada. Todo en UNA transacción. Devuelve los gramos devueltos al stock.
+ */
+export async function restoreMovementsByRefTx(
+  reason: FilamentMovementReason,
+  refId: string,
+  database: Database = db,
+): Promise<number> {
+  return database.transaction(async (tx) => {
+    const already = await tx
+      .select({ id: filamentMovements.id })
+      .from(filamentMovements)
+      .where(
+        and(
+          eq(filamentMovements.reason, "restore"),
+          eq(filamentMovements.refId, refId),
+        ),
+      )
+      .limit(1);
+    if (already.length > 0) return 0;
+
+    const movements = await tx
+      .select()
+      .from(filamentMovements)
+      .where(
+        and(
+          eq(filamentMovements.reason, reason),
+          eq(filamentMovements.refId, refId),
+        ),
+      );
+
+    let restored = 0;
+    for (const m of movements) {
+      const grams = -Number(m.deltaGrams); // consumo fue negativo → devolver +
+      if (grams <= 0) continue; // delta real 0: no hay nada que compensar
+
+      if (m.filamentId) {
+        const [row] = await tx
+          .select({ id: filaments.id, stockGrams: filaments.stockGrams })
+          .from(filaments)
+          .where(eq(filaments.id, m.filamentId))
+          .for("update");
+        if (row) {
+          await tx
+            .update(filaments)
+            .set({ stockGrams: String(Number(row.stockGrams) + grams) })
+            .where(eq(filaments.id, row.id));
+          restored += grams;
+        }
+      }
+
+      // El compensatorio se inserta aunque el filamento ya no exista: deja el
+      // ledger saldado (consumo neto 0) para el reporte de consumo real.
+      await tx.insert(filamentMovements).values({
+        filamentId: m.filamentId,
+        material: m.material,
+        color: m.color,
+        deltaGrams: grams.toFixed(2),
+        reason: "restore",
+        refId,
+      });
+    }
+    return restored;
   });
 }
 

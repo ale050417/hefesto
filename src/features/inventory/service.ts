@@ -1,5 +1,10 @@
 import { NotFoundError } from "@/core/errors";
-import type { Filament, PrintFailure } from "./types";
+import type {
+  Filament,
+  FilamentMovementReason,
+  NewFilamentMovement,
+  PrintFailure,
+} from "./types";
 
 // --- Lógica pura (testeable) ---
 
@@ -98,6 +103,115 @@ export async function registerFailure(
   });
 
   return { lowStock, deducted };
+}
+
+// --- Ledger de movimientos: ventas descuentan filamento (diseño 2026-07) ---
+
+/**
+ * GREATEST(stock + delta, 0): el stock nunca baja de 0 y se devuelve el delta
+ * REAL aplicado (pedía -80 con 50 en stock → newStock 0, appliedDelta -50).
+ * Pura y testeable; el repository aplica la misma regla dentro de la tx.
+ */
+export function applyCappedDelta(
+  current: number,
+  delta: number,
+): { newStock: number; appliedDelta: number } {
+  const newStock = Math.max(0, current + delta);
+  return { newStock, appliedDelta: newStock - current };
+}
+
+type FilamentMatch = Pick<Filament, "id" | "material" | "color">;
+
+/**
+ * Filamento que consume una línea de pedido online. El color elegido viaja en
+ * el snapshot `variantLabel` ("Rojo" o "Talle M · Rojo"); el material sale del
+ * producto. Matching insensible a mayúsculas; los segmentos del label se
+ * prueban del final al principio porque el color se agrega último. Pura y
+ * testeable (Cap. 15). Si no hay match, el hook NO bloquea la venta: registra
+ * warning en auditoría.
+ */
+export function resolveFilamentForItem<T extends FilamentMatch>(
+  filaments: T[],
+  params: { material: string | null; variantLabel: string | null },
+): T | null {
+  const material = params.material?.trim().toLowerCase();
+  const label = params.variantLabel?.trim();
+  if (!material || !label) return null;
+
+  const byMaterial = filaments.filter(
+    (f) => f.material.trim().toLowerCase() === material,
+  );
+  if (byMaterial.length === 0) return null;
+
+  const segments = label
+    .split("·")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  for (let i = segments.length - 1; i >= 0; i--) {
+    const hit = byMaterial.find(
+      (f) => f.color.trim().toLowerCase() === segments[i],
+    );
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
+ * Filamento que consume una venta manual: por id si se eligió uno; si no, por
+ * material SOLO cuando hay un único filamento de ese material (si hay varios
+ * no se adivina: se saltea con warning). Pura y testeable.
+ */
+export function resolveFilamentForManualSale<T extends FilamentMatch>(
+  filaments: T[],
+  params: { filamentId?: string | null; material?: string | null },
+): T | null {
+  if (params.filamentId) {
+    return filaments.find((f) => f.id === params.filamentId) ?? null;
+  }
+  const material = params.material?.trim().toLowerCase();
+  if (!material) return null;
+  const matches = filaments.filter(
+    (f) => f.material.trim().toLowerCase() === material,
+  );
+  return matches.length === 1 ? matches[0]! : null;
+}
+
+// Puerta única del ledger para otros features (orders importa ESTE service,
+// nunca el repository de inventory — regla de dependencias, Cap. 5/19).
+
+/** ¿Este pedido/venta ya descontó? (idempotencia del hook) */
+export async function hasFilamentMovements(
+  reason: FilamentMovementReason,
+  refId: string,
+): Promise<boolean> {
+  const repo = await import("./repository");
+  return repo.existsMovementByRef(reason, refId);
+}
+
+/** Lista de filamentos para matching (id + material + color + stock). */
+export async function listFilamentsForMatching(): Promise<Filament[]> {
+  const repo = await import("./repository");
+  return repo.listFilaments();
+}
+
+/** Aplica descuentos/reposiciones y registra los movimientos (una tx). */
+export async function applyFilamentDeltas(
+  movements: NewFilamentMovement[],
+): Promise<void> {
+  const repo = await import("./repository");
+  return repo.applyFilamentDeltasTx(movements);
+}
+
+/**
+ * Repone lo que un pedido/venta había descontado (compensatorio 'restore').
+ * Idempotente. Devuelve los gramos devueltos al stock.
+ */
+export async function restoreFilamentMovements(
+  reason: FilamentMovementReason,
+  refId: string,
+): Promise<number> {
+  const repo = await import("./repository");
+  return repo.restoreMovementsByRefTx(reason, refId);
 }
 
 // --- deleteFailure: devuelve al stock los gramos descontados ---

@@ -2,10 +2,10 @@ import { formatPrice } from "@/lib/format";
 import type { ConsumptionRow } from "../service";
 
 /**
- * Consumo de filamento del año (Fase 5): gramos usados y costo asociado.
- *  - "ventas": estimado por peso del producto × unidades vendidas en tienda.
+ * Consumo de filamento del año: gramos usados y costo asociado.
+ *  - "ventas": consumo REAL del ledger de movimientos (pedidos online y
+ *    ventas manuales descuentan stock desde 2026-07; neto de reposiciones).
  *  - "fallas": gramos perdidos reales registrados en Fallas.
- * Las ventas manuales no guardan gramos, por eso no se estiman (se aclara).
  */
 export function FilamentConsumption({ rows }: { rows: ConsumptionRow[] }) {
   const totalGrams = rows.reduce((acc, r) => acc + r.grams, 0);
@@ -17,8 +17,8 @@ export function FilamentConsumption({ rows }: { rows: ConsumptionRow[] }) {
     <div className="ui-card section-card">
       <div className="section-title mb-1">Consumo de filamento</div>
       <div className="text-faint mb-4 text-[12.5px]">
-        Estimado por ventas de tienda (peso × unidades) + pérdidas reales por
-        fallas. Las ventas manuales no registran gramos.
+        Consumo real descontado del inventario por ventas (tienda y manuales) +
+        pérdidas registradas en fallas.
       </div>
       {rows.length === 0 ? (
         <p className="text-dim py-6 text-center text-sm">

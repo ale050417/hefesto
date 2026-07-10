@@ -1,6 +1,8 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/core/db";
 import { manualSales } from "@/core/db/schema";
+import { recordAudit } from "@/core/audit";
+import type { Filament, NewFilamentMovement } from "@/features/inventory/types";
 import type { ManualSaleInput } from "../schemas";
 
 export type ManualSale = typeof manualSales.$inferSelect;
@@ -62,7 +64,136 @@ export async function createManualSale(
     .values(toManualSaleRow(input, createdBy))
     .returning();
   if (!row) throw new Error("No se pudo registrar la venta manual");
+  // Descuento de filamento (diseño 2026-07). La venta YA está guardada y no
+  // se bloquea: la función atrapa sus errores y deja warning en auditoría.
+  // La importación Excel entra por acá también (pasa material, rara vez id).
+  await deductFilamentForManualSale(row.id, input);
   return row;
+}
+
+// --- Descuento de filamento por venta manual (diseño 2026-07) ---
+
+export type ManualSaleStockDeps = {
+  listFilaments: () => Promise<Filament[]>;
+  hasMovements: (reason: "manual_sale", refId: string) => Promise<boolean>;
+  applyDeltas: (movements: NewFilamentMovement[]) => Promise<void>;
+  /** Matching puro (inventory). Si no se inyecta, se resuelve perezoso. */
+  resolveFilament?: (
+    filaments: Filament[],
+    params: { filamentId?: string | null; material?: string | null },
+  ) => Filament | null;
+  audit: typeof recordAudit;
+};
+
+const defaultStockDeps: ManualSaleStockDeps = {
+  listFilaments: () =>
+    import("@/features/inventory/service").then((m) =>
+      m.listFilamentsForMatching(),
+    ),
+  hasMovements: (reason, refId) =>
+    import("@/features/inventory/service").then((m) =>
+      m.hasFilamentMovements(reason, refId),
+    ),
+  applyDeltas: (movements) =>
+    import("@/features/inventory/service").then((m) =>
+      m.applyFilamentDeltas(movements),
+    ),
+  audit: recordAudit,
+};
+
+/**
+ * Descuenta del inventario los gramos de una venta manual: gramos (por unidad,
+ * los de la calculadora) × cantidad, del filamento elegido por id — o por
+ * material SOLO si hay un único filamento de ese material (no se adivina).
+ * Reglas firmes: nunca bloquea la venta (atrapa todo y deja warning en
+ * auditoría) y es idempotente vía ledger (reason 'manual_sale' + ref_id).
+ * Si la carga no trae gramos ni filamento/material, no hay intención de
+ * descontar (cargas viejas/histórico): se saltea en silencio.
+ */
+export async function deductFilamentForManualSale(
+  saleId: string,
+  input: Pick<
+    ManualSaleInput,
+    "filamentId" | "material" | "grams" | "quantity"
+  >,
+  deps: ManualSaleStockDeps = defaultStockDeps,
+): Promise<{ deducted: boolean; reason?: string }> {
+  const hasIntent = Boolean(input.filamentId || input.material);
+  const grams = input.grams ?? 0;
+  try {
+    if (!hasIntent) return { deducted: false, reason: "sin filamento" };
+    if (await deps.hasMovements("manual_sale", saleId)) {
+      return { deducted: false, reason: "ya descontado" };
+    }
+
+    const warn = async (reason: string) => {
+      console.warn(
+        `[inventario] venta manual ${saleId}: sin descuento (${reason})`,
+      );
+      await deps.audit({
+        actorId: null,
+        action: "inventory.manual_sale_no_deduct",
+        entityType: "manual_sale",
+        entityId: saleId,
+        metadata: {
+          reason,
+          filamentId: input.filamentId ?? null,
+          material: input.material ?? null,
+          grams,
+        },
+      });
+      return { deducted: false, reason };
+    };
+
+    if (!(grams > 0)) return warn("sin gramos");
+
+    const resolve: NonNullable<ManualSaleStockDeps["resolveFilament"]> =
+      deps.resolveFilament ??
+      (await import("@/features/inventory/service").then(
+        (m) => m.resolveFilamentForManualSale,
+      ));
+    const filament = resolve(await deps.listFilaments(), {
+      filamentId: input.filamentId ?? null,
+      material: input.material ?? null,
+    });
+    if (!filament) {
+      return warn(
+        input.filamentId
+          ? "el filamento elegido ya no existe"
+          : `material "${input.material}" sin filamento único`,
+      );
+    }
+
+    const qty = Math.max(1, Math.floor(input.quantity));
+    await deps.applyDeltas([
+      {
+        filamentId: filament.id,
+        material: filament.material,
+        color: filament.color,
+        deltaGrams: -(grams * qty),
+        reason: "manual_sale",
+        refId: saleId,
+      },
+    ]);
+    return { deducted: true };
+  } catch (error) {
+    console.error(
+      `[inventario] no se pudo descontar filamento de la venta ${saleId}:`,
+      error,
+    );
+    await deps
+      .audit({
+        actorId: null,
+        action: "inventory.manual_sale_deduct_failed",
+        entityType: "manual_sale",
+        entityId: saleId,
+        metadata: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      .catch(() => undefined);
+    return { deducted: false, reason: "error" };
+  }
 }
 
 export async function listManualSales(): Promise<ManualSale[]> {
@@ -86,10 +217,23 @@ export async function updateManualSaleStatus(
 }
 
 /**
- * Borra una venta manual (cargada mal / duplicada). No tiene hijos ni toca
- * puntos/cupón/filamento: solo deja de sumar a facturación, ganancias y
- * reportes. La autorización (solo admin) se valida en la action.
+ * Borra una venta manual (cargada mal / duplicada). Antes de borrar, REPONE el
+ * filamento que la venta había descontado (compensatorio 'restore' en el
+ * ledger, idempotente) — el inventario siempre refleja la realidad, misma
+ * regla que el borrado de fallas. La reposición va primero: si el delete
+ * falla, el reintento no repone dos veces. La autorización (solo admin) se
+ * valida en la action.
  */
 export async function deleteManualSale(id: string): Promise<void> {
+  const { restoreFilamentMovements } =
+    await import("@/features/inventory/service");
+  await restoreFilamentMovements("manual_sale", id).catch((error) => {
+    // No bloquea el borrado: queda para ajuste manual (y trazado en consola).
+    console.error(
+      `[inventario] no se pudo reponer el filamento de la venta ${id}:`,
+      error,
+    );
+    return 0;
+  });
   await db.delete(manualSales).where(eq(manualSales.id, id));
 }

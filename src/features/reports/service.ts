@@ -52,11 +52,12 @@ export type ConsumptionRow = {
 };
 
 /**
- * Combina el consumo estimado por ventas (gramos por material) con el costo
- * promedio por kg de ese material. Pura y testeable (toca dinero).
+ * Combina el consumo REAL por ventas (gramos netos del ledger de filamento,
+ * por material y color) con el costo promedio por kg de ese material. Pura y
+ * testeable (toca dinero).
  */
 export function combineSalesConsumption(
-  grams: Array<{ material: string; grams: number }>,
+  grams: Array<{ material: string; color?: string | null; grams: number }>,
   costs: Array<{ material: string; costPerKg: number }>,
 ): ConsumptionRow[] {
   const costMap = new Map(costs.map((c) => [c.material, c.costPerKg]));
@@ -64,7 +65,7 @@ export function combineSalesConsumption(
     .filter((g) => g.grams > 0)
     .map((g) => ({
       material: g.material,
-      color: null,
+      color: g.color ?? null,
       grams: Number(g.grams),
       // pesos = gramos × (costo/kg ÷ 1000), redondeado a 2 decimales
       cost:
@@ -182,7 +183,7 @@ const getReportsOverviewRaw = async (year: number) => {
     repo.getTopProducts(6),
     repo.getRevenueBySource(year),
     repo.getFailureConsumption(year),
-    repo.getSalesGramsByMaterial(year),
+    repo.getLedgerSalesConsumption(year),
     repo.getAvgCostPerMaterial(),
   ]);
 

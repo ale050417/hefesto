@@ -75,12 +75,16 @@ export type ConfirmPaymentDeps = {
     paidAt: Date;
     note: string;
   }) => Promise<Order>;
+  /** Pago acreditado → descuenta filamento (idempotente; nunca lanza). */
+  deductFilament?: (orderId: string) => Promise<unknown>;
 };
 
 const confirmDeps: ConfirmPaymentDeps = {
   getOrder: (id) => import("../repository").then((m) => m.findOrderById(id)),
   markPaid: (params) =>
     import("../repository").then((m) => m.updateOrderStatus(params)),
+  deductFilament: (orderId) =>
+    import("./orderInventory").then((m) => m.deductFilamentForOrder(orderId)),
 };
 
 /**
@@ -123,6 +127,10 @@ export async function confirmOrderPayment(
   } catch (e) {
     console.error("[rewards] no se pudieron otorgar puntos:", e);
   }
+  // Pago acreditado = la pieza se va a imprimir: descuenta filamento (diseño
+  // 2026-07). Solo corre en el camino que GANÓ el compare-and-set; los
+  // reintentos del webhook vuelven antes (idempotencia doble: acá y ledger).
+  await deps.deductFilament?.(updated.id);
   return updated;
 }
 

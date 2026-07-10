@@ -311,6 +311,21 @@ export async function listProductImages(
   return listImagesByProduct(productId);
 }
 
+/**
+ * Material + peso de un producto, para el descuento de filamento por ventas
+ * (hook de stock en orders). Liviano a propósito: no arrastra imágenes.
+ */
+export async function getProductPrintSpecs(
+  id: string,
+): Promise<{ material: string | null; weightGrams: number | null } | null> {
+  const product = await findProductById(id);
+  if (!product) return null;
+  return {
+    material: product.material ?? null,
+    weightGrams: product.weightGrams ?? null,
+  };
+}
+
 /** Trae un producto (cualquier estado) + sus imágenes, para el form de edición. */
 export async function getProductAdmin(
   id: string,

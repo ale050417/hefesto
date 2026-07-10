@@ -274,6 +274,13 @@
       "when": 1783301800000,
       "tag": "0038_realtime_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1783302400000,
+      "tag": "0039_filament_movements",
+      "breakpoints": true
     }
   ]
 }

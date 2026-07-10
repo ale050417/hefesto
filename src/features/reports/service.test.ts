@@ -113,4 +113,20 @@ describe("combineSalesConsumption (costo de filamento)", () => {
       combineSalesConsumption([{ material: "PLA", grams: 0 }], []),
     ).toEqual([]);
   });
+
+  // Diseño 2026-07: el consumo por ventas ahora sale del ledger real, que
+  // trae color; se muestra tal cual (antes era un estimado sin color).
+  it("conserva el color del ledger cuando viene", () => {
+    const rows = combineSalesConsumption(
+      [{ material: "PLA", color: "Rojo", grams: 240 }],
+      [{ material: "PLA", costPerKg: 20000 }],
+    );
+    expect(rows[0]).toEqual({
+      material: "PLA",
+      color: "Rojo",
+      grams: 240,
+      cost: 4800,
+      source: "ventas",
+    });
+  });
 });
