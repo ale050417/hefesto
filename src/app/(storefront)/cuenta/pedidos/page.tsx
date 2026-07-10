@@ -357,7 +357,8 @@ export default async function MyOrdersPage() {
           </div>
           <div className="ui-card p-0">
             <div className="table-wrap border-0">
-              <table className="tbl">
+              {/* En móvil se apila como tarjetas (.tbl-cards + data-label). */}
+              <table className="tbl tbl-cards">
                 <thead>
                   <tr>
                     <th>Pedido</th>
@@ -371,13 +372,13 @@ export default async function MyOrdersPage() {
                 <tbody>
                   {past.map((o) => (
                     <tr key={o.orderNumber}>
-                      <td>
+                      <td data-label="Pedido">
                         <b>{o.orderNumber}</b>
                       </td>
-                      <td className="text-dim">
+                      <td className="text-dim" data-label="Fecha">
                         {dateFmt.format(o.createdAt)}
                       </td>
-                      <td>
+                      <td data-label="Productos">
                         <div className="flex items-center gap-2">
                           <span
                             className="ph flex-shrink-0 rounded-md"
@@ -399,15 +400,15 @@ export default async function MyOrdersPage() {
                           </div>
                         </div>
                       </td>
-                      <td>
+                      <td data-label="Estado">
                         <Badge variant={ORDER_STATUS_VARIANT[o.status]}>
                           {ORDER_STATUS_LABEL[o.status]}
                         </Badge>
                       </td>
-                      <td className="text-right font-medium">
+                      <td className="text-right font-medium" data-label="Total">
                         {formatPrice(o.total)}
                       </td>
-                      <td className="text-right">
+                      <td className="text-right" data-label="">
                         <Link
                           href={`/cuenta/pedidos/${encodeURIComponent(o.orderNumber)}`}
                           className="text-[var(--gold-bright)] hover:underline"

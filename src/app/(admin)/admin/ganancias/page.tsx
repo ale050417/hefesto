@@ -165,7 +165,8 @@ export default async function GananciasPage({
           </p>
         ) : (
           <div className="table-wrap" style={{ border: "none" }}>
-            <table className="tbl">
+            {/* En móvil se apila como tarjetas (.tbl-cards + data-label). */}
+            <table className="tbl tbl-cards">
               <thead>
                 <tr>
                   <th>Pedido</th>
@@ -191,29 +192,34 @@ export default async function GananciasPage({
                   );
                   return (
                     <tr key={o.id}>
-                      <td>
+                      <td data-label="Pedido">
                         <b>{o.orderNumber}</b>
                         <div className="text-faint text-[11.5px]">
                           {dateFmt.format(o.createdAt)}
                         </div>
                       </td>
-                      <td>{o.customerName ?? "—"}</td>
-                      <td className="price text-right">
+                      <td data-label="Cliente">{o.customerName ?? "—"}</td>
+                      <td className="price text-right" data-label="Ingreso">
                         {formatPrice(o.ingreso)}
                       </td>
                       <td
                         className="price text-right"
                         style={{ color: "var(--warning)" }}
+                        data-label="Amortización"
                       >
                         −{formatPrice(o.amort)}
                       </td>
-                      <td className="price text-right">
+                      <td className="price text-right" data-label="Ganancia">
                         <b style={{ color: "var(--success)" }}>
                           {formatPrice(o.gananciaPura)}
                         </b>
                       </td>
                       {payouts.map((p, i) => (
-                        <td key={p.name} className="price text-right">
+                        <td
+                          key={p.name}
+                          className="price text-right"
+                          data-label={(p.name || "").split(" ")[0]}
+                        >
                           {splitMap.has(p.name) ? (
                             <span
                               style={{ color: GN_COLORS[i % GN_COLORS.length] }}
@@ -231,25 +237,30 @@ export default async function GananciasPage({
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={2}>
+                  <td colSpan={2} data-label="">
                     <b>Totales</b>
                   </td>
-                  <td className="price text-right">
+                  <td className="price text-right" data-label="Ingreso">
                     <b>{formatPrice(totals.ingreso)}</b>
                   </td>
                   <td
                     className="price text-right"
                     style={{ color: "var(--warning)" }}
+                    data-label="Amortización"
                   >
                     <b>−{formatPrice(totals.amort)}</b>
                   </td>
-                  <td className="price text-right">
+                  <td className="price text-right" data-label="Ganancia">
                     <b style={{ color: "var(--success)" }}>
                       {formatPrice(totals.profit)}
                     </b>
                   </td>
                   {payouts.map((p, i) => (
-                    <td key={p.name} className="price text-right">
+                    <td
+                      key={p.name}
+                      className="price text-right"
+                      data-label={(p.name || "").split(" ")[0]}
+                    >
                       <b style={{ color: GN_COLORS[i % GN_COLORS.length] }}>
                         {formatPrice(p.amount)}
                       </b>

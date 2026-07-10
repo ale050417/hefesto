@@ -20,8 +20,9 @@ export function CustomerSearch() {
     });
   }
 
+  // Búsqueda fluida en móvil: el ancho fijo pasa a ser tope máximo.
   return (
-    <div className="search" style={{ width: 300 }}>
+    <div className="search" style={{ width: "100%", maxWidth: 300 }}>
       <svg
         viewBox="0 0 24 24"
         fill="none"

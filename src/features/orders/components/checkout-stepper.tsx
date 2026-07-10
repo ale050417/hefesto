@@ -152,7 +152,11 @@ export function CheckoutStepper({ mpEnabled = true }: { mpEnabled?: boolean }) {
               >
                 {i + 1}
               </span>
-              <span className={i === step ? "text-fg" : "text-dim"}>
+              {/* En móvil solo se lee el label del paso activo; los otros
+                  quedan como círculos numerados (no entran los 3 textos). */}
+              <span
+                className={i === step ? "text-fg" : "text-dim hidden sm:inline"}
+              >
                 {label}
               </span>
               {i < STEPS.length - 1 ? (

@@ -587,7 +587,8 @@ export function PriceCalculator({
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="section-title">Historial de cálculos</div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="search" style={{ width: 220 }}>
+            {/* Fluida en móvil: el ancho fijo pasa a tope máximo. */}
+            <div className="search" style={{ width: "100%", maxWidth: 220 }}>
               <svg
                 viewBox="0 0 24 24"
                 fill="none"

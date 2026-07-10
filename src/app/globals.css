@@ -666,6 +666,13 @@ body > * {
     .hero-title {
       font-size: 40px;
     }
+    /* Las métricas (piezas · rating · entrega) pueden no entrar en una sola
+       fila en 375px: se permite el salto de línea en vez de desbordar. */
+    .hero-stats {
+      flex-wrap: wrap;
+      gap: 20px 28px;
+      margin-top: 30px;
+    }
   }
 
   /* Carrusel del hero (paridad index) */
@@ -1926,7 +1933,17 @@ body > * {
       width: 19px;
       height: 19px;
     }
-    /* Pestañas (config, etc.): scroll horizontal en vez de romper el layout */
+    /* Botones de acción dentro del encabezado: ocupan el ancho en celular */
+    .page-head .btn {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  /* Pestañas (Configuración, etc.): las 5 pestañas miden ~560-600px, así que
+     el scroll horizontal tiene que cubrir hasta 767px (antes cortaba en 600 y
+     entre 601-767 desbordaban sin scroll). */
+  @media (max-width: 767px) {
     .tabs {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
@@ -1937,11 +1954,6 @@ body > * {
     }
     .tab {
       white-space: nowrap;
-    }
-    /* Botones de acción dentro del encabezado: ocupan el ancho en celular */
-    .page-head .btn {
-      width: 100%;
-      justify-content: center;
     }
   }
   @media (max-width: 400px) {
@@ -1995,6 +2007,7 @@ body > * {
     table.tbl-cards,
     table.tbl-cards thead,
     table.tbl-cards tbody,
+    table.tbl-cards tfoot,
     table.tbl-cards tr,
     table.tbl-cards td {
       display: block;
@@ -2008,14 +2021,21 @@ body > * {
       clip: rect(0 0 0 0);
       white-space: nowrap;
     }
-    table.tbl-cards tbody tr {
+    table.tbl-cards tbody tr,
+    table.tbl-cards tfoot tr {
       border: 1px solid var(--border);
       border-radius: var(--radius-md);
       background: var(--surface-1);
       padding: 4px 12px;
       margin-bottom: 10px;
     }
-    table.tbl-cards tbody td {
+    /* La fila de totales (tfoot) se distingue como tarjeta de resumen. */
+    table.tbl-cards tfoot tr {
+      background: var(--surface-2);
+      border-color: var(--border-strong, var(--border));
+    }
+    table.tbl-cards tbody td,
+    table.tbl-cards tfoot td {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -2025,10 +2045,12 @@ body > * {
       text-align: right;
       white-space: normal;
     }
-    table.tbl-cards tbody tr td:last-child {
+    table.tbl-cards tbody tr td:last-child,
+    table.tbl-cards tfoot tr td:last-child {
       border-bottom: none;
     }
-    table.tbl-cards tbody td::before {
+    table.tbl-cards tbody td::before,
+    table.tbl-cards tfoot td::before {
       content: attr(data-label);
       color: var(--text-faint);
       font-size: 11px;
@@ -2039,7 +2061,8 @@ body > * {
       flex-shrink: 0;
     }
     /* Celda de acciones: sin etiqueta y alineada a la derecha. */
-    table.tbl-cards tbody td[data-label=""]::before {
+    table.tbl-cards tbody td[data-label=""]::before,
+    table.tbl-cards tfoot td[data-label=""]::before {
       content: none;
     }
   }
@@ -3467,6 +3490,15 @@ body > * {
   }
 
   /* Toasts */
+  /* Dentro de un modal, los pares de campos (.grid-2) se apilan en pantallas
+     muy angostas: dos columnas de ~150px truncan selects largos (p. ej. el
+     filamento de la calculadora flotante). Mismo criterio que sm:grid-cols-2. */
+  @media (max-width: 480px) {
+    .modal .grid-2 {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .toaster {
     position: fixed;
     bottom: 24px;

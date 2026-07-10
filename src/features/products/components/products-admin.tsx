@@ -238,7 +238,8 @@ export function ProductsAdmin({
       </div>
 
       <div className="toolbar">
-        <div className="search" style={{ width: 260 }}>
+        {/* Fluida en móvil: el ancho fijo pasa a tope máximo. */}
+        <div className="search" style={{ width: "100%", maxWidth: 260 }}>
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -405,7 +406,8 @@ export function ProductsAdmin({
       ) : (
         <div className="ui-card">
           <div className="table-wrap" style={{ border: "none" }}>
-            <table className="tbl">
+            {/* En móvil se apila como tarjetas (.tbl-cards + data-label). */}
+            <table className="tbl tbl-cards">
               <thead>
                 <tr>
                   <th>Producto</th>
@@ -419,7 +421,7 @@ export function ProductsAdmin({
               <tbody>
                 {list.map((p) => (
                   <tr key={p.id}>
-                    <td>
+                    <td data-label="Producto">
                       <div className="flex items-center gap-3">
                         <span
                           className="bg-surface-2 relative block shrink-0 overflow-hidden rounded"
@@ -438,9 +440,13 @@ export function ProductsAdmin({
                         <b>{p.name}</b>
                       </div>
                     </td>
-                    <td className="muted">{p.categoryName ?? "—"}</td>
-                    <td className="muted">{p.material ?? "—"}</td>
-                    <td className="price">
+                    <td className="muted" data-label="Categoría">
+                      {p.categoryName ?? "—"}
+                    </td>
+                    <td className="muted" data-label="Material">
+                      {p.material ?? "—"}
+                    </td>
+                    <td className="price" data-label="Precio">
                       {p.salePrice ? (
                         <>
                           <b style={{ color: "var(--gold-bright)" }}>
@@ -454,14 +460,14 @@ export function ProductsAdmin({
                         <b>{formatPrice(p.price)}</b>
                       )}
                     </td>
-                    <td>
+                    <td data-label="Estado">
                       {p.status === "published" ? (
                         <span className="badge badge-success">Activo</span>
                       ) : (
                         <span className="badge badge-neutral">Oculto</span>
                       )}
                     </td>
-                    <td>
+                    <td data-label="">
                       <div className="flex justify-end gap-1">
                         <button
                           className="btn-icon btn-ghost"
