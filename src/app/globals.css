@@ -1617,19 +1617,26 @@ body > * {
     height: 14px;
   }
 
-  /* Admin: topbar móvil + sidebar off-canvas + content */
+  /* Admin: topbar SIEMPRE visible (acciones globales) + fila sidebar/content.
+     2026-07-11: antes la topbar era solo móvil y la campana/tema/"volver a la
+     tienda" quedaban enterrados en el sidebar (que además scrolleaba). */
   .admin-shell {
     display: flex;
     flex-direction: column;
     min-height: 100dvh;
   }
+  .admin-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
   @media (min-width: 768px) {
-    .admin-shell {
+    .admin-body {
       flex-direction: row;
     }
   }
 
-  /* Topbar: solo móvil (hamburguesa + marca) */
   .admin-topbar {
     position: sticky;
     top: 0;
@@ -1637,13 +1644,17 @@ body > * {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 9px 12px;
+    height: var(--admin-topbar-h, 54px);
+    padding: 0 12px;
     background: color-mix(in srgb, var(--surface-1) 92%, transparent);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border);
   }
   @media (min-width: 768px) {
     .admin-topbar {
+      padding: 0 20px;
+    }
+    .admin-burger {
       display: none;
     }
   }
@@ -1688,7 +1699,7 @@ body > * {
   .admin-nav {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
   }
   .sidebar-backdrop {
     position: fixed;
@@ -1697,13 +1708,15 @@ body > * {
     background: rgba(0, 0, 0, 0.5);
   }
   @media (min-width: 768px) {
+    /* Compacto (2026-07-11): más angosto, menos padding y debajo de la topbar,
+       para que los ~17 ítems entren en la pantalla sin scrollear. */
     .admin-sidebar {
       position: sticky;
-      width: 252px;
+      width: 214px;
       flex-shrink: 0;
-      padding: 18px 14px;
-      top: 0;
-      height: 100dvh;
+      padding: 8px 8px 10px;
+      top: var(--admin-topbar-h, 54px);
+      height: calc(100dvh - var(--admin-topbar-h, 54px));
       transform: none;
       box-shadow: none;
     }
@@ -1724,21 +1737,21 @@ body > * {
   }
   .nav-section-label {
     display: block;
-    font-size: 10px;
-    letter-spacing: 0.18em;
+    font-size: 9.5px;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
     color: var(--text-faint);
     font-weight: 700;
-    padding: 14px 12px 6px;
+    padding: 9px 10px 3px;
   }
   .nav-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 11px 12px;
+    gap: 10px;
+    padding: 7px 10px;
     border-radius: var(--radius-md);
     color: var(--text-dim);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     transition:
       background 0.18s,
@@ -1747,8 +1760,8 @@ body > * {
     white-space: nowrap;
   }
   .nav-item svg {
-    width: 19px;
-    height: 19px;
+    width: 17px;
+    height: 17px;
     flex-shrink: 0;
   }
   .nav-item:hover {

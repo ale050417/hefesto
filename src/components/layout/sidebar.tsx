@@ -4,8 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "./brand-mark";
-import { ThemeSwitcher } from "./theme-switcher";
-import { AdminNotificationBell } from "@/features/notifications/components/admin-notification-bell";
 
 const icons: Record<string, React.ReactNode> = {
   panel: (
@@ -283,17 +281,15 @@ export function Sidebar({
 
   return (
     <aside className={cn("admin-sidebar", open && "open")}>
-      <div className="mb-2 flex items-center justify-between gap-1">
+      {/* Marca solo en el drawer móvil: en desktop ya está en la topbar
+          (2026-07-11) y ahorrar esta fila ayuda a que el menú entre sin scroll. */}
+      <div className="mb-1 flex items-center gap-1 md:hidden">
         <Link href="/admin" className="brand px-2 py-1" onClick={onNavigate}>
           <BrandMark size={30} />
           <span className="brand-name text-[15px]">
             HEFESTO<b> Admin</b>
           </span>
         </Link>
-        {/* Campana del negocio: en desktop vive acá (en móvil está en la topbar). */}
-        <span className="hidden md:inline-flex">
-          <AdminNotificationBell />
-        </span>
       </div>
 
       <nav className="admin-nav">
@@ -324,18 +320,6 @@ export function Sidebar({
           </div>
         ))}
       </nav>
-
-      <div className="mt-auto flex items-center justify-between gap-2 px-3 pt-4">
-        <Link
-          href="/"
-          onClick={onNavigate}
-          className="text-faint hover:text-fg text-xs transition-colors"
-        >
-          ← Volver a la tienda
-        </Link>
-        {/* Tema claro / oscuro / cálido (igual que en la tienda) */}
-        <ThemeSwitcher />
-      </div>
     </aside>
   );
 }

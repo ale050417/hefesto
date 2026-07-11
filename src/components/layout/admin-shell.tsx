@@ -6,12 +6,15 @@ import { Sidebar } from "./sidebar";
 import { BrandMark } from "./brand-mark";
 import { ThemeSwitcher } from "./theme-switcher";
 import { AdminNotificationBell } from "@/features/notifications/components/admin-notification-bell";
+import { AssistantWidget } from "@/features/assistant/components/assistant-widget";
 
 /**
- * Estructura del panel con navegación móvil real: topbar con hamburguesa +
- * sidebar off-canvas (drawer con backdrop). El drawer se cierra al navegar, al
- * tocar el backdrop o con Escape. En escritorio el sidebar es una columna fija
- * y la topbar/backdrop se ocultan por CSS.
+ * Estructura del panel: topbar SIEMPRE visible (2026-07-11) con las acciones
+ * globales — volver a la tienda, tema claro/oscuro/cálido y la campana de
+ * notificaciones (instancia ÚNICA: antes se montaba también en el sidebar y
+ * duplicaba fetch/polling) — + sidebar compacto. En móvil el sidebar es un
+ * drawer off-canvas con backdrop; se cierra al navegar, al tocar el backdrop
+ * o con Escape.
  */
 export function AdminShell({
   perms,
@@ -67,30 +70,56 @@ export function AdminShell({
             HEFESTO<b> Admin</b>
           </span>
         </Link>
-        {/* Notificaciones del negocio + tema (igual que en la tienda) */}
-        <span className="ml-auto flex items-center gap-1">
-          <AdminNotificationBell />
+        {/* Acciones globales: tienda + tema + notificaciones (única campana) */}
+        <span className="ml-auto flex items-center gap-2">
+          <Link
+            href="/"
+            className="text-dim hover:text-fg flex items-center gap-1.5 text-xs font-medium whitespace-nowrap transition-colors"
+            title="Volver a la tienda"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              width="16"
+              height="16"
+              aria-hidden
+            >
+              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <path d="M9 22V12h6v10" />
+            </svg>
+            <span className="hidden sm:inline">Volver a la tienda</span>
+          </Link>
           <ThemeSwitcher />
+          <AdminNotificationBell />
         </span>
       </header>
 
-      <Sidebar
-        perms={perms}
-        open={menuOpen}
-        onNavigate={() => setMenuOpen(false)}
-      />
-
-      {menuOpen ? (
-        <div
-          className="sidebar-backdrop"
-          onClick={() => setMenuOpen(false)}
-          aria-hidden
+      <div className="admin-body">
+        <Sidebar
+          perms={perms}
+          open={menuOpen}
+          onNavigate={() => setMenuOpen(false)}
         />
-      ) : null}
 
-      <main id="main" className="admin-content">
-        {children}
-      </main>
+        {menuOpen ? (
+          <div
+            className="sidebar-backdrop"
+            onClick={() => setMenuOpen(false)}
+            aria-hidden
+          />
+        ) : null}
+
+        <main id="main" className="admin-content">
+          {children}
+        </main>
+      </div>
+
+      {/* Asistente IA del negocio (burbuja flotante, solo en el admin) */}
+      <AssistantWidget />
     </div>
   );
 }
