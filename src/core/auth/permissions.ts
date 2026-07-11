@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/core/db";
 import { roles } from "@/core/db/schema";
+import { withDeadline } from "@/lib/safe-load";
 import { getCurrentUser, type CurrentUser } from "./session";
 import {
   PERM_MODULE_KEYS,
@@ -41,15 +42,30 @@ const loadResolveInput = cache(async function loadResolveInput(
   const enumRole = user.profile?.role ?? null;
   const roleId = user.profile?.roleId ?? null;
   if (!roleId) return { enumRole, role: null };
-  const [row] = await db
-    .select({ isAdmin: roles.isAdmin, permissions: roles.permissions })
-    .from(roles)
-    .where(eq(roles.id, roleId))
-    .limit(1);
-  return {
-    enumRole,
-    role: row ? { isAdmin: row.isAdmin, permissions: row.permissions } : null,
-  };
+  try {
+    // Deadline: sin esto, una espera de conexión al pool cuelga el layout
+    // entero (504 en TODAS las rutas del admin, 2026-07-11).
+    const [row] = await withDeadline(
+      db
+        .select({ isAdmin: roles.isAdmin, permissions: roles.permissions })
+        .from(roles)
+        .where(eq(roles.id, roleId))
+        .limit(1),
+      10_000,
+      "auth:role",
+    );
+    return {
+      enumRole,
+      role: row ? { isAdmin: row.isAdmin, permissions: row.permissions } : null,
+    };
+  } catch (error) {
+    // Fallo de lectura ≠ "sin permisos": error VISIBLE (boundary), nunca
+    // denegación silenciosa que termina en redirect fantasma.
+    console.error("[admin-guard] no se pudo leer el rol custom:", error);
+    throw new Error(
+      "No pudimos verificar tus permisos: la base de datos no respondió. Recargá en unos segundos.",
+    );
+  }
 });
 
 /**
@@ -132,6 +148,13 @@ export async function requirePermissionPage(
 ): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/ingresar?redirect=/admin");
+  if (user.profileUnavailable) {
+    // "No pude leer el perfil" ≠ "sin permiso": error visible, no redirect.
+    console.error("[admin-guard] perfil no verificable (DB no respondió)");
+    throw new Error(
+      "No pudimos verificar tu sesión: la base de datos no respondió. Recargá en unos segundos.",
+    );
+  }
   if (user.profile?.mustChangePassword) redirect("/cuenta/cambiar-clave");
   const input = await loadResolveInput(user);
   if (!resolveAllowed(input, module, action)) redirect("/admin");

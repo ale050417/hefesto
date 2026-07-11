@@ -6,6 +6,7 @@ import { ProfitSharesEditor } from "@/features/earnings/components/profit-shares
 import { GN_COLORS } from "@/features/earnings/constants";
 import { getEarningsOverview } from "@/features/earnings/service";
 import { compactPrice, formatPrice } from "@/lib/format";
+import { loadOrThrow } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Ganancias y socios" };
@@ -40,8 +41,10 @@ export default async function GananciasPage({
   await requirePermissionPage("ganancias", "ver");
   const canEdit = await can("ganancias", "editar");
   const sp = await searchParams;
+  // Carga etiquetada y con deadline: error claro + log [admin:ganancias] en
+  // vez de un cuelgue de 30 s si la DB no responde (2026-07-11).
   const { settings, shares, rows, totals, months, selectedMonth, payouts } =
-    await getEarningsOverview(first(sp.mes));
+    await loadOrThrow("ganancias", getEarningsOverview(first(sp.mes)));
 
   const pctProfit =
     totals.ingreso > 0 ? Math.round((totals.profit / totals.ingreso) * 100) : 0;

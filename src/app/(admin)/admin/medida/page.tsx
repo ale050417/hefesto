@@ -3,7 +3,9 @@ import { requirePermissionPage } from "@/core/auth/permissions";
 import { CUSTOM_ORDERS_ENABLED } from "@/features/custom/config";
 import { UnderConstruction } from "@/components/shared/under-construction";
 import { AppError } from "@/core/errors";
+import { DegradedNotice } from "@/components/shared/degraded-notice";
 import { formatPrice } from "@/lib/format";
+import { safeLoad } from "@/lib/safe-load";
 import { ChatThread } from "@/features/custom/components/chat-thread";
 import { RealtimeRefresher } from "@/components/shared/realtime-refresher";
 import { CustomStatusBadge } from "@/features/custom/components/status-badge";
@@ -118,7 +120,13 @@ export default async function AdminCustomPage({
     ? first(sp.f)!
     : "all";
 
-  const rows = await listAdminRequestsWithMeta();
+  // Carga acotada: aviso de datos parciales en vez de 504 (2026-07-11).
+  const rowsR = await safeLoad(
+    "pedidos a medida",
+    listAdminRequestsWithMeta(),
+    [],
+  );
+  const rows = rowsR.value;
   const needReply = rows.filter(requestNeedsReply).length;
 
   // Lista filtrada; las "por responder" primero, luego por fecha de mensaje.
@@ -168,6 +176,7 @@ export default async function AdminCustomPage({
     <div className="view grid gap-5">
       {/* Tiempo real (Fase 10): un mensaje nuevo refresca la bandeja */}
       <RealtimeRefresher table="custom_messages" />
+      <DegradedNotice sources={rowsR.ok ? [] : ["los pedidos a medida"]} />
       <div className="page-head">
         <div className="flex items-center gap-3">
           <span

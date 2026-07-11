@@ -7,6 +7,7 @@ import { CategoryDonut } from "@/features/reports/components/category-donut";
 import { FilamentConsumption } from "@/features/reports/components/filament-consumption";
 import { getReportsOverview } from "@/features/reports/service";
 import { compactPrice, formatPrice } from "@/lib/format";
+import { loadOrThrow } from "@/lib/safe-load";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export default async function ReportesPage({
     topProducts,
     bySource,
     consumption,
-  } = await getReportsOverview(year);
+  } = await loadOrThrow("reportes", getReportsOverview(year));
 
   const avgTicket =
     kpis.salesCount > 0 ? Math.round(kpis.revenue / kpis.salesCount) : 0;

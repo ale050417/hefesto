@@ -3,7 +3,9 @@ import { KpiCard } from "@/features/reports/components/kpi-card";
 import { NuevoFilamentoButton } from "@/features/inventory/components/nuevo-filamento-button";
 import { FilamentsBoard } from "@/features/inventory/components/filaments-board";
 import { listFilamentsView } from "@/features/inventory/queries";
+import { DegradedNotice } from "@/components/shared/degraded-notice";
 import { compactPrice, formatPrice } from "@/lib/format";
+import { safeLoad } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Filamentos" };
@@ -23,7 +25,9 @@ const ic = (path: string) => (
 
 export default async function FilamentosPage() {
   await requirePermissionPage("filamentos", "ver");
-  const filaments = await listFilamentsView();
+  // Carga acotada: aviso de datos parciales en vez de 504 (2026-07-11).
+  const filamentsR = await safeLoad("filamentos", listFilamentsView(), []);
+  const filaments = filamentsR.value;
 
   const totalG = filaments.reduce((a, f) => a + f.stockGrams, 0);
   const valor = filaments.reduce(
@@ -36,6 +40,9 @@ export default async function FilamentosPage() {
 
   return (
     <div className="view grid gap-5">
+      <DegradedNotice
+        sources={filamentsR.ok ? [] : ["el inventario de filamentos"]}
+      />
       <div className="page-head">
         <div>
           <div className="eyebrow">Inventario</div>

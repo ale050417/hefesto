@@ -1,8 +1,10 @@
 import { requirePermissionPage } from "@/core/auth/permissions";
+import { DegradedNotice } from "@/components/shared/degraded-notice";
 import { Badge } from "@/components/ui/badge";
 import { ReviewModeration } from "@/features/reviews/components/review-moderation";
 import { Stars } from "@/features/reviews/components/stars";
 import { listReviewsForModeration } from "@/features/reviews/service";
+import { safeLoad } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Reseñas" };
@@ -11,11 +13,14 @@ const dateFmt = new Intl.DateTimeFormat("es-AR", { dateStyle: "short" });
 
 export default async function ResenasPage() {
   await requirePermissionPage("resenas", "ver");
-  const reviews = await listReviewsForModeration();
+  // Carga acotada: aviso de datos parciales en vez de 504 (2026-07-11).
+  const reviewsR = await safeLoad("reseñas", listReviewsForModeration(), []);
+  const reviews = reviewsR.value;
   const pending = reviews.filter((r) => !r.isApproved).length;
 
   return (
     <div>
+      <DegradedNotice sources={reviewsR.ok ? [] : ["las reseñas"]} />
       <div className="page-head">
         <div>
           <div className="eyebrow">Comunidad</div>

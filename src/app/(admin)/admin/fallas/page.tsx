@@ -1,4 +1,6 @@
 import { requirePermissionPage } from "@/core/auth/permissions";
+import { DegradedNotice } from "@/components/shared/degraded-notice";
+import { safeLoad } from "@/lib/safe-load";
 import { KpiCard } from "@/features/reports/components/kpi-card";
 import { RegistrarFallaButton } from "@/features/inventory/components/registrar-falla-button";
 import {
@@ -30,10 +32,16 @@ const ALERT_PATH =
 
 export default async function FallasPage() {
   await requirePermissionPage("fallas", "ver");
-  const [filaments, failures] = await Promise.all([
-    listFilamentsView(),
-    listFailures(),
+  // Cargas acotadas: aviso de datos parciales en vez de 504 (2026-07-11).
+  const [filamentsR, failuresR] = await Promise.all([
+    safeLoad("filamentos", listFilamentsView(), []),
+    safeLoad("impresiones fallidas", listFailures(), []),
   ]);
+  const filaments = filamentsR.value;
+  const failures = failuresR.value;
+  const degraded: string[] = [];
+  if (!filamentsR.ok) degraded.push("el inventario de filamentos");
+  if (!failuresR.ok) degraded.push("las impresiones fallidas");
 
   const costKg = (material: string | null, color: string | null): number => {
     const exact = filaments.find(
@@ -68,6 +76,7 @@ export default async function FallasPage() {
 
   return (
     <div className="view grid gap-5">
+      <DegradedNotice sources={degraded} />
       <div className="page-head">
         <div className="flex items-center gap-3">
           <span

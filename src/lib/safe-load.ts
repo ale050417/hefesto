@@ -8,6 +8,49 @@
  * devuelve `ok: false` para que la UI avise que hay datos parciales
  * (ver <DegradedNotice/>): nada de ceros silenciosos.
  */
+/**
+ * Promise con tope de espera: rechaza con un Error etiquetado si excede `ms`.
+ * El `statement_timeout` de la base corta la EJECUCIÓN de una query, pero la
+ * espera de conexión en el pool no tiene tope — esto lo pone.
+ */
+export function withDeadline<T>(
+  run: PromiseLike<T>,
+  ms: number,
+  label: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    run,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`deadline de "${label}" (>${ms / 1000}s)`)),
+        ms,
+      );
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  }) as Promise<T>;
+}
+
+/**
+ * Variante para páginas que NO pueden renderizar sin el dato (formularios,
+ * detalle, configuración): no degrada a un fallback — loguea con etiqueta de
+ * sección y relanza para que el error boundary lo muestre. La espera queda
+ * acotada (deadline) para no colgar el render hasta el 504 de Vercel.
+ */
+export async function loadOrThrow<T>(
+  label: string,
+  run: PromiseLike<T>,
+  deadlineMs = 15000,
+): Promise<T> {
+  try {
+    return await withDeadline(run, deadlineMs, label);
+  } catch (e) {
+    console.error(`[admin:${label}] falló la carga:`, e);
+    throw e;
+  }
+}
+
 export async function safeLoad<T>(
   label: string,
   run: Promise<T>,

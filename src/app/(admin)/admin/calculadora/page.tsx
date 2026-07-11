@@ -10,6 +10,7 @@ import {
   listMarginPresets,
 } from "@/features/calculator/service";
 import { listFilamentsView } from "@/features/inventory/queries";
+import { loadOrThrow } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Calculadora 3D" };
@@ -17,16 +18,21 @@ export const metadata = { title: "Calculadora 3D" };
 export default async function CalculatorPage() {
   await requirePermissionPage("calculadora", "ver");
   const admin = await isAdmin();
+  // Carga etiquetada y con deadline: error claro + log [admin:calculadora] en
+  // vez de un cuelgue de 30 s si la DB no responde (2026-07-11).
   const [config, history, stats, filaments, presetOptions, presets] =
-    await Promise.all([
-      getCalcConfig(),
-      listHistory(),
-      getStats(),
-      listFilamentsView(),
-      listActivePresetOptions(),
-      // El margen completo solo se carga (y se envía al cliente) si es admin.
-      admin ? listMarginPresets() : Promise.resolve([]),
-    ]);
+    await loadOrThrow(
+      "calculadora",
+      Promise.all([
+        getCalcConfig(),
+        listHistory(),
+        getStats(),
+        listFilamentsView(),
+        listActivePresetOptions(),
+        // El margen completo solo se carga (y se envía al cliente) si es admin.
+        admin ? listMarginPresets() : Promise.resolve([]),
+      ]),
+    );
 
   // Cada filamento con SU costo (fix auditoría 2026-07: el mapa material→costo
   // colapsaba filamentos del mismo material con distinto precio).

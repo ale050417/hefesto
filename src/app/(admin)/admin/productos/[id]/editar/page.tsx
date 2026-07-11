@@ -13,6 +13,7 @@ import {
 } from "@/features/products/services/catalogService";
 import { getEstimatorContext } from "@/features/calculator/service";
 import { isUuid } from "@/lib/ids";
+import { loadOrThrow } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
 
@@ -25,11 +26,12 @@ export default async function EditarProductoPage({
   const { id } = await params;
   // Id que no es UUID → 404 directo (sin query que reviente el panel).
   if (!isUuid(id)) notFound();
-  const [data, categories, estimator] = await Promise.all([
-    getProductAdmin(id),
-    listCategories(),
-    getEstimatorContext(),
-  ]);
+  // Carga etiquetada y con deadline: error claro + log [admin:productos/editar]
+  // en vez de un cuelgue de 30 s si la DB no responde (2026-07-11).
+  const [data, categories, estimator] = await loadOrThrow(
+    "productos/editar",
+    Promise.all([getProductAdmin(id), listCategories(), getEstimatorContext()]),
+  );
   if (!data) notFound();
   const { product, images } = data;
 

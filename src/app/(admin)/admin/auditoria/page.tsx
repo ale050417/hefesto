@@ -1,5 +1,7 @@
 import { requirePermissionPage } from "@/core/auth/permissions";
 import { listRecentAudit } from "@/core/audit";
+import { DegradedNotice } from "@/components/shared/degraded-notice";
+import { safeLoad } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Auditoría" };
@@ -16,10 +18,16 @@ const ACTION_LABEL: Record<string, string> = {
 
 export default async function AuditoriaPage() {
   await requirePermissionPage("auditoria", "ver");
-  const entries = await listRecentAudit(100);
+  // Carga acotada: si la base se traba, la página avisa en vez de colgarse
+  // ("Connection closed" / stream cortado a los 30 s, bug 2026-07-11).
+  const entriesR = await safeLoad("auditoría", listRecentAudit(100), []);
+  const entries = entriesR.value;
 
   return (
     <div>
+      <DegradedNotice
+        sources={entriesR.ok ? [] : ["el registro de auditoría"]}
+      />
       <div className="page-head">
         <div>
           <div className="eyebrow">Seguridad</div>

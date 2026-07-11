@@ -8,21 +8,25 @@ import {
   listTeam,
 } from "@/features/settings/service";
 import { ConfigTabs } from "@/features/settings/components/config-tabs";
+import { loadOrThrow } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Configuración" };
 
 export default async function AdminSettingsPage() {
   const user = await requirePermissionPage("config", "ver");
-  const [settings, payment, shipping, banners, team, roles] = await Promise.all(
-    [
+  // Carga etiquetada y con deadline: error claro + log [admin:configuración]
+  // en vez de un cuelgue de 30 s si la DB no responde (2026-07-11).
+  const [settings, payment, shipping, banners, team, roles] = await loadOrThrow(
+    "configuración",
+    Promise.all([
       getBusinessSettings(),
       getPaymentSettings(),
       getShippingSettings(),
       getAllBanners(),
       listTeam(),
       listRoles(),
-    ],
+    ]),
   );
 
   return (

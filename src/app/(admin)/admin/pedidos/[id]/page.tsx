@@ -13,6 +13,7 @@ import { getOrderAdmin } from "@/features/orders/services/orderAdminService";
 import { getOrderMessages } from "@/features/orders/services/orderChat";
 import { OrderChat } from "@/features/orders/components/order-chat";
 import { isUuid } from "@/lib/ids";
+import { loadOrThrow } from "@/lib/safe-load";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -33,9 +34,12 @@ export default async function OrderDetailAdminPage({
   // Un id que no es UUID (p. ej. /admin/pedidos/manuales) es un 404, no un
   // error de Postgres que tumba el panel (bug 2026-07-11).
   if (!isUuid(id)) notFound();
-  const order = await getOrderAdmin(id);
+  const order = await loadOrThrow("pedidos/detalle", getOrderAdmin(id));
   if (!order) notFound();
-  const messages = await getOrderMessages(order.id);
+  const messages = await loadOrThrow(
+    "pedidos/detalle:mensajes",
+    getOrderMessages(order.id),
+  );
   // Cancelar/reembolsar es solo admin (Cap. 11); la UI oculta lo que la
   // action ya rechaza en el servidor.
   const canCancelRefund = await isAdmin();

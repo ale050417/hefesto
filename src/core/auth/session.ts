@@ -1,11 +1,19 @@
 import { cache } from "react";
 import { createClient } from "@/core/supabase/server";
+import { withDeadline } from "@/lib/safe-load";
 import { getProfileById, type Profile } from "./profile";
 
 export type CurrentUser = {
   id: string;
   email: string | null;
   profile: Profile | null;
+  /**
+   * true si la LECTURA del perfil falló (DB caída/lenta) — distinto de
+   * "no tiene perfil". Los guards del admin deben tratarlo como error
+   * visible, JAMÁS como "no autorizado" (bug del redirect fantasma,
+   * 2026-07-11).
+   */
+  profileUnavailable?: boolean;
 };
 
 /**
@@ -44,14 +52,31 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   }
 
   let profile: Profile | null = null;
+  let profileUnavailable = false;
   try {
-    profile = await getProfileById(id);
+    // Deadline: si el pool no da conexión, no colgamos el render entero.
+    profile = await withDeadline(getProfileById(id), 10_000, "auth:profile");
   } catch (error) {
-    // No tumbamos el sitio si falla la lectura del perfil (ej. falta migrar).
+    // No tumbamos el sitio público si falla la lectura del perfil, pero lo
+    // MARCAMOS: los guards del admin distinguen "sin perfil" de "DB caída".
+    profileUnavailable = true;
     console.error("[auth] no se pudo leer el profile:", error);
   }
-  return { id, email, profile };
+  return { id, email, profile, profileUnavailable };
 });
+
+/**
+ * La lectura del rol falló (DB caída/lenta): error VISIBLE para el error
+ * boundary del admin, con log etiquetado para diagnóstico rápido.
+ */
+function throwAuthUnavailable(): never {
+  console.error(
+    "[admin-guard] no pudimos verificar el rol: la base de datos no respondió",
+  );
+  throw new Error(
+    "No pudimos verificar tu sesión: la base de datos no respondió. Recargá en unos segundos.",
+  );
+}
 
 import { redirect } from "next/navigation";
 
@@ -62,6 +87,8 @@ import { redirect } from "next/navigation";
 export async function requireStaff(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user) redirect("/ingresar?redirect=/admin");
+  // "No pude leer el rol" ≠ "no sos staff": error visible, no redirect mudo.
+  if (user.profileUnavailable) throwAuthUnavailable();
   const role = user.profile?.role;
   if (role !== "admin" && role !== "operator") redirect("/");
   // Invitado con contraseña temporal: debe cambiarla antes de entrar al panel.
@@ -81,6 +108,7 @@ export async function requireUser(
 /** True si el usuario actual es staff (admin/operador). Para guards en actions. */
 export async function isStaff(): Promise<boolean> {
   const user = await getCurrentUser();
+  if (user?.profileUnavailable) throwAuthUnavailable();
   const role = user?.profile?.role;
   return role === "admin" || role === "operator";
 }
@@ -91,6 +119,7 @@ export async function isStaff(): Promise<boolean> {
  */
 export async function getStaffUser(): Promise<CurrentUser | null> {
   const user = await getCurrentUser();
+  if (user?.profileUnavailable) throwAuthUnavailable();
   const role = user?.profile?.role;
   return role === "admin" || role === "operator" ? user : null;
 }

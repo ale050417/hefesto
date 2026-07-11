@@ -6,6 +6,7 @@ import {
 } from "@/features/products/components/product-form";
 import { listCategories } from "@/features/products/services/catalogService";
 import { getEstimatorContext } from "@/features/calculator/service";
+import { loadOrThrow } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
 
@@ -32,10 +33,12 @@ const emptyDefaults: ProductFormValues = {
 
 export default async function NuevoProductoPage() {
   await requirePermissionPage("productos", "crear");
-  const [categories, estimator] = await Promise.all([
-    listCategories(),
-    getEstimatorContext(),
-  ]);
+  // Carga etiquetada y con deadline: error claro + log [admin:productos/nuevo]
+  // en vez de un cuelgue de 30 s si la DB no responde (2026-07-11).
+  const [categories, estimator] = await loadOrThrow(
+    "productos/nuevo",
+    Promise.all([listCategories(), getEstimatorContext()]),
+  );
   if (categories.length === 0) {
     return (
       <div className="mx-auto max-w-2xl">

@@ -12,6 +12,7 @@ import { CustomerNoteForm } from "@/features/customers/components/customer-note-
 import { EditarClienteButton } from "@/features/customers/components/editar-cliente-button";
 import { formatPrice } from "@/lib/format";
 import { isUuid } from "@/lib/ids";
+import { loadOrThrow } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +55,7 @@ export default async function AdminCustomerDetail({
   const { id } = await params;
   // Id que no es UUID → 404 directo (sin query que reviente el panel).
   if (!isUuid(id)) notFound();
-  const data = await getAdminCustomer(id);
+  const data = await loadOrThrow("clientes/detalle", getAdminCustomer(id));
   if (!data) notFound();
   const { customer, orders, points } = data;
   const firstName = customer.name.split(" ")[0] ?? customer.name;
