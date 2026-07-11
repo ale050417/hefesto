@@ -49,6 +49,11 @@ export function AssistantWidget() {
       } | null;
       if (!res.ok || !data?.reply) {
         setError(data?.error ?? "El asistente no pudo responder.");
+        // Rollback del turno fallido: si quedara en el historial, el reintento
+        // mandaría dos mensajes "user" seguidos y la API los rechaza (400,
+        // roles alternados). El texto vuelve al input para reintentar fácil.
+        setMessages(messages);
+        setInput(text);
       } else {
         setMessages((prev) => [
           ...prev,

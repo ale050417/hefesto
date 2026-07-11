@@ -45,7 +45,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         error:
-          "El asistente no está configurado: falta ANTHROPIC_API_KEY en las variables de entorno (Vercel → Settings → Environment Variables).",
+          "El asistente no está configurado: falta GEMINI_API_KEY (gratis, aistudio.google.com) o ANTHROPIC_API_KEY en las variables de entorno de Vercel.",
       },
       { status: 501 },
     );
@@ -72,9 +72,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ reply });
   } catch (e) {
     console.error("[asistente] no pudo responder:", e);
-    return NextResponse.json(
-      { error: "El asistente no pudo responder. Probá en un momento." },
-      { status: 502 },
-    );
+    // Diagnóstico útil en la UI: el código de la API dice qué pasa sin ir a
+    // los logs (401 = key inválida; 400/403 suele ser falta de crédito).
+    const msg = e instanceof Error ? e.message : "";
+    const apiStatus = /^ASSISTANT_API_ERROR:(\d+)$/.exec(msg)?.[1];
+    let hint = "El asistente no pudo responder. Probá en un momento.";
+    if (apiStatus === "401" || apiStatus === "403") {
+      hint = `La API de IA rechazó la key (${apiStatus}): revisá que esté bien copiada en Vercel.`;
+    } else if (apiStatus === "400") {
+      hint =
+        "La API de IA devolvió 400: si usás Anthropic suele ser falta de crédito (Billing); si usás Gemini, revisá la key.";
+    } else if (apiStatus === "429") {
+      hint =
+        "Se alcanzó el límite de consultas del proveedor de IA. Esperá un minuto y probá de nuevo.";
+    } else if (apiStatus) {
+      hint = `La API de IA devolvió ${apiStatus}. Probá en un momento.`;
+    }
+    return NextResponse.json({ error: hint }, { status: 502 });
   }
 }

@@ -45,11 +45,14 @@ const envSchema = z.object({
   NEXT_PUBLIC_SENTRY_DSN: z.string().optional(),
   // Analytics (ej. Vercel Analytics / Plausible). Opcional.
   NEXT_PUBLIC_ANALYTICS_ID: z.string().optional(),
-  // Chatbot IA del panel admin (Anthropic). Opcional: sin API key el asistente
-  // muestra cómo configurarla y no llama a la API (features/assistant).
+  // Chatbot IA del panel admin (features/assistant). Opcionales: sin ninguna
+  // key el asistente muestra cómo configurarse y no llama a ninguna API.
+  // Proveedores soportados: Anthropic (pago) o Google Gemini (capa gratuita).
+  // Si están las dos keys, se prefiere Anthropic.
   ANTHROPIC_API_KEY: z.string().optional(),
-  // Modelo del asistente. Default económico (ver features/assistant/service).
   ANTHROPIC_MODEL: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional(),
+  GEMINI_MODEL: z.string().optional(),
 });
 
 type Env = z.infer<typeof envSchema>;

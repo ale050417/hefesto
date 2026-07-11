@@ -8,19 +8,30 @@ import { listManualSales } from "@/features/orders/services/manualSaleService";
  * Asistente IA del panel admin (Fase mejoras 2026-07, "Opción A").
  *
  * v1 sin herramientas: arma un SNAPSHOT compacto del negocio (KPIs, stock,
- * últimas ventas) reusando los services existentes y se lo da a Claude como
- * system prompt. Responde preguntas del staff sobre el negocio y sobre
- * impresión 3D en general. Llama a la API de Anthropic por fetch directo
- * (sin SDK: una dependencia menos, el endpoint es un POST simple).
+ * últimas ventas) reusando los services existentes y se lo da al modelo como
+ * instrucción de sistema. Soporta DOS proveedores por fetch directo (sin SDK):
+ *  - Google Gemini (GEMINI_API_KEY): capa gratuita, sin tarjeta — el default
+ *    del proyecto. OJO: en el free tier Google puede usar los datos enviados
+ *    para mejorar sus modelos.
+ *  - Anthropic (ANTHROPIC_API_KEY): pago por uso; si está, se prefiere.
  */
 
-/** Modelo económico por default; se puede pisar con ANTHROPIC_MODEL. */
-const MODEL = env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
+/** Modelos por default, pisables por env. */
+const ANTHROPIC_MODEL = env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
+const GEMINI_MODEL = env.GEMINI_MODEL ?? "gemini-2.5-flash";
 
 export type AssistantMessage = { role: "user" | "assistant"; content: string };
 
+type Provider = "anthropic" | "gemini";
+
+function pickProvider(): Provider | null {
+  if (env.ANTHROPIC_API_KEY) return "anthropic";
+  if (env.GEMINI_API_KEY) return "gemini";
+  return null;
+}
+
 export function isAssistantConfigured(): boolean {
-  return Boolean(env.ANTHROPIC_API_KEY);
+  return pickProvider() !== null;
 }
 
 /**
@@ -85,33 +96,45 @@ Reglas:
 - También podés ayudar con impresión 3D en general (materiales, fallas comunes, costos) y con ideas para el negocio.
 - Respuestas cortas: 1 a 4 oraciones salvo que pidan detalle.`;
 
-/** Envía la conversación a la API de Anthropic y devuelve la respuesta. */
-export async function askAssistant(
-  messages: AssistantMessage[],
+/**
+ * La API exige roles alternados empezando por "user": fusionamos turnos
+ * consecutivos del mismo rol y descartamos un "assistant" inicial huérfano
+ * (defensa en profundidad; la UI ya hace rollback de turnos fallidos).
+ */
+function normalizeTurns(messages: AssistantMessage[]): AssistantMessage[] {
+  const normalized: AssistantMessage[] = [];
+  for (const m of messages) {
+    const prev = normalized[normalized.length - 1];
+    if (prev && prev.role === m.role) {
+      prev.content = `${prev.content}\n${m.content}`;
+    } else if (normalized.length === 0 && m.role === "assistant") {
+      continue;
+    } else {
+      normalized.push({ ...m });
+    }
+  }
+  return normalized;
+}
+
+async function callAnthropic(
+  system: string,
+  normalized: AssistantMessage[],
 ): Promise<string> {
-  const apiKey = env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ASSISTANT_NOT_CONFIGURED");
-
-  const snapshot = await buildBusinessSnapshot();
-  const system = `${SYSTEM_BASE}\n\n=== DATOS ACTUALES DEL NEGOCIO ===\n${snapshot}`;
-
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-api-key": apiKey,
+      "x-api-key": env.ANTHROPIC_API_KEY as string,
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: ANTHROPIC_MODEL,
       max_tokens: 1024,
       system,
-      messages,
+      messages: normalized,
     }),
-    // La API puede tardar; el tope evita colgar el request hasta el 504.
     signal: AbortSignal.timeout(25_000),
   });
-
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
     console.error(
@@ -121,15 +144,73 @@ export async function askAssistant(
     );
     throw new Error(`ASSISTANT_API_ERROR:${res.status}`);
   }
-
   const data = (await res.json()) as {
     content?: Array<{ type: string; text?: string }>;
   };
-  const text = (data.content ?? [])
+  return (data.content ?? [])
     .filter((b) => b.type === "text")
     .map((b) => b.text ?? "")
     .join("")
     .trim();
+}
+
+async function callGemini(
+  system: string,
+  normalized: AssistantMessage[],
+): Promise<string> {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-goog-api-key": env.GEMINI_API_KEY as string,
+    },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: system }] },
+      contents: normalized.map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      })),
+      generationConfig: { maxOutputTokens: 1024 },
+    }),
+    signal: AbortSignal.timeout(25_000),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    console.error(
+      "[asistente] la API de Gemini falló:",
+      res.status,
+      detail.slice(0, 300),
+    );
+    throw new Error(`ASSISTANT_API_ERROR:${res.status}`);
+  }
+  const data = (await res.json()) as {
+    candidates?: Array<{
+      content?: { parts?: Array<{ text?: string }> };
+    }>;
+  };
+  return (data.candidates?.[0]?.content?.parts ?? [])
+    .map((p) => p.text ?? "")
+    .join("")
+    .trim();
+}
+
+/** Envía la conversación al proveedor configurado y devuelve la respuesta. */
+export async function askAssistant(
+  messages: AssistantMessage[],
+): Promise<string> {
+  const provider = pickProvider();
+  if (!provider) throw new Error("ASSISTANT_NOT_CONFIGURED");
+
+  const snapshot = await buildBusinessSnapshot();
+  const system = `${SYSTEM_BASE}\n\n=== DATOS ACTUALES DEL NEGOCIO ===\n${snapshot}`;
+  const normalized = normalizeTurns(messages);
+  if (normalized.length === 0) throw new Error("ASSISTANT_EMPTY_INPUT");
+
+  const text =
+    provider === "anthropic"
+      ? await callAnthropic(system, normalized)
+      : await callGemini(system, normalized);
   if (!text) throw new Error("ASSISTANT_EMPTY_REPLY");
   return text;
 }
