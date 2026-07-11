@@ -4,6 +4,11 @@ import { getAllPerms } from "@/core/auth/permissions";
 import { PermsProvider } from "@/components/auth/perms-provider";
 import { AdminShell } from "@/components/layout/admin-shell";
 
+// Tope de ejecución del render del panel. Sin esto, un request que se
+// cuelga esperando conexión a la DB podía retenerla hasta 300 s (default de
+// la plataforma) y agravar el agotamiento del pool. 30 s corta rápido.
+export const maxDuration = 30;
+
 export default async function AdminLayout({
   children,
 }: {

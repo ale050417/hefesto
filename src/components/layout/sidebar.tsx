@@ -306,6 +306,11 @@ export function Sidebar({
                 <Link
                   key={l.href}
                   href={l.href}
+                  // Sin prefetch: el panel tiene ~15 links force-dynamic y Next
+                  // los prefetcheaba TODOS al entrar → ráfaga de RSC que agotaba
+                  // el pooler de la DB (cada uno pega a la base). Se navegan al
+                  // click, de a uno.
+                  prefetch={false}
                   onClick={onNavigate}
                   className={cn(
                     "nav-item",

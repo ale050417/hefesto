@@ -77,10 +77,18 @@ export default async function AdminDashboard() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Link href="/admin/reportes" className="btn btn-secondary">
+          <Link
+            href="/admin/reportes"
+            prefetch={false}
+            className="btn btn-secondary"
+          >
             <Icon name="download" size={16} /> Exportar
           </Link>
-          <Link href="/admin/productos/nuevo" className="btn btn-primary">
+          <Link
+            href="/admin/productos/nuevo"
+            prefetch={false}
+            className="btn btn-primary"
+          >
             <Icon name="plus" size={16} /> Nuevo producto
           </Link>
         </div>
@@ -133,7 +141,11 @@ export default async function AdminDashboard() {
         <div className="ui-card section-card">
           <div className="mb-3.5 flex items-center justify-between">
             <div className="section-title">Últimos pedidos</div>
-            <Link href="/admin/pedidos" className="btn btn-ghost btn-sm">
+            <Link
+              href="/admin/pedidos"
+              prefetch={false}
+              className="btn btn-ghost btn-sm"
+            >
               Ver todos →
             </Link>
           </div>
@@ -145,6 +157,7 @@ export default async function AdminDashboard() {
                 <Link
                   key={o.id}
                   href={`/admin/pedidos/${o.id}`}
+                  prefetch={false}
                   className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] p-3 text-sm transition hover:border-[var(--gold)]"
                 >
                   <span className="min-w-0">
