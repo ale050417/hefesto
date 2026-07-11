@@ -19,8 +19,15 @@ export function withDeadline<T>(
   label: string,
 ): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
+  // Si el deadline gana, la query abandonada sigue corriendo y puede rechazar
+  // DESPUÉS (p. ej. cuando el statement_timeout de la base la cancela). Ese
+  // rechazo tardío no debe quedar sin handler: un unhandledRejection tumba el
+  // proceso entero de la función (exit 128) y con Fluid se lleva puestos todos
+  // los requests de la instancia (incidente 2026-07-11).
+  const guarded = Promise.resolve(run);
+  guarded.catch(() => {});
   return Promise.race([
-    run,
+    guarded,
     new Promise<never>((_, reject) => {
       timer = setTimeout(
         () => reject(new Error(`deadline de "${label}" (>${ms / 1000}s)`)),
