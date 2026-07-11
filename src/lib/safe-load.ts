@@ -12,7 +12,12 @@ export async function safeLoad<T>(
   label: string,
   run: Promise<T>,
   fallback: T,
-  timeoutMs = 6000,
+  // 12 s: con el pool en max 2, las queries de una página se encolan; si la DB
+  // está lenta (incidente de capacidad de Supabase 2026-07), 6 s mataba a las
+  // que esperaban turno aunque cada una tardara 2-3 s. Con la DB sana todo
+  // resuelve en <1 s y este número no juega; el tope duro sigue siendo el
+  // maxDuration=30 del layout.
+  timeoutMs = 12000,
 ): Promise<{ value: T; ok: boolean }> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
