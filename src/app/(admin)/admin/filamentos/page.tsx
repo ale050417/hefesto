@@ -52,7 +52,12 @@ export default async function FilamentosPage() {
             en stock · valor {formatPrice(valor)}
           </div>
         </div>
-        <NuevoFilamentoButton />
+        <NuevoFilamentoButton
+          suggestions={{
+            brands: filaments.map((f) => f.brand),
+            colors: filaments.map((f) => f.color),
+          }}
+        />
       </div>
 
       <div className="kpi-grid">

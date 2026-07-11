@@ -395,6 +395,10 @@ export function FilamentsBoard({
               costPerKg: editing.costPerKg,
               alertThresholdGrams: editing.alertThresholdGrams,
             }}
+            suggestions={{
+              brands: filaments.map((f) => f.brand),
+              colors: filaments.map((f) => f.color),
+            }}
             onDone={() => setEditing(null)}
             onCancel={() => setEditing(null)}
           />

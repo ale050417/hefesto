@@ -5,7 +5,12 @@ import { Modal } from "@/components/ui/modal";
 import { useCan } from "@/components/auth/perms-provider";
 import { FilamentForm } from "./filament-form";
 
-export function NuevoFilamentoButton() {
+export function NuevoFilamentoButton({
+  suggestions,
+}: {
+  /** Marcas/colores ya usados, para el autocompletado del formulario. */
+  suggestions?: { brands?: string[]; colors?: string[] };
+}) {
   const [open, setOpen] = useState(false);
   const canCreate = useCan("filamentos", "crear");
   if (!canCreate) return null;
@@ -36,6 +41,7 @@ export function NuevoFilamentoButton() {
         size="lg"
       >
         <FilamentForm
+          suggestions={suggestions}
           onDone={() => setOpen(false)}
           onCancel={() => setOpen(false)}
         />

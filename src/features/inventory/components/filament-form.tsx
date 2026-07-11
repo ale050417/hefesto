@@ -37,15 +37,31 @@ const DEFAULTS: FilamentFormData = {
 
 export function FilamentForm({
   filament,
+  suggestions,
   onDone,
   onCancel,
 }: {
   filament?: FilamentFormData;
+  /**
+   * Marcas/colores ya usados en el inventario: se suman a los de base para
+   * el autocompletado. El campo es libre — escribir un valor nuevo LO CREA
+   * (pedido 2026-07-11: "hay muchas marcas y colores").
+   */
+  suggestions?: { brands?: string[]; colors?: string[] };
   onDone?: () => void;
   onCancel?: () => void;
 }) {
   const edit = !!filament?.id;
   const init = filament ?? DEFAULTS;
+  const colorOptions = [
+    ...new Set([
+      ...FILAMENT_COLORS.map((c) => c.n),
+      ...(suggestions?.colors ?? []),
+    ]),
+  ].sort((a, b) => a.localeCompare(b, "es"));
+  const brandOptions = [
+    ...new Set([...FILAMENT_BRANDS, ...(suggestions?.brands ?? [])]),
+  ].sort((a, b) => a.localeCompare(b, "es"));
   const [form, setForm] = useState({
     material: init.material,
     color: init.color,
@@ -106,36 +122,38 @@ export function FilamentForm({
         </div>
         <div className="field">
           <label htmlFor="fm-color">Color</label>
-          <select
+          <input
             id="fm-color"
-            className="select"
+            className="input"
+            list="fm-color-opts"
             value={form.color}
             onChange={(e) => set("color", e.target.value)}
-          >
-            {FILAMENT_COLORS.map((fc) => (
-              <option key={fc.n} value={fc.n}>
-                {fc.n}
-              </option>
+            placeholder="Elegí o escribí uno nuevo"
+          />
+          <datalist id="fm-color-opts">
+            {colorOptions.map((c) => (
+              <option key={c} value={c} />
             ))}
-          </select>
+          </datalist>
         </div>
       </div>
 
       <div className="grid-2">
         <div className="field">
           <label htmlFor="fm-brand">Marca</label>
-          <select
+          <input
             id="fm-brand"
-            className="select"
+            className="input"
+            list="fm-brand-opts"
             value={form.brand}
             onChange={(e) => set("brand", e.target.value)}
-          >
-            {FILAMENT_BRANDS.map((b) => (
-              <option key={b} value={b}>
-                {b}
-              </option>
+            placeholder="Elegí o escribí una nueva"
+          />
+          <datalist id="fm-brand-opts">
+            {brandOptions.map((b) => (
+              <option key={b} value={b} />
             ))}
-          </select>
+          </datalist>
         </div>
         <div className="field">
           <label htmlFor="fm-dia">Diámetro (mm)</label>
