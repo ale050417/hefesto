@@ -28,6 +28,14 @@ export function AdminNotificationBell() {
   const [items, setItems] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
+  // Canal de realtime ÚNICO por instancia: esta campana se monta 2 veces
+  // (topbar móvil + sidebar desktop). Dos canales con el MISMO nombre colisionan
+  // ("cannot add postgres_changes callbacks after subscribe()") y ese throw,
+  // al ocurrir dentro del effect, escala al error boundary ("Algo salió mal").
+  // Un sufijo aleatorio por instancia evita la colisión.
+  const [channelName] = useState(
+    () => `rt:notifications:admin:${Math.random().toString(36).slice(2, 10)}`,
+  );
 
   const load = useCallback(async () => {
     const r = await getAdminNotificationsAction();
@@ -58,24 +66,31 @@ export function AdminNotificationBell() {
       last = now;
       void load();
     };
-    const channel = supabase
-      .channel("rt:notifications:admin")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications" },
-        refresh,
-      )
-      .subscribe((status) => {
-        subscribed = status === "SUBSCRIBED";
-      });
+    // Realtime es best-effort: si falla al suscribirse NO debe tirar el panel
+    // (antes escalaba al error boundary). Cae a polling.
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    try {
+      channel = supabase
+        .channel(channelName)
+        .on(
+          "postgres_changes",
+          { event: "INSERT", schema: "public", table: "notifications" },
+          refresh,
+        )
+        .subscribe((status) => {
+          subscribed = status === "SUBSCRIBED";
+        });
+    } catch (e) {
+      console.warn("[notif-admin] realtime no disponible; uso polling:", e);
+    }
     const interval = setInterval(() => {
       if (!subscribed) refresh();
     }, 30_000);
     return () => {
       clearInterval(interval);
-      void supabase.removeChannel(channel);
+      if (channel) void supabase.removeChannel(channel);
     };
-  }, [load]);
+  }, [load, channelName]);
 
   // Cerrar al hacer clic afuera o con Escape.
   useEffect(() => {
