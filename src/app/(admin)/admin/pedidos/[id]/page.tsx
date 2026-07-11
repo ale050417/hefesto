@@ -12,6 +12,7 @@ import { OrderSummary } from "@/features/orders/components/order-summary";
 import { getOrderAdmin } from "@/features/orders/services/orderAdminService";
 import { getOrderMessages } from "@/features/orders/services/orderChat";
 import { OrderChat } from "@/features/orders/components/order-chat";
+import { isUuid } from "@/lib/ids";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,9 @@ export default async function OrderDetailAdminPage({
 }) {
   await requirePermissionPage("pedidos", "ver");
   const { id } = await params;
+  // Un id que no es UUID (p. ej. /admin/pedidos/manuales) es un 404, no un
+  // error de Postgres que tumba el panel (bug 2026-07-11).
+  if (!isUuid(id)) notFound();
   const order = await getOrderAdmin(id);
   if (!order) notFound();
   const messages = await getOrderMessages(order.id);

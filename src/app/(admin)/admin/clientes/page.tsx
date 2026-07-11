@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { requirePermissionPage } from "@/core/auth/permissions";
+import { DegradedNotice } from "@/components/shared/degraded-notice";
 import { listAdminCustomers } from "@/features/customers/service";
 import { TIER_BADGE_CLASS, TIER_LABEL } from "@/features/customers/tier";
 import { CustomerSearch } from "@/features/customers/components/customer-search";
 import { NuevoClienteButton } from "@/features/customers/components/nuevo-cliente-button";
 import { compactPrice, formatPrice } from "@/lib/format";
+import { safeLoad } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Clientes" };
@@ -30,7 +32,10 @@ export default async function ClientesAdminPage({
   const sp = await searchParams;
   const q = (first(sp.q) ?? "").toLowerCase();
 
-  const all = await listAdminCustomers();
+  // Carga acotada: si la base se traba, la página avisa con datos parciales
+  // en vez de colgarse hasta el 504 (ver lib/safe-load, 2026-07-11).
+  const allR = await safeLoad("clientes", listAdminCustomers(), []);
+  const all = allR.value;
   const list = q
     ? all.filter(
         (c) =>
@@ -43,6 +48,7 @@ export default async function ClientesAdminPage({
 
   return (
     <div className="view grid gap-5">
+      <DegradedNotice sources={allR.ok ? [] : ["la lista de clientes"]} />
       <div className="page-head">
         <div>
           <div className="eyebrow">Relaciones</div>

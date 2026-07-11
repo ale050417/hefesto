@@ -11,6 +11,7 @@ import { TIER_LABEL } from "@/features/customers/tier";
 import { CustomerNoteForm } from "@/features/customers/components/customer-note-form";
 import { EditarClienteButton } from "@/features/customers/components/editar-cliente-button";
 import { formatPrice } from "@/lib/format";
+import { isUuid } from "@/lib/ids";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,8 @@ export default async function AdminCustomerDetail({
 }) {
   await requirePermissionPage("clientes", "ver");
   const { id } = await params;
+  // Id que no es UUID → 404 directo (sin query que reviente el panel).
+  if (!isUuid(id)) notFound();
   const data = await getAdminCustomer(id);
   if (!data) notFound();
   const { customer, orders, points } = data;

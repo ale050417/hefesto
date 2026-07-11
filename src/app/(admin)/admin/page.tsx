@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { DegradedNotice } from "@/components/shared/degraded-notice";
 import { Badge } from "@/components/ui/badge";
 import {
   ORDER_STATUS_LABEL,
@@ -63,11 +64,12 @@ function greeting(): string {
 }
 
 export default async function AdminDashboard() {
-  const { kpis, revenueSeries, recentOrders, lowStock } =
+  const { kpis, revenueSeries, recentOrders, lowStock, degraded } =
     await getDashboardData(30);
 
   return (
     <div>
+      <DegradedNotice sources={degraded} />
       <div className="page-head">
         <div>
           <div className="eyebrow">Panel de gestión</div>

@@ -1,6 +1,7 @@
 import { unstable_cache } from "next/cache";
 import { listFilamentsView } from "@/features/inventory/queries";
 import { listOrdersAdmin } from "@/features/orders/services/orderAdminService";
+import { safeLoad } from "@/lib/safe-load";
 import * as repo from "./repository";
 
 export type RevenuePoint = { date: string; total: number };
@@ -102,55 +103,41 @@ async function getDashboardDataUncached(days: number) {
   since.setDate(since.getDate() - (days - 1));
   since.setHours(0, 0, 0, 0);
 
-  // Resiliente: si UNA métrica falla (p. ej. una query que no consigue conexión
-  // bajo carga), el panel NO se cae entero. Esa fuente usa un default y se
-  // loguea cuál falló, así lo vemos en los logs. El dashboard siempre renderiza.
-  // Con timeout POR query: `safe` atrapa rechazos, pero una query que se CUELGA
-  // (espera un lock, o el statement_timeout no la corta a tiempo) dejaría el
-  // `await` colgado hasta los 30 s de Vercel → 504. El Promise.race garantiza
-  // que cada fuente responde en <=6 s: si tarda más, usa el default y loguea.
-  async function safe<T>(
-    label: string,
-    run: Promise<T>,
-    fallback: T,
-  ): Promise<T> {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      return await Promise.race([
-        run,
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(
-            () => reject(new Error(`timeout de "${label}" (>6s)`)),
-            6000,
-          );
-        }),
-      ]);
-    } catch (e) {
-      console.error(`[dashboard] no se pudo cargar ${label}:`, e);
-      return fallback;
-    } finally {
-      if (timer) clearTimeout(timer);
-    }
-  }
-
-  const [kpis, manualKpis, revenueRows, manualRows, recentItems, filaments] =
+  // Resiliente: si UNA métrica falla o se cuelga (lock / pool sin conexiones),
+  // el panel NO se cae entero: esa fuente usa un default, se loguea cuál falló
+  // y queda registrada en `degraded` para que la UI muestre un aviso de datos
+  // parciales (DegradedNotice) en vez de ceros silenciosos que parecen "no
+  // vendiste nada" (incidente 2026-07-11). safeLoad acota cada fuente a 6 s.
+  const [kpisR, manualKpisR, revenueR, manualRevR, recentR, filamentsR] =
     await Promise.all([
-      safe("kpis", repo.getKpiRows(), {
+      safeLoad("kpis", repo.getKpiRows(), {
         revenue: 0,
         salesCount: 0,
         pendingCount: 0,
         lowStockCount: 0,
       }),
-      safe("manualKpis", repo.getManualKpis(), { revenue: 0, count: 0 }),
-      safe("revenueByDay", repo.getRevenueByDay(since), []),
-      safe("manualRevenueByDay", repo.getManualRevenueByDay(since), []),
-      safe(
+      safeLoad("manualKpis", repo.getManualKpis(), { revenue: 0, count: 0 }),
+      safeLoad("revenueByDay", repo.getRevenueByDay(since), []),
+      safeLoad("manualRevenueByDay", repo.getManualRevenueByDay(since), []),
+      safeLoad(
         "recentOrders",
         listOrdersAdmin({ page: 1, pageSize: 6 }).then((r) => r.items),
         [] as Awaited<ReturnType<typeof listOrdersAdmin>>["items"],
       ),
-      safe("filaments", listFilamentsView(), []),
+      safeLoad("filaments", listFilamentsView(), []),
     ]);
+  const kpis = kpisR.value;
+  const manualKpis = manualKpisR.value;
+  const revenueRows = revenueR.value;
+  const manualRows = manualRevR.value;
+  const recentItems = recentR.value;
+  const filaments = filamentsR.value;
+  const degraded: string[] = [];
+  if (!kpisR.ok) degraded.push("los KPIs");
+  if (!manualKpisR.ok) degraded.push("las ventas manuales");
+  if (!revenueR.ok || !manualRevR.ok) degraded.push("los ingresos por día");
+  if (!recentR.ok) degraded.push("los últimos pedidos");
+  if (!filamentsR.ok) degraded.push("el stock de filamentos");
 
   return {
     // Las ventas manuales cuentan igual que las de tienda (Fase 5).
@@ -165,6 +152,7 @@ async function getDashboardDataUncached(days: number) {
     ),
     recentOrders: recentItems,
     lowStock: filaments.filter((f) => f.lowStock),
+    degraded,
   };
 }
 

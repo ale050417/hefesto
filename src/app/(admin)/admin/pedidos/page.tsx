@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { can, isAdmin, requirePermissionPage } from "@/core/auth/permissions";
+import { DegradedNotice } from "@/components/shared/degraded-notice";
 import { Pagination } from "@/components/shared/pagination";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -13,13 +14,17 @@ import {
 } from "@/features/orders/services/orderAdminService";
 import { listManualSales } from "@/features/orders/services/manualSaleService";
 import { listProfitShares } from "@/features/earnings/service";
-import { getEstimatorContext } from "@/features/calculator/service";
+import {
+  getEstimatorContext,
+  type EstimatorContext,
+} from "@/features/calculator/service";
 import { CargarVentaButton } from "@/features/orders/components/cargar-venta-button";
 import { OrdersAdminList } from "@/features/orders/components/orders-admin-list";
 import { DeleteManualSaleButton } from "@/features/orders/components/delete-manual-sale-button";
 import { ManualSaleStatusSelect } from "@/features/orders/components/manual-sale-status-select";
 import type { OrderStatus } from "@/features/orders/types";
 import { formatPrice } from "@/lib/format";
+import { safeLoad } from "@/lib/safe-load";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -53,13 +58,41 @@ export default async function PedidosAdminPage({
   const pageParam = Number(first(sp.page) ?? "1");
   const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
 
-  const [result, counts, manualSales, shares, estimator] = await Promise.all([
-    listOrdersAdmin({ status, page, pageSize: 20 }),
-    getOrderStatusCounts(),
-    listManualSales(),
-    listProfitShares(),
-    getEstimatorContext(),
-  ]);
+  // Cargas acotadas (safeLoad): si la base se traba (lock / pool agotado),
+  // la página igual renderiza con datos parciales y un aviso, en vez de
+  // colgarse hasta el 504 de Vercel ("el panel no carga", 2026-07-11).
+  const [resultR, countsR, manualSalesR, sharesR, estimatorR] =
+    await Promise.all([
+      safeLoad("pedidos", listOrdersAdmin({ status, page, pageSize: 20 }), {
+        items: [],
+        page: 1,
+        totalPages: 1,
+        total: 0,
+      }),
+      safeLoad(
+        "conteos por estado",
+        getOrderStatusCounts(),
+        {} as Record<string, number>,
+      ),
+      safeLoad("ventas manuales", listManualSales(), []),
+      safeLoad("socios", listProfitShares(), []),
+      safeLoad(
+        "calculadora",
+        getEstimatorContext(),
+        null as EstimatorContext | null,
+      ),
+    ]);
+  const result = resultR.value;
+  const counts = countsR.value;
+  const manualSales = manualSalesR.value;
+  const shares = sharesR.value;
+  const estimator = estimatorR.value;
+  const degraded: string[] = [];
+  if (!resultR.ok) degraded.push("la lista de pedidos");
+  if (!countsR.ok) degraded.push("los conteos por estado");
+  if (!manualSalesR.ok) degraded.push("las ventas manuales");
+  if (!sharesR.ok) degraded.push("los socios");
+  if (!estimatorR.ok) degraded.push("la calculadora de ventas");
 
   // Socios actuales: precargan el reparto del formulario de venta manual.
   const partners = shares.map((s) => ({ name: s.name, pct: Number(s.pct) }));
@@ -85,6 +118,7 @@ export default async function PedidosAdminPage({
 
   return (
     <div>
+      <DegradedNotice sources={degraded} />
       <div className="page-head">
         <div>
           <div className="eyebrow">Operación</div>
@@ -106,7 +140,9 @@ export default async function PedidosAdminPage({
             </svg>
             Importar Excel/CSV
           </Link>
-          <CargarVentaButton partners={partners} estimator={estimator} />
+          {estimator ? (
+            <CargarVentaButton partners={partners} estimator={estimator} />
+          ) : null}
         </div>
       </div>
 

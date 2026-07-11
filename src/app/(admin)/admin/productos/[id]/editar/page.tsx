@@ -12,6 +12,7 @@ import {
   listCategories,
 } from "@/features/products/services/catalogService";
 import { getEstimatorContext } from "@/features/calculator/service";
+import { isUuid } from "@/lib/ids";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,8 @@ export default async function EditarProductoPage({
 }) {
   await requirePermissionPage("productos", "editar");
   const { id } = await params;
+  // Id que no es UUID → 404 directo (sin query que reviente el panel).
+  if (!isUuid(id)) notFound();
   const [data, categories, estimator] = await Promise.all([
     getProductAdmin(id),
     listCategories(),
