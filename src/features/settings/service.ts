@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import {
   createUserWithPassword,
   getUserEmail,
@@ -29,25 +30,53 @@ import type {
   TeamMember,
 } from "./types";
 
-// Cacheado por request: Header, Footer, Home y el FAB lo piden sin duplicar query.
-export const getBrandSettings = cache(async (): Promise<BrandSettings> => {
-  const s = await getSettings();
-  return {
-    logoUrl: s?.logoUrl ?? null,
-    heroImageUrl: s?.heroImageUrl ?? null,
-    storeName: s?.storeName ?? null,
-    slogan: s?.slogan ?? null,
-    whatsapp: s?.whatsapp ?? null,
-    instagram: s?.instagram ?? null,
-    facebook: s?.facebook ?? null,
-    contactEmail: s?.contactEmail ?? null,
-    accentColor: s?.accentColor ?? null,
-    season: s?.season ?? "none",
-    seasonDeco: s?.seasonDeco ?? false,
-    seasonIntensity: s?.seasonIntensity ?? 16,
-    homeSections: s?.homeSections ?? null,
-  };
-});
+// Marca (logo, nombre, redes…) del shell público. Cacheada 60 s CROSS-request
+// con unstable_cache. Antes era React cache(), que solo deduplica DENTRO de un
+// request → golpeaba la DB en CADA visita de CADA página y saturaba el pooler.
+// El admin ve sus cambios propagados en ≤60 s, igual que la vidriera.
+export const getBrandSettings = unstable_cache(
+  async (): Promise<BrandSettings> => {
+    const s = await getSettings();
+    return {
+      logoUrl: s?.logoUrl ?? null,
+      heroImageUrl: s?.heroImageUrl ?? null,
+      storeName: s?.storeName ?? null,
+      slogan: s?.slogan ?? null,
+      whatsapp: s?.whatsapp ?? null,
+      instagram: s?.instagram ?? null,
+      facebook: s?.facebook ?? null,
+      contactEmail: s?.contactEmail ?? null,
+      accentColor: s?.accentColor ?? null,
+      season: s?.season ?? "none",
+      seasonDeco: s?.seasonDeco ?? false,
+      seasonIntensity: s?.seasonIntensity ?? 16,
+      homeSections: s?.homeSections ?? null,
+    };
+  },
+  ["brand-settings-public"],
+  { revalidate: 60 },
+);
+
+// Info del footer (incluye description y addressText, que no van en la marca).
+// Cacheada 60 s como el resto del shell; separada de getBusinessSettings, que el
+// admin necesita fresca.
+export const getPublicStoreInfo = unstable_cache(
+  async () => {
+    const s = await getSettings();
+    return {
+      logoUrl: s?.logoUrl ?? null,
+      storeName: s?.storeName ?? null,
+      slogan: s?.slogan ?? null,
+      description: s?.description ?? null,
+      whatsapp: s?.whatsapp ?? null,
+      instagram: s?.instagram ?? null,
+      contactEmail: s?.contactEmail ?? null,
+      addressText: s?.addressText ?? null,
+    };
+  },
+  ["public-store-info"],
+  { revalidate: 60 },
+);
 
 // Configuración completa (para el panel del admin).
 export const getBusinessSettings = cache(
@@ -385,9 +414,13 @@ export async function saveAppearance(patch: AppearancePatch): Promise<void> {
 
 /* ---------- Banners ---------- */
 
-export const getActiveBanners = cache(async (): Promise<StoreBanner[]> => {
-  return listActiveBanners();
-});
+export const getActiveBanners = unstable_cache(
+  async (): Promise<StoreBanner[]> => {
+    return listActiveBanners();
+  },
+  ["active-banners-public"],
+  { revalidate: 60 },
+);
 
 export async function getAllBanners(): Promise<StoreBanner[]> {
   return listBanners();

@@ -27,7 +27,7 @@ function makeClient() {
     // que cada instancia debe tomar POCAS conexiones. Con `max` alto, varias
     // instancias warm × 10 agotan el pool del proyecto y el render server-side
     // queda esperando conexión → 503 "Algo salió mal" (estabilización 2026-07).
-    max: 3,
+    max: 2,
     connect_timeout: 15,
     ssl: "require",
   });

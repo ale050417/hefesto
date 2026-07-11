@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getBusinessSettings } from "@/features/settings/service";
+import { getPublicStoreInfo } from "@/features/settings/service";
 import { listCategories } from "@/features/products/services/catalogService";
 import { BrandMark } from "./brand-mark";
 
@@ -46,7 +46,7 @@ const ICONS = {
 export async function Footer() {
   const year = new Date().getFullYear();
   const [s, categories] = await Promise.all([
-    getBusinessSettings(),
+    getPublicStoreInfo(),
     listCategories(),
   ]);
   const name = s?.storeName?.trim() || "Hefesto 3D";
