@@ -105,16 +105,31 @@ async function getDashboardDataUncached(days: number) {
   // Resiliente: si UNA métrica falla (p. ej. una query que no consigue conexión
   // bajo carga), el panel NO se cae entero. Esa fuente usa un default y se
   // loguea cuál falló, así lo vemos en los logs. El dashboard siempre renderiza.
+  // Con timeout POR query: `safe` atrapa rechazos, pero una query que se CUELGA
+  // (espera un lock, o el statement_timeout no la corta a tiempo) dejaría el
+  // `await` colgado hasta los 30 s de Vercel → 504. El Promise.race garantiza
+  // que cada fuente responde en <=6 s: si tarda más, usa el default y loguea.
   async function safe<T>(
     label: string,
     run: Promise<T>,
     fallback: T,
   ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      return await run;
+      return await Promise.race([
+        run,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error(`timeout de "${label}" (>6s)`)),
+            6000,
+          );
+        }),
+      ]);
     } catch (e) {
       console.error(`[dashboard] no se pudo cargar ${label}:`, e);
       return fallback;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
