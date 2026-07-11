@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { createClient } from "@/core/supabase/server";
 import { withDeadline } from "@/lib/safe-load";
 import { getProfileById, type Profile } from "./profile";
@@ -54,8 +55,21 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   let profile: Profile | null = null;
   let profileUnavailable = false;
   try {
+    // Cacheado 60 s POR USUARIO (unstable_cache): el perfil/rol cambia casi
+    // nunca y esta lectura corre en CADA request del admin — con el pooler
+    // degradado era la primera en morir (incidente 2026-07-11). Un fallo NO
+    // se cachea (unstable_cache no guarda si la función lanza).
+    const cachedProfile = unstable_cache(
+      () => getProfileById(id),
+      ["auth-profile", id],
+      { revalidate: 60 },
+    );
     // Deadline: si el pool no da conexión, no colgamos el render entero.
-    profile = await withDeadline(getProfileById(id), 10_000, "auth:profile");
+    profile = await withDeadline(cachedProfile(), 12_000, "auth:profile");
+    // unstable_cache serializa: en cache HIT las fechas vuelven como string.
+    if (profile) {
+      profile = { ...profile, createdAt: new Date(profile.createdAt) };
+    }
   } catch (error) {
     // No tumbamos el sitio público si falla la lectura del perfil, pero lo
     // MARCAMOS: los guards del admin distinguen "sin perfil" de "DB caída".

@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/core/db";
@@ -43,17 +44,23 @@ const loadResolveInput = cache(async function loadResolveInput(
   const roleId = user.profile?.roleId ?? null;
   if (!roleId) return { enumRole, role: null };
   try {
-    // Deadline: sin esto, una espera de conexión al pool cuelga el layout
-    // entero (504 en TODAS las rutas del admin, 2026-07-11).
-    const [row] = await withDeadline(
-      db
-        .select({ isAdmin: roles.isAdmin, permissions: roles.permissions })
-        .from(roles)
-        .where(eq(roles.id, roleId))
-        .limit(1),
-      10_000,
-      "auth:role",
+    // Cacheado 60 s POR ROL (unstable_cache): los permisos de un rol cambian
+    // casi nunca y esta lectura corre en cada request del admin. Un fallo NO
+    // se cachea. Deadline: sin esto, una espera de conexión al pool cuelga el
+    // layout entero (504 en TODAS las rutas del admin, 2026-07-11).
+    const cachedRole = unstable_cache(
+      async () => {
+        const [r] = await db
+          .select({ isAdmin: roles.isAdmin, permissions: roles.permissions })
+          .from(roles)
+          .where(eq(roles.id, roleId))
+          .limit(1);
+        return r ?? null;
+      },
+      ["auth-role", roleId],
+      { revalidate: 60 },
     );
+    const row = await withDeadline(cachedRole(), 12_000, "auth:role");
     return {
       enumRole,
       role: row ? { isAdmin: row.isAdmin, permissions: row.permissions } : null,
