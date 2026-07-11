@@ -163,7 +163,7 @@ export default async function AdminDashboard() {
                   <span className="min-w-0">
                     <b>{o.orderNumber}</b>
                     <span className="text-faint ml-2 text-xs">
-                      {dateFmt.format(o.createdAt)}
+                      {dateFmt.format(new Date(o.createdAt))}
                     </span>
                   </span>
                   <Badge variant={ORDER_STATUS_VARIANT[o.status]}>

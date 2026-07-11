@@ -97,19 +97,44 @@ export function buildSalesCsv(
   return [header, ...lines].join("\n");
 }
 
-export async function getDashboardData(days = 30) {
+async function getDashboardDataUncached(days: number) {
   const since = new Date();
   since.setDate(since.getDate() - (days - 1));
   since.setHours(0, 0, 0, 0);
 
-  const [kpis, manualKpis, revenueRows, manualRows, recent, filaments] =
+  // Resiliente: si UNA métrica falla (p. ej. una query que no consigue conexión
+  // bajo carga), el panel NO se cae entero. Esa fuente usa un default y se
+  // loguea cuál falló, así lo vemos en los logs. El dashboard siempre renderiza.
+  async function safe<T>(
+    label: string,
+    run: Promise<T>,
+    fallback: T,
+  ): Promise<T> {
+    try {
+      return await run;
+    } catch (e) {
+      console.error(`[dashboard] no se pudo cargar ${label}:`, e);
+      return fallback;
+    }
+  }
+
+  const [kpis, manualKpis, revenueRows, manualRows, recentItems, filaments] =
     await Promise.all([
-      repo.getKpiRows(),
-      repo.getManualKpis(),
-      repo.getRevenueByDay(since),
-      repo.getManualRevenueByDay(since),
-      listOrdersAdmin({ page: 1, pageSize: 6 }),
-      listFilamentsView(),
+      safe("kpis", repo.getKpiRows(), {
+        revenue: 0,
+        salesCount: 0,
+        pendingCount: 0,
+        lowStockCount: 0,
+      }),
+      safe("manualKpis", repo.getManualKpis(), { revenue: 0, count: 0 }),
+      safe("revenueByDay", repo.getRevenueByDay(since), []),
+      safe("manualRevenueByDay", repo.getManualRevenueByDay(since), []),
+      safe(
+        "recentOrders",
+        listOrdersAdmin({ page: 1, pageSize: 6 }).then((r) => r.items),
+        [] as Awaited<ReturnType<typeof listOrdersAdmin>>["items"],
+      ),
+      safe("filaments", listFilamentsView(), []),
     ]);
 
   return {
@@ -123,10 +148,19 @@ export async function getDashboardData(days = 30) {
       sumDailySeries(revenueRows, manualRows),
       days,
     ),
-    recentOrders: recent.items,
+    recentOrders: recentItems,
     lowStock: filaments.filter((f) => f.lowStock),
   };
 }
+
+// Cacheado 30 s: el panel dispara ~9 queries por carga y era force-dynamic, así
+// que golpeaba la DB en CADA visita y, bajo carga, era la primera página en
+// agotar el pooler. Con cache la mayoría de las cargas no tocan la base.
+export const getDashboardData = unstable_cache(
+  getDashboardDataUncached,
+  ["dashboard-data"],
+  { revalidate: 30 },
+);
 
 export async function getReportsData(days = 30) {
   const since = new Date();
