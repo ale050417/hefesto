@@ -18,7 +18,20 @@ import { listManualSales } from "@/features/orders/services/manualSaleService";
 
 /** Modelos por default, pisables por env. */
 const ANTHROPIC_MODEL = env.ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
-const GEMINI_MODEL = env.GEMINI_MODEL ?? "gemini-2.5-flash";
+/**
+ * Google rota/da de baja modelos SIN respetar sus propias fechas (el
+ * 2026-07-09 mató a gemini-2.5-flash tres meses antes de lo anunciado y el
+ * bot quedó en 404). Por eso: lista de candidatos — se intenta en orden y se
+ * recuerda el primero que funciona. GEMINI_MODEL (env) va primero si existe.
+ */
+const GEMINI_CANDIDATES = [
+  env.GEMINI_MODEL,
+  "gemini-3.5-flash",
+  "gemini-flash-latest",
+  "gemini-3.1-flash-lite",
+  "gemini-2.5-flash",
+].filter((m): m is string => Boolean(m));
+let geminiWorkingModel: string | null = null;
 
 export type AssistantMessage = { role: "user" | "assistant"; content: string };
 
@@ -158,41 +171,66 @@ async function callGemini(
   system: string,
   normalized: AssistantMessage[],
 ): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-goog-api-key": env.GEMINI_API_KEY as string,
-    },
-    body: JSON.stringify({
-      system_instruction: { parts: [{ text: system }] },
-      contents: normalized.map((m) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-      })),
-      generationConfig: { maxOutputTokens: 1024 },
-    }),
-    signal: AbortSignal.timeout(25_000),
+  const body = JSON.stringify({
+    system_instruction: { parts: [{ text: system }] },
+    contents: normalized.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    })),
+    generationConfig: { maxOutputTokens: 1024 },
   });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => "");
-    console.error(
-      "[asistente] la API de Gemini falló:",
-      res.status,
-      detail.slice(0, 300),
+
+  // Con modelo ya validado, va directo; si no, prueba candidatos en orden.
+  const candidates = geminiWorkingModel
+    ? [geminiWorkingModel]
+    : GEMINI_CANDIDATES;
+
+  let lastStatus = 404;
+  for (const model of candidates) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-goog-api-key": env.GEMINI_API_KEY as string,
+        },
+        body,
+        signal: AbortSignal.timeout(25_000),
+      },
     );
-    throw new Error(`ASSISTANT_API_ERROR:${res.status}`);
+    if (res.status === 404) {
+      // Modelo dado de baja/inexistente: probamos el siguiente candidato.
+      console.warn(`[asistente] modelo Gemini "${model}" no existe (404)`);
+      geminiWorkingModel = null;
+      lastStatus = 404;
+      continue;
+    }
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      console.error(
+        "[asistente] la API de Gemini falló:",
+        res.status,
+        detail.slice(0, 300),
+      );
+      throw new Error(`ASSISTANT_API_ERROR:${res.status}`);
+    }
+    geminiWorkingModel = model;
+    const data = (await res.json()) as {
+      candidates?: Array<{
+        content?: { parts?: Array<{ text?: string }> };
+      }>;
+    };
+    return (data.candidates?.[0]?.content?.parts ?? [])
+      .map((p) => p.text ?? "")
+      .join("")
+      .trim();
   }
-  const data = (await res.json()) as {
-    candidates?: Array<{
-      content?: { parts?: Array<{ text?: string }> };
-    }>;
-  };
-  return (data.candidates?.[0]?.content?.parts ?? [])
-    .map((p) => p.text ?? "")
-    .join("")
-    .trim();
+  console.error(
+    "[asistente] ningún modelo Gemini de la lista está disponible:",
+    candidates.join(", "),
+  );
+  throw new Error(`ASSISTANT_API_ERROR:${lastStatus}`);
 }
 
 /** Envía la conversación al proveedor configurado y devuelve la respuesta. */

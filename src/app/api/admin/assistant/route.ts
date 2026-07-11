@@ -85,6 +85,9 @@ export async function POST(req: Request) {
     } else if (apiStatus === "429") {
       hint =
         "Se alcanzó el límite de consultas del proveedor de IA. Esperá un minuto y probá de nuevo.";
+    } else if (apiStatus === "404") {
+      hint =
+        "El proveedor de IA dio de baja el modelo configurado. Avisale a tu desarrollador para actualizar GEMINI_MODEL.";
     } else if (apiStatus) {
       hint = `La API de IA devolvió ${apiStatus}. Probá en un momento.`;
     }
