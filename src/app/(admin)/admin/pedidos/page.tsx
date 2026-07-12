@@ -57,6 +57,9 @@ export default async function PedidosAdminPage({
     : undefined;
   const pageParam = Number(first(sp.page) ?? "1");
   const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
+  const tipoParam = first(sp.tipo);
+  const tipo =
+    tipoParam === "online" || tipoParam === "manual" ? tipoParam : "todo";
 
   // Cargas acotadas (safeLoad): si la base se traba (lock / pool agotado),
   // la página igual renderiza con datos parciales y un aviso, en vez de
@@ -99,7 +102,16 @@ export default async function PedidosAdminPage({
 
   const totalAll = Object.values(counts).reduce((a, b) => a + b, 0);
   const baseParams: Record<string, string> = {};
+  if (tipo !== "todo") baseParams.tipo = tipo;
   if (status) baseParams.status = status;
+
+  const hrefWith = (t: string, st?: OrderStatus) => {
+    const q = new URLSearchParams();
+    if (t !== "todo") q.set("tipo", t);
+    if (st) q.set("status", st);
+    const qs = q.toString();
+    return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
+  };
 
   const chip = (
     key: OrderStatus | "all",
@@ -109,7 +121,7 @@ export default async function PedidosAdminPage({
   ) => (
     <Link
       key={key}
-      href={key === "all" ? "/admin/pedidos" : `/admin/pedidos?status=${key}`}
+      href={hrefWith(tipo, key === "all" ? undefined : key)}
       className={cn("chip", active && "active")}
     >
       {label} <b className="opacity-60">{count}</b>
@@ -146,29 +158,54 @@ export default async function PedidosAdminPage({
         </div>
       </div>
 
-      <div className="mb-5 flex flex-wrap gap-2">
-        {chip("all", "Todos", totalAll, !status)}
-        {STATUSES.map((s) =>
-          chip(s, ORDER_STATUS_LABEL[s], counts[s] ?? 0, status === s),
-        )}
+      <div className="mb-4 flex flex-wrap gap-2">
+        <Link
+          href={hrefWith("todo")}
+          className={cn("chip", tipo === "todo" && "active")}
+        >
+          Todo
+        </Link>
+        <Link
+          href={hrefWith("online")}
+          className={cn("chip", tipo === "online" && "active")}
+        >
+          Ventas online
+        </Link>
+        <Link
+          href={hrefWith("manual")}
+          className={cn("chip", tipo === "manual" && "active")}
+        >
+          Ventas manuales
+        </Link>
       </div>
 
-      {result.items.length === 0 ? (
-        <div className="ui-card text-dim p-10 text-center text-sm">
-          No hay pedidos con este filtro.
-        </div>
-      ) : (
-        <OrdersAdminList items={result.items} isAdmin={admin} />
-      )}
+      {tipo !== "manual" ? (
+        <>
+          <div className="mb-5 flex flex-wrap gap-2">
+            {chip("all", "Todos", totalAll, !status)}
+            {STATUSES.map((s) =>
+              chip(s, ORDER_STATUS_LABEL[s], counts[s] ?? 0, status === s),
+            )}
+          </div>
 
-      <Pagination
-        page={result.page}
-        totalPages={result.totalPages}
-        params={baseParams}
-        basePath="/admin/pedidos"
-      />
+          {result.items.length === 0 ? (
+            <div className="ui-card text-dim p-10 text-center text-sm">
+              No hay pedidos con este filtro.
+            </div>
+          ) : (
+            <OrdersAdminList items={result.items} isAdmin={admin} />
+          )}
 
-      {manualSales.length > 0 ? (
+          <Pagination
+            page={result.page}
+            totalPages={result.totalPages}
+            params={baseParams}
+            basePath="/admin/pedidos"
+          />
+        </>
+      ) : null}
+
+      {tipo !== "online" && manualSales.length > 0 ? (
         <div className="mt-8">
           <div className="eyebrow mb-3">
             Ventas manuales · {manualSales.length}
