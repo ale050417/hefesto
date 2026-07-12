@@ -110,6 +110,25 @@ export function FilamentsBoard({
     }
   }
 
+  // Copia una plantilla lista para pegar a clientes con los colores que HAY
+  // en stock (pedido 2026-07-11). Toma los filamentos con stock > 0.
+  function copyColorTemplate() {
+    const colors = [
+      ...new Set(
+        filaments.filter((f) => f.stockGrams > 0).map((f) => f.color.trim()),
+      ),
+    ].sort((a, b) => a.localeCompare(b, "es"));
+    const text = colors.length
+      ? `¡Hola! 🎨 Estos son los colores que tenemos disponibles ahora:\n\n${colors
+          .map((c) => `• ${c}`)
+          .join("\n")}\n\n¿Con cuál te gustaría tu pieza?`
+      : "Por ahora no tenemos colores en stock.";
+    navigator.clipboard
+      .writeText(text)
+      .then(() => toast("Plantilla de colores copiada", "success"))
+      .catch(() => toast("No se pudo copiar. Copiá a mano.", "danger"));
+  }
+
   // Patrón único de eliminación (serializa, toast garantizado).
   const { deleteResource: removeFilament } = useDeleteResource({
     action: (filamentId: string) => deleteFilamentAction(filamentId),
@@ -155,6 +174,13 @@ export function FilamentsBoard({
           </button>
         ))}
         <div className="grow" />
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={copyColorTemplate}
+          title="Copiar la lista de colores en stock para compartir a clientes"
+        >
+          Copiar colores
+        </button>
         <div className="mode-switch">
           <button
             className={view === "grilla" ? "active" : ""}
@@ -201,10 +227,9 @@ export function FilamentsBoard({
         <div className="grid-3">
           {list.map((f) => {
             const b = CARD_BADGE[f.status];
-            const pct = Math.min(
-              (f.stockGrams / (f.spoolGrams * 3)) * 100,
-              100,
-            );
+            // Barra sobre 1000 g = capacidad de un carrete estándar (pedido
+            // 2026-07-11): llenado completo = 1000 g.
+            const pct = Math.min((f.stockGrams / 1000) * 100, 100);
             const spools = f.spoolGrams ? f.stockGrams / f.spoolGrams : 0;
             const barColor =
               f.status === "agotado"
