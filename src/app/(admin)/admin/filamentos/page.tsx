@@ -2,7 +2,11 @@ import { requirePermissionPage } from "@/core/auth/permissions";
 import { KpiCard } from "@/features/reports/components/kpi-card";
 import { NuevoFilamentoButton } from "@/features/inventory/components/nuevo-filamento-button";
 import { FilamentsBoard } from "@/features/inventory/components/filaments-board";
-import { listFilamentsView } from "@/features/inventory/queries";
+import {
+  listBrandCatalog,
+  listColorCatalog,
+  listFilamentsView,
+} from "@/features/inventory/queries";
 import { DegradedNotice } from "@/components/shared/degraded-notice";
 import { compactPrice, formatPrice } from "@/lib/format";
 import { safeLoad } from "@/lib/safe-load";
@@ -28,6 +32,9 @@ export default async function FilamentosPage() {
   // Carga acotada: aviso de datos parciales en vez de 504 (2026-07-11).
   const filamentsR = await safeLoad("filamentos", listFilamentsView(), []);
   const filaments = filamentsR.value;
+  const colorCatalog = (await safeLoad("colores", listColorCatalog(), []))
+    .value;
+  const brandCatalog = (await safeLoad("marcas", listBrandCatalog(), [])).value;
 
   const totalG = filaments.reduce((a, f) => a + f.stockGrams, 0);
   const valor = filaments.reduce(
@@ -53,10 +60,8 @@ export default async function FilamentosPage() {
           </div>
         </div>
         <NuevoFilamentoButton
-          suggestions={{
-            brands: filaments.map((f) => f.brand),
-            colors: filaments.map((f) => f.color),
-          }}
+          colorCatalog={colorCatalog}
+          brandCatalog={brandCatalog}
         />
       </div>
 
@@ -100,7 +105,12 @@ export default async function FilamentosPage() {
         />
       </div>
 
-      <FilamentsBoard filaments={filaments} materials={materials} />
+      <FilamentsBoard
+        filaments={filaments}
+        materials={materials}
+        colorCatalog={colorCatalog}
+        brandCatalog={brandCatalog}
+      />
     </div>
   );
 }

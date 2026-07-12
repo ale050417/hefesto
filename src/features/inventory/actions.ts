@@ -7,7 +7,12 @@ import { can } from "@/core/auth/permissions";
 import { notifyAdmins } from "@/features/notifications/service";
 import { type ActionResult, toActionError } from "@/core/errors";
 import * as queries from "./queries";
-import { failureSchema, filamentSchema } from "./schemas";
+import {
+  brandSchema,
+  colorSchema,
+  failureSchema,
+  filamentSchema,
+} from "./schemas";
 
 const NOT_STAFF = {
   ok: false as const,
@@ -156,6 +161,50 @@ export async function deleteFailureAction(id: string): Promise<ActionResult> {
       metadata: { restoredGrams: restored },
     });
     revalidatePath("/admin/fallas");
+    revalidatePath("/admin/filamentos");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+export async function addColorAction(input: unknown): Promise<ActionResult> {
+  if (!(await can("filamentos", "crear"))) return NOT_STAFF;
+  const parsed = colorSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "Revisá los datos.",
+        fields: fieldErrors(parsed.error),
+      },
+    };
+  }
+  try {
+    await queries.addColor(parsed.data);
+    revalidatePath("/admin/filamentos");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+export async function addBrandAction(input: unknown): Promise<ActionResult> {
+  if (!(await can("filamentos", "crear"))) return NOT_STAFF;
+  const parsed = brandSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "Revisá los datos.",
+        fields: fieldErrors(parsed.error),
+      },
+    };
+  }
+  try {
+    await queries.addBrand(parsed.data);
     revalidatePath("/admin/filamentos");
     return { ok: true };
   } catch (error) {

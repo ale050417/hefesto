@@ -3,14 +3,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
-import { saveFilamentAction } from "../actions";
+import { addBrandAction, addColorAction, saveFilamentAction } from "../actions";
 import { runAction } from "@/lib/run-action";
-import {
-  FILAMENT_BRANDS,
-  FILAMENT_COLORS,
-  FILAMENT_DIAMETERS,
-  FILAMENT_MATERIALS,
-} from "../constants";
+import { FILAMENT_DIAMETERS, FILAMENT_MATERIALS } from "../constants";
 
 export type FilamentFormData = {
   id?: string;
@@ -24,6 +19,8 @@ export type FilamentFormData = {
   alertThresholdGrams: number;
 };
 
+export type CatalogItem = { name: string; hex: string | null };
+
 const DEFAULTS: FilamentFormData = {
   material: "PLA",
   color: "Negro",
@@ -35,33 +32,31 @@ const DEFAULTS: FilamentFormData = {
   alertThresholdGrams: 1000,
 };
 
+/** Une el catálogo con el valor actual (por si edito un filamento con un
+ * color/marca viejo, de texto libre, que todavía no está en el catálogo). */
+function withCurrent(items: string[], current: string): string[] {
+  return [...new Set([current, ...items].filter(Boolean))].sort((a, b) =>
+    a.localeCompare(b, "es"),
+  );
+}
+
 export function FilamentForm({
   filament,
-  suggestions,
+  colorCatalog,
+  brandCatalog,
   onDone,
   onCancel,
 }: {
   filament?: FilamentFormData;
-  /**
-   * Marcas/colores ya usados en el inventario: se suman a los de base para
-   * el autocompletado. El campo es libre — escribir un valor nuevo LO CREA
-   * (pedido 2026-07-11: "hay muchas marcas y colores").
-   */
-  suggestions?: { brands?: string[]; colors?: string[] };
+  colorCatalog: CatalogItem[];
+  brandCatalog: CatalogItem[];
   onDone?: () => void;
   onCancel?: () => void;
 }) {
   const edit = !!filament?.id;
   const init = filament ?? DEFAULTS;
-  const colorOptions = [
-    ...new Set([
-      ...FILAMENT_COLORS.map((c) => c.n),
-      ...(suggestions?.colors ?? []),
-    ]),
-  ].sort((a, b) => a.localeCompare(b, "es"));
-  const brandOptions = [
-    ...new Set([...FILAMENT_BRANDS, ...(suggestions?.brands ?? [])]),
-  ].sort((a, b) => a.localeCompare(b, "es"));
+  const [colors, setColors] = useState<CatalogItem[]>(colorCatalog);
+  const [brands, setBrands] = useState<CatalogItem[]>(brandCatalog);
   const [form, setForm] = useState({
     material: init.material,
     color: init.color,
@@ -75,8 +70,65 @@ export function FilamentForm({
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // Alta inline de color / marca (botón "＋"): quedan guardados en el catálogo.
+  const [addingColor, setAddingColor] = useState(false);
+  const [newColor, setNewColor] = useState({ name: "", hex: "#C9A84C" });
+  const [addingBrand, setAddingBrand] = useState(false);
+  const [newBrand, setNewBrand] = useState("");
+  const [savingCat, setSavingCat] = useState(false);
+
   const set = (k: keyof typeof form, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  const colorOptions = withCurrent(
+    colors.map((c) => c.name),
+    form.color,
+  );
+  const brandOptions = withCurrent(
+    brands.map((b) => b.name),
+    form.brand,
+  );
+  const hexOf = (name: string) =>
+    colors.find((c) => c.name === name)?.hex ?? "#888";
+
+  async function addNewColor() {
+    const name = newColor.name.trim();
+    if (!name) return;
+    setSavingCat(true);
+    const res = await runAction(
+      () => addColorAction({ name, hex: newColor.hex }),
+      { silent: true },
+    );
+    setSavingCat(false);
+    if (!res.ok) return toast(res.error.message, "danger");
+    setColors((c) => [
+      ...c.filter((x) => x.name !== name),
+      { name, hex: newColor.hex },
+    ]);
+    set("color", name);
+    setNewColor({ name: "", hex: "#C9A84C" });
+    setAddingColor(false);
+    toast("Color agregado al catálogo", "success");
+  }
+
+  async function addNewBrand() {
+    const name = newBrand.trim();
+    if (!name) return;
+    setSavingCat(true);
+    const res = await runAction(() => addBrandAction({ name }), {
+      silent: true,
+    });
+    setSavingCat(false);
+    if (!res.ok) return toast(res.error.message, "danger");
+    setBrands((b) => [
+      ...b.filter((x) => x.name !== name),
+      { name, hex: null },
+    ]);
+    set("brand", name);
+    setNewBrand("");
+    setAddingBrand(false);
+    toast("Marca agregada al catálogo", "success");
+  }
 
   async function submit() {
     setErr(null);
@@ -122,38 +174,104 @@ export function FilamentForm({
         </div>
         <div className="field">
           <label htmlFor="fm-color">Color</label>
-          <input
-            id="fm-color"
-            className="input"
-            list="fm-color-opts"
-            value={form.color}
-            onChange={(e) => set("color", e.target.value)}
-            placeholder="Elegí o escribí uno nuevo"
-          />
-          <datalist id="fm-color-opts">
-            {colorOptions.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
+          <div className="flex items-center gap-2">
+            <span
+              aria-hidden
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: "50%",
+                background: hexOf(form.color),
+                border: "1px solid var(--border)",
+                flexShrink: 0,
+              }}
+            />
+            <select
+              id="fm-color"
+              className="select"
+              value={form.color}
+              onChange={(e) => set("color", e.target.value)}
+            >
+              {colorOptions.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setAddingColor((v) => !v)}
+              title="Agregar un color nuevo al catálogo"
+            >
+              ＋
+            </button>
+          </div>
+          {addingColor ? (
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                className="input"
+                placeholder="Nombre del color"
+                value={newColor.name}
+                onChange={(e) =>
+                  setNewColor((n) => ({ ...n, name: e.target.value }))
+                }
+              />
+              <input
+                type="color"
+                value={newColor.hex}
+                onChange={(e) =>
+                  setNewColor((n) => ({ ...n, hex: e.target.value }))
+                }
+                title="Tono del color"
+                style={{ width: 42, height: 38, padding: 2 }}
+              />
+              <Button type="button" onClick={addNewColor} loading={savingCat}>
+                Agregar
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
 
       <div className="grid-2">
         <div className="field">
           <label htmlFor="fm-brand">Marca</label>
-          <input
-            id="fm-brand"
-            className="input"
-            list="fm-brand-opts"
-            value={form.brand}
-            onChange={(e) => set("brand", e.target.value)}
-            placeholder="Elegí o escribí una nueva"
-          />
-          <datalist id="fm-brand-opts">
-            {brandOptions.map((b) => (
-              <option key={b} value={b} />
-            ))}
-          </datalist>
+          <div className="flex items-center gap-2">
+            <select
+              id="fm-brand"
+              className="select"
+              value={form.brand}
+              onChange={(e) => set("brand", e.target.value)}
+            >
+              {brandOptions.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setAddingBrand((v) => !v)}
+              title="Agregar una marca nueva al catálogo"
+            >
+              ＋
+            </button>
+          </div>
+          {addingBrand ? (
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                className="input"
+                placeholder="Nombre de la marca"
+                value={newBrand}
+                onChange={(e) => setNewBrand(e.target.value)}
+              />
+              <Button type="button" onClick={addNewBrand} loading={savingCat}>
+                Agregar
+              </Button>
+            </div>
+          ) : null}
         </div>
         <div className="field">
           <label htmlFor="fm-dia">Diámetro (mm)</label>

@@ -25,5 +25,20 @@ export const failureSchema = z.object({
   deducted: z.boolean().optional(),
 });
 
+export const colorSchema = z.object({
+  name: z.string().trim().min(1, "Ingresá el nombre del color.").max(40),
+  hex: z
+    .string()
+    .trim()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Elegí un color válido.")
+    .optional(),
+});
+
+export const brandSchema = z.object({
+  name: z.string().trim().min(1, "Ingresá el nombre de la marca.").max(40),
+});
+
 export type FilamentInput = z.infer<typeof filamentSchema>;
+export type ColorInput = z.infer<typeof colorSchema>;
+export type BrandInput = z.infer<typeof brandSchema>;
 export type FailureInput = z.infer<typeof failureSchema>;

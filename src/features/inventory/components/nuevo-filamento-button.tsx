@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { useCan } from "@/components/auth/perms-provider";
-import { FilamentForm } from "./filament-form";
+import { FilamentForm, type CatalogItem } from "./filament-form";
 
 export function NuevoFilamentoButton({
-  suggestions,
+  colorCatalog,
+  brandCatalog,
 }: {
-  /** Marcas/colores ya usados, para el autocompletado del formulario. */
-  suggestions?: { brands?: string[]; colors?: string[] };
+  colorCatalog: CatalogItem[];
+  brandCatalog: CatalogItem[];
 }) {
   const [open, setOpen] = useState(false);
   const canCreate = useCan("filamentos", "crear");
@@ -41,7 +42,8 @@ export function NuevoFilamentoButton({
         size="lg"
       >
         <FilamentForm
-          suggestions={suggestions}
+          colorCatalog={colorCatalog}
+          brandCatalog={brandCatalog}
           onDone={() => setOpen(false)}
           onCancel={() => setOpen(false)}
         />

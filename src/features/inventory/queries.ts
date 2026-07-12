@@ -115,3 +115,26 @@ export async function deleteFailure(id: string): Promise<{ restored: number }> {
     persist: (p) => repo.deleteFailureTx(p),
   });
 }
+
+// --- Catálogo de colores y marcas (0042): lista para los selectores del form
+// y alta de nuevos desde el botón "＋". ---
+export type CatalogItem = repo.CatalogRow;
+
+export function listColorCatalog(): Promise<CatalogItem[]> {
+  return repo.listFilamentCatalog("color");
+}
+
+export function listBrandCatalog(): Promise<CatalogItem[]> {
+  return repo.listFilamentCatalog("brand");
+}
+
+export async function addColor(input: {
+  name: string;
+  hex?: string | null;
+}): Promise<void> {
+  await repo.insertFilamentCatalog("color", input.name, input.hex ?? null);
+}
+
+export async function addBrand(input: { name: string }): Promise<void> {
+  await repo.insertFilamentCatalog("brand", input.name, null);
+}

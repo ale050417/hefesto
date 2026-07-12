@@ -1,6 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/core/db";
-import { filamentMovements, filaments, printFailures } from "@/core/db/schema";
+import {
+  filamentCatalog,
+  filamentMovements,
+  filaments,
+  printFailures,
+} from "@/core/db/schema";
 import type {
   Filament,
   FilamentMovement,
@@ -322,4 +327,34 @@ export async function registerFailureTx(
         .where(eq(filaments.id, params.stockUpdate.filamentId));
     }
   });
+}
+
+// --- Catálogo de colores y marcas (0042) ---
+export type CatalogRow = { id: string; name: string; hex: string | null };
+
+export async function listFilamentCatalog(
+  kind: "color" | "brand",
+  database: Database = db,
+): Promise<CatalogRow[]> {
+  return database
+    .select({
+      id: filamentCatalog.id,
+      name: filamentCatalog.name,
+      hex: filamentCatalog.hex,
+    })
+    .from(filamentCatalog)
+    .where(eq(filamentCatalog.kind, kind))
+    .orderBy(asc(filamentCatalog.name));
+}
+
+export async function insertFilamentCatalog(
+  kind: "color" | "brand",
+  name: string,
+  hex: string | null,
+  database: Database = db,
+): Promise<void> {
+  await database
+    .insert(filamentCatalog)
+    .values({ kind, name, hex })
+    .onConflictDoNothing();
 }

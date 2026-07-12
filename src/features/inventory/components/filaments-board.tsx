@@ -8,7 +8,7 @@ import { formatPrice } from "@/lib/format";
 import { addSpoolAction, deleteFilamentAction } from "../actions";
 import { filColor } from "../constants";
 import type { FilamentView } from "../types";
-import { FilamentForm } from "./filament-form";
+import { FilamentForm, type CatalogItem } from "./filament-form";
 import { runAction } from "@/lib/run-action";
 import { useDeleteResource } from "@/hooks/use-delete-resource";
 
@@ -78,9 +78,13 @@ const TrashIcon = (
 export function FilamentsBoard({
   filaments,
   materials,
+  colorCatalog,
+  brandCatalog,
 }: {
   filaments: FilamentView[];
   materials: string[];
+  colorCatalog: CatalogItem[];
+  brandCatalog: CatalogItem[];
 }) {
   const [search, setSearch] = useState("");
   const [mat, setMat] = useState("all");
@@ -420,10 +424,8 @@ export function FilamentsBoard({
               costPerKg: editing.costPerKg,
               alertThresholdGrams: editing.alertThresholdGrams,
             }}
-            suggestions={{
-              brands: filaments.map((f) => f.brand),
-              colors: filaments.map((f) => f.color),
-            }}
+            colorCatalog={colorCatalog}
+            brandCatalog={brandCatalog}
             onDone={() => setEditing(null)}
             onCancel={() => setEditing(null)}
           />

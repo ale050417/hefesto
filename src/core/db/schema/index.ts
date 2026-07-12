@@ -22,6 +22,7 @@ export * from "./addresses";
 export * from "./wishlist-items";
 export * from "./filaments";
 export * from "./filament-movements";
+export * from "./filament-catalog";
 export * from "./print-failures";
 export * from "./coupons";
 export * from "./coupon-redemptions";
