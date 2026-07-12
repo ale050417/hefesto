@@ -101,6 +101,12 @@ export function ManualSaleForm({
     (a, l) => a + (Number(l.grams) || 0),
     0,
   );
+  const calcGrams = estData?.grams ?? null;
+  const gramsMismatch =
+    calcGrams != null &&
+    calcGrams > 0 &&
+    colorGramsTotal > 0 &&
+    Math.abs(colorGramsTotal - calcGrams) > 0.5;
   const prodCategories = [
     ...new Set(
       products.map((p) => p.categoryName).filter((c): c is string => !!c),
@@ -155,10 +161,12 @@ export function ManualSaleForm({
     const colors = p.colors ?? [];
     const weight = p.weightGrams ?? 0;
     // Reparte el peso en partes iguales entre los colores del producto (editable).
-    const per = colors.length > 0 ? Math.round(weight / colors.length) : 0;
-    const lines = colors.map((c) => ({
+    const n = colors.length;
+    const base = n > 0 ? Math.floor(weight / n) : 0;
+    const rem = n > 0 ? weight - base * n : 0;
+    const lines = colors.map((c, idx) => ({
       filamentId: matchFilamentId(p.material ?? "", c) ?? "",
-      grams: per > 0 ? String(per) : "",
+      grams: n > 0 ? String(base + (idx === n - 1 ? rem : 0)) : "",
     }));
     setColorLines(
       lines.length > 0 ? lines : [{ filamentId: "", grams: String(weight) }],
@@ -397,9 +405,16 @@ export function ManualSaleForm({
               + Agregar color
             </button>
             <span className="text-faint ml-auto text-[12px]">
-              Total: {colorGramsTotal} g
+              Calculado: {calcGrams ?? "—"} g · Colores: {colorGramsTotal} g
             </span>
           </div>
+          {gramsMismatch ? (
+            <p className="bg-warning/10 text-warning mt-2 rounded-md px-3 py-2 text-[12px]">
+              ⚠ El total de los colores ({colorGramsTotal} g) no coincide con el
+              peso calculado ({calcGrams} g). Ajustá los gramos: del stock se
+              descuenta lo que pongas acá.
+            </p>
+          ) : null}
         </div>
       ) : null}
       {err ? (
