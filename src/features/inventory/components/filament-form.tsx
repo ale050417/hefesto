@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
-import { addBrandAction, addColorAction, saveFilamentAction } from "../actions";
+import {
+  addBrandAction,
+  addColorAction,
+  deleteBrandAction,
+  deleteColorAction,
+  saveFilamentAction,
+} from "../actions";
 import { runAction } from "@/lib/run-action";
 import { FILAMENT_DIAMETERS, FILAMENT_MATERIALS } from "../constants";
 
@@ -72,10 +78,16 @@ export function FilamentForm({
 
   // Alta inline de color / marca (botón "＋"): quedan guardados en el catálogo.
   const [addingColor, setAddingColor] = useState(false);
-  const [newColor, setNewColor] = useState({ name: "", hex: "#C9A84C" });
+  const [newColor, setNewColor] = useState({
+    name: "",
+    hex: "#C9A84C",
+    hexText: "#C9A84C",
+  });
   const [addingBrand, setAddingBrand] = useState(false);
   const [newBrand, setNewBrand] = useState("");
   const [savingCat, setSavingCat] = useState(false);
+  const [deletingColor, setDeletingColor] = useState(false);
+  const [deletingBrand, setDeletingBrand] = useState(false);
 
   const set = (k: keyof typeof form, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -106,7 +118,7 @@ export function FilamentForm({
       { name, hex: newColor.hex },
     ]);
     set("color", name);
-    setNewColor({ name: "", hex: "#C9A84C" });
+    setNewColor({ name: "", hex: "#C9A84C", hexText: "#C9A84C" });
     setAddingColor(false);
     toast("Color agregado al catálogo", "success");
   }
@@ -128,6 +140,38 @@ export function FilamentForm({
     setNewBrand("");
     setAddingBrand(false);
     toast("Marca agregada al catálogo", "success");
+  }
+
+  async function removeSelectedColor() {
+    const name = form.color;
+    if (!name) return;
+    setSavingCat(true);
+    const res = await runAction(() => deleteColorAction(name), {
+      silent: true,
+    });
+    setSavingCat(false);
+    if (!res.ok) return toast(res.error.message, "danger");
+    const rest = colors.filter((x) => x.name !== name);
+    setColors(rest);
+    set("color", rest[0]?.name ?? "");
+    setDeletingColor(false);
+    toast("Color eliminado del catálogo", "success");
+  }
+
+  async function removeSelectedBrand() {
+    const name = form.brand;
+    if (!name) return;
+    setSavingCat(true);
+    const res = await runAction(() => deleteBrandAction(name), {
+      silent: true,
+    });
+    setSavingCat(false);
+    if (!res.ok) return toast(res.error.message, "danger");
+    const rest = brands.filter((x) => x.name !== name);
+    setBrands(rest);
+    set("brand", rest[0]?.name ?? "");
+    setDeletingBrand(false);
+    toast("Marca eliminada del catálogo", "success");
   }
 
   async function submit() {
@@ -201,14 +245,29 @@ export function FilamentForm({
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={() => setAddingColor((v) => !v)}
+              onClick={() => {
+                setAddingColor((v) => !v);
+                setDeletingColor(false);
+              }}
               title="Agregar un color nuevo al catálogo"
             >
               ＋
             </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setDeletingColor((v) => !v);
+                setAddingColor(false);
+              }}
+              title="Eliminar del catálogo el color seleccionado"
+              disabled={!form.color}
+            >
+              🗑
+            </button>
           </div>
           {addingColor ? (
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <input
                 className="input"
                 placeholder="Nombre del color"
@@ -221,13 +280,56 @@ export function FilamentForm({
                 type="color"
                 value={newColor.hex}
                 onChange={(e) =>
-                  setNewColor((n) => ({ ...n, hex: e.target.value }))
+                  setNewColor((n) => ({
+                    ...n,
+                    hex: e.target.value,
+                    hexText: e.target.value,
+                  }))
                 }
-                title="Tono del color"
+                title="Elegir el tono"
                 style={{ width: 42, height: 38, padding: 2 }}
+              />
+              <input
+                className="input"
+                placeholder="#RRGGBB"
+                value={newColor.hexText}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const clean = raw.trim().replace(/^#/, "");
+                  const valid = /^[0-9a-fA-F]{6}$/.test(clean);
+                  setNewColor((n) => ({
+                    ...n,
+                    hexText: raw,
+                    hex: valid ? `#${clean}` : n.hex,
+                  }));
+                }}
+                title="Código hexadecimal (ej. #FF5733)"
+                style={{ maxWidth: 130 }}
               />
               <Button type="button" onClick={addNewColor} loading={savingCat}>
                 Agregar
+              </Button>
+            </div>
+          ) : null}
+          {deletingColor ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <span>
+                ¿Eliminar <b>{form.color}</b> del catálogo?
+              </span>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={removeSelectedColor}
+                loading={savingCat}
+              >
+                Sí, eliminar
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setDeletingColor(false)}
+              >
+                No
               </Button>
             </div>
           ) : null}
@@ -253,10 +355,25 @@ export function FilamentForm({
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={() => setAddingBrand((v) => !v)}
+              onClick={() => {
+                setAddingBrand((v) => !v);
+                setDeletingBrand(false);
+              }}
               title="Agregar una marca nueva al catálogo"
             >
               ＋
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setDeletingBrand((v) => !v);
+                setAddingBrand(false);
+              }}
+              title="Eliminar del catálogo la marca seleccionada"
+              disabled={!form.brand}
+            >
+              🗑
             </button>
           </div>
           {addingBrand ? (
@@ -269,6 +386,28 @@ export function FilamentForm({
               />
               <Button type="button" onClick={addNewBrand} loading={savingCat}>
                 Agregar
+              </Button>
+            </div>
+          ) : null}
+          {deletingBrand ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <span>
+                ¿Eliminar <b>{form.brand}</b> del catálogo?
+              </span>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={removeSelectedBrand}
+                loading={savingCat}
+              >
+                Sí, eliminar
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setDeletingBrand(false)}
+              >
+                No
               </Button>
             </div>
           ) : null}

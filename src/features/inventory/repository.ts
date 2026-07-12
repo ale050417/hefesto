@@ -10,6 +10,7 @@ import type {
   Filament,
   FilamentMovement,
   FilamentMovementReason,
+  LowStockFilament,
   NewFilamentMovement,
   PrintFailure,
 } from "./types";
@@ -185,12 +186,19 @@ export async function existsMovementByRef(
 export async function applyFilamentDeltasTx(
   movements: NewFilamentMovement[],
   database: Database = db,
-): Promise<void> {
-  if (movements.length === 0) return;
+): Promise<LowStockFilament[]> {
+  if (movements.length === 0) return [];
+  const low: LowStockFilament[] = [];
   await database.transaction(async (tx) => {
     for (const m of movements) {
       const [row] = await tx
-        .select({ id: filaments.id, stockGrams: filaments.stockGrams })
+        .select({
+          id: filaments.id,
+          stockGrams: filaments.stockGrams,
+          alertThresholdGrams: filaments.alertThresholdGrams,
+          material: filaments.material,
+          color: filaments.color,
+        })
         .from(filaments)
         .where(eq(filaments.id, m.filamentId))
         .for("update");
@@ -208,6 +216,17 @@ export async function applyFilamentDeltasTx(
           .update(filaments)
           .set({ stockGrams: String(newStock) })
           .where(eq(filaments.id, row.id));
+        // Reposición: si fue una BAJA (venta/falla) y quedó en/bajo el umbral.
+        const threshold = Number(row.alertThresholdGrams);
+        if (m.deltaGrams < 0 && newStock <= threshold) {
+          low.push({
+            filamentId: row.id,
+            material: row.material,
+            color: row.color,
+            stockGrams: newStock,
+            threshold,
+          });
+        }
       }
 
       await tx.insert(filamentMovements).values({
@@ -220,6 +239,7 @@ export async function applyFilamentDeltasTx(
       });
     }
   });
+  return low;
 }
 
 /**
@@ -345,6 +365,16 @@ export async function listFilamentCatalog(
     .from(filamentCatalog)
     .where(eq(filamentCatalog.kind, kind))
     .orderBy(asc(filamentCatalog.name));
+}
+
+export async function deleteFilamentCatalog(
+  kind: "color" | "brand",
+  name: string,
+  database: Database = db,
+): Promise<void> {
+  await database
+    .delete(filamentCatalog)
+    .where(and(eq(filamentCatalog.kind, kind), eq(filamentCatalog.name, name)));
 }
 
 export async function insertFilamentCatalog(

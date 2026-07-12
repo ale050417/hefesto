@@ -211,3 +211,25 @@ export async function addBrandAction(input: unknown): Promise<ActionResult> {
     return { ok: false, error: toActionError(error) };
   }
 }
+
+export async function deleteColorAction(name: string): Promise<ActionResult> {
+  if (!(await can("filamentos", "eliminar"))) return NOT_STAFF;
+  try {
+    await queries.removeColor(name);
+    revalidatePath("/admin/filamentos");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+export async function deleteBrandAction(name: string): Promise<ActionResult> {
+  if (!(await can("filamentos", "eliminar"))) return NOT_STAFF;
+  try {
+    await queries.removeBrand(name);
+    revalidatePath("/admin/filamentos");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}

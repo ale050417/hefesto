@@ -138,3 +138,11 @@ export async function addColor(input: {
 export async function addBrand(input: { name: string }): Promise<void> {
   await repo.insertFilamentCatalog("brand", input.name, null);
 }
+
+export async function removeColor(name: string): Promise<void> {
+  await repo.deleteFilamentCatalog("color", name);
+}
+
+export async function removeBrand(name: string): Promise<void> {
+  await repo.deleteFilamentCatalog("brand", name);
+}

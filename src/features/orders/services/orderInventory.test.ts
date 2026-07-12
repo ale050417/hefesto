@@ -33,9 +33,7 @@ function makeOrder(items: Array<Partial<OrderWithItems["items"][number]>>) {
 }
 
 function makeDeps(overrides: Partial<OrderInventoryDeps> = {}) {
-  const applyDeltas = vi.fn<OrderInventoryDeps["applyDeltas"]>(
-    async () => undefined,
-  );
+  const applyDeltas = vi.fn<OrderInventoryDeps["applyDeltas"]>(async () => []);
   const audit = vi.fn(async () => undefined);
   const deps: OrderInventoryDeps = {
     getOrder: async () => makeOrder([{}]),
@@ -52,6 +50,22 @@ function makeDeps(overrides: Partial<OrderInventoryDeps> = {}) {
 }
 
 describe("deductFilamentForOrder", () => {
+  it("avisa (notifyLowStock) cuando la venta deja stock en/bajo el umbral", async () => {
+    const low = [
+      {
+        filamentId: "f1",
+        material: "PLA",
+        color: "Rojo",
+        stockGrams: 10,
+        threshold: 50,
+      },
+    ];
+    const notifyLowStock = vi.fn(async () => undefined);
+    const { deps } = makeDeps({ applyDeltas: async () => low, notifyLowStock });
+    await deductFilamentForOrder("o1", deps);
+    expect(notifyLowStock).toHaveBeenCalledWith(low);
+  });
+
   it("descuenta peso × cantidad del filamento por material + color", async () => {
     const { deps, applyDeltas } = makeDeps({
       getOrder: async () => makeOrder([{ variantLabel: "Rojo", quantity: 3 }]),
@@ -156,6 +170,7 @@ describe("reversa completa (deduct → restore)", () => {
       hasMovements: async () => ledger.length > 0,
       applyDeltas: async (movs) => {
         ledger.push(...movs);
+        return [];
       },
       restoreByRef: async (_reason, refId) =>
         ledger

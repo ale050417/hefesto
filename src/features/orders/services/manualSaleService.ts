@@ -2,7 +2,12 @@ import { eq } from "drizzle-orm";
 import { db } from "@/core/db";
 import { manualSales } from "@/core/db/schema";
 import { recordAudit } from "@/core/audit";
-import type { Filament, NewFilamentMovement } from "@/features/inventory/types";
+import type {
+  Filament,
+  LowStockFilament,
+  NewFilamentMovement,
+} from "@/features/inventory/types";
+import { notifyLowStockAfterSale } from "@/features/inventory/lowStockNotify";
 import type { ManualSaleInput } from "../schemas";
 
 export type ManualSale = typeof manualSales.$inferSelect;
@@ -76,7 +81,12 @@ export async function createManualSale(
 export type ManualSaleStockDeps = {
   listFilaments: () => Promise<Filament[]>;
   hasMovements: (reason: "manual_sale", refId: string) => Promise<boolean>;
-  applyDeltas: (movements: NewFilamentMovement[]) => Promise<void>;
+  applyDeltas: (
+    movements: NewFilamentMovement[],
+  ) => Promise<LowStockFilament[]>;
+  /** Aviso best-effort cuando la venta deja colores en/bajo el umbral.
+   * Opcional: por defecto notifica al panel. */
+  notifyLowStock?: (items: LowStockFilament[]) => Promise<void>;
   /** Matching puro (inventory). Si no se inyecta, se resuelve perezoso. */
   resolveFilament?: (
     filaments: Filament[],
@@ -165,7 +175,7 @@ export async function deductFilamentForManualSale(
     }
 
     const qty = Math.max(1, Math.floor(input.quantity));
-    await deps.applyDeltas([
+    const low = await deps.applyDeltas([
       {
         filamentId: filament.id,
         material: filament.material,
@@ -175,6 +185,10 @@ export async function deductFilamentForManualSale(
         refId: saleId,
       },
     ]);
+    if (low.length > 0) {
+      const notify = deps.notifyLowStock ?? notifyLowStockAfterSale;
+      await notify(low).catch(() => undefined);
+    }
     return { deducted: true };
   } catch (error) {
     console.error(

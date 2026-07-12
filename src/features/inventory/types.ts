@@ -40,3 +40,12 @@ export type FilamentView = {
   lowStock: boolean;
   status: "ok" | "bajo" | "agotado";
 };
+
+/** Filamento que quedó en/bajo el umbral tras una baja (venta/falla). */
+export type LowStockFilament = {
+  filamentId: string;
+  material: string;
+  color: string;
+  stockGrams: number;
+  threshold: number;
+};

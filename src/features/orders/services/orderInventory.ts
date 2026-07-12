@@ -1,5 +1,10 @@
 import { recordAudit } from "@/core/audit";
-import type { Filament, NewFilamentMovement } from "@/features/inventory/types";
+import type {
+  Filament,
+  LowStockFilament,
+  NewFilamentMovement,
+} from "@/features/inventory/types";
+import { notifyLowStockAfterSale } from "@/features/inventory/lowStockNotify";
 import type { OrderWithItems } from "../types";
 
 /**
@@ -26,7 +31,12 @@ export type OrderInventoryDeps = {
   ) => Promise<{ material: string | null; weightGrams: number | null } | null>;
   listFilaments: () => Promise<Filament[]>;
   hasMovements: (reason: "order", refId: string) => Promise<boolean>;
-  applyDeltas: (movements: NewFilamentMovement[]) => Promise<void>;
+  applyDeltas: (
+    movements: NewFilamentMovement[],
+  ) => Promise<LowStockFilament[]>;
+  /** Aviso best-effort cuando la venta deja colores en/bajo el umbral.
+   * Opcional: por defecto notifica al panel. */
+  notifyLowStock?: (items: LowStockFilament[]) => Promise<void>;
   restoreByRef: (reason: "order", refId: string) => Promise<number>;
   /** Matching puro (inventory). Si no se inyecta, se resuelve perezoso. */
   resolveFilament?: (
@@ -132,8 +142,12 @@ export async function deductFilamentForOrder(
     }
 
     if (movements.length > 0) {
-      await deps.applyDeltas(movements);
+      const low = await deps.applyDeltas(movements);
       result.deducted = movements.length;
+      if (low.length > 0) {
+        const notify = deps.notifyLowStock ?? notifyLowStockAfterSale;
+        await notify(low).catch(() => undefined);
+      }
     }
 
     if (result.skipped.length > 0) {

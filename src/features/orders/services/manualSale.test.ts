@@ -212,7 +212,7 @@ describe("deductFilamentForManualSale", () => {
 
   function makeDeps(overrides: Partial<ManualSaleStockDeps> = {}) {
     const applyDeltas = vi.fn<ManualSaleStockDeps["applyDeltas"]>(
-      async () => undefined,
+      async () => [],
     );
     const audit = vi.fn(async () => undefined);
     const deps: ManualSaleStockDeps = {

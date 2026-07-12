@@ -2,6 +2,7 @@ import { NotFoundError } from "@/core/errors";
 import type {
   Filament,
   FilamentMovementReason,
+  LowStockFilament,
   NewFilamentMovement,
   PrintFailure,
 } from "./types";
@@ -197,7 +198,7 @@ export async function listFilamentsForMatching(): Promise<Filament[]> {
 /** Aplica descuentos/reposiciones y registra los movimientos (una tx). */
 export async function applyFilamentDeltas(
   movements: NewFilamentMovement[],
-): Promise<void> {
+): Promise<LowStockFilament[]> {
   const repo = await import("./repository");
   return repo.applyFilamentDeltasTx(movements);
 }
