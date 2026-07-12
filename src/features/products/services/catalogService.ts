@@ -504,6 +504,7 @@ export type ProductForSale = {
   material: string | null;
   weightGrams: number | null;
   printMinutes: number | null;
+  colors: string[];
   categoryName: string | null;
 };
 
@@ -518,6 +519,7 @@ export async function listProductsForSale(): Promise<ProductForSale[]> {
     material: p.material,
     weightGrams: p.weightGrams,
     printMinutes: p.printTimeMinutes,
+    colors: p.colors ?? [],
     categoryName: p.categoryName,
   }));
 }

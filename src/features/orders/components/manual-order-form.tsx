@@ -57,7 +57,7 @@ export function ManualSaleForm({
     detail: "",
     quantity: "1",
     paymentMethod: "cash" as (typeof PAYS)[number]["v"],
-    status: "delivered" as (typeof STATUSES)[number]["v"],
+    status: "pending_payment" as (typeof STATUSES)[number]["v"],
   });
   // Datos de la calculadora para que el servidor calcule la amortización.
   // `filamentId` identifica el filamento EXACTO (dos PLA pueden costar distinto).
@@ -75,6 +75,8 @@ export function ManualSaleForm({
   >([]);
   const [prodSearch, setProdSearch] = useState("");
   const [prodCat, setProdCat] = useState("all");
+  const [colorOptions, setColorOptions] = useState<string[]>([]);
+  const [selectedColor, setSelectedColor] = useState("");
 
   const qtyN = Math.max(1, Math.floor(Number(form.quantity) || 1));
   const extrasCost = extras.reduce(
@@ -102,6 +104,7 @@ export function ManualSaleForm({
   // Calculadora flotante (obligatoria): al "Usar precio" copia el total
   // (unitario × cantidad) y guarda gramos/horas/filamento para la amortización.
   function handleEstUse(v: EstimatorValue) {
+    setColorOptions([]);
     setEstData({
       filamentId: v.filamentId,
       material: v.material,
@@ -120,11 +123,27 @@ export function ManualSaleForm({
   // "Cargar desde la tienda": autocompleta detalle, material, gramos, minutos
   // y precio desde un producto publicado. La amortización la calcula el
   // servidor con esos datos (igual que la calculadora, modo material).
+  function matchFilamentId(material: string, color: string): string | null {
+    const m = material.trim().toLowerCase();
+    const c = color.trim().toLowerCase();
+    return (
+      estimator.filaments.find(
+        (x) =>
+          x.material.trim().toLowerCase() === m &&
+          x.color.trim().toLowerCase() === c,
+      )?.id ?? null
+    );
+  }
+
   function pickProduct(id: string) {
     const p = products.find((x) => x.id === id);
     if (!p) return;
+    const colors = p.colors ?? [];
+    const color = colors[0] ?? "";
+    setColorOptions(colors);
+    setSelectedColor(color);
     setEstData({
-      filamentId: null,
+      filamentId: color ? matchFilamentId(p.material ?? "", color) : null,
       material: p.material ?? "",
       grams: p.weightGrams ?? 0,
       printMinutes: p.printMinutes ?? 0,
@@ -247,38 +266,71 @@ export function ManualSaleForm({
               ))}
             </select>
           </div>
-          <div className="mt-2 max-h-48 overflow-auto rounded-md border border-[var(--border)]">
-            {filteredProducts.length === 0 ? (
-              <div className="text-faint p-3 text-[12.5px]">
-                Sin resultados.
-              </div>
-            ) : (
-              filteredProducts.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="hover:bg-surface-2 flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm"
-                  onClick={() => {
-                    pickProduct(p.id);
-                    setProdSearch("");
-                  }}
-                >
-                  <span className="truncate">
-                    {p.name}
-                    {p.categoryName ? (
-                      <span className="text-faint"> · {p.categoryName}</span>
-                    ) : null}
-                  </span>
-                  <span className="text-faint text-[12px]">
-                    ${p.price.toLocaleString("es-AR")}
-                  </span>
-                </button>
-              ))
-            )}
-          </div>
+          {!prodSearch.trim() ? (
+            <div className="text-faint mt-2 text-[11.5px]">
+              Escribí arriba para buscar un producto de la tienda.
+            </div>
+          ) : (
+            <div className="mt-2 max-h-48 overflow-auto rounded-md border border-[var(--border)]">
+              {filteredProducts.length === 0 ? (
+                <div className="text-faint p-3 text-[12.5px]">
+                  Sin resultados.
+                </div>
+              ) : (
+                filteredProducts.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="hover:bg-surface-2 flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm"
+                    onClick={() => {
+                      pickProduct(p.id);
+                      setProdSearch("");
+                    }}
+                  >
+                    <span className="truncate">
+                      {p.name}
+                      {p.categoryName ? (
+                        <span className="text-faint"> · {p.categoryName}</span>
+                      ) : null}
+                    </span>
+                    <span className="text-faint text-[12px]">
+                      ${p.price.toLocaleString("es-AR")}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
           <div className="text-faint text-[11.5px]">
             Autocompleta detalle, material, gramos y precio. Ajustá lo que haga
             falta.
+          </div>
+        </div>
+      ) : null}
+
+      {colorOptions.length > 0 ? (
+        <div className="field">
+          <label htmlFor="ms-color">Color usado</label>
+          <select
+            id="ms-color"
+            className="select"
+            value={selectedColor}
+            onChange={(e) => {
+              const c = e.target.value;
+              setSelectedColor(c);
+              setEstData((d) =>
+                d ? { ...d, filamentId: matchFilamentId(d.material, c) } : d,
+              );
+            }}
+          >
+            {colorOptions.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+          <div className="text-faint text-[11.5px]">
+            Se descuenta el stock de ese color (si tenés ese filamento cargado).
           </div>
         </div>
       ) : null}

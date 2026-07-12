@@ -468,10 +468,11 @@ export async function findProductsForSale() {
       material: products.material,
       weightGrams: products.weightGrams,
       printTimeMinutes: products.printTimeMinutes,
+      colors: products.colors,
       categoryName: categories.name,
     })
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
-    .where(eq(products.status, "published"))
+    .where(ne(products.status, "archived"))
     .orderBy(asc(products.name));
 }
