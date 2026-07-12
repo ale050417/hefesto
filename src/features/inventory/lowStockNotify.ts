@@ -7,6 +7,7 @@ import type { LowStockFilament } from "./types";
  */
 export async function notifyLowStockAfterSale(
   items: LowStockFilament[],
+  kind: "venta" | "falla" = "venta",
 ): Promise<void> {
   if (items.length === 0) return;
   const { notifyAdmins } = await import("@/features/notifications/service");
@@ -18,11 +19,12 @@ export async function notifyLowStockAfterSale(
   if (short.length)
     parts.push(`Faltó stock (conviene COMPRAR filamento): ${fmt(short)}`);
   if (low.length) parts.push(`Quedó bajo el umbral: ${fmt(low)}`);
+  const origin = kind === "falla" ? "una falla" : "una venta";
   await notifyAdmins({
     title: short.length
-      ? "Falta filamento para una venta"
+      ? "Falta filamento para reponer"
       : "Stock bajo de filamento",
-    body: `${parts.join(". ")}.`,
+    body: `${parts.join(". ")}. (por ${origin})`,
     link: "/admin/filamentos",
   });
 }

@@ -14,8 +14,12 @@ import type {
   NewFilamentMovement,
   PrintFailure,
 } from "./types";
+import { resolveStockDelta } from "./stock-delta";
 
 type Database = typeof db;
+// El parámetro `tx` que entrega database.transaction (para componer varias
+// escrituras atómicas en una sola transacción, ej. falla + descuento).
+type Tx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 export async function listFilaments(
   database: Database = db,
@@ -183,63 +187,162 @@ export async function existsMovementByRef(
  *  - Si el filamento fue borrado en el medio, no hay stock que tocar y el
  *    movimiento queda con filament_id null (snapshots material/color).
  */
+async function applyDeltasOnTx(
+  tx: Tx,
+  movements: NewFilamentMovement[],
+): Promise<LowStockFilament[]> {
+  const low: LowStockFilament[] = [];
+  for (const m of movements) {
+    const [row] = await tx
+      .select({
+        id: filaments.id,
+        stockGrams: filaments.stockGrams,
+        alertThresholdGrams: filaments.alertThresholdGrams,
+        material: filaments.material,
+        color: filaments.color,
+      })
+      .from(filaments)
+      .where(eq(filaments.id, m.filamentId))
+      .for("update");
+
+    let applied = 0;
+    let filamentId: string | null = null;
+    if (row) {
+      const threshold = Number(row.alertThresholdGrams);
+      const { newStock, appliedDelta, atThreshold, shortfall } =
+        resolveStockDelta(Number(row.stockGrams), m.deltaGrams, threshold);
+      applied = appliedDelta;
+      filamentId = row.id;
+      await tx
+        .update(filaments)
+        .set({ stockGrams: String(newStock) })
+        .where(eq(filaments.id, row.id));
+      // Aviso en bajas: quedo en/bajo el umbral, o falto (shortfall).
+      if (atThreshold || shortfall) {
+        low.push({
+          filamentId: row.id,
+          material: row.material,
+          color: row.color,
+          stockGrams: newStock,
+          threshold,
+          shortfall,
+        });
+      }
+    }
+
+    await tx.insert(filamentMovements).values({
+      filamentId,
+      material: m.material,
+      color: m.color,
+      deltaGrams: applied.toFixed(2),
+      reason: m.reason,
+      refId: m.refId,
+    });
+  }
+  return low;
+}
+
 export async function applyFilamentDeltasTx(
   movements: NewFilamentMovement[],
   database: Database = db,
 ): Promise<LowStockFilament[]> {
   if (movements.length === 0) return [];
-  const low: LowStockFilament[] = [];
-  await database.transaction(async (tx) => {
-    for (const m of movements) {
-      const [row] = await tx
-        .select({
-          id: filaments.id,
-          stockGrams: filaments.stockGrams,
-          alertThresholdGrams: filaments.alertThresholdGrams,
-          material: filaments.material,
-          color: filaments.color,
-        })
-        .from(filaments)
-        .where(eq(filaments.id, m.filamentId))
-        .for("update");
+  return database.transaction((tx) => applyDeltasOnTx(tx, movements));
+}
 
-      let applied = 0;
-      let filamentId: string | null = null;
-      if (row) {
-        const current = Number(row.stockGrams);
-        // GREATEST(stock + delta, 0) — misma regla pura que applyCappedDelta
-        // (service), acá inline para no invertir la dependencia repo→service.
-        const newStock = Math.max(0, current + m.deltaGrams);
-        applied = newStock - current;
-        filamentId = row.id;
-        await tx
-          .update(filaments)
-          .set({ stockGrams: String(newStock) })
-          .where(eq(filaments.id, row.id));
-        // Reposición: si fue una BAJA (venta/falla) y quedó en/bajo el umbral.
-        const threshold = Number(row.alertThresholdGrams);
-        if (m.deltaGrams < 0 && newStock <= threshold) {
-          low.push({
-            filamentId: row.id,
-            material: row.material,
-            color: row.color,
-            stockGrams: newStock,
-            threshold,
-          });
+/**
+ * Registra una falla y descuenta N carretes (multicolor) en UNA transaccion.
+ * Inserta la fila de la falla, y con su id como refId aplica los movimientos
+ * (reason=failure). Devuelve el id y los carretes que quedaron bajos/faltantes.
+ */
+export async function registerFailureWithDeltasTx(
+  failure: {
+    filamentId: string | null;
+    pieceName: string;
+    material: string;
+    color: string;
+    gramsLost: number;
+    reason: string;
+    notes: string | null;
+    deducted: boolean;
+  },
+  movements: Omit<NewFilamentMovement, "refId">[],
+  database: Database = db,
+): Promise<{ failureId: string; low: LowStockFilament[] }> {
+  return database.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(printFailures)
+      .values({
+        filamentId: failure.filamentId,
+        pieceName: failure.pieceName,
+        material: failure.material,
+        color: failure.color,
+        gramsLost: String(failure.gramsLost),
+        reason: failure.reason,
+        notes: failure.notes,
+        deducted: failure.deducted,
+      })
+      .returning({ id: printFailures.id });
+    const failureId = row!.id;
+    const low =
+      failure.deducted && movements.length > 0
+        ? await applyDeltasOnTx(
+            tx,
+            movements.map((m) => ({ ...m, refId: failureId })),
+          )
+        : [];
+    return { failureId, low };
+  });
+}
+
+/**
+ * Borra una falla DEVOLVIENDO al stock lo que habia descontado por el ledger
+ * (reason=failure, ref_id=falla). Repone el delta REAL aplicado de cada
+ * carrete, borra esos movimientos y la fila. Reemplaza el camino directo viejo.
+ */
+export async function deleteFailureWithLedgerTx(
+  failureId: string,
+  database: Database = db,
+): Promise<void> {
+  await database.transaction(async (tx) => {
+    const movs = await tx
+      .select({
+        filamentId: filamentMovements.filamentId,
+        deltaGrams: filamentMovements.deltaGrams,
+      })
+      .from(filamentMovements)
+      .where(
+        and(
+          eq(filamentMovements.reason, "failure"),
+          eq(filamentMovements.refId, failureId),
+        ),
+      );
+    for (const m of movs) {
+      const applied = Number(m.deltaGrams); // negativo (o 0)
+      if (m.filamentId && applied < 0) {
+        const [row] = await tx
+          .select({ stockGrams: filaments.stockGrams })
+          .from(filaments)
+          .where(eq(filaments.id, m.filamentId))
+          .for("update");
+        if (row) {
+          await tx
+            .update(filaments)
+            .set({ stockGrams: String(Number(row.stockGrams) - applied) })
+            .where(eq(filaments.id, m.filamentId));
         }
       }
-
-      await tx.insert(filamentMovements).values({
-        filamentId,
-        material: m.material,
-        color: m.color,
-        deltaGrams: applied.toFixed(2),
-        reason: m.reason,
-        refId: m.refId,
-      });
     }
+    await tx
+      .delete(filamentMovements)
+      .where(
+        and(
+          eq(filamentMovements.reason, "failure"),
+          eq(filamentMovements.refId, failureId),
+        ),
+      );
+    await tx.delete(printFailures).where(eq(printFailures.id, failureId));
   });
-  return low;
 }
 
 /**

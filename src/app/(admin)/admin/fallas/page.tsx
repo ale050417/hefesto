@@ -73,6 +73,13 @@ export default async function FallasPage() {
     byReason.set(r.reason, (byReason.get(r.reason) ?? 0) + 1);
   const topReason = [...byReason.entries()].sort((a, b) => b[1] - a[1])[0];
   const materials = [...new Set(filaments.map((f) => f.material))];
+  // Carretes reales para elegir en el descuento multicolor del alta de falla.
+  const formFilaments = filaments.map((f) => ({
+    id: f.id,
+    material: f.material,
+    color: f.color,
+    stockGrams: f.stockGrams,
+  }));
 
   return (
     <div className="view grid gap-5">
@@ -101,7 +108,7 @@ export default async function FallasPage() {
             </div>
           </div>
         </div>
-        <RegistrarFallaButton materials={materials} />
+        <RegistrarFallaButton materials={materials} filaments={formFilaments} />
       </div>
 
       <div className="kpi-grid">

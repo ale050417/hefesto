@@ -1,6 +1,8 @@
 import { NotFoundError } from "@/core/errors";
 import * as repo from "./repository";
+import { notifyLowStockAfterSale } from "./lowStockNotify";
 import {
+  buildFailureMovements,
   deleteFailure as runDeleteFailure,
   filamentStatus,
   isLowStock,
@@ -77,7 +79,38 @@ export async function listFailures(): Promise<PrintFailure[]> {
 export async function recordFailure(
   input: FailureInput,
 ): Promise<{ lowStock: boolean; deducted: boolean }> {
-  return registerFailure(
+  const deducted = input.deducted ?? true;
+  const lines = input.colorLines ?? [];
+
+  // Camino multicolor (nuevo): cada carrete descuenta por el ledger, en una
+  // sola transacción con la falla. Si a algún color no le alcanza, la falla
+  // igual queda registrada y se avisa al panel (shortfall).
+  if (lines.length > 0) {
+    const fils = await repo.listFilaments();
+    const movements = buildFailureMovements(lines, fils);
+
+    const willDeduct = deducted && movements.length > 0;
+    const { low } = await repo.registerFailureWithDeltasTx(
+      {
+        filamentId: willDeduct ? (movements[0]!.filamentId ?? null) : null,
+        pieceName: input.pieceName,
+        material: input.material,
+        color: input.color,
+        gramsLost: input.gramsLost,
+        reason: input.reason,
+        notes: input.notes ?? null,
+        deducted: willDeduct,
+      },
+      willDeduct ? movements : [],
+    );
+    if (low.length > 0) {
+      await notifyLowStockAfterSale(low, "falla").catch(() => undefined);
+    }
+    return { lowStock: low.some((l) => !l.shortfall), deducted: willDeduct };
+  }
+
+  // Camino viejo (sin colorLines): material+color → un carrete.
+  const res = await registerFailure(
     {
       pieceName: input.pieceName,
       material: input.material,
@@ -85,13 +118,28 @@ export async function recordFailure(
       gramsLost: input.gramsLost,
       reason: input.reason,
       notes: input.notes ?? null,
-      deducted: input.deducted ?? true,
+      deducted,
     },
     {
       findFilament: repo.findFilamentByMaterialColor,
       persist: (p) => repo.registerFailureTx(p),
     },
   );
+  if (res.lowStock) {
+    await notifyLowStockAfterSale(
+      [
+        {
+          filamentId: "",
+          material: input.material,
+          color: input.color,
+          stockGrams: 0,
+          threshold: 0,
+        },
+      ],
+      "falla",
+    ).catch(() => undefined);
+  }
+  return res;
 }
 
 export async function updateFailure(
@@ -109,6 +157,19 @@ export async function updateFailure(
 }
 
 export async function deleteFailure(id: string): Promise<{ restored: number }> {
+  // Nuevo/backfilled: la falla descontó por el ledger → reversa por ahí
+  // (repone el delta REAL aplicado de cada carrete y borra sus movimientos).
+  const movs = await repo.findMovementsByRef("failure", id);
+  if (movs.length > 0) {
+    const restored = movs.reduce(
+      (a, m) => a + Math.max(0, -Number(m.deltaGrams)),
+      0,
+    );
+    await repo.deleteFailureWithLedgerTx(id);
+    return { restored };
+  }
+  // Viejo sin ledger (o no descontada): reversa directa como antes. Si la falla
+  // no existe, runDeleteFailure tira NotFoundError.
   return runDeleteFailure(id, {
     findFailure: repo.findFailureById,
     findFilamentById: repo.findFilamentById,

@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/core/audit";
 import { getCurrentUser } from "@/core/auth/session";
 import { can } from "@/core/auth/permissions";
-import { notifyAdmins } from "@/features/notifications/service";
 import { type ActionResult, toActionError } from "@/core/errors";
 import * as queries from "./queries";
 import {
@@ -108,14 +107,8 @@ export async function registerFailureAction(
     });
     revalidatePath("/admin/fallas");
     revalidatePath("/admin/filamentos");
-    // Si la falla dejó el filamento bajo el umbral, avisamos al panel.
-    if (res.lowStock) {
-      await notifyAdmins({
-        title: "Stock bajo de filamento",
-        body: `${parsed.data.material} ${parsed.data.color} quedó bajo el umbral de alerta`,
-        link: "/admin/filamentos",
-      }).catch(() => undefined);
-    }
+    // El aviso de stock bajo / faltante lo dispara recordFailure (ledger),
+    // que distingue "quedó bajo el umbral" de "faltó" (shortfall) por color.
     return { ok: true, data: res };
   } catch (error) {
     return { ok: false, error: toActionError(error) };

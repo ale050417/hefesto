@@ -121,6 +121,30 @@ export function applyCappedDelta(
   return { newStock, appliedDelta: newStock - current };
 }
 
+/**
+ * Movimientos de descuento de una falla MULTICOLOR: uno por carrete valido
+ * (gramos > 0 y filamento existente). Pura y testeable (Cap. 15). El refId (id
+ * de la falla) lo completa el repository dentro de la transaccion.
+ */
+export function buildFailureMovements(
+  lines: { filamentId: string; grams: number }[],
+  filaments: Pick<Filament, "id" | "material" | "color">[],
+): Omit<NewFilamentMovement, "refId">[] {
+  return lines
+    .map((ln): Omit<NewFilamentMovement, "refId"> | null => {
+      const f = filaments.find((x) => x.id === ln.filamentId);
+      if (!f || !(ln.grams > 0)) return null;
+      return {
+        filamentId: f.id,
+        material: f.material,
+        color: f.color,
+        deltaGrams: -ln.grams,
+        reason: "failure",
+      };
+    })
+    .filter((m): m is Omit<NewFilamentMovement, "refId"> => m !== null);
+}
+
 type FilamentMatch = Pick<Filament, "id" | "material" | "color">;
 
 /**

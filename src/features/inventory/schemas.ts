@@ -23,6 +23,16 @@ export const failureSchema = z.object({
   reason: z.string().trim().min(1, "Ingresá la causa."),
   notes: z.string().trim().max(500).optional(),
   deducted: z.boolean().optional(),
+  // Falla multicolor: gramos perdidos por carrete. Cada línea descuenta su
+  // filamento (mismo patrón que la venta manual). Si viene, manda el descuento.
+  colorLines: z
+    .array(
+      z.object({
+        filamentId: z.uuid(),
+        grams: z.coerce.number().positive(),
+      }),
+    )
+    .optional(),
 });
 
 export const colorSchema = z.object({

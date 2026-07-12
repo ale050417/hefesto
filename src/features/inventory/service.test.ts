@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   applyCappedDelta,
+  buildFailureMovements,
   computeNewStock,
   deleteFailure,
   filamentStatus,
@@ -12,6 +13,7 @@ import {
   type DeleteFailureDeps,
   type RegisterFailureDeps,
 } from "./service";
+import { resolveStockDelta } from "./stock-delta";
 import { NotFoundError } from "@/core/errors";
 import type { Filament, PrintFailure } from "./types";
 
@@ -64,6 +66,95 @@ describe("applyCappedDelta", () => {
       newStock: 150,
       appliedDelta: 50,
     });
+  });
+});
+
+describe("resolveStockDelta (shortfall / umbral)", () => {
+  it("baja con stock de sobra: no avisa", () => {
+    expect(resolveStockDelta(1000, -100, 200)).toEqual({
+      newStock: 900,
+      appliedDelta: -100,
+      atThreshold: false,
+      shortfall: false,
+    });
+  });
+  it("queda en/bajo el umbral: avisa (sin shortfall)", () => {
+    expect(resolveStockDelta(250, -100, 200)).toEqual({
+      newStock: 150,
+      appliedDelta: -100,
+      atThreshold: true,
+      shortfall: false,
+    });
+  });
+  it("pide MAS de lo que hay: shortfall + delta real capado", () => {
+    // pedia -80 con 50: queda 0, se aplico -50, y falto filamento.
+    expect(resolveStockDelta(50, -80, 200)).toEqual({
+      newStock: 0,
+      appliedDelta: -50,
+      atThreshold: true,
+      shortfall: true,
+    });
+  });
+  it("reposicion (delta+) nunca avisa", () => {
+    expect(resolveStockDelta(10, 500, 200)).toEqual({
+      newStock: 510,
+      appliedDelta: 500,
+      atThreshold: false,
+      shortfall: false,
+    });
+  });
+});
+
+describe("buildFailureMovements (falla multicolor)", () => {
+  const fils = [
+    { id: "f1", material: "PLA", color: "Negro" },
+    { id: "f2", material: "PLA", color: "Rojo" },
+  ];
+  it("un movimiento por carrete, en negativo", () => {
+    expect(
+      buildFailureMovements(
+        [
+          { filamentId: "f1", grams: 30 },
+          { filamentId: "f2", grams: 20 },
+        ],
+        fils,
+      ),
+    ).toEqual([
+      {
+        filamentId: "f1",
+        material: "PLA",
+        color: "Negro",
+        deltaGrams: -30,
+        reason: "failure",
+      },
+      {
+        filamentId: "f2",
+        material: "PLA",
+        color: "Rojo",
+        deltaGrams: -20,
+        reason: "failure",
+      },
+    ]);
+  });
+  it("saltea gramos <= 0 y carretes inexistentes", () => {
+    expect(
+      buildFailureMovements(
+        [
+          { filamentId: "f1", grams: 0 },
+          { filamentId: "fX", grams: 10 },
+          { filamentId: "f2", grams: 15 },
+        ],
+        fils,
+      ),
+    ).toEqual([
+      {
+        filamentId: "f2",
+        material: "PLA",
+        color: "Rojo",
+        deltaGrams: -15,
+        reason: "failure",
+      },
+    ]);
   });
 });
 

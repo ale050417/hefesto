@@ -31,7 +31,7 @@ export const filamentMovements = pgTable(
     color: text("color").notNull(),
     deltaGrams: numeric("delta_grams", { precision: 10, scale: 2 }).notNull(),
     // 'order' | 'manual_sale' | 'failure' | 'adjust' | 'restore'
-    // (failure/adjust reservados: las fallas hoy descuentan por su propia tabla)
+    // (failure = impresión fallida multicolor, Bloque 3 2026-07; adjust reservado)
     reason: text("reason").notNull(),
     // id del pedido / venta manual que originó el movimiento (sin FK: el
     // ledger sobrevive al borrado del pedido para poder reponer y auditar).
