@@ -88,6 +88,8 @@ export function FilamentsBoard({
 }) {
   const [search, setSearch] = useState("");
   const [mat, setMat] = useState("all");
+  const [color, setColor] = useState("all");
+  const [brand, setBrand] = useState("all");
   const [view, setView] = useState<View>("grilla");
   const [editing, setEditing] = useState<FilamentView | null>(null);
   const [confirming, setConfirming] = useState<FilamentView | null>(null);
@@ -97,11 +99,28 @@ export function FilamentsBoard({
     const q = search.trim().toLowerCase();
     return filaments.filter((f) => {
       if (mat !== "all" && f.material !== mat) return false;
+      if (color !== "all" && f.color !== color) return false;
+      if (brand !== "all" && f.brand !== brand) return false;
       if (q && !`${f.material}${f.color}${f.brand}`.toLowerCase().includes(q))
         return false;
       return true;
     });
-  }, [filaments, search, mat]);
+  }, [filaments, search, mat, color, brand]);
+
+  const colorOpts = useMemo(
+    () =>
+      [...new Set(filaments.map((f) => f.color))].sort((a, b) =>
+        a.localeCompare(b, "es"),
+      ),
+    [filaments],
+  );
+  const brandOpts = useMemo(
+    () =>
+      [...new Set(filaments.map((f) => f.brand))].sort((a, b) =>
+        a.localeCompare(b, "es"),
+      ),
+    [filaments],
+  );
 
   async function addSpool(id: string) {
     setPendingId(id);
@@ -162,6 +181,34 @@ export function FilamentsBoard({
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <select
+          className="select"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+          style={{ maxWidth: 160 }}
+          title="Filtrar por color"
+        >
+          <option value="all">Todos los colores</option>
+          {colorOpts.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <select
+          className="select"
+          value={brand}
+          onChange={(e) => setBrand(e.target.value)}
+          style={{ maxWidth: 160 }}
+          title="Filtrar por marca"
+        >
+          <option value="all">Todas las marcas</option>
+          {brandOpts.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
         <button
           className={`chip ${mat === "all" ? "active" : ""}`}
           onClick={() => setMat("all")}
@@ -309,6 +356,16 @@ export function FilamentsBoard({
                         }}
                       >
                         {EditIcon}
+                      </button>
+                      <button
+                        className="btn-icon btn-ghost"
+                        title="Eliminar"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirming(f);
+                        }}
+                      >
+                        {TrashIcon}
                       </button>
                     </div>
                   </div>
