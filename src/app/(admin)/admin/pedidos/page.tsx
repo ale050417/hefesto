@@ -1,17 +1,7 @@
 import Link from "next/link";
 import { can, isAdmin, requirePermissionPage } from "@/core/auth/permissions";
 import { DegradedNotice } from "@/components/shared/degraded-notice";
-import { Pagination } from "@/components/shared/pagination";
-import { Badge } from "@/components/ui/badge";
-import {
-  ORDER_STATUS_LABEL,
-  ORDER_STATUS_VARIANT,
-  PAYMENT_METHOD_LABEL,
-} from "@/features/orders/constants";
-import {
-  getOrderStatusCounts,
-  listOrdersAdmin,
-} from "@/features/orders/services/orderAdminService";
+import { listOrdersAdmin } from "@/features/orders/services/orderAdminService";
 import { listManualSales } from "@/features/orders/services/manualSaleService";
 import { listProfitShares } from "@/features/earnings/service";
 import {
@@ -19,114 +9,79 @@ import {
   type EstimatorContext,
 } from "@/features/calculator/service";
 import { CargarVentaButton } from "@/features/orders/components/cargar-venta-button";
-import { OrdersAdminList } from "@/features/orders/components/orders-admin-list";
-import { DeleteManualSaleButton } from "@/features/orders/components/delete-manual-sale-button";
-import { ManualSaleStatusSelect } from "@/features/orders/components/manual-sale-status-select";
-import type { OrderStatus } from "@/features/orders/types";
-import { formatPrice } from "@/lib/format";
+import {
+  OrdersBoard,
+  type UnifiedSale,
+} from "@/features/orders/components/orders-board";
 import { safeLoad } from "@/lib/safe-load";
-import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pedidos" };
 
-type SearchParams = Record<string, string | string[] | undefined>;
-
-const STATUSES = Object.keys(ORDER_STATUS_LABEL) as OrderStatus[];
-const dateFmt = new Intl.DateTimeFormat("es-AR", { dateStyle: "medium" });
-
-function first(value: string | string[] | undefined): string | undefined {
-  const v = Array.isArray(value) ? value[0] : value;
-  return v && v !== "" ? v : undefined;
-}
-
-export default async function PedidosAdminPage({
-  searchParams,
-}: {
-  searchParams: Promise<SearchParams>;
-}) {
+export default async function PedidosAdminPage() {
   await requirePermissionPage("pedidos", "ver");
   const [admin, canEdit] = await Promise.all([
     isAdmin(),
     can("pedidos", "editar"),
   ]);
-  const sp = await searchParams;
-  const statusParam = first(sp.status);
-  const status = STATUSES.includes(statusParam as OrderStatus)
-    ? (statusParam as OrderStatus)
-    : undefined;
-  const pageParam = Number(first(sp.page) ?? "1");
-  const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
-  const tipoParam = first(sp.tipo);
-  const tipo =
-    tipoParam === "online" || tipoParam === "manual" ? tipoParam : "todo";
 
-  // Cargas acotadas (safeLoad): si la base se traba (lock / pool agotado),
-  // la página igual renderiza con datos parciales y un aviso, en vez de
-  // colgarse hasta el 504 de Vercel ("el panel no carga", 2026-07-11).
-  const [resultR, countsR, manualSalesR, sharesR, estimatorR] =
-    await Promise.all([
-      safeLoad("pedidos", listOrdersAdmin({ status, page, pageSize: 20 }), {
-        items: [],
-        page: 1,
-        totalPages: 1,
-        total: 0,
-      }),
-      safeLoad(
-        "conteos por estado",
-        getOrderStatusCounts(),
-        {} as Record<string, number>,
-      ),
-      safeLoad("ventas manuales", listManualSales(), []),
-      safeLoad("socios", listProfitShares(), []),
-      safeLoad(
-        "calculadora",
-        getEstimatorContext(),
-        null as EstimatorContext | null,
-      ),
-    ]);
-  const result = resultR.value;
-  const counts = countsR.value;
-  const manualSales = manualSalesR.value;
+  // Se cargan todas las ventas (online + manuales) para una tabla unificada con
+  // filtros del lado del cliente. safeLoad: si la base se traba, renderiza con
+  // datos parciales + aviso en vez de colgarse.
+  const [ordersR, manualR, sharesR, estimatorR] = await Promise.all([
+    safeLoad("pedidos", listOrdersAdmin({ page: 1, pageSize: 500 }), {
+      items: [],
+      page: 1,
+      totalPages: 1,
+      total: 0,
+    }),
+    safeLoad("ventas manuales", listManualSales(), []),
+    safeLoad("socios", listProfitShares(), []),
+    safeLoad(
+      "calculadora",
+      getEstimatorContext(),
+      null as EstimatorContext | null,
+    ),
+  ]);
+  const online = ordersR.value.items;
+  const manual = manualR.value;
   const shares = sharesR.value;
   const estimator = estimatorR.value;
+
   const degraded: string[] = [];
-  if (!resultR.ok) degraded.push("la lista de pedidos");
-  if (!countsR.ok) degraded.push("los conteos por estado");
-  if (!manualSalesR.ok) degraded.push("las ventas manuales");
+  if (!ordersR.ok) degraded.push("los pedidos online");
+  if (!manualR.ok) degraded.push("las ventas manuales");
   if (!sharesR.ok) degraded.push("los socios");
   if (!estimatorR.ok) degraded.push("la calculadora de ventas");
 
-  // Socios actuales: precargan el reparto del formulario de venta manual.
   const partners = shares.map((s) => ({ name: s.name, pct: Number(s.pct) }));
 
-  const totalAll = Object.values(counts).reduce((a, b) => a + b, 0);
-  const baseParams: Record<string, string> = {};
-  if (tipo !== "todo") baseParams.tipo = tipo;
-  if (status) baseParams.status = status;
-
-  const hrefWith = (t: string, st?: OrderStatus) => {
-    const q = new URLSearchParams();
-    if (t !== "todo") q.set("tipo", t);
-    if (st) q.set("status", st);
-    const qs = q.toString();
-    return qs ? `/admin/pedidos?${qs}` : "/admin/pedidos";
-  };
-
-  const chip = (
-    key: OrderStatus | "all",
-    label: string,
-    count: number,
-    active: boolean,
-  ) => (
-    <Link
-      key={key}
-      href={hrefWith(tipo, key === "all" ? undefined : key)}
-      className={cn("chip", active && "active")}
-    >
-      {label} <b className="opacity-60">{count}</b>
-    </Link>
-  );
+  const items: UnifiedSale[] = [
+    ...online.map(
+      (o): UnifiedSale => ({
+        id: o.id,
+        source: "online",
+        date: o.createdAt,
+        customerName: o.customerName,
+        label: o.orderNumber,
+        paymentMethod: o.paymentMethod,
+        status: o.status,
+        total: o.total,
+      }),
+    ),
+    ...manual.map(
+      (s): UnifiedSale => ({
+        id: s.id,
+        source: "manual",
+        date: s.saleDate,
+        customerName: s.customerName,
+        label: s.detail ?? "",
+        paymentMethod: s.paymentMethod,
+        status: s.status,
+        total: Number(s.total),
+      }),
+    ),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
     <div>
@@ -135,7 +90,7 @@ export default async function PedidosAdminPage({
         <div>
           <div className="eyebrow">Operación</div>
           <h1 className="page-title">Pedidos</h1>
-          <div className="page-sub">{totalAll} pedidos en total</div>
+          <div className="page-sub">{items.length} ventas en total</div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/admin/pedidos/importar" className="btn btn-secondary">
@@ -158,117 +113,7 @@ export default async function PedidosAdminPage({
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        <Link
-          href={hrefWith("todo")}
-          className={cn("chip", tipo === "todo" && "active")}
-        >
-          Todo
-        </Link>
-        <Link
-          href={hrefWith("online")}
-          className={cn("chip", tipo === "online" && "active")}
-        >
-          Ventas online
-        </Link>
-        <Link
-          href={hrefWith("manual")}
-          className={cn("chip", tipo === "manual" && "active")}
-        >
-          Ventas manuales
-        </Link>
-      </div>
-
-      {tipo !== "manual" ? (
-        <>
-          <div className="mb-5 flex flex-wrap gap-2">
-            {chip("all", "Todos", totalAll, !status)}
-            {STATUSES.map((s) =>
-              chip(s, ORDER_STATUS_LABEL[s], counts[s] ?? 0, status === s),
-            )}
-          </div>
-
-          {result.items.length === 0 ? (
-            <div className="ui-card text-dim p-10 text-center text-sm">
-              No hay pedidos con este filtro.
-            </div>
-          ) : (
-            <OrdersAdminList items={result.items} isAdmin={admin} />
-          )}
-
-          <Pagination
-            page={result.page}
-            totalPages={result.totalPages}
-            params={baseParams}
-            basePath="/admin/pedidos"
-          />
-        </>
-      ) : null}
-
-      {tipo !== "online" && manualSales.length > 0 ? (
-        <div className="mt-8">
-          <div className="eyebrow mb-3">
-            Ventas manuales · {manualSales.length}
-          </div>
-          <div className="ui-card overflow-hidden">
-            <div className="table-wrap" style={{ border: "none" }}>
-              <table className="tbl tbl-cards">
-                <thead>
-                  <tr>
-                    <th>Fecha</th>
-                    <th>Cliente</th>
-                    <th>Detalle</th>
-                    <th>Pago</th>
-                    <th>Estado</th>
-                    <th className="text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {manualSales.map((s) => (
-                    <tr key={s.id}>
-                      <td
-                        className="text-dim whitespace-nowrap"
-                        data-label="Fecha"
-                      >
-                        {dateFmt.format(s.saleDate)}
-                      </td>
-                      <td className="text-fg" data-label="Cliente">
-                        {s.customerName}
-                      </td>
-                      <td className="text-dim" data-label="Detalle">
-                        {s.detail ?? "—"}
-                      </td>
-                      <td className="text-dim" data-label="Pago">
-                        {PAYMENT_METHOD_LABEL[s.paymentMethod]}
-                      </td>
-                      <td data-label="Estado">
-                        {canEdit ? (
-                          <ManualSaleStatusSelect id={s.id} status={s.status} />
-                        ) : (
-                          <Badge variant={ORDER_STATUS_VARIANT[s.status]}>
-                            {ORDER_STATUS_LABEL[s.status]}
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="text-fg text-right" data-label="Total">
-                        <span className="inline-flex items-center justify-end gap-1">
-                          {formatPrice(Number(s.total))}
-                          {admin ? (
-                            <DeleteManualSaleButton
-                              id={s.id}
-                              label={s.customerName}
-                            />
-                          ) : null}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <OrdersBoard items={items} isAdmin={admin} canEdit={canEdit} />
     </div>
   );
 }
