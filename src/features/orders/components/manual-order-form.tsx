@@ -75,8 +75,9 @@ export function ManualSaleForm({
   >([]);
   const [prodSearch, setProdSearch] = useState("");
   const [prodCat, setProdCat] = useState("all");
-  const [colorOptions, setColorOptions] = useState<string[]>([]);
-  const [selectedColor, setSelectedColor] = useState("");
+  const [colorLines, setColorLines] = useState<
+    Array<{ filamentId: string; grams: string }>
+  >([]);
 
   const qtyN = Math.max(1, Math.floor(Number(form.quantity) || 1));
   const extrasCost = extras.reduce(
@@ -90,6 +91,16 @@ export function ManualSaleForm({
     setExtras((es) => [...es, { name: "", cost: "", qty: "1" }]);
   const removeExtra = (i: number) =>
     setExtras((es) => es.filter((_, j) => j !== i));
+  const setColorLine = (i: number, k: "filamentId" | "grams", v: string) =>
+    setColorLines((ls) => ls.map((l, j) => (j === i ? { ...l, [k]: v } : l)));
+  const addColorLine = () =>
+    setColorLines((ls) => [...ls, { filamentId: "", grams: "" }]);
+  const removeColorLine = (i: number) =>
+    setColorLines((ls) => ls.filter((_, j) => j !== i));
+  const colorGramsTotal = colorLines.reduce(
+    (a, l) => a + (Number(l.grams) || 0),
+    0,
+  );
   const prodCategories = [
     ...new Set(
       products.map((p) => p.categoryName).filter((c): c is string => !!c),
@@ -104,7 +115,7 @@ export function ManualSaleForm({
   // Calculadora flotante (obligatoria): al "Usar precio" copia el total
   // (unitario × cantidad) y guarda gramos/horas/filamento para la amortización.
   function handleEstUse(v: EstimatorValue) {
-    setColorOptions([]);
+    setColorLines([]);
     setEstData({
       filamentId: v.filamentId,
       material: v.material,
@@ -139,13 +150,20 @@ export function ManualSaleForm({
     const p = products.find((x) => x.id === id);
     if (!p) return;
     const colors = p.colors ?? [];
-    const color = colors[0] ?? "";
-    setColorOptions(colors);
-    setSelectedColor(color);
+    const weight = p.weightGrams ?? 0;
+    // Reparte el peso en partes iguales entre los colores del producto (editable).
+    const per = colors.length > 0 ? Math.round(weight / colors.length) : 0;
+    const lines = colors.map((c) => ({
+      filamentId: matchFilamentId(p.material ?? "", c) ?? "",
+      grams: per > 0 ? String(per) : "",
+    }));
+    setColorLines(
+      lines.length > 0 ? lines : [{ filamentId: "", grams: String(weight) }],
+    );
     setEstData({
-      filamentId: color ? matchFilamentId(p.material ?? "", color) : null,
+      filamentId: lines.find((l) => l.filamentId)?.filamentId || null,
       material: p.material ?? "",
-      grams: p.weightGrams ?? 0,
+      grams: weight,
       printMinutes: p.printMinutes ?? 0,
     });
     setUnitPrice(p.price);
@@ -200,6 +218,15 @@ export function ManualSaleForm({
             .map((p) => ({ name: p.name.trim(), pct: Number(p.pct) }))
         : undefined;
     try {
+      const validLines = colorLines
+        .filter((l) => l.filamentId && Number(l.grams) > 0)
+        .map((l) => ({ filamentId: l.filamentId, grams: Number(l.grams) }));
+      const gramsFinal = validLines.length
+        ? validLines.reduce((a, l) => a + l.grams, 0)
+        : estData.grams;
+      const filamentFinal = validLines.length
+        ? validLines[0]!.filamentId
+        : (estData.filamentId ?? "");
       const res = await runAction(
         () =>
           createManualSaleAction({
@@ -207,10 +234,11 @@ export function ManualSaleForm({
             total,
             extrasCost,
             quantity: qtyN,
-            filamentId: estData.filamentId ?? "",
+            filamentId: filamentFinal,
             material: estData.material,
-            grams: estData.grams,
+            grams: gramsFinal,
             printMinutes: estData.printMinutes,
+            colorLines: validLines.length ? validLines : undefined,
             profitSplit,
           }),
         { silent: true },
@@ -308,29 +336,59 @@ export function ManualSaleForm({
         </div>
       ) : null}
 
-      {colorOptions.length > 0 ? (
+      {colorLines.length > 0 ? (
         <div className="field">
-          <label htmlFor="ms-color">Color usado</label>
-          <select
-            id="ms-color"
-            className="select"
-            value={selectedColor}
-            onChange={(e) => {
-              const c = e.target.value;
-              setSelectedColor(c);
-              setEstData((d) =>
-                d ? { ...d, filamentId: matchFilamentId(d.material, c) } : d,
-              );
-            }}
-          >
-            {colorOptions.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          <div className="text-faint text-[11.5px]">
-            Se descuenta el stock de ese color (si tenés ese filamento cargado).
+          <label>Colores usados (descuenta stock)</label>
+          <p className="text-faint text-[12px] leading-relaxed">
+            Cuántos gramos de cada color/carrete. Se descuenta de cada uno; si
+            falta stock, la venta se registra igual y te avisa por notificación
+            para reponer.
+          </p>
+          {colorLines.map((ln, i) => (
+            <div key={i} className="mt-2 flex items-center gap-2">
+              <select
+                className="select flex-1"
+                value={ln.filamentId}
+                onChange={(e) => setColorLine(i, "filamentId", e.target.value)}
+              >
+                <option value="">— Elegí color / carrete —</option>
+                {estimator.filaments.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.material} · {f.color}
+                  </option>
+                ))}
+              </select>
+              <input
+                className="input"
+                style={{ width: 100 }}
+                type="number"
+                min={0}
+                placeholder="gramos"
+                value={ln.grams}
+                onChange={(e) => setColorLine(i, "grams", e.target.value)}
+              />
+              <span className="text-faint text-[12px]">g</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-icon"
+                onClick={() => removeColorLine(i)}
+                aria-label="Quitar color"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={addColorLine}
+            >
+              + Agregar color
+            </button>
+            <span className="text-faint ml-auto text-[12px]">
+              Total: {colorGramsTotal} g
+            </span>
           </div>
         </div>
       ) : null}

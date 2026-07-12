@@ -124,11 +124,13 @@ export async function deductFilamentForManualSale(
   saleId: string,
   input: Pick<
     ManualSaleInput,
-    "filamentId" | "material" | "grams" | "quantity"
+    "filamentId" | "material" | "grams" | "quantity" | "colorLines"
   >,
   deps: ManualSaleStockDeps = defaultStockDeps,
 ): Promise<{ deducted: boolean; reason?: string }> {
-  const hasIntent = Boolean(input.filamentId || input.material);
+  const hasIntent = Boolean(
+    input.filamentId || input.material || (input.colorLines?.length ?? 0) > 0,
+  );
   const grams = input.grams ?? 0;
   try {
     if (!hasIntent) return { deducted: false, reason: "sin filamento" };
@@ -154,6 +156,35 @@ export async function deductFilamentForManualSale(
       });
       return { deducted: false, reason };
     };
+
+    // MULTICOLOR: descuenta cada color de su carrete (varios movimientos). Si un
+    // color pide más de lo que hay, applyDeltas lo reporta (shortfall) y se avisa.
+    const lines = input.colorLines ?? [];
+    if (lines.length > 0) {
+      const qtyM = Math.max(1, Math.floor(input.quantity));
+      const fils = await deps.listFilaments();
+      const movements = lines
+        .map((ln): NewFilamentMovement | null => {
+          const f = fils.find((x) => x.id === ln.filamentId);
+          if (!f || !(ln.grams > 0)) return null;
+          return {
+            filamentId: f.id,
+            material: f.material,
+            color: f.color,
+            deltaGrams: -(ln.grams * qtyM),
+            reason: "manual_sale" as const,
+            refId: saleId,
+          };
+        })
+        .filter((m): m is NewFilamentMovement => m !== null);
+      if (movements.length === 0) return warn("colores sin filamento/gramos");
+      const lowM = await deps.applyDeltas(movements);
+      if (lowM.length > 0) {
+        const notify = deps.notifyLowStock ?? notifyLowStockAfterSale;
+        await notify(lowM).catch(() => undefined);
+      }
+      return { deducted: true };
+    }
 
     if (!(grams > 0)) return warn("sin gramos");
 

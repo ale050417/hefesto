@@ -226,6 +226,25 @@ describe("deductFilamentForManualSale", () => {
     return { deps, applyDeltas, audit };
   }
 
+  it("multicolor: descuenta cada color/carrete de su filamento", async () => {
+    const { deps, applyDeltas } = makeDeps();
+    await deductFilamentForManualSale(
+      "sMC",
+      {
+        quantity: 2,
+        colorLines: [
+          { filamentId: "f1", grams: 30 },
+          { filamentId: "f2", grams: 20 },
+        ],
+      },
+      deps,
+    );
+    const movs = applyDeltas.mock.calls[0]![0] as NewFilamentMovement[];
+    expect(movs).toHaveLength(2);
+    expect(movs.map((m) => m.deltaGrams)).toEqual([-60, -40]);
+    expect(movs.map((m) => m.color)).toEqual(["Negro", "Rojo"]);
+  });
+
   it("descuenta gramos (por unidad) × cantidad del filamento elegido", async () => {
     const { deps, applyDeltas } = makeDeps();
     const res = await deductFilamentForManualSale(

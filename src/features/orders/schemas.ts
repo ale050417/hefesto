@@ -80,6 +80,11 @@ export const manualSaleSchema = z.object({
   ),
   grams: z.coerce.number().min(0).optional(),
   printMinutes: z.coerce.number().min(0).optional(),
+  // Multicolor: gramos por color/carrete. Se descuenta cada uno de su filamento;
+  // si un color pide más de lo que hay, se registra igual y se avisa al panel.
+  colorLines: z
+    .array(z.object({ filamentId: z.uuid(), grams: z.coerce.number().min(0) }))
+    .optional(),
   // Insumos/agregados (argollas, vaso del chop, polímero, etc.): su costo TOTAL
   // (ya calculado en el cliente) suma al total cobrado y a la amortización.
   extrasCost: z.coerce.number().min(0).optional(),

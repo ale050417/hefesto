@@ -48,4 +48,6 @@ export type LowStockFilament = {
   color: string;
   stockGrams: number;
   threshold: number;
+  /** true = se pidió MÁS de lo que había (quedó en 0): falta filamento. */
+  shortfall?: boolean;
 };
