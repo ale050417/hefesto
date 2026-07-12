@@ -6,6 +6,9 @@ import {
 } from "@/features/products/components/product-form";
 import { listCategories } from "@/features/products/services/catalogService";
 import { getEstimatorContext } from "@/features/calculator/service";
+import { listColorCatalog } from "@/features/inventory/queries";
+import { getBrandSettings } from "@/features/settings/service";
+import { sectionOn } from "@/features/settings/home-sections";
 import { loadOrThrow } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
@@ -29,16 +32,23 @@ const emptyDefaults: ProductFormValues = {
   productionTime: "",
   isFeatured: false,
   isNew: false,
+  status: "draft",
 };
 
 export default async function NuevoProductoPage() {
   await requirePermissionPage("productos", "crear");
   // Carga etiquetada y con deadline: error claro + log [admin:productos/nuevo]
   // en vez de un cuelgue de 30 s si la DB no responde (2026-07-11).
-  const [categories, estimator] = await loadOrThrow(
+  const [categories, estimator, colorCatalog, brand] = await loadOrThrow(
     "productos/nuevo",
-    Promise.all([listCategories(), getEstimatorContext()]),
+    Promise.all([
+      listCategories(),
+      getEstimatorContext(),
+      listColorCatalog(),
+      getBrandSettings(),
+    ]),
   );
+  const newsSectionActive = sectionOn(brand.homeSections, "nuevos");
   if (categories.length === 0) {
     return (
       <div className="mx-auto max-w-2xl">
@@ -75,6 +85,8 @@ export default async function NuevoProductoPage() {
           categories={categories}
           defaultValues={emptyDefaults}
           estimator={estimator}
+          colorCatalog={colorCatalog}
+          newsSectionActive={newsSectionActive}
         />
       </div>
     </div>

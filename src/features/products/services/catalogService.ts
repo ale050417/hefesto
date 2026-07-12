@@ -24,6 +24,7 @@ import {
   setPrimaryImage,
   setProductStatus,
   updateCategoryRow,
+  productSlugExists,
   updateProductRow,
 } from "../repository";
 import { cache } from "react";
@@ -257,8 +258,24 @@ function toRow(input: ProductInput) {
 }
 
 /** Crea un producto (nace como borrador). */
+/** Slug unico: si el derivado del nombre ya existe, agrega -2, -3, ... */
+async function ensureUniqueSlug(base: string): Promise<string> {
+  const clean = base || "producto";
+  let slug = clean;
+  let n = 2;
+  while (await productSlugExists(slug)) {
+    slug = `${clean}-${n++}`;
+  }
+  return slug;
+}
+
 export async function createProduct(input: ProductInput): Promise<Product> {
-  return insertProduct({ ...toRow(input), status: "draft" });
+  const slug = await ensureUniqueSlug(input.slug);
+  return insertProduct({
+    ...toRow(input),
+    slug,
+    status: input.status ?? "draft",
+  });
 }
 
 /** Actualiza un producto existente. */

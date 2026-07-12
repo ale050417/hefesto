@@ -134,11 +134,62 @@ export async function getProductFormDataAction(id: string): Promise<
     productionTime: product.productionTime ?? "",
     isFeatured: product.isFeatured,
     isNew: product.isNew,
+    status: product.status === "published" ? "published" : "draft",
   };
   return {
     ok: true,
     data: { name: product.name, status: product.status, defaults, images },
   };
+}
+
+export async function generateDescriptionAction(
+  name: unknown,
+): Promise<ActionResult<{ description: string }>> {
+  const actor = await getStaffUser();
+  if (!actor) return UNAUTHORIZED;
+  if (!(await can("productos", "crear"))) return UNAUTHORIZED;
+  const parsed = z.string().trim().min(2).max(120).safeParse(name);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "Escribí primero el nombre del producto.",
+      },
+    };
+  }
+  try {
+    const { generateProductDescription, isAssistantConfigured } =
+      await import("@/features/assistant/service");
+    if (!isAssistantConfigured()) {
+      return {
+        ok: false,
+        error: {
+          code: "NOT_CONFIGURED",
+          message: "La generación con IA no está disponible en este momento.",
+        },
+      };
+    }
+    const description = await generateProductDescription(parsed.data);
+    if (!description) {
+      return {
+        ok: false,
+        error: {
+          code: "EMPTY",
+          message: "No se pudo generar una descripción. Probá de nuevo.",
+        },
+      };
+    }
+    return { ok: true, data: { description } };
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "INTERNAL",
+        message: "No se pudo generar la descripción. Probá de nuevo.",
+      },
+    };
+  }
 }
 
 export async function createProductAction(

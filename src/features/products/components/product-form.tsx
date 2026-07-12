@@ -8,7 +8,11 @@ import { cn } from "@/lib/utils";
 import { EstimatorModalButton } from "@/features/calculator/components/estimator-modal-button";
 import type { EstimatorValue } from "@/features/calculator/components/price-estimator";
 import type { EstimatorContext } from "@/features/calculator/service";
-import { createProductAction, updateProductAction } from "../actions";
+import {
+  createProductAction,
+  generateDescriptionAction,
+  updateProductAction,
+} from "../actions";
 import type { Category } from "../types";
 import { runAction } from "@/lib/run-action";
 
@@ -31,20 +35,9 @@ export type ProductFormValues = {
   productionTime: string;
   isFeatured: boolean;
   isNew: boolean;
+  status: "draft" | "published";
 };
 
-const FILAMENT_COLORS = [
-  { n: "Negro", c: "#1a1a1f" },
-  { n: "Blanco", c: "#f4f4f0" },
-  { n: "Dorado", c: "#C9A84C" },
-  { n: "Gris", c: "#8b8b95" },
-  { n: "Rojo", c: "#d14b3c" },
-  { n: "Azul", c: "#3a72c4" },
-  { n: "Verde", c: "#3fa46a" },
-  { n: "Galaxia", c: "#4b3a78" },
-  { n: "Translúcido", c: "#cfe6ee" },
-  { n: "Arcoíris", c: "#d98a5a" },
-];
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -60,6 +53,8 @@ export function ProductForm({
   categories,
   defaultValues,
   estimator,
+  colorCatalog = [],
+  newsSectionActive = true,
   onSaved,
 }: {
   mode: "create" | "edit";
@@ -68,11 +63,16 @@ export function ProductForm({
   defaultValues: ProductFormValues;
   /** Contexto de la calculadora embebida (config, filamentos, tipos, isAdmin). */
   estimator: EstimatorContext;
+  /** Colores del catálogo (Bloque 1) para elegir los del producto. */
+  colorCatalog?: Array<{ name: string; hex: string | null }>;
+  /** ¿Está activa la sección "Nuevos" del home? (para habilitar el check). */
+  newsSectionActive?: boolean;
   /** Si se pasa, en vez de navegar avisa al contenedor (uso en modal). */
   onSaved?: (id: string) => void;
 }) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
+  const [genBusy, setGenBusy] = useState(false);
   const [colorMode, setColorMode] = useState<"single" | "multi">(
     defaultValues.colorMode ?? "single",
   );
@@ -103,6 +103,13 @@ export function ProductForm({
   } = useForm<ProductFormValues>({ defaultValues });
 
   const infill = useWatch({ control, name: "infillPercent" });
+  const colorList =
+    colorCatalog.length > 0
+      ? colorCatalog.map((c) => ({ n: c.name, c: c.hex ?? "#888" }))
+      : [
+          { n: "Negro", c: "#1a1a1f" },
+          { n: "Blanco", c: "#f4f4f0" },
+        ];
 
   function toggleColor(name: string) {
     setColors((prev) =>
@@ -117,10 +124,34 @@ export function ProductForm({
     if (v.price != null) setValue("price", String(v.price));
   }
 
+  async function generateWithHefi() {
+    const name = getValues("name").trim();
+    if (!name) {
+      setFormError("Escribí primero el nombre del producto.");
+      return;
+    }
+    setFormError(null);
+    setGenBusy(true);
+    const res = await runAction(() => generateDescriptionAction(name), {
+      silent: true,
+    });
+    setGenBusy(false);
+    if (!res.ok) {
+      setFormError(res.error.message);
+      return;
+    }
+    setValue("description", res.data.description);
+  }
+
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
     const payload: ProductFormValues = {
       ...values,
+      // Slug automático desde el nombre al crear; en edición se conserva (no
+      // romper URLs/SEO). El server garantiza que sea único.
+      slug: mode === "create" ? slugify(values.name) : defaultValues.slug,
+      // El precio de oferta se maneja desde Descuentos (Bloque 5): no se carga acá.
+      salePrice: "",
       // Ficha técnica desde el estimador (fuente única).
       material: est.material,
       weightGrams: est.grams ? String(est.grams) : "",
@@ -189,30 +220,25 @@ export function ProductForm({
       </div>
 
       <div className="field">
-        <label htmlFor="slug">Slug</label>
-        <div className="flex gap-2">
-          <input id="slug" className="input" {...register("slug")} />
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <label htmlFor="description" className="mb-0">
+            Descripción
+          </label>
           <Button
             type="button"
             variant="secondary"
             size="sm"
-            onClick={() => setValue("slug", slugify(getValues("name")))}
+            onClick={generateWithHefi}
+            loading={genBusy}
           >
-            Generar
+            ✨ Generar con Hefi
           </Button>
         </div>
-        {errors.slug ? (
-          <p className="text-danger text-xs">{errors.slug.message}</p>
-        ) : null}
-      </div>
-
-      <div className="field">
-        <label htmlFor="description">Descripción</label>
         <textarea
           id="description"
           rows={4}
           className="textarea"
-          placeholder="Describí la pieza, su uso y detalles..."
+          placeholder="Describí la pieza, su uso y detalles... o generala con Hefi"
           {...register("description")}
         />
       </div>
@@ -250,45 +276,36 @@ export function ProductForm({
         ) : null}
       </div>
 
-      <div className="grid-2">
-        <div className="field">
-          <label htmlFor="price">Precio</label>
-          <input
-            id="price"
-            type="number"
-            step="0.01"
-            className="input"
-            {...register("price")}
-          />
-          <div className="mt-1">
-            <EstimatorModalButton
-              estimator={estimator}
-              onUse={handleEstUse}
-              initial={{
-                material: defaultValues.material,
-                grams: Number(defaultValues.weightGrams) || 0,
-                printMinutes: Number(defaultValues.printTimeMinutes) || 0,
-                layerHeight: defaultValues.layerHeight,
-              }}
-            />
-          </div>
-          {errors.price ? (
-            <p className="text-danger text-xs">{errors.price.message}</p>
-          ) : null}
+      <div className="field">
+        <label htmlFor="price">Precio</label>
+        <input
+          id="price"
+          type="number"
+          step="0.01"
+          className="input"
+          readOnly
+          placeholder="Calculalo con la calculadora"
+          {...register("price")}
+        />
+        <div className="text-faint mt-1 text-[11.5px]">
+          El precio se calcula con la calculadora (no se carga a mano). Las
+          ofertas van por Descuentos.
         </div>
-        <div className="field">
-          <label htmlFor="salePrice">Precio oferta (opcional)</label>
-          <input
-            id="salePrice"
-            type="number"
-            step="0.01"
-            className="input"
-            {...register("salePrice")}
+        <div className="mt-1.5">
+          <EstimatorModalButton
+            estimator={estimator}
+            onUse={handleEstUse}
+            initial={{
+              material: defaultValues.material,
+              grams: Number(defaultValues.weightGrams) || 0,
+              printMinutes: Number(defaultValues.printTimeMinutes) || 0,
+              layerHeight: defaultValues.layerHeight,
+            }}
           />
-          {errors.salePrice ? (
-            <p className="text-danger text-xs">{errors.salePrice.message}</p>
-          ) : null}
         </div>
+        {errors.price ? (
+          <p className="text-danger text-xs">{errors.price.message}</p>
+        ) : null}
       </div>
 
       {/* Ficha técnica de impresión 3D */}
@@ -355,7 +372,7 @@ export function ProductForm({
               : "Colores disponibles"}
           </label>
           <div className="flex flex-wrap gap-2">
-            {FILAMENT_COLORS.map((fc) => (
+            {colorList.map((fc) => (
               <button
                 key={fc.n}
                 type="button"
@@ -458,6 +475,16 @@ export function ProductForm({
         </div>
       </div>
 
+      {mode === "create" ? (
+        <div className="field">
+          <label htmlFor="status">Estado</label>
+          <select id="status" className="select" {...register("status")}>
+            <option value="draft">Borrador (no visible en la tienda)</option>
+            <option value="published">Publicado (visible)</option>
+          </select>
+        </div>
+      ) : null}
+
       <div className="flex gap-6">
         <label className="text-fg flex items-center gap-2 text-sm">
           <input
@@ -467,10 +494,21 @@ export function ProductForm({
           />{" "}
           Destacado
         </label>
-        <label className="text-fg flex items-center gap-2 text-sm">
+        <label
+          className={cn(
+            "text-fg flex items-center gap-2 text-sm",
+            !newsSectionActive && "opacity-50",
+          )}
+          title={
+            newsSectionActive
+              ? undefined
+              : "Activá la sección “Nuevos lanzamientos” en Configuración › Apariencia"
+          }
+        >
           <input
             type="checkbox"
             className="accent-[var(--gold)]"
+            disabled={!newsSectionActive}
             {...register("isNew")}
           />{" "}
           Nuevo

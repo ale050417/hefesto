@@ -200,6 +200,18 @@ export async function findPublishedSlugs(
 }
 
 /** Inserta un producto y lo devuelve. */
+export async function productSlugExists(
+  slug: string,
+  database: Database = db,
+): Promise<boolean> {
+  const [row] = await database
+    .select({ id: products.id })
+    .from(products)
+    .where(eq(products.slug, slug))
+    .limit(1);
+  return !!row;
+}
+
 export async function insertProduct(
   values: NewProduct,
   database: Database = db,

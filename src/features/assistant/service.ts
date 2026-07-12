@@ -271,3 +271,32 @@ export async function askAssistant(
   if (!text) throw new Error("ASSISTANT_EMPTY_REPLY");
   return text;
 }
+
+/**
+ * "Generar con Hefi": una descripción de producto a partir del nombre. One-shot
+ * (sin historial ni snapshot del negocio), reusa el mismo proveedor y llamadas
+ * del asistente. Devuelve texto plano listo para el campo Descripción.
+ */
+export async function generateProductDescription(
+  name: string,
+): Promise<string> {
+  const provider = pickProvider();
+  if (!provider) throw new Error("ASSISTANT_NOT_CONFIGURED");
+  const system =
+    "Sos Hefi, el asistente de Hefesto 3D, una tienda argentina de impresión 3D. " +
+    "Escribí la descripción de un producto para la tienda: atractiva, clara y breve " +
+    "(2 a 4 oraciones), en español rioplatense, tono cálido y profesional. NO inventes " +
+    "medidas, materiales, colores ni especificaciones que no te den. Devolvé SOLO la " +
+    "descripción, sin título, sin comillas y sin listas.";
+  const messages: AssistantMessage[] = [
+    {
+      role: "user",
+      content: `Nombre del producto: "${name}". Escribí su descripción para la tienda.`,
+    },
+  ];
+  const text =
+    provider === "gemini"
+      ? await callGemini(system, messages)
+      : await callAnthropic(system, messages);
+  return text.trim();
+}

@@ -39,6 +39,7 @@ const EMPTY_DEFAULTS: ProductFormValues = {
   productionTime: "",
   isFeatured: false,
   isNew: false,
+  status: "draft",
 };
 
 type View = "grid" | "list";

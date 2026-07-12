@@ -12,6 +12,9 @@ import {
   listCategories,
 } from "@/features/products/services/catalogService";
 import { getEstimatorContext } from "@/features/calculator/service";
+import { listColorCatalog } from "@/features/inventory/queries";
+import { getBrandSettings } from "@/features/settings/service";
+import { sectionOn } from "@/features/settings/home-sections";
 import { isUuid } from "@/lib/ids";
 import { loadOrThrow } from "@/lib/safe-load";
 
@@ -28,10 +31,17 @@ export default async function EditarProductoPage({
   if (!isUuid(id)) notFound();
   // Carga etiquetada y con deadline: error claro + log [admin:productos/editar]
   // en vez de un cuelgue de 30 s si la DB no responde (2026-07-11).
-  const [data, categories, estimator] = await loadOrThrow(
+  const [data, categories, estimator, colorCatalog, brand] = await loadOrThrow(
     "productos/editar",
-    Promise.all([getProductAdmin(id), listCategories(), getEstimatorContext()]),
+    Promise.all([
+      getProductAdmin(id),
+      listCategories(),
+      getEstimatorContext(),
+      listColorCatalog(),
+      getBrandSettings(),
+    ]),
   );
+  const newsSectionActive = sectionOn(brand.homeSections, "nuevos");
   if (!data) notFound();
   const { product, images } = data;
 
@@ -54,6 +64,7 @@ export default async function EditarProductoPage({
     productionTime: product.productionTime ?? "",
     isFeatured: product.isFeatured,
     isNew: product.isNew,
+    status: product.status === "published" ? "published" : "draft",
   };
 
   return (
@@ -82,6 +93,8 @@ export default async function EditarProductoPage({
             categories={categories}
             defaultValues={defaults}
             estimator={estimator}
+            colorCatalog={colorCatalog}
+            newsSectionActive={newsSectionActive}
           />
         </div>
         <div>
