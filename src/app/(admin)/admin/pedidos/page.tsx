@@ -13,6 +13,8 @@ import {
   OrdersBoard,
   type UnifiedSale,
 } from "@/features/orders/components/orders-board";
+import { listSaleColors } from "@/features/inventory/queries";
+import { listProductsForSale } from "@/features/products/services/catalogService";
 import { safeLoad } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
@@ -28,25 +30,34 @@ export default async function PedidosAdminPage() {
   // Se cargan todas las ventas (online + manuales) para una tabla unificada con
   // filtros del lado del cliente. safeLoad: si la base se traba, renderiza con
   // datos parciales + aviso en vez de colgarse.
-  const [ordersR, manualR, sharesR, estimatorR] = await Promise.all([
-    safeLoad("pedidos", listOrdersAdmin({ page: 1, pageSize: 500 }), {
-      items: [],
-      page: 1,
-      totalPages: 1,
-      total: 0,
-    }),
-    safeLoad("ventas manuales", listManualSales(), []),
-    safeLoad("socios", listProfitShares(), []),
-    safeLoad(
-      "calculadora",
-      getEstimatorContext(),
-      null as EstimatorContext | null,
-    ),
-  ]);
+  const [ordersR, manualR, sharesR, estimatorR, colorsR, productsR] =
+    await Promise.all([
+      safeLoad("pedidos", listOrdersAdmin({ page: 1, pageSize: 500 }), {
+        items: [],
+        page: 1,
+        totalPages: 1,
+        total: 0,
+      }),
+      safeLoad("ventas manuales", listManualSales(), []),
+      safeLoad("socios", listProfitShares(), []),
+      safeLoad(
+        "calculadora",
+        getEstimatorContext(),
+        null as EstimatorContext | null,
+      ),
+      safeLoad(
+        "colores de ventas",
+        listSaleColors(),
+        {} as Record<string, string[]>,
+      ),
+      safeLoad("productos", listProductsForSale(), []),
+    ]);
   const online = ordersR.value.items;
   const manual = manualR.value;
   const shares = sharesR.value;
   const estimator = estimatorR.value;
+  const saleColors = colorsR.value;
+  const products = productsR.value;
 
   const degraded: string[] = [];
   if (!ordersR.ok) degraded.push("los pedidos online");
@@ -67,6 +78,7 @@ export default async function PedidosAdminPage() {
         paymentMethod: o.paymentMethod,
         status: o.status,
         total: o.total,
+        colors: saleColors[o.id] ?? [],
       }),
     ),
     ...manual.map(
@@ -79,6 +91,7 @@ export default async function PedidosAdminPage() {
         paymentMethod: s.paymentMethod,
         status: s.status,
         total: Number(s.total),
+        colors: saleColors[s.id] ?? [],
       }),
     ),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -108,7 +121,11 @@ export default async function PedidosAdminPage() {
             Importar Excel/CSV
           </Link>
           {estimator ? (
-            <CargarVentaButton partners={partners} estimator={estimator} />
+            <CargarVentaButton
+              partners={partners}
+              estimator={estimator}
+              products={products}
+            />
           ) : null}
         </div>
       </div>

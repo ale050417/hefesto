@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/core/db";
 import {
   filamentCatalog,
@@ -387,4 +387,19 @@ export async function insertFilamentCatalog(
     .insert(filamentCatalog)
     .values({ kind, name, hex })
     .onConflictDoNothing();
+}
+
+// Colores usados por cada venta (online + manual), leídos del ledger de
+// movimientos. Sirve para mostrar "qué color(es)" en el listado de Pedidos sin
+// guardar nada extra en la venta (el movimiento ya tiene color + refId).
+export async function getSaleColors(
+  database: Database = db,
+): Promise<Array<{ refId: string | null; color: string }>> {
+  return database
+    .selectDistinct({
+      refId: filamentMovements.refId,
+      color: filamentMovements.color,
+    })
+    .from(filamentMovements)
+    .where(inArray(filamentMovements.reason, ["order", "manual_sale"]));
 }

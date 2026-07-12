@@ -146,3 +146,16 @@ export async function removeColor(name: string): Promise<void> {
 export async function removeBrand(name: string): Promise<void> {
   await repo.deleteFilamentCatalog("brand", name);
 }
+
+// Mapa refId -> colores usados (para la columna de color del listado de ventas).
+export async function listSaleColors(): Promise<Record<string, string[]>> {
+  const rows = await repo.getSaleColors();
+  const map: Record<string, string[]> = {};
+  for (const r of rows) {
+    if (!r.refId) continue;
+    (map[r.refId] ??= []).push(r.color);
+  }
+  for (const k of Object.keys(map))
+    map[k] = [...new Set(map[k])].sort((a, b) => a.localeCompare(b, "es"));
+  return map;
+}

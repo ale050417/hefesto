@@ -4,14 +4,17 @@ import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { useCan } from "@/components/auth/perms-provider";
 import type { EstimatorContext } from "@/features/calculator/service";
+import type { ProductForSale } from "@/features/products/services/catalogService";
 import { ManualSaleForm } from "./manual-order-form";
 
 export function CargarVentaButton({
   partners = [],
   estimator,
+  products = [],
 }: {
   partners?: Array<{ name: string; pct: number }>;
   estimator: EstimatorContext;
+  products?: ProductForSale[];
 }) {
   const [open, setOpen] = useState(false);
   const canCreate = useCan("pedidos", "crear");
@@ -45,6 +48,7 @@ export function CargarVentaButton({
         <ManualSaleForm
           partners={partners}
           estimator={estimator}
+          products={products}
           onDone={() => setOpen(false)}
           onCancel={() => setOpen(false)}
         />

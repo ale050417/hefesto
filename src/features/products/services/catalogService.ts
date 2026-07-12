@@ -13,6 +13,7 @@ import {
   findMaterials,
   findProductById,
   findPublished,
+  findProductsForSale,
   findPublishedSlugs,
   findRelated,
   insertCategory,
@@ -494,4 +495,27 @@ export async function listProductsByIds(ids: string[]): Promise<ProductView[]> {
   const { findByIds } = await import("../repository");
   const rows = await findByIds(ids);
   return rows.map(toProductView);
+}
+
+export type ProductForSale = {
+  id: string;
+  name: string;
+  price: number;
+  material: string | null;
+  weightGrams: number | null;
+  printMinutes: number | null;
+};
+
+/** Productos publicados para el selector "cargar desde la tienda" de una venta
+ * manual: autocompletan detalle, material, gramos, minutos y precio. */
+export async function listProductsForSale(): Promise<ProductForSale[]> {
+  const rows = await findProductsForSale();
+  return rows.map((p) => ({
+    id: p.id,
+    name: p.name,
+    price: Number(p.price),
+    material: p.material,
+    weightGrams: p.weightGrams,
+    printMinutes: p.printTimeMinutes,
+  }));
 }

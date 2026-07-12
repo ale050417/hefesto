@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { EstimatorModalButton } from "@/features/calculator/components/estimator-modal-button";
 import type { EstimatorValue } from "@/features/calculator/components/price-estimator";
 import type { EstimatorContext } from "@/features/calculator/service";
+import type { ProductForSale } from "@/features/products/services/catalogService";
 import { createManualSaleAction } from "../actions";
 import { ORDER_STATUS_LABEL } from "../constants";
 import type { OrderStatus } from "../types";
@@ -39,11 +40,13 @@ type SplitPart = { name: string; pct: string };
 export function ManualSaleForm({
   partners = [],
   estimator,
+  products = [],
   onDone,
   onCancel,
 }: {
   partners?: Array<{ name: string; pct: number }>;
   estimator: EstimatorContext;
+  products?: ProductForSale[];
   onDone?: () => void;
   onCancel?: () => void;
 }) {
@@ -99,6 +102,29 @@ export function ManualSaleForm({
         next.total = String(Math.round(unitPrice * q * 100) / 100);
       }
       return next;
+    });
+  }
+
+  // "Cargar desde la tienda": autocompleta detalle, material, gramos, minutos
+  // y precio desde un producto publicado. La amortización la calcula el
+  // servidor con esos datos (igual que la calculadora, modo material).
+  function pickProduct(id: string) {
+    const p = products.find((x) => x.id === id);
+    if (!p) return;
+    setEstData({
+      filamentId: null,
+      material: p.material ?? "",
+      grams: p.weightGrams ?? 0,
+      printMinutes: p.printMinutes ?? 0,
+    });
+    setUnitPrice(p.price);
+    setForm((f) => {
+      const q = Math.max(1, Math.floor(Number(f.quantity) || 1));
+      return {
+        ...f,
+        detail: p.name,
+        total: String(Math.round(p.price * q * 100) / 100),
+      };
     });
   }
   // Reparto de la ganancia de ESTA venta. "current" = dividir por los socios
@@ -188,6 +214,31 @@ export function ManualSaleForm({
         Registrá una venta ya realizada (por ejemplo, ventas anteriores al
         sistema). Queda en el historial y suma a la facturación.
       </p>
+
+      {products.length > 0 ? (
+        <div className="field">
+          <label htmlFor="ms-prod">
+            Cargar desde un producto de la tienda (opcional)
+          </label>
+          <select
+            id="ms-prod"
+            className="select"
+            defaultValue=""
+            onChange={(e) => pickProduct(e.target.value)}
+          >
+            <option value="">— Elegir un producto publicado —</option>
+            {products.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <div className="text-faint text-[11.5px]">
+            Autocompleta detalle, material, gramos y precio. Podés ajustar lo
+            que haga falta.
+          </div>
+        </div>
+      ) : null}
       {err ? (
         <p className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
           {err}
@@ -253,11 +304,11 @@ export function ManualSaleForm({
           <input
             id="ms-total"
             type="number"
-            min={0}
             className="input"
-            placeholder="0"
+            placeholder="Se completa con la calculadora"
             value={form.total}
-            onChange={(e) => set("total", e.target.value)}
+            readOnly
+            title="El total se calcula con la calculadora (precio × cantidad)"
           />
           <div className="mt-1">
             <EstimatorModalButton estimator={estimator} onUse={handleEstUse} />

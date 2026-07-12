@@ -24,6 +24,7 @@ export type UnifiedSale = {
   paymentMethod: PaymentMethod;
   status: OrderStatus;
   total: number;
+  colors: string[];
 };
 
 const dateFmt = new Intl.DateTimeFormat("es-AR", { dateStyle: "medium" });
@@ -138,6 +139,7 @@ export function OrdersBoard({
                     <th>Tipo</th>
                     <th>Pedido / Detalle</th>
                     <th>Cliente</th>
+                    <th>Color</th>
                     <th>Pago</th>
                     <th>Estado</th>
                     <th className="text-right">Total</th>
@@ -159,6 +161,9 @@ export function OrdersBoard({
                         </div>
                       </td>
                       <td className="text-dim">{o.customerName ?? "—"}</td>
+                      <td className="text-dim">
+                        {o.colors.length ? o.colors.join(", ") : "—"}
+                      </td>
                       <td className="text-dim">
                         {PAYMENT_METHOD_LABEL[o.paymentMethod]}
                       </td>
@@ -213,6 +218,11 @@ export function OrdersBoard({
                   <span>{o.customerName ?? "—"}</span>
                   <span>{PAYMENT_METHOD_LABEL[o.paymentMethod]}</span>
                 </div>
+                {o.colors.length ? (
+                  <div className="text-faint mt-1 text-[12px]">
+                    Color: {o.colors.join(", ")}
+                  </div>
+                ) : null}
                 <div className="border-surface-2 mt-3 flex items-center justify-between border-t pt-3">
                   <div className="text-fg text-lg font-medium">
                     {formatPrice(o.total)}

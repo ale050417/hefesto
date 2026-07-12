@@ -456,3 +456,20 @@ export async function countChildCategories(
     .where(eq(categories.parentId, parentId));
   return row?.count ?? 0;
 }
+
+// Productos PUBLICADOS con lo necesario para cargar una venta manual desde la
+// tienda (detalle, material, gramos, minutos de impresión y precio).
+export async function findProductsForSale() {
+  return db.query.products.findMany({
+    where: eq(products.status, "published"),
+    columns: {
+      id: true,
+      name: true,
+      price: true,
+      material: true,
+      weightGrams: true,
+      printTimeMinutes: true,
+    },
+    orderBy: (pr, { asc }) => [asc(pr.name)],
+  });
+}
