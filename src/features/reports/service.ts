@@ -40,6 +40,21 @@ export function sumDailySeries(
 }
 
 /** Suma dos arrays de 12 meses, posición a posición. */
+/** Combina la facturacion por categoria de tienda + manuales (suma por nombre,
+ * ordena desc). Pura y testeable: una venta manual pesa igual que una de tienda. */
+export function combineCategoryBreakdown(
+  online: Array<{ name: string; revenue: number }>,
+  manual: Array<{ name: string; revenue: number }>,
+): Array<{ name: string; revenue: number }> {
+  const map = new Map<string, number>();
+  for (const r of [...online, ...manual]) {
+    map.set(r.name, (map.get(r.name) ?? 0) + r.revenue);
+  }
+  return [...map.entries()]
+    .map(([name, revenue]) => ({ name, revenue }))
+    .sort((a, b) => b.revenue - a.revenue);
+}
+
 export function sumMonthly(a: number[], b: number[]): number[] {
   return Array.from({ length: 12 }, (_v, i) => (a[i] ?? 0) + (b[i] ?? 0));
 }
@@ -204,6 +219,7 @@ const getReportsOverviewRaw = async (year: number) => {
     monthsPrev,
     manualMonthsPrev,
     categoryBreakdown,
+    manualCategoryBreakdown,
     topProducts,
     bySource,
     failureConsumption,
@@ -217,6 +233,7 @@ const getReportsOverviewRaw = async (year: number) => {
     repo.getMonthlyRevenue(prevYear),
     repo.getManualMonthlyRevenue(prevYear),
     repo.getCategoryBreakdown(),
+    repo.getManualCategoryBreakdown(),
     repo.getTopProducts(6),
     repo.getRevenueBySource(year),
     repo.getFailureConsumption(year),
@@ -247,7 +264,10 @@ const getReportsOverviewRaw = async (year: number) => {
     },
     monthsCurrent: sumMonthly(monthsCurrent, manualMonths),
     monthsPrev: sumMonthly(monthsPrev, manualMonthsPrev),
-    categoryBreakdown,
+    categoryBreakdown: combineCategoryBreakdown(
+      categoryBreakdown,
+      manualCategoryBreakdown,
+    ),
     topProducts,
     bySource,
     consumption,

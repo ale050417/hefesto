@@ -226,3 +226,38 @@ export async function deleteBrandAction(name: string): Promise<ActionResult> {
     return { ok: false, error: toActionError(error) };
   }
 }
+
+export async function addMaterialAction(input: unknown): Promise<ActionResult> {
+  if (!(await can("filamentos", "crear"))) return NOT_STAFF;
+  const parsed = brandSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "Revisá los datos.",
+        fields: fieldErrors(parsed.error),
+      },
+    };
+  }
+  try {
+    await queries.addMaterial(parsed.data);
+    revalidatePath("/admin/filamentos");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+export async function deleteMaterialAction(
+  name: string,
+): Promise<ActionResult> {
+  if (!(await can("filamentos", "eliminar"))) return NOT_STAFF;
+  try {
+    await queries.removeMaterial(name);
+    revalidatePath("/admin/filamentos");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}

@@ -6,12 +6,14 @@ import { toast } from "@/stores/toastStore";
 import {
   addBrandAction,
   addColorAction,
+  addMaterialAction,
   deleteBrandAction,
   deleteColorAction,
+  deleteMaterialAction,
   saveFilamentAction,
 } from "../actions";
 import { runAction } from "@/lib/run-action";
-import { FILAMENT_DIAMETERS, FILAMENT_MATERIALS } from "../constants";
+import { FILAMENT_DIAMETERS } from "../constants";
 
 export type FilamentFormData = {
   id?: string;
@@ -50,12 +52,14 @@ export function FilamentForm({
   filament,
   colorCatalog,
   brandCatalog,
+  materialCatalog,
   onDone,
   onCancel,
 }: {
   filament?: FilamentFormData;
   colorCatalog: CatalogItem[];
   brandCatalog: CatalogItem[];
+  materialCatalog: CatalogItem[];
   onDone?: () => void;
   onCancel?: () => void;
 }) {
@@ -63,6 +67,7 @@ export function FilamentForm({
   const init = filament ?? DEFAULTS;
   const [colors, setColors] = useState<CatalogItem[]>(colorCatalog);
   const [brands, setBrands] = useState<CatalogItem[]>(brandCatalog);
+  const [materials, setMaterials] = useState<CatalogItem[]>(materialCatalog);
   const [form, setForm] = useState({
     material: init.material,
     color: init.color,
@@ -85,6 +90,9 @@ export function FilamentForm({
   });
   const [addingBrand, setAddingBrand] = useState(false);
   const [newBrand, setNewBrand] = useState("");
+  const [addingMaterial, setAddingMaterial] = useState(false);
+  const [newMaterial, setNewMaterial] = useState("");
+  const [deletingMaterial, setDeletingMaterial] = useState(false);
   const [savingCat, setSavingCat] = useState(false);
   const [deletingColor, setDeletingColor] = useState(false);
   const [deletingBrand, setDeletingBrand] = useState(false);
@@ -99,6 +107,10 @@ export function FilamentForm({
   const brandOptions = withCurrent(
     brands.map((b) => b.name),
     form.brand,
+  );
+  const materialOptions = withCurrent(
+    materials.map((m) => m.name),
+    form.material,
   );
   const hexOf = (name: string) =>
     colors.find((c) => c.name === name)?.hex ?? "#888";
@@ -174,6 +186,41 @@ export function FilamentForm({
     toast("Marca eliminada del catálogo", "success");
   }
 
+  async function addNewMaterial() {
+    const name = newMaterial.trim();
+    if (!name) return;
+    setSavingCat(true);
+    const res = await runAction(() => addMaterialAction({ name }), {
+      silent: true,
+    });
+    setSavingCat(false);
+    if (!res.ok) return toast(res.error.message, "danger");
+    setMaterials((m) => [
+      ...m.filter((x) => x.name !== name),
+      { name, hex: null },
+    ]);
+    set("material", name);
+    setNewMaterial("");
+    setAddingMaterial(false);
+    toast("Material agregado al catálogo", "success");
+  }
+
+  async function removeSelectedMaterial() {
+    const name = form.material;
+    if (!name) return;
+    setSavingCat(true);
+    const res = await runAction(() => deleteMaterialAction(name), {
+      silent: true,
+    });
+    setSavingCat(false);
+    if (!res.ok) return toast(res.error.message, "danger");
+    const rest = materials.filter((x) => x.name !== name);
+    setMaterials(rest);
+    set("material", rest[0]?.name ?? "");
+    setDeletingMaterial(false);
+    toast("Material eliminado del catálogo", "success");
+  }
+
   async function submit() {
     setErr(null);
     setBusy(true);
@@ -203,18 +250,82 @@ export function FilamentForm({
       <div className="grid-2">
         <div className="field">
           <label htmlFor="fm-mat">Material</label>
-          <select
-            id="fm-mat"
-            className="select"
-            value={form.material}
-            onChange={(e) => set("material", e.target.value)}
-          >
-            {FILAMENT_MATERIALS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2">
+            <select
+              id="fm-mat"
+              className="select"
+              value={form.material}
+              onChange={(e) => set("material", e.target.value)}
+            >
+              {materialOptions.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setAddingMaterial((v) => !v);
+                setDeletingMaterial(false);
+              }}
+              title="Agregar un material nuevo al catálogo"
+            >
+              ＋
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => {
+                setDeletingMaterial((v) => !v);
+                setAddingMaterial(false);
+              }}
+              title="Eliminar del catálogo el material seleccionado"
+              disabled={!form.material}
+            >
+              🗑
+            </button>
+          </div>
+          {addingMaterial ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <input
+                className="input"
+                placeholder="Nombre del material (ej. PLA Silk)"
+                value={newMaterial}
+                onChange={(e) => setNewMaterial(e.target.value)}
+              />
+              <Button
+                type="button"
+                onClick={addNewMaterial}
+                loading={savingCat}
+              >
+                Agregar
+              </Button>
+            </div>
+          ) : null}
+          {deletingMaterial ? (
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <span>
+                ¿Eliminar <b>{form.material}</b> del catálogo?
+              </span>
+              <Button
+                type="button"
+                variant="danger"
+                onClick={removeSelectedMaterial}
+                loading={savingCat}
+              >
+                Sí, eliminar
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setDeletingMaterial(false)}
+              >
+                No
+              </Button>
+            </div>
+          ) : null}
         </div>
         <div className="field">
           <label htmlFor="fm-color">Color</label>

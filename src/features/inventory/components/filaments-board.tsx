@@ -80,11 +80,13 @@ export function FilamentsBoard({
   materials,
   colorCatalog,
   brandCatalog,
+  materialCatalog,
 }: {
   filaments: FilamentView[];
   materials: string[];
   colorCatalog: CatalogItem[];
   brandCatalog: CatalogItem[];
+  materialCatalog: CatalogItem[];
 }) {
   const [search, setSearch] = useState("");
   const [mat, setMat] = useState("all");
@@ -483,6 +485,7 @@ export function FilamentsBoard({
             }}
             colorCatalog={colorCatalog}
             brandCatalog={brandCatalog}
+            materialCatalog={materialCatalog}
             onDone={() => setEditing(null)}
             onCancel={() => setEditing(null)}
           />

@@ -58,6 +58,12 @@ export default async function PedidosAdminPage() {
   const estimator = estimatorR.value;
   const saleColors = colorsR.value;
   const products = productsR.value;
+  // Categorías para la venta manual (las presentes en el catálogo de productos).
+  const saleCategories = [
+    ...new Set(
+      products.map((p) => p.categoryName).filter((c): c is string => !!c),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "es"));
 
   const degraded: string[] = [];
   if (!ordersR.ok) degraded.push("los pedidos online");
@@ -122,6 +128,7 @@ export default async function PedidosAdminPage() {
           </Link>
           {estimator ? (
             <CargarVentaButton
+              categories={saleCategories}
               partners={partners}
               estimator={estimator}
               products={products}

@@ -24,6 +24,9 @@ export const manualSales = pgTable(
     saleDate: timestamp("sale_date", { withTimezone: true }).notNull(),
     customerName: text("customer_name").notNull(),
     detail: text("detail"),
+    // Categoria (snapshot del nombre) para agrupar en Reportes junto con la
+    // tienda. Nullable: ventas viejas o sin categoria caen en "Sin categoria".
+    category: text("category"),
     // Cantidad de unidades de la venta (fix auditoría 2026-07: antes 80
     // unidades se cargaban una por una o multiplicando a mano). El total es de
     // TODA la venta; la amortización guardada también (unitaria × cantidad).

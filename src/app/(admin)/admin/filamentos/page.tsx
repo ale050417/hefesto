@@ -5,6 +5,7 @@ import { FilamentsBoard } from "@/features/inventory/components/filaments-board"
 import {
   listBrandCatalog,
   listColorCatalog,
+  listMaterialCatalog,
   listFilamentsView,
 } from "@/features/inventory/queries";
 import { DegradedNotice } from "@/components/shared/degraded-notice";
@@ -35,6 +36,9 @@ export default async function FilamentosPage() {
   const colorCatalog = (await safeLoad("colores", listColorCatalog(), []))
     .value;
   const brandCatalog = (await safeLoad("marcas", listBrandCatalog(), [])).value;
+  const materialCatalog = (
+    await safeLoad("materiales", listMaterialCatalog(), [])
+  ).value;
 
   const totalG = filaments.reduce((a, f) => a + f.stockGrams, 0);
   const valor = filaments.reduce(
@@ -62,6 +66,7 @@ export default async function FilamentosPage() {
         <NuevoFilamentoButton
           colorCatalog={colorCatalog}
           brandCatalog={brandCatalog}
+          materialCatalog={materialCatalog}
         />
       </div>
 
@@ -110,6 +115,7 @@ export default async function FilamentosPage() {
         materials={materials}
         colorCatalog={colorCatalog}
         brandCatalog={brandCatalog}
+        materialCatalog={materialCatalog}
       />
     </div>
   );

@@ -58,6 +58,11 @@ export const manualSaleSchema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().trim().max(300).optional(),
   ),
+  // Categoria de la venta (para Reportes por categoria, combinado con tienda).
+  category: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().trim().max(80).optional(),
+  ),
   // Cantidad de unidades (fix auditoría 2026-07: 80 unidades = un registro).
   // El total es de TODA la venta; la amortización se multiplica en el servidor.
   quantity: z.coerce

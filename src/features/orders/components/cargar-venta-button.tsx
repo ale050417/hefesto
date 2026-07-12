@@ -11,10 +11,12 @@ export function CargarVentaButton({
   partners = [],
   estimator,
   products = [],
+  categories = [],
 }: {
   partners?: Array<{ name: string; pct: number }>;
   estimator: EstimatorContext;
   products?: ProductForSale[];
+  categories?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const canCreate = useCan("pedidos", "crear");
@@ -49,6 +51,7 @@ export function CargarVentaButton({
           partners={partners}
           estimator={estimator}
           products={products}
+          categories={categories}
           onDone={() => setOpen(false)}
           onCancel={() => setOpen(false)}
         />

@@ -453,10 +453,11 @@ export async function registerFailureTx(
 }
 
 // --- Catálogo de colores y marcas (0042) ---
+export type CatalogKind = "color" | "brand" | "material";
 export type CatalogRow = { id: string; name: string; hex: string | null };
 
 export async function listFilamentCatalog(
-  kind: "color" | "brand",
+  kind: CatalogKind,
   database: Database = db,
 ): Promise<CatalogRow[]> {
   return database
@@ -471,7 +472,7 @@ export async function listFilamentCatalog(
 }
 
 export async function deleteFilamentCatalog(
-  kind: "color" | "brand",
+  kind: CatalogKind,
   name: string,
   database: Database = db,
 ): Promise<void> {
@@ -481,7 +482,7 @@ export async function deleteFilamentCatalog(
 }
 
 export async function insertFilamentCatalog(
-  kind: "color" | "brand",
+  kind: CatalogKind,
   name: string,
   hex: string | null,
   database: Database = db,

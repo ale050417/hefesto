@@ -8,9 +8,11 @@ import { FilamentForm, type CatalogItem } from "./filament-form";
 export function NuevoFilamentoButton({
   colorCatalog,
   brandCatalog,
+  materialCatalog,
 }: {
   colorCatalog: CatalogItem[];
   brandCatalog: CatalogItem[];
+  materialCatalog: CatalogItem[];
 }) {
   const [open, setOpen] = useState(false);
   const canCreate = useCan("filamentos", "crear");
@@ -44,6 +46,7 @@ export function NuevoFilamentoButton({
         <FilamentForm
           colorCatalog={colorCatalog}
           brandCatalog={brandCatalog}
+          materialCatalog={materialCatalog}
           onDone={() => setOpen(false)}
           onCancel={() => setOpen(false)}
         />

@@ -44,6 +44,7 @@ export function toManualSaleRow(
     saleDate: new Date(`${input.saleDate}T12:00:00`),
     customerName: input.customerName,
     detail: input.detail ?? null,
+    category: input.category ?? null,
     quantity: input.quantity,
     total: input.total.toFixed(2),
     amortization:

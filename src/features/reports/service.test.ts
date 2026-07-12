@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSalesCsv,
+  combineCategoryBreakdown,
   combineSalesConsumption,
   fillDailySeries,
   sumDailySeries,
@@ -128,5 +129,28 @@ describe("combineSalesConsumption (costo de filamento)", () => {
       cost: 4800,
       source: "ventas",
     });
+  });
+});
+
+describe("combineCategoryBreakdown (tienda + manual)", () => {
+  it("suma por nombre y ordena por facturacion desc", () => {
+    const rows = combineCategoryBreakdown(
+      [
+        { name: "Llaveros", revenue: 100 },
+        { name: "Deco", revenue: 50 },
+      ],
+      [
+        { name: "Llaveros", revenue: 30 },
+        { name: "Sin categoria", revenue: 200 },
+      ],
+    );
+    expect(rows).toEqual([
+      { name: "Sin categoria", revenue: 200 },
+      { name: "Llaveros", revenue: 130 },
+      { name: "Deco", revenue: 50 },
+    ]);
+  });
+  it("listas vacias -> []", () => {
+    expect(combineCategoryBreakdown([], [])).toEqual([]);
   });
 });

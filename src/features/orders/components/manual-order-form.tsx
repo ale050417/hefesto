@@ -41,12 +41,14 @@ export function ManualSaleForm({
   partners = [],
   estimator,
   products = [],
+  categories = [],
   onDone,
   onCancel,
 }: {
   partners?: Array<{ name: string; pct: number }>;
   estimator: EstimatorContext;
   products?: ProductForSale[];
+  categories?: string[];
   onDone?: () => void;
   onCancel?: () => void;
 }) {
@@ -55,6 +57,7 @@ export function ManualSaleForm({
     saleDate: today(),
     customerName: "",
     detail: "",
+    category: "",
     quantity: "1",
     paymentMethod: "cash" as (typeof PAYS)[number]["v"],
     status: "pending_payment" as (typeof STATUSES)[number]["v"],
@@ -178,7 +181,11 @@ export function ManualSaleForm({
       printMinutes: p.printMinutes ?? 0,
     });
     setUnitPrice(p.price);
-    setForm((f) => ({ ...f, detail: p.name }));
+    setForm((f) => ({
+      ...f,
+      detail: p.name,
+      category: p.categoryName ?? f.category,
+    }));
   }
   // Reparto de la ganancia de ESTA venta. "current" = dividir por los socios
   // actuales (no se manda nada; lo resuelve Ganancias). "custom" = guardar este
@@ -473,6 +480,26 @@ export function ManualSaleForm({
               {qtyN} × ${unitPrice.toLocaleString("es-AR")} c/u
             </div>
           ) : null}
+        </div>
+      </div>
+
+      <div className="field">
+        <label htmlFor="ms-cat">Categoría</label>
+        <select
+          id="ms-cat"
+          className="select"
+          value={form.category}
+          onChange={(e) => set("category", e.target.value)}
+        >
+          <option value="">Sin categoría</option>
+          {categories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <div className="text-faint text-[11.5px]">
+          Para que la venta sume en “ventas por categoría” del reporte.
         </div>
       </div>
 

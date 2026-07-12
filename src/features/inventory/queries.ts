@@ -189,6 +189,10 @@ export function listBrandCatalog(): Promise<CatalogItem[]> {
   return repo.listFilamentCatalog("brand");
 }
 
+export function listMaterialCatalog(): Promise<CatalogItem[]> {
+  return repo.listFilamentCatalog("material");
+}
+
 export async function addColor(input: {
   name: string;
   hex?: string | null;
@@ -200,12 +204,20 @@ export async function addBrand(input: { name: string }): Promise<void> {
   await repo.insertFilamentCatalog("brand", input.name, null);
 }
 
+export async function addMaterial(input: { name: string }): Promise<void> {
+  await repo.insertFilamentCatalog("material", input.name, null);
+}
+
 export async function removeColor(name: string): Promise<void> {
   await repo.deleteFilamentCatalog("color", name);
 }
 
 export async function removeBrand(name: string): Promise<void> {
   await repo.deleteFilamentCatalog("brand", name);
+}
+
+export async function removeMaterial(name: string): Promise<void> {
+  await repo.deleteFilamentCatalog("material", name);
 }
 
 // Mapa refId -> colores usados (para la columna de color del listado de ventas).

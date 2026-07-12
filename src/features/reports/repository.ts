@@ -239,6 +239,23 @@ export async function getCategoryBreakdown(
     .orderBy(desc(sql`coalesce(sum(${orderItems.lineTotal}), 0)`));
 }
 
+/** Facturacion por categoria de las VENTAS MANUALES (snapshot de nombre). Sin
+ * categoria -> "Sin categoria". Se combina con la de tienda en el service. */
+export async function getManualCategoryBreakdown(
+  database: Database = db,
+): Promise<Array<{ name: string; revenue: number }>> {
+  const label = sql<string>`coalesce(nullif(${manualSales.category}, ''), 'Sin categoria')`;
+  return database
+    .select({
+      name: label,
+      revenue: sql<number>`coalesce(sum(${manualSales.total}), 0)::float8`,
+    })
+    .from(manualSales)
+    .where(inArray(manualSales.status, SALES_STATUSES))
+    .groupBy(label)
+    .orderBy(desc(sql`coalesce(sum(${manualSales.total}), 0)`));
+}
+
 export async function getSalesForCsv(
   from: Date,
   to: Date,
