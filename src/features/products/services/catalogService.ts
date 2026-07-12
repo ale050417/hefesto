@@ -504,6 +504,7 @@ export type ProductForSale = {
   material: string | null;
   weightGrams: number | null;
   printMinutes: number | null;
+  categoryName: string | null;
 };
 
 /** Productos publicados para el selector "cargar desde la tienda" de una venta
@@ -517,5 +518,6 @@ export async function listProductsForSale(): Promise<ProductForSale[]> {
     material: p.material,
     weightGrams: p.weightGrams,
     printMinutes: p.printTimeMinutes,
+    categoryName: p.categoryName,
   }));
 }

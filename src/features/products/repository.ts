@@ -460,16 +460,18 @@ export async function countChildCategories(
 // Productos PUBLICADOS con lo necesario para cargar una venta manual desde la
 // tienda (detalle, material, gramos, minutos de impresión y precio).
 export async function findProductsForSale() {
-  return db.query.products.findMany({
-    where: eq(products.status, "published"),
-    columns: {
-      id: true,
-      name: true,
-      price: true,
-      material: true,
-      weightGrams: true,
-      printTimeMinutes: true,
-    },
-    orderBy: (pr, { asc }) => [asc(pr.name)],
-  });
+  return db
+    .select({
+      id: products.id,
+      name: products.name,
+      price: products.price,
+      material: products.material,
+      weightGrams: products.weightGrams,
+      printTimeMinutes: products.printTimeMinutes,
+      categoryName: categories.name,
+    })
+    .from(products)
+    .leftJoin(categories, eq(products.categoryId, categories.id))
+    .where(eq(products.status, "published"))
+    .orderBy(asc(products.name));
 }

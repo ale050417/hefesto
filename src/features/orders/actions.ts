@@ -181,10 +181,14 @@ export async function createManualSaleAction(
     total: parsed.data.total,
     quantity: parsed.data.quantity,
   });
+  // Insumos: su costo suma a la amortización (costo real). El total ya los
+  // incluye (los sumó el cliente), así la ganancia queda igual (pass-through).
+  const extrasCost = parsed.data.extrasCost ?? 0;
+  const amortization = costs.amortization + extrasCost;
   const withCosts = {
     ...parsed.data,
-    amortization: costs.amortization,
-    profit: costs.profit,
+    amortization,
+    profit: parsed.data.total - amortization,
   };
   try {
     const sale = await createManualSale(withCosts, user?.id ?? null);

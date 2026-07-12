@@ -56,7 +56,6 @@ export function ManualSaleForm({
     customerName: "",
     detail: "",
     quantity: "1",
-    total: "",
     paymentMethod: "cash" as (typeof PAYS)[number]["v"],
     status: "delivered" as (typeof STATUSES)[number]["v"],
   });
@@ -71,8 +70,34 @@ export function ManualSaleForm({
   // Precio UNITARIO que dio la calculadora: el total = unitario × cantidad
   // (editable a mano igual).
   const [unitPrice, setUnitPrice] = useState<number | null>(null);
+  const [extras, setExtras] = useState<
+    Array<{ name: string; cost: string; qty: string }>
+  >([]);
+  const [prodSearch, setProdSearch] = useState("");
+  const [prodCat, setProdCat] = useState("all");
 
   const qtyN = Math.max(1, Math.floor(Number(form.quantity) || 1));
+  const extrasCost = extras.reduce(
+    (a, e) => a + (Number(e.cost) || 0) * (Number(e.qty) || 0),
+    0,
+  );
+  const total = Math.round(((unitPrice ?? 0) * qtyN + extrasCost) * 100) / 100;
+  const setExtra = (i: number, k: "name" | "cost" | "qty", v: string) =>
+    setExtras((es) => es.map((e, j) => (j === i ? { ...e, [k]: v } : e)));
+  const addExtra = () =>
+    setExtras((es) => [...es, { name: "", cost: "", qty: "1" }]);
+  const removeExtra = (i: number) =>
+    setExtras((es) => es.filter((_, j) => j !== i));
+  const prodCategories = [
+    ...new Set(
+      products.map((p) => p.categoryName).filter((c): c is string => !!c),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "es"));
+  const filteredProducts = products.filter((p) => {
+    if (prodCat !== "all" && p.categoryName !== prodCat) return false;
+    const q = prodSearch.trim().toLowerCase();
+    return !q || p.name.toLowerCase().includes(q);
+  });
 
   // Calculadora flotante (obligatoria): al "Usar precio" copia el total
   // (unitario × cantidad) y guarda gramos/horas/filamento para la amortización.
@@ -83,26 +108,13 @@ export function ManualSaleForm({
       grams: v.grams,
       printMinutes: v.printMinutes,
     });
-    if (v.price != null) {
-      setUnitPrice(v.price);
-      setForm((f) => {
-        const q = Math.max(1, Math.floor(Number(f.quantity) || 1));
-        return { ...f, total: String(Math.round(v.price! * q * 100) / 100) };
-      });
-    }
+    if (v.price != null) setUnitPrice(v.price);
   }
 
   // Si cambia la cantidad y hay precio unitario de la calculadora, el total se
   // recalcula solo (sigue siendo editable a mano después).
   function handleQtyChange(value: string) {
-    setForm((f) => {
-      const q = Math.max(1, Math.floor(Number(value) || 1));
-      const next = { ...f, quantity: value };
-      if (unitPrice != null) {
-        next.total = String(Math.round(unitPrice * q * 100) / 100);
-      }
-      return next;
-    });
+    setForm((f) => ({ ...f, quantity: value }));
   }
 
   // "Cargar desde la tienda": autocompleta detalle, material, gramos, minutos
@@ -118,14 +130,7 @@ export function ManualSaleForm({
       printMinutes: p.printMinutes ?? 0,
     });
     setUnitPrice(p.price);
-    setForm((f) => {
-      const q = Math.max(1, Math.floor(Number(f.quantity) || 1));
-      return {
-        ...f,
-        detail: p.name,
-        total: String(Math.round(p.price * q * 100) / 100),
-      };
-    });
+    setForm((f) => ({ ...f, detail: p.name }));
   }
   // Reparto de la ganancia de ESTA venta. "current" = dividir por los socios
   // actuales (no se manda nada; lo resuelve Ganancias). "custom" = guardar este
@@ -180,6 +185,8 @@ export function ManualSaleForm({
         () =>
           createManualSaleAction({
             ...form,
+            total,
+            extrasCost,
             quantity: qtyN,
             filamentId: estData.filamentId ?? "",
             material: estData.material,
@@ -217,25 +224,61 @@ export function ManualSaleForm({
 
       {products.length > 0 ? (
         <div className="field">
-          <label htmlFor="ms-prod">
-            Cargar desde un producto de la tienda (opcional)
-          </label>
-          <select
-            id="ms-prod"
-            className="select"
-            defaultValue=""
-            onChange={(e) => pickProduct(e.target.value)}
-          >
-            <option value="">— Elegir un producto publicado —</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <label>Cargar desde un producto de la tienda (opcional)</label>
+          <div className="flex flex-wrap gap-2">
+            <input
+              className="input flex-1"
+              style={{ minWidth: 160 }}
+              placeholder="Buscar producto…"
+              value={prodSearch}
+              onChange={(e) => setProdSearch(e.target.value)}
+            />
+            <select
+              className="select"
+              style={{ maxWidth: 190 }}
+              value={prodCat}
+              onChange={(e) => setProdCat(e.target.value)}
+            >
+              <option value="all">Todas las categorías</option>
+              {prodCategories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="mt-2 max-h-48 overflow-auto rounded-md border border-[var(--border)]">
+            {filteredProducts.length === 0 ? (
+              <div className="text-faint p-3 text-[12.5px]">
+                Sin resultados.
+              </div>
+            ) : (
+              filteredProducts.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="hover:bg-surface-2 flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm"
+                  onClick={() => {
+                    pickProduct(p.id);
+                    setProdSearch("");
+                  }}
+                >
+                  <span className="truncate">
+                    {p.name}
+                    {p.categoryName ? (
+                      <span className="text-faint"> · {p.categoryName}</span>
+                    ) : null}
+                  </span>
+                  <span className="text-faint text-[12px]">
+                    ${p.price.toLocaleString("es-AR")}
+                  </span>
+                </button>
+              ))
+            )}
+          </div>
           <div className="text-faint text-[11.5px]">
-            Autocompleta detalle, material, gramos y precio. Podés ajustar lo
-            que haga falta.
+            Autocompleta detalle, material, gramos y precio. Ajustá lo que haga
+            falta.
           </div>
         </div>
       ) : null}
@@ -306,9 +349,9 @@ export function ManualSaleForm({
             type="number"
             className="input"
             placeholder="Se completa con la calculadora"
-            value={form.total}
+            value={total > 0 ? total : ""}
             readOnly
-            title="El total se calcula con la calculadora (precio × cantidad)"
+            title="Precio (calculadora/producto) × cantidad + insumos"
           />
           <div className="mt-1">
             <EstimatorModalButton estimator={estimator} onUse={handleEstUse} />
@@ -328,6 +371,65 @@ export function ManualSaleForm({
               </option>
             ))}
           </select>
+        </div>
+      </div>
+
+      <div className="field">
+        <label>Insumos adicionales (opcional)</label>
+        <p className="text-faint text-[12px] leading-relaxed">
+          Argollas, vaso del chop, polímero, etc. Su costo se suma al total y a
+          la amortización (costo real de la venta).
+        </p>
+        {extras.map((e, i) => (
+          <div key={i} className="mt-2 flex items-center gap-2">
+            <input
+              className="input flex-1"
+              placeholder="Ej: argollas, vaso de aluminio"
+              value={e.name}
+              onChange={(ev) => setExtra(i, "name", ev.target.value)}
+            />
+            <input
+              className="input"
+              style={{ width: 120 }}
+              type="number"
+              min={0}
+              placeholder="Costo c/u"
+              value={e.cost}
+              onChange={(ev) => setExtra(i, "cost", ev.target.value)}
+            />
+            <span className="text-faint text-[12px]">×</span>
+            <input
+              className="input"
+              style={{ width: 80 }}
+              type="number"
+              min={1}
+              placeholder="Cant."
+              value={e.qty}
+              onChange={(ev) => setExtra(i, "qty", ev.target.value)}
+            />
+            <button
+              type="button"
+              className="btn btn-ghost btn-icon"
+              onClick={() => removeExtra(i)}
+              aria-label="Quitar insumo"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={addExtra}
+          >
+            + Agregar insumo
+          </button>
+          {extrasCost > 0 ? (
+            <span className="text-faint ml-auto text-[12px]">
+              Insumos: ${extrasCost.toLocaleString("es-AR")}
+            </span>
+          ) : null}
         </div>
       </div>
 

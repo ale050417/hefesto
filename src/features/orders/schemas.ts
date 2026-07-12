@@ -80,6 +80,9 @@ export const manualSaleSchema = z.object({
   ),
   grams: z.coerce.number().min(0).optional(),
   printMinutes: z.coerce.number().min(0).optional(),
+  // Insumos/agregados (argollas, vaso del chop, polímero, etc.): su costo TOTAL
+  // (ya calculado en el cliente) suma al total cobrado y a la amortización.
+  extrasCost: z.coerce.number().min(0).optional(),
   // Costos resueltos en el servidor (no se confía en el cliente).
   amortization: z.coerce.number().min(0).optional(),
   profit: z.coerce.number().optional(),
