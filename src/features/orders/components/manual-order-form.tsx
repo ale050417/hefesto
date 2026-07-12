@@ -77,7 +77,7 @@ export function ManualSaleForm({
   const [prodCat, setProdCat] = useState("all");
   const [colorLines, setColorLines] = useState<
     Array<{ filamentId: string; grams: string }>
-  >([]);
+  >([{ filamentId: "", grams: "" }]);
 
   const qtyN = Math.max(1, Math.floor(Number(form.quantity) || 1));
   const extrasCost = extras.reduce(
@@ -96,7 +96,7 @@ export function ManualSaleForm({
   const addColorLine = () =>
     setColorLines((ls) => [...ls, { filamentId: "", grams: "" }]);
   const removeColorLine = (i: number) =>
-    setColorLines((ls) => ls.filter((_, j) => j !== i));
+    setColorLines((ls) => (ls.length <= 1 ? ls : ls.filter((_, j) => j !== i)));
   const colorGramsTotal = colorLines.reduce(
     (a, l) => a + (Number(l.grams) || 0),
     0,
@@ -115,7 +115,6 @@ export function ManualSaleForm({
   // Calculadora flotante (obligatoria): al "Usar precio" copia el total
   // (unitario × cantidad) y guarda gramos/horas/filamento para la amortización.
   function handleEstUse(v: EstimatorValue) {
-    setColorLines([]);
     setEstData({
       filamentId: v.filamentId,
       material: v.material,
@@ -123,6 +122,10 @@ export function ManualSaleForm({
       printMinutes: v.printMinutes,
     });
     if (v.price != null) setUnitPrice(v.price);
+    // La calculadora eligió un filamento: lo dejo como primera línea de color.
+    if (v.filamentId) {
+      setColorLines([{ filamentId: v.filamentId, grams: String(v.grams) }]);
+    }
   }
 
   // Si cambia la cantidad y hay precio unitario de la calculadora, el total se
@@ -208,6 +211,13 @@ export function ManualSaleForm({
     if (!estData) {
       return setErr(
         "Calculá el precio con la calculadora (la amortización es obligatoria).",
+      );
+    }
+    if (
+      colorLines.filter((l) => l.filamentId && Number(l.grams) > 0).length === 0
+    ) {
+      return setErr(
+        "Elegí al menos un color/carrete y sus gramos (se descuenta del stock).",
       );
     }
     setBusy(true);
@@ -340,9 +350,9 @@ export function ManualSaleForm({
         <div className="field">
           <label>Colores usados (descuenta stock)</label>
           <p className="text-faint text-[12px] leading-relaxed">
-            Cuántos gramos de cada color/carrete. Se descuenta de cada uno; si
-            falta stock, la venta se registra igual y te avisa por notificación
-            para reponer.
+            Obligatorio: elegí el/los color(es) y cuántos gramos de cada
+            carrete. Se descuenta de cada uno; si falta stock, la venta se
+            registra igual y te avisa por notificación para reponer.
           </p>
           {colorLines.map((ln, i) => (
             <div key={i} className="mt-2 flex items-center gap-2">
