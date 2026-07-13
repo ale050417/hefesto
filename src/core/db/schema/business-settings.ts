@@ -36,10 +36,15 @@ export const businessSettings = pgTable(
     homeSections: jsonb("home_sections").$type<Record<string, boolean>>(),
     // Datos fiscales / operativos (pestaña Negocio).
     cuit: text("cuit"),
-    hours:
-      jsonb("hours").$type<
-        Array<{ label: string; from: string; to: string; on: boolean }>
-      >(),
+    // Cada día tiene dos turnos: mañana y tarde, cada uno con su on/desde/hasta.
+    // (Formato viejo {label,from,to,on} se normaliza al leer en el form.)
+    hours: jsonb("hours").$type<
+      Array<{
+        label: string;
+        morning: { on: boolean; from: string; to: string };
+        afternoon: { on: boolean; from: string; to: string };
+      }>
+    >(),
     pickupEnabled: boolean("pickup_enabled").notNull().default(true),
     deliveryEnabled: boolean("delivery_enabled").notNull().default(true),
     updatedAt: timestamp("updated_at", { withTimezone: true })

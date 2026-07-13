@@ -125,9 +125,16 @@ const businessInfoSchema = z.object({
     .array(
       z.object({
         label: z.string().trim().max(40),
-        from: z.string().trim().max(10),
-        to: z.string().trim().max(10),
-        on: z.boolean(),
+        morning: z.object({
+          on: z.boolean(),
+          from: z.string().trim().max(10),
+          to: z.string().trim().max(10),
+        }),
+        afternoon: z.object({
+          on: z.boolean(),
+          from: z.string().trim().max(10),
+          to: z.string().trim().max(10),
+        }),
       }),
     )
     .optional(),

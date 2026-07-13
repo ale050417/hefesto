@@ -7,12 +7,98 @@ import { saveBusinessInfoAction } from "../actions";
 import type { BusinessSettings } from "../types";
 import { runAction } from "@/lib/run-action";
 
-type Hour = { label: string; from: string; to: string; on: boolean };
+type Shift = { on: boolean; from: string; to: string };
+type Hour = { label: string; morning: Shift; afternoon: Shift };
+const OFF: Shift = { on: false, from: "", to: "" };
 const DEFAULT_HOURS: Hour[] = [
-  { label: "Lun a Vie", from: "09:00", to: "19:00", on: true },
-  { label: "Sábados", from: "09:00", to: "13:00", on: true },
-  { label: "Domingos", from: "", to: "", on: false },
+  {
+    label: "Lun a Vie",
+    morning: { on: true, from: "09:00", to: "13:00" },
+    afternoon: { on: true, from: "16:00", to: "20:00" },
+  },
+  {
+    label: "Sábados",
+    morning: { on: true, from: "09:00", to: "13:00" },
+    afternoon: { ...OFF },
+  },
+  { label: "Domingos", morning: { ...OFF }, afternoon: { ...OFF } },
 ];
+
+// Acepta el formato nuevo (mañana/tarde) o el viejo ({from,to,on}) y devuelve
+// siempre el nuevo: el rango viejo pasa al turno "mañana".
+function normalizeHours(raw: unknown): Hour[] {
+  if (!Array.isArray(raw) || raw.length === 0) return DEFAULT_HOURS;
+  const toShift = (s: unknown): Shift => {
+    const o = (s ?? {}) as Record<string, unknown>;
+    return {
+      on: Boolean(o.on),
+      from: String(o.from ?? ""),
+      to: String(o.to ?? ""),
+    };
+  };
+  return raw.map((r) => {
+    const h = (r ?? {}) as Record<string, unknown>;
+    const label = String(h.label ?? "");
+    if (h.morning || h.afternoon) {
+      return {
+        label,
+        morning: toShift(h.morning),
+        afternoon: toShift(h.afternoon),
+      };
+    }
+    return { label, morning: toShift(h), afternoon: { ...OFF } };
+  });
+}
+
+// Fila de un turno (Mañana/Tarde). Responsive: envuelve en pantallas chicas.
+function ShiftRow({
+  label,
+  shift,
+  onToggle,
+  onChange,
+}: {
+  label: string;
+  shift: Shift;
+  onToggle: () => void;
+  onChange: (patch: Partial<Shift>) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        role="switch"
+        aria-checked={shift.on}
+        aria-label={label}
+        className={`switch ${shift.on ? "on" : ""}`}
+        onClick={onToggle}
+      />
+      <span className="text-faint text-[12.5px]" style={{ width: 46 }}>
+        {label}
+      </span>
+      {shift.on ? (
+        <div className="flex items-center gap-1">
+          <input
+            type="time"
+            className="input"
+            style={{ width: "auto", padding: "6px 9px" }}
+            value={shift.from}
+            onChange={(e) => onChange({ from: e.target.value })}
+          />
+          <span className="text-faint">a</span>
+          <input
+            type="time"
+            className="input"
+            style={{ width: "auto", padding: "6px 9px" }}
+            value={shift.to}
+            onChange={(e) => onChange({ to: e.target.value })}
+          />
+        </div>
+      ) : (
+        <span className="text-faint text-[12px]">Cerrado</span>
+      )}
+    </div>
+  );
+}
 
 export function BusinessConfigForm({
   settings,
@@ -30,10 +116,8 @@ export function BusinessConfigForm({
     addressText: settings?.addressText ?? "",
     description: settings?.description ?? "",
   });
-  const [hours, setHours] = useState<Hour[]>(
-    settings?.hours && settings.hours.length > 0
-      ? settings.hours
-      : DEFAULT_HOURS,
+  const [hours, setHours] = useState<Hour[]>(() =>
+    normalizeHours(settings?.hours),
   );
   const [pickup, setPickup] = useState(settings?.pickupEnabled ?? true);
   const [delivery, setDelivery] = useState(settings?.deliveryEnabled ?? true);
@@ -42,8 +126,18 @@ export function BusinessConfigForm({
 
   const set = (k: keyof typeof form, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
-  const setHour = (i: number, patch: Partial<Hour>) =>
-    setHours((hs) => hs.map((h, j) => (j === i ? { ...h, ...patch } : h)));
+  const setLabel = (i: number, label: string) =>
+    setHours((hs) => hs.map((h, j) => (j === i ? { ...h, label } : h)));
+  const setShift = (
+    i: number,
+    key: "morning" | "afternoon",
+    patch: Partial<Shift>,
+  ) =>
+    setHours((hs) =>
+      hs.map((h, j) =>
+        j === i ? { ...h, [key]: { ...h[key], ...patch } } : h,
+      ),
+    );
 
   async function submit() {
     setErr(null);
@@ -72,8 +166,9 @@ export function BusinessConfigForm({
   }
 
   return (
-    <div className="grid-2" style={{ alignItems: "start" }}>
-      {/* Columna 1 — Información del negocio */}
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+      {/* Columna 1 — Información del negocio (paneles apilados en tablet; lado
+          a lado en desktop ≥1024, porque el sidebar reduce el ancho útil). */}
       <div className="ui-card section-card flex flex-col gap-4">
         <div className="section-title">Información del negocio</div>
         <div className="grid-2">
@@ -181,51 +276,46 @@ export function BusinessConfigForm({
         <div className="field">
           <label>Horario de atención</label>
           <div className="flex flex-col gap-2">
-            {hours.map((h, i) => (
-              <div
-                key={i}
-                className="ui-card flex items-center gap-2"
-                style={{ padding: "9px 12px" }}
-              >
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={h.on}
-                  aria-label={h.label}
-                  className={`switch ${h.on ? "on" : ""}`}
-                  onClick={() => setHour(i, { on: !h.on })}
-                />
-                <input
-                  className="input"
-                  style={{ width: 110, padding: "6px 9px" }}
-                  value={h.label}
-                  onChange={(e) => setHour(i, { label: e.target.value })}
-                />
-                <div className="ml-auto flex items-center gap-1">
-                  {h.on ? (
-                    <>
-                      <input
-                        type="time"
-                        className="input"
-                        style={{ width: "auto", padding: "6px 9px" }}
-                        value={h.from}
-                        onChange={(e) => setHour(i, { from: e.target.value })}
-                      />
-                      <span className="text-faint">a</span>
-                      <input
-                        type="time"
-                        className="input"
-                        style={{ width: "auto", padding: "6px 9px" }}
-                        value={h.to}
-                        onChange={(e) => setHour(i, { to: e.target.value })}
-                      />
-                    </>
-                  ) : (
-                    <span className="badge badge-neutral">Cerrado</span>
-                  )}
+            {hours.map((h, i) => {
+              const closed = !h.morning.on && !h.afternoon.on;
+              return (
+                <div
+                  key={i}
+                  className="ui-card flex flex-col gap-2.5"
+                  style={{ padding: "10px 12px" }}
+                >
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="input font-semibold"
+                      style={{ maxWidth: 150, padding: "6px 9px" }}
+                      value={h.label}
+                      onChange={(e) => setLabel(i, e.target.value)}
+                    />
+                    {closed ? (
+                      <span className="badge badge-neutral ml-auto">
+                        Cerrado
+                      </span>
+                    ) : null}
+                  </div>
+                  <ShiftRow
+                    label="Mañana"
+                    shift={h.morning}
+                    onToggle={() =>
+                      setShift(i, "morning", { on: !h.morning.on })
+                    }
+                    onChange={(patch) => setShift(i, "morning", patch)}
+                  />
+                  <ShiftRow
+                    label="Tarde"
+                    shift={h.afternoon}
+                    onToggle={() =>
+                      setShift(i, "afternoon", { on: !h.afternoon.on })
+                    }
+                    onChange={(patch) => setShift(i, "afternoon", patch)}
+                  />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
