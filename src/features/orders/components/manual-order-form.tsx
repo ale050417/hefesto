@@ -198,6 +198,7 @@ export function ManualSaleForm({
   );
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [step, setStep] = useState(0);
 
   const set = (k: keyof typeof form, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -289,433 +290,497 @@ export function ManualSaleForm({
           : "ui-card flex max-w-2xl flex-col gap-4 p-6"
       }
     >
-      <p className="text-faint text-[12.5px] leading-relaxed">
-        Registrá una venta ya realizada (por ejemplo, ventas anteriores al
-        sistema). Queda en el historial y suma a la facturación.
-      </p>
-
-      {products.length > 0 ? (
-        <div className="field">
-          <label>Cargar desde un producto de la tienda (opcional)</label>
-          <div className="flex flex-wrap gap-2">
-            <input
-              className="input flex-1"
-              style={{ minWidth: 160 }}
-              placeholder="Buscar producto…"
-              value={prodSearch}
-              onChange={(e) => setProdSearch(e.target.value)}
-            />
-            <select
-              className="select"
-              style={{ maxWidth: 190 }}
-              value={prodCat}
-              onChange={(e) => setProdCat(e.target.value)}
-            >
-              <option value="all">Todas las categorías</option>
-              {prodCategories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-          {!prodSearch.trim() ? (
-            <div className="text-faint mt-2 text-[11.5px]">
-              Escribí arriba para buscar un producto de la tienda.
-            </div>
-          ) : (
-            <div className="mt-2 max-h-48 overflow-auto rounded-md border border-[var(--border)]">
-              {filteredProducts.length === 0 ? (
-                <div className="text-faint p-3 text-[12.5px]">
-                  Sin resultados.
-                </div>
-              ) : (
-                filteredProducts.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className="hover:bg-surface-2 flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm"
-                    onClick={() => {
-                      pickProduct(p.id);
-                      setProdSearch("");
-                    }}
-                  >
-                    <span className="truncate">
-                      {p.name}
-                      {p.categoryName ? (
-                        <span className="text-faint"> · {p.categoryName}</span>
-                      ) : null}
-                    </span>
-                    <span className="text-faint text-[12px]">
-                      ${p.price.toLocaleString("es-AR")}
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-          )}
-          <div className="text-faint text-[11.5px]">
-            Autocompleta detalle, material, gramos y precio. Ajustá lo que haga
-            falta.
-          </div>
-        </div>
-      ) : null}
-
-      {colorLines.length > 0 ? (
-        <div className="field">
-          <label>Colores usados (descuenta stock)</label>
-          <p className="text-faint text-[12px] leading-relaxed">
-            Obligatorio: elegí el/los color(es) y cuántos gramos de cada
-            carrete. Se descuenta de cada uno; si falta stock, la venta se
-            registra igual y te avisa por notificación para reponer.
-          </p>
-          {colorLines.map((ln, i) => (
-            <div key={i} className="mt-2 flex items-center gap-2">
-              <select
-                className="select flex-1"
-                value={ln.filamentId}
-                onChange={(e) => setColorLine(i, "filamentId", e.target.value)}
+      <div className="flex items-center gap-2">
+        {["Producto y cliente", "Precio e insumos", "Estado y reparto"].map(
+          (label, i) => (
+            <div key={label} className="flex flex-1 items-center gap-2">
+              <div
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold ${
+                  i === step
+                    ? "bg-[var(--gold)] text-black"
+                    : i < step
+                      ? "bg-[rgba(var(--gold-rgb),.2)] text-[var(--gold-bright)]"
+                      : "text-dim bg-[var(--surface-2)]"
+                }`}
               >
-                <option value="">— Elegí color / carrete —</option>
-                {estimator.filaments.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.material} · {f.color}
-                  </option>
-                ))}
-              </select>
-              <input
-                className="input"
-                style={{ width: 100 }}
-                type="number"
-                min={0}
-                placeholder="gramos"
-                value={ln.grams}
-                onChange={(e) => setColorLine(i, "grams", e.target.value)}
-              />
-              <span className="text-faint text-[12px]">g</span>
-              <button
-                type="button"
-                className="btn btn-ghost btn-icon"
-                onClick={() => removeColorLine(i)}
-                aria-label="Quitar color"
+                {i < step ? "✓" : i + 1}
+              </div>
+              <span
+                className={`text-[12px] ${i === step ? "text-fg font-medium" : "text-faint"}`}
               >
-                ×
-              </button>
+                {label}
+              </span>
             </div>
-          ))}
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={addColorLine}
-            >
-              + Agregar color
-            </button>
-            <span className="text-faint ml-auto text-[12px]">
-              Calculado: {calcGrams ?? "—"} g · Colores: {colorGramsTotal} g
-            </span>
-          </div>
-          {gramsMismatch ? (
-            <p className="bg-warning/10 text-warning mt-2 rounded-md px-3 py-2 text-[12px]">
-              ⚠ El total de los colores ({colorGramsTotal} g) no coincide con el
-              peso calculado ({calcGrams} g). Ajustá los gramos: del stock se
-              descuenta lo que pongas acá.
-            </p>
-          ) : null}
-        </div>
-      ) : null}
+          ),
+        )}
+      </div>
       {err ? (
         <p className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
           {err}
         </p>
       ) : null}
 
-      <div className="grid-2">
-        <div className="field">
-          <label htmlFor="ms-date">Fecha</label>
-          <input
-            id="ms-date"
-            type="date"
-            className="input"
-            value={form.saleDate}
-            onChange={(e) => set("saleDate", e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="ms-cust">Cliente</label>
-          <input
-            id="ms-cust"
-            className="input"
-            placeholder="Nombre del cliente"
-            value={form.customerName}
-            onChange={(e) => set("customerName", e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="grid-2">
-        <div className="field">
-          <label htmlFor="ms-det">Detalle / producto</label>
-          <input
-            id="ms-det"
-            className="input"
-            placeholder="Ej: llavero personalizado"
-            value={form.detail}
-            onChange={(e) => set("detail", e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="ms-qty">Cantidad</label>
-          <input
-            id="ms-qty"
-            type="number"
-            min={1}
-            max={9999}
-            className="input"
-            value={form.quantity}
-            onChange={(e) => handleQtyChange(e.target.value)}
-          />
-          {unitPrice != null && qtyN > 1 ? (
-            <div className="text-faint text-[11.5px]">
-              {qtyN} × ${unitPrice.toLocaleString("es-AR")} c/u
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="field">
-        <label htmlFor="ms-cat">Categoría</label>
-        <select
-          id="ms-cat"
-          className="select"
-          value={form.category}
-          onChange={(e) => set("category", e.target.value)}
-        >
-          <option value="">Sin categoría</option>
-          {categories.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        <div className="text-faint text-[11.5px]">
-          Para que la venta sume en “ventas por categoría” del reporte.
-        </div>
-      </div>
-
-      <div className="grid-2">
-        <div className="field">
-          <label htmlFor="ms-total">Total cobrado (ARS)</label>
-          <input
-            id="ms-total"
-            type="number"
-            className="input"
-            placeholder="Se completa con la calculadora"
-            value={total > 0 ? total : ""}
-            readOnly
-            title="Precio (calculadora/producto) × cantidad + insumos"
-          />
-          <div className="mt-1">
-            <EstimatorModalButton estimator={estimator} onUse={handleEstUse} />
-          </div>
-        </div>
-        <div className="field">
-          <label htmlFor="ms-pay">Método de pago</label>
-          <select
-            id="ms-pay"
-            className="select"
-            value={form.paymentMethod}
-            onChange={(e) => set("paymentMethod", e.target.value)}
-          >
-            {PAYS.map((p) => (
-              <option key={p.v} value={p.v}>
-                {p.l}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="field">
-        <label>Insumos adicionales (opcional)</label>
-        <p className="text-faint text-[12px] leading-relaxed">
-          Argollas, vaso del chop, polímero, etc. Su costo se suma al total y a
-          la amortización (costo real de la venta).
-        </p>
-        {extras.map((e, i) => (
-          <div key={i} className="mt-2 flex items-center gap-2">
-            <input
-              className="input flex-1"
-              placeholder="Ej: argollas, vaso de aluminio"
-              value={e.name}
-              onChange={(ev) => setExtra(i, "name", ev.target.value)}
-            />
-            <input
-              className="input"
-              style={{ width: 120 }}
-              type="number"
-              min={0}
-              placeholder="Costo c/u"
-              value={e.cost}
-              onChange={(ev) => setExtra(i, "cost", ev.target.value)}
-            />
-            <span className="text-faint text-[12px]">×</span>
-            <input
-              className="input"
-              style={{ width: 80 }}
-              type="number"
-              min={1}
-              placeholder="Cant."
-              value={e.qty}
-              onChange={(ev) => setExtra(i, "qty", ev.target.value)}
-            />
-            <button
-              type="button"
-              className="btn btn-ghost btn-icon"
-              onClick={() => removeExtra(i)}
-              aria-label="Quitar insumo"
-            >
-              ×
-            </button>
-          </div>
-        ))}
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={addExtra}
-          >
-            + Agregar insumo
-          </button>
-          {extrasCost > 0 ? (
-            <span className="text-faint ml-auto text-[12px]">
-              Insumos: ${extrasCost.toLocaleString("es-AR")}
-            </span>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="field">
-        <label htmlFor="ms-status">Estado</label>
-        <select
-          id="ms-status"
-          className="select"
-          value={form.status}
-          onChange={(e) => set("status", e.target.value)}
-        >
-          {STATUSES.map((s) => (
-            <option key={s.v} value={s.v}>
-              {s.l}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="field">
-        <label>Reparto de la ganancia</label>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={`chip ${splitMode === "current" ? "active" : ""}`}
-            onClick={() => setSplitMode("current")}
-          >
-            Dividir por socios actuales
-          </button>
-          <button
-            type="button"
-            className={`chip ${splitMode === "custom" ? "active" : ""}`}
-            onClick={() => setSplitMode("custom")}
-          >
-            Personalizar
-          </button>
-        </div>
-        {splitMode === "current" ? (
-          <p className="text-faint mt-1.5 text-[12px] leading-relaxed">
-            {partners.length > 0
-              ? `Se reparte entre los ${partners.length} socio(s) actuales según sus porcentajes, igual que las compras de la tienda.`
-              : "No hay socios cargados: la ganancia queda sin repartir hasta que agregues socios en Ganancias."}
+      {step === 0 && (
+        <>
+          <p className="text-faint text-[12.5px] leading-relaxed">
+            Registrá una venta ya realizada (por ejemplo, ventas anteriores al
+            sistema). Queda en el historial y suma a la facturación.
           </p>
-        ) : (
-          <div className="mt-2 flex flex-col gap-2">
-            <p className="text-faint text-[12px] leading-relaxed">
-              Reparto fijo para esta venta (no cambia si después sumás o sacás
-              socios). Útil para ventas viejas.
-            </p>
-            {parts.map((p, i) => (
-              <div key={i} className="flex items-center gap-2">
+
+          {products.length > 0 ? (
+            <div className="field">
+              <label>Cargar desde un producto de la tienda (opcional)</label>
+              <div className="flex flex-wrap gap-2">
                 <input
                   className="input flex-1"
-                  placeholder="Nombre"
-                  value={p.name}
-                  onChange={(e) => setPart(i, "name", e.target.value)}
+                  style={{ minWidth: 160 }}
+                  placeholder="Buscar producto…"
+                  value={prodSearch}
+                  onChange={(e) => setProdSearch(e.target.value)}
                 />
-                <input
-                  className="input"
-                  style={{ width: 90 }}
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="%"
-                  value={p.pct}
-                  onChange={(e) => setPart(i, "pct", e.target.value)}
-                />
-                <span className="text-faint text-[12px]">%</span>
-                {parts.length > 1 ? (
+                <select
+                  className="select"
+                  style={{ maxWidth: 190 }}
+                  value={prodCat}
+                  onChange={(e) => setProdCat(e.target.value)}
+                >
+                  <option value="all">Todas las categorías</option>
+                  {prodCategories.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {!prodSearch.trim() ? (
+                <div className="text-faint mt-2 text-[11.5px]">
+                  Escribí arriba para buscar un producto de la tienda.
+                </div>
+              ) : (
+                <div className="mt-2 max-h-48 overflow-auto rounded-md border border-[var(--border)]">
+                  {filteredProducts.length === 0 ? (
+                    <div className="text-faint p-3 text-[12.5px]">
+                      Sin resultados.
+                    </div>
+                  ) : (
+                    filteredProducts.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        className="hover:bg-surface-2 flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm"
+                        onClick={() => {
+                          pickProduct(p.id);
+                          setProdSearch("");
+                        }}
+                      >
+                        <span className="truncate">
+                          {p.name}
+                          {p.categoryName ? (
+                            <span className="text-faint">
+                              {" "}
+                              · {p.categoryName}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="text-faint text-[12px]">
+                          ${p.price.toLocaleString("es-AR")}
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+              <div className="text-faint text-[11.5px]">
+                Autocompleta detalle, material, gramos y precio. Ajustá lo que
+                haga falta.
+              </div>
+            </div>
+          ) : null}
+
+          {colorLines.length > 0 ? (
+            <div className="field">
+              <label>Colores usados (descuenta stock)</label>
+              <p className="text-faint text-[12px] leading-relaxed">
+                Obligatorio: elegí el/los color(es) y cuántos gramos de cada
+                carrete. Se descuenta de cada uno; si falta stock, la venta se
+                registra igual y te avisa por notificación para reponer.
+              </p>
+              {colorLines.map((ln, i) => (
+                <div key={i} className="mt-2 flex items-center gap-2">
+                  <select
+                    className="select flex-1"
+                    value={ln.filamentId}
+                    onChange={(e) =>
+                      setColorLine(i, "filamentId", e.target.value)
+                    }
+                  >
+                    <option value="">— Elegí color / carrete —</option>
+                    {estimator.filaments.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.material} · {f.color}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className="input"
+                    style={{ width: 100 }}
+                    type="number"
+                    min={0}
+                    placeholder="gramos"
+                    value={ln.grams}
+                    onChange={(e) => setColorLine(i, "grams", e.target.value)}
+                  />
+                  <span className="text-faint text-[12px]">g</span>
                   <button
                     type="button"
                     className="btn btn-ghost btn-icon"
-                    onClick={() => removePart(i)}
-                    aria-label="Quitar"
+                    onClick={() => removeColorLine(i)}
+                    aria-label="Quitar color"
                   >
                     ×
                   </button>
-                ) : null}
+                </div>
+              ))}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={addColorLine}
+                >
+                  + Agregar color
+                </button>
+                <span className="text-faint ml-auto text-[12px]">
+                  Calculado: {calcGrams ?? "—"} g · Colores: {colorGramsTotal} g
+                </span>
+              </div>
+              {gramsMismatch ? (
+                <p className="bg-warning/10 text-warning mt-2 rounded-md px-3 py-2 text-[12px]">
+                  ⚠ El total de los colores ({colorGramsTotal} g) no coincide
+                  con el peso calculado ({calcGrams} g). Ajustá los gramos: del
+                  stock se descuenta lo que pongas acá.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="ms-date">Fecha</label>
+              <input
+                id="ms-date"
+                type="date"
+                className="input"
+                value={form.saleDate}
+                onChange={(e) => set("saleDate", e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="ms-cust">Cliente</label>
+              <input
+                id="ms-cust"
+                className="input"
+                placeholder="Nombre del cliente"
+                value={form.customerName}
+                onChange={(e) => set("customerName", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="ms-det">Detalle / producto</label>
+              <input
+                id="ms-det"
+                className="input"
+                placeholder="Ej: llavero personalizado"
+                value={form.detail}
+                onChange={(e) => set("detail", e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="ms-qty">Cantidad</label>
+              <input
+                id="ms-qty"
+                type="number"
+                min={1}
+                max={9999}
+                className="input"
+                value={form.quantity}
+                onChange={(e) => handleQtyChange(e.target.value)}
+              />
+              {unitPrice != null && qtyN > 1 ? (
+                <div className="text-faint text-[11.5px]">
+                  {qtyN} × ${unitPrice.toLocaleString("es-AR")} c/u
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="ms-cat">Categoría</label>
+            <select
+              id="ms-cat"
+              className="select"
+              value={form.category}
+              onChange={(e) => set("category", e.target.value)}
+            >
+              <option value="">Sin categoría</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+            <div className="text-faint text-[11.5px]">
+              Para que la venta sume en “ventas por categoría” del reporte.
+            </div>
+          </div>
+        </>
+      )}
+
+      {step === 1 && (
+        <>
+          <div className="grid-2">
+            <div className="field">
+              <label htmlFor="ms-total">Total cobrado (ARS)</label>
+              <input
+                id="ms-total"
+                type="number"
+                className="input"
+                placeholder="Se completa con la calculadora"
+                value={total > 0 ? total : ""}
+                readOnly
+                title="Precio (calculadora/producto) × cantidad + insumos"
+              />
+              <div className="mt-1">
+                <EstimatorModalButton
+                  estimator={estimator}
+                  onUse={handleEstUse}
+                />
+              </div>
+            </div>
+            <div className="field">
+              <label htmlFor="ms-pay">Método de pago</label>
+              <select
+                id="ms-pay"
+                className="select"
+                value={form.paymentMethod}
+                onChange={(e) => set("paymentMethod", e.target.value)}
+              >
+                {PAYS.map((p) => (
+                  <option key={p.v} value={p.v}>
+                    {p.l}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="field">
+            <label>Insumos adicionales (opcional)</label>
+            <p className="text-faint text-[12px] leading-relaxed">
+              Argollas, vaso del chop, polímero, etc. Su costo se suma al total
+              y a la amortización (costo real de la venta).
+            </p>
+            {extras.map((e, i) => (
+              <div key={i} className="mt-2 flex items-center gap-2">
+                <input
+                  className="input flex-1"
+                  placeholder="Ej: argollas, vaso de aluminio"
+                  value={e.name}
+                  onChange={(ev) => setExtra(i, "name", ev.target.value)}
+                />
+                <input
+                  className="input"
+                  style={{ width: 120 }}
+                  type="number"
+                  min={0}
+                  placeholder="Costo c/u"
+                  value={e.cost}
+                  onChange={(ev) => setExtra(i, "cost", ev.target.value)}
+                />
+                <span className="text-faint text-[12px]">×</span>
+                <input
+                  className="input"
+                  style={{ width: 80 }}
+                  type="number"
+                  min={1}
+                  placeholder="Cant."
+                  value={e.qty}
+                  onChange={(ev) => setExtra(i, "qty", ev.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-icon"
+                  onClick={() => removeExtra(i)}
+                  aria-label="Quitar insumo"
+                >
+                  ×
+                </button>
               </div>
             ))}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 className="btn btn-secondary btn-sm"
-                onClick={addPart}
+                onClick={addExtra}
               >
-                + Agregar persona
+                + Agregar insumo
+              </button>
+              {extrasCost > 0 ? (
+                <span className="text-faint ml-auto text-[12px]">
+                  Insumos: ${extrasCost.toLocaleString("es-AR")}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </>
+      )}
+
+      {step === 2 && (
+        <>
+          <div className="field">
+            <label htmlFor="ms-status">Estado</label>
+            <select
+              id="ms-status"
+              className="select"
+              value={form.status}
+              onChange={(e) => set("status", e.target.value)}
+            >
+              {STATUSES.map((s) => (
+                <option key={s.v} value={s.v}>
+                  {s.l}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field">
+            <label>Reparto de la ganancia</label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className={`chip ${splitMode === "current" ? "active" : ""}`}
+                onClick={() => setSplitMode("current")}
+              >
+                Dividir por socios actuales
               </button>
               <button
                 type="button"
-                className="btn btn-ghost btn-sm"
-                onClick={allForMe}
+                className={`chip ${splitMode === "custom" ? "active" : ""}`}
+                onClick={() => setSplitMode("custom")}
               >
-                Todo para mí
+                Personalizar
               </button>
-              <span
-                className="ml-auto text-[12px]"
-                style={{
-                  color:
-                    Math.round(splitTotal) === 100
-                      ? "var(--success)"
-                      : "var(--warning)",
-                }}
-              >
-                Suma: {splitTotal}%
-              </span>
             </div>
+            {splitMode === "current" ? (
+              <p className="text-faint mt-1.5 text-[12px] leading-relaxed">
+                {partners.length > 0
+                  ? `Se reparte entre los ${partners.length} socio(s) actuales según sus porcentajes, igual que las compras de la tienda.`
+                  : "No hay socios cargados: la ganancia queda sin repartir hasta que agregues socios en Ganancias."}
+              </p>
+            ) : (
+              <div className="mt-2 flex flex-col gap-2">
+                <p className="text-faint text-[12px] leading-relaxed">
+                  Reparto fijo para esta venta (no cambia si después sumás o
+                  sacás socios). Útil para ventas viejas.
+                </p>
+                {parts.map((p, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      className="input flex-1"
+                      placeholder="Nombre"
+                      value={p.name}
+                      onChange={(e) => setPart(i, "name", e.target.value)}
+                    />
+                    <input
+                      className="input"
+                      style={{ width: 90 }}
+                      type="number"
+                      min={0}
+                      max={100}
+                      placeholder="%"
+                      value={p.pct}
+                      onChange={(e) => setPart(i, "pct", e.target.value)}
+                    />
+                    <span className="text-faint text-[12px]">%</span>
+                    {parts.length > 1 ? (
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-icon"
+                        onClick={() => removePart(i)}
+                        aria-label="Quitar"
+                      >
+                        ×
+                      </button>
+                    ) : null}
+                  </div>
+                ))}
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={addPart}
+                  >
+                    + Agregar persona
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={allForMe}
+                  >
+                    Todo para mí
+                  </button>
+                  <span
+                    className="ml-auto text-[12px]"
+                    style={{
+                      color:
+                        Math.round(splitTotal) === 100
+                          ? "var(--success)"
+                          : "var(--warning)",
+                    }}
+                  >
+                    Suma: {splitTotal}%
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
-      <div className="flex justify-end gap-2 border-t border-[var(--border)] pt-4">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() =>
-            onCancel ? onCancel() : router.push("/admin/pedidos")
-          }
-        >
-          Cancelar
-        </Button>
-        <Button type="button" onClick={submit} loading={busy}>
-          {busy ? "Registrando…" : "Registrar venta"}
-        </Button>
+      <div className="flex justify-between gap-2 border-t border-[var(--border)] pt-4">
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() =>
+              onCancel ? onCancel() : router.push("/admin/pedidos")
+            }
+          >
+            Cancelar
+          </Button>
+          {step > 0 ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setStep((v) => Math.max(0, v - 1))}
+            >
+              ← Atrás
+            </Button>
+          ) : null}
+        </div>
+        {step < 2 ? (
+          <Button
+            type="button"
+            onClick={() => setStep((v) => Math.min(2, v + 1))}
+          >
+            Siguiente →
+          </Button>
+        ) : (
+          <Button type="button" onClick={submit} loading={busy}>
+            {busy ? "Registrando…" : "Registrar venta"}
+          </Button>
+        )}
       </div>
     </div>
   );
