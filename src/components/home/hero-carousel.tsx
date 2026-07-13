@@ -70,6 +70,8 @@ type Banner = {
   align: "left" | "center";
   /** Imagen de fondo opcional (banner del hero o imagen del hero configurada). */
   image?: string | null;
+  /** Encuadre de la imagen de fondo (background-position). Ej: "50% 30%". */
+  position?: string | null;
 };
 
 const banners: Banner[] = [
@@ -156,7 +158,7 @@ export function HeroCarousel({ slides }: { slides?: Banner[] } = {}) {
                   ? {
                       backgroundImage: `linear-gradient(rgba(10,8,4,.55), rgba(10,8,4,.55)), url('${b.image}')`,
                       backgroundSize: "cover",
-                      backgroundPosition: "center",
+                      backgroundPosition: b.position || "center",
                     }
                   : undefined
               }

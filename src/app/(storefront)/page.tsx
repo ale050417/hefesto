@@ -270,6 +270,7 @@ export default async function Home({
     href: b.ctaHref ?? "/catalogo",
     align: (b.align === "center" ? "center" : "left") as "left" | "center",
     image: b.imageUrl ?? null,
+    position: b.position ?? "center",
   }));
 
   // Sin banners pero con imagen de hero configurada: un slide con esa imagen.
@@ -281,6 +282,7 @@ export default async function Home({
       href: "/catalogo",
       align: "left",
       image: brand.heroImageUrl,
+      position: "center",
     });
   }
 

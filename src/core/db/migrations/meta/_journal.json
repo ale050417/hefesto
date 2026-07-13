@@ -344,6 +344,20 @@
       "when": 1783305200000,
       "tag": "0048_coupon_scope_birthday",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1783305400000,
+      "tag": "0049_season_duration",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1783305500000,
+      "tag": "0050_banner_position",
+      "breakpoints": true
     }
   ]
 }

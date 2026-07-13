@@ -50,6 +50,7 @@ export const getBrandSettings = unstable_cache(
       season: s?.season ?? "none",
       seasonDeco: s?.seasonDeco ?? false,
       seasonIntensity: s?.seasonIntensity ?? 16,
+      seasonDurationSec: s?.seasonDurationSec ?? 0,
       homeSections: s?.homeSections ?? null,
     };
   },
@@ -405,6 +406,7 @@ export type AppearancePatch = {
   season?: string;
   seasonDeco?: boolean;
   seasonIntensity?: number;
+  seasonDurationSec?: number;
   homeSections?: Record<string, boolean> | null;
 };
 
@@ -430,6 +432,7 @@ export async function createBanner(values: {
   title: string;
   subtitle: string | null;
   imageUrl: string | null;
+  position: string;
   align: string;
   ctaText: string | null;
   ctaHref: string | null;
@@ -445,6 +448,7 @@ export async function updateBanner(
     title: string;
     subtitle: string | null;
     imageUrl: string | null;
+    position: string;
     align: string;
     ctaText: string | null;
     ctaHref: string | null;

@@ -376,7 +376,7 @@ export function RolesManager({
                       return (
                         <td key={a} style={{ textAlign: "center" }}>
                           <div
-                            className={`check${on ? "on" : ""}`}
+                            className={`check ${on ? "on" : ""}`}
                             style={{ margin: "0 auto" }}
                           >
                             {ic(I.check)}
@@ -847,7 +847,7 @@ function RoleModal({
                           aria-label={`${ml}: ${a}`}
                         >
                           <span
-                            className={`check${on ? "on" : ""}`}
+                            className={`check ${on ? "on" : ""}`}
                             style={{ margin: "0 auto" }}
                             aria-hidden
                           >

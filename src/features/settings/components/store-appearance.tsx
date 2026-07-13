@@ -38,6 +38,14 @@ const INTENSITIES: Array<[string, number]> = [
   ["Media", 16],
   ["Festiva", 26],
 ];
+// Cuántos segundos corre la decoración al entrar (0 = siempre). Frenarla mejora
+// el rendimiento en equipos flojos.
+const DURATIONS: Array<[string, number]> = [
+  ["Siempre", 0],
+  ["5 s", 5],
+  ["10 s", 10],
+  ["20 s", 20],
+];
 
 const sIc = (path: string) => (
   <svg
@@ -73,6 +81,8 @@ type BannerForm = {
   title: string;
   subtitle: string;
   imageUrl: string;
+  posX: number;
+  posY: number;
   align: "left" | "center" | "right";
   ctaText: string;
   ctaHref: string;
@@ -83,12 +93,20 @@ const EMPTY_BANNER: BannerForm = {
   title: "",
   subtitle: "",
   imageUrl: "",
+  posX: 50,
+  posY: 50,
   align: "left",
   ctaText: "",
   ctaHref: "",
   isActive: true,
   sortOrder: 0,
 };
+
+// "50% 30%" → { x: 50, y: 30 }. Default centrado.
+function parsePos(pos: string | null | undefined): { x: number; y: number } {
+  const m = /(-?\d+(?:\.\d+)?)%\s+(-?\d+(?:\.\d+)?)%/.exec(pos ?? "");
+  return m ? { x: Number(m[1]), y: Number(m[2]) } : { x: 50, y: 50 };
+}
 
 export function StoreAppearance({
   settings,
@@ -112,6 +130,7 @@ export function StoreAppearance({
     season: (settings?.season as SeasonKey) ?? "none",
     deco: settings?.seasonDeco ?? false,
     intensity: settings?.seasonIntensity ?? 16,
+    durationSec: settings?.seasonDurationSec ?? 0,
   });
   const [sections, setSections] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
@@ -166,6 +185,7 @@ export function StoreAppearance({
         season: form.season,
         seasonDeco: form.deco,
         seasonIntensity: form.intensity,
+        seasonDurationSec: form.durationSec,
         homeSections: sections,
       }),
     ]);
@@ -180,11 +200,14 @@ export function StoreAppearance({
     setBannerOpen(true);
   }
   function openEditBanner(b: StoreBanner) {
+    const p = parsePos(b.position);
     setBf({
       id: b.id,
       title: b.title,
       subtitle: b.subtitle ?? "",
       imageUrl: b.imageUrl ?? "",
+      posX: p.x,
+      posY: p.y,
       align: (b.align as BannerForm["align"]) ?? "left",
       ctaText: b.ctaText ?? "",
       ctaHref: b.ctaHref ?? "",
@@ -200,6 +223,7 @@ export function StoreAppearance({
       title: bf.title,
       subtitle: bf.subtitle,
       imageUrl: bf.imageUrl,
+      position: `${bf.posX}% ${bf.posY}%`,
       align: bf.align,
       ctaText: bf.ctaText,
       ctaHref: bf.ctaHref,
@@ -458,6 +482,26 @@ export function StoreAppearance({
               ))}
             </div>
           </div>
+          <div className="field">
+            <label>
+              Duración al entrar{" "}
+              <span className="text-faint font-normal">
+                · después frena sola (mejor rendimiento)
+              </span>
+            </label>
+            <div className="flex gap-2">
+              {DURATIONS.map(([l, v]) => (
+                <button
+                  key={v}
+                  type="button"
+                  className={`chip ${form.durationSec === v ? "active" : ""}`}
+                  onClick={() => set("durationSec", v)}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Banners */}
@@ -694,6 +738,39 @@ export function StoreAppearance({
             <div className="text-faint mt-2 text-[11.5px] leading-relaxed">
               Tamaño recomendado: <b>1600 × 600 px</b> (apaisado, relación 8:3).
             </div>
+            {bf.imageUrl ? (
+              <div className="mt-3 flex flex-col gap-2">
+                <label className="text-faint text-[11.5px] font-medium">
+                  Encuadre de la imagen · movés qué parte se ve
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-faint w-16 text-[11px]">
+                    Horizontal
+                  </span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={bf.posX}
+                    onChange={(e) => setB("posX", Number(e.target.value))}
+                    className="flex-1"
+                    aria-label="Posición horizontal"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-faint w-16 text-[11px]">Vertical</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={bf.posY}
+                    onChange={(e) => setB("posY", Number(e.target.value))}
+                    className="flex-1"
+                    aria-label="Posición vertical"
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
           <div className="grid-2">
             <div className="field">
@@ -810,7 +887,7 @@ function BannerLivePreview({
           overflow: "hidden",
           border: "1px solid var(--border)",
           background: hasImg
-            ? `linear-gradient(rgba(10,8,4,.55), rgba(10,8,4,.55)), center/cover url('${banner.imageUrl}')`
+            ? `linear-gradient(rgba(10,8,4,.55), rgba(10,8,4,.55)), ${banner.posX}% ${banner.posY}%/cover url('${banner.imageUrl}')`
             : `linear-gradient(135deg, ${accent}33, var(--surface-2))`,
           color: hasImg ? "#fff" : "var(--fg)",
           display: "flex",
@@ -893,6 +970,7 @@ function bannerPayload(b: StoreBanner, sortOrder: number) {
     title: b.title,
     subtitle: b.subtitle ?? "",
     imageUrl: b.imageUrl ?? "",
+    position: b.position,
     align: b.align,
     ctaText: b.ctaText ?? "",
     ctaHref: b.ctaHref ?? "",

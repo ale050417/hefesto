@@ -30,6 +30,8 @@ export const businessSettings = pgTable(
     season: text("season").notNull().default("none"),
     seasonDeco: boolean("season_deco").notNull().default(false),
     seasonIntensity: integer("season_intensity").notNull().default(16),
+    // Segundos que corre la decoración al entrar (0 = siempre). Perf: frena sola.
+    seasonDurationSec: integer("season_duration_sec").notNull().default(0),
     // Visibilidad de las secciones del home: { [sectionId]: boolean }.
     homeSections: jsonb("home_sections").$type<Record<string, boolean>>(),
     // Datos fiscales / operativos (pestaña Negocio).

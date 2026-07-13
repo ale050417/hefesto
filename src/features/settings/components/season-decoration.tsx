@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
 // Pseudo-aleatorio determinístico (puro): mismo seed → mismo valor. Evita
 // Math.random en el render y el mismatch de hidratación.
@@ -13,10 +13,23 @@ function rand(seed: number): number {
 export function SeasonDecoration({
   glyphs,
   intensity,
+  durationSec = 0,
 }: {
   glyphs: string[];
   intensity: number;
+  /** Segundos que corre al entrar; 0 = siempre. Después se desmonta (perf). */
+  durationSec?: number;
 }) {
+  const [visible, setVisible] = useState(true);
+
+  // Con una duración > 0, la decoración corre ese rato al entrar y se apaga
+  // sola (no anima para siempre → mejor rendimiento). 0 = siempre encendida.
+  useEffect(() => {
+    if (!durationSec || durationSec <= 0) return;
+    const t = setTimeout(() => setVisible(false), durationSec * 1000);
+    return () => clearTimeout(t);
+  }, [durationSec]);
+
   const count = Math.max(0, Math.min(40, intensity || 16));
   const flakes = Array.from({ length: count }, (_, i) => ({
     glyph: glyphs[i % glyphs.length] ?? "•",
@@ -27,7 +40,7 @@ export function SeasonDecoration({
     sway: (rand(i + 5) * 2 - 1) * 40,
   }));
 
-  if (count === 0) return null;
+  if (count === 0 || !visible) return null;
 
   return (
     <div className="season-deco" aria-hidden>

@@ -9,6 +9,10 @@ export async function StoreSeasonDecoration() {
   if (!brand.seasonDeco || !season.deco) return null;
   const glyphs = DECO_GLYPHS[season.deco];
   return (
-    <SeasonDecoration glyphs={[...glyphs]} intensity={brand.seasonIntensity} />
+    <SeasonDecoration
+      glyphs={[...glyphs]}
+      intensity={brand.seasonIntensity}
+      durationSec={brand.seasonDurationSec}
+    />
   );
 }

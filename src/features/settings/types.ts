@@ -51,5 +51,6 @@ export type BrandSettings = {
   season: string;
   seasonDeco: boolean;
   seasonIntensity: number;
+  seasonDurationSec: number;
   homeSections: Record<string, boolean> | null;
 };

@@ -18,6 +18,13 @@ const field =
   "w-full rounded-md border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-fg";
 const labelCls = "mb-1 block text-xs font-medium text-dim";
 
+// El efectivo no se abona online: se ofrece coordinar por WhatsApp.
+function waHref(whatsapp: string | null, text: string): string | null {
+  if (!whatsapp) return null;
+  const d = whatsapp.replace(/[^\d]/g, "");
+  return d ? `https://wa.me/${d}?text=${encodeURIComponent(text)}` : null;
+}
+
 const PAYMENT_OPTIONS: {
   value: PaymentMethod;
   label: string;
@@ -38,7 +45,13 @@ const PAYMENT_OPTIONS: {
 
 const STEPS = ["Envío", "Pago", "Revisión"] as const;
 
-export function CheckoutStepper({ mpEnabled = true }: { mpEnabled?: boolean }) {
+export function CheckoutStepper({
+  mpEnabled = true,
+  whatsapp = null,
+}: {
+  mpEnabled?: boolean;
+  whatsapp?: string | null;
+}) {
   const router = useRouter();
   const mounted = useMounted();
   const items = useCartStore((s) => s.items);
@@ -47,6 +60,10 @@ export function CheckoutStepper({ mpEnabled = true }: { mpEnabled?: boolean }) {
 
   const paymentOptions = PAYMENT_OPTIONS.filter(
     (o) => o.value !== "mercadopago" || mpEnabled,
+  );
+  const cashWa = waHref(
+    whatsapp,
+    "¡Hola! Quiero coordinar el pago en efectivo de mi pedido.",
   );
   const [step, setStep] = useState(0);
   const [payment, setPayment] = useState<PaymentMethod>("transfer");
@@ -316,6 +333,30 @@ export function CheckoutStepper({ mpEnabled = true }: { mpEnabled?: boolean }) {
                 </span>
               </label>
             ))}
+            {payment === "cash" ? (
+              <div className="border-accent/40 bg-accent/5 rounded-lg border p-4">
+                <p className="text-fg text-sm font-medium">
+                  El efectivo no se paga online
+                </p>
+                <p className="text-dim mt-1 text-xs leading-relaxed">
+                  Confirmá el pedido y coordinamos el pago y la entrega o retiro
+                  por WhatsApp.
+                </p>
+                {cashWa ? (
+                  <a
+                    href={cashWa}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className={cn(
+                      buttonVariants({ variant: "primary" }),
+                      "mt-3 inline-flex",
+                    )}
+                  >
+                    Coordinar por WhatsApp
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
             <div className="flex gap-3 pt-2">
               <Button type="button" variant="ghost" onClick={() => setStep(0)}>
                 Volver

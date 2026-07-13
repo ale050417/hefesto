@@ -13,6 +13,8 @@ export const storeBanners = pgTable("store_banners", {
   title: text("title").notNull(),
   subtitle: text("subtitle"),
   imageUrl: text("image_url"),
+  // Encuadre de la imagen de fondo (background-position). Ej: "50% 30%".
+  position: text("position").notNull().default("50% 50%"),
   align: text("align").notNull().default("left"), // left | center | right
   ctaText: text("cta_text"),
   ctaHref: text("cta_href"),

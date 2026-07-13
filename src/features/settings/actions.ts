@@ -190,6 +190,7 @@ const appearanceSchema = z.object({
   season: z.string().trim().max(40).optional(),
   seasonDeco: z.boolean().optional(),
   seasonIntensity: z.coerce.number().int().min(0).max(100).optional(),
+  seasonDurationSec: z.coerce.number().int().min(0).max(120).optional(),
   homeSections: z.record(z.string(), z.boolean()).optional(),
 });
 
@@ -210,6 +211,7 @@ export async function saveAppearanceAction(
       season: parsed.data.season ?? "none",
       seasonDeco: parsed.data.seasonDeco ?? false,
       seasonIntensity: parsed.data.seasonIntensity ?? 16,
+      seasonDurationSec: parsed.data.seasonDurationSec ?? 0,
       ...(parsed.data.homeSections
         ? { homeSections: parsed.data.homeSections }
         : {}),
@@ -226,6 +228,7 @@ const bannerSchema = z.object({
   title: z.string().trim().min(1, "Ingresá un título."),
   subtitle: z.string().trim().max(200).optional().or(z.literal("")),
   imageUrl: z.string().trim().url().optional().or(z.literal("")),
+  position: z.string().trim().max(20).optional().or(z.literal("")),
   align: z.enum(["left", "center", "right"]).optional(),
   ctaText: z.string().trim().max(60).optional().or(z.literal("")),
   ctaHref: z.string().trim().max(200).optional().or(z.literal("")),
@@ -251,6 +254,7 @@ export async function createBannerAction(
       title: parsed.data.title,
       subtitle: normStr(parsed.data.subtitle),
       imageUrl: normStr(parsed.data.imageUrl),
+      position: parsed.data.position || "50% 50%",
       align: parsed.data.align ?? "left",
       ctaText: normStr(parsed.data.ctaText),
       ctaHref: normStr(parsed.data.ctaHref),
@@ -282,6 +286,7 @@ export async function updateBannerAction(
       title: parsed.data.title,
       subtitle: normStr(parsed.data.subtitle),
       imageUrl: normStr(parsed.data.imageUrl),
+      position: parsed.data.position || "50% 50%",
       align: parsed.data.align ?? "left",
       ctaText: normStr(parsed.data.ctaText),
       ctaHref: normStr(parsed.data.ctaHref),
