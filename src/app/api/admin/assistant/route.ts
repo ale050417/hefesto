@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getStaffUser } from "@/core/auth/session";
 import { rateLimit } from "@/core/security/rate-limit";
 import {
-  askAssistant,
+  askAssistantSmart,
   isAssistantConfigured,
 } from "@/features/assistant/service";
 
@@ -68,8 +68,11 @@ export async function POST(req: Request) {
   }
 
   try {
-    const reply = await askAssistant(parsed.data.messages);
-    return NextResponse.json({ reply });
+    const result = await askAssistantSmart(parsed.data.messages);
+    if (result.type === "action") {
+      return NextResponse.json({ action: result });
+    }
+    return NextResponse.json({ reply: result.text });
   } catch (e) {
     console.error("[asistente] no pudo responder:", e);
     // Diagnóstico útil en la UI: el código de la API dice qué pasa sin ir a

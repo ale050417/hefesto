@@ -3,6 +3,7 @@ import { safeLoad } from "@/lib/safe-load";
 import { getDashboardData } from "@/features/reports/service";
 import { listFilamentsView } from "@/features/inventory/queries";
 import { listManualSales } from "@/features/orders/services/manualSaleService";
+import { findTool, toolsPromptDoc } from "./tools";
 
 /**
  * Asistente IA del panel admin (Fase mejoras 2026-07, "Opción A").
@@ -303,4 +304,89 @@ export async function generateProductDescription(
       ? await callGemini(system, messages, 18_000)
       : await callAnthropic(system, messages, 18_000);
   return text.trim();
+}
+
+/* ---------- Acciones con confirmación (Fase 5) ---------- */
+
+export type AssistantReply =
+  | { type: "text"; text: string }
+  | {
+      type: "action";
+      name: string;
+      args: Record<string, unknown>;
+      summary: string;
+    };
+
+const SYSTEM_ACTIONS = `
+
+=== ACCIONES QUE PODÉS EJECUTAR ===
+Si el staff te pide EJECUTAR (no solo consultar) una de estas acciones, respondé ÚNICAMENTE con un bloque JSON, sin ningún texto adicional:
+\`\`\`json
+{"accion": "<nombre>", "args": { ... }}
+\`\`\`
+Acciones disponibles:
+${toolsPromptDoc()}
+Si falta un dato OBLIGATORIO, NO lo inventes: pedíselo en texto normal. Para preguntas o cualquier otra cosa, respondé en texto normal SIN JSON.`;
+
+/** Extrae { accion, args } de un bloque JSON en la respuesta del modelo. */
+function parseActionBlock(text: string): { name: string; raw: unknown } | null {
+  // Sacamos el cerco de código (```json ... ```) sin escapar backticks en regex.
+  const cleaned = text.replace(/```json/gi, "").replace(/```/g, "");
+  const candidate = /\{[\s\S]*"accion"[\s\S]*\}/.exec(cleaned)?.[0];
+  if (!candidate) return null;
+  try {
+    const obj = JSON.parse(candidate.trim()) as {
+      accion?: unknown;
+      args?: unknown;
+    };
+    if (typeof obj.accion === "string") {
+      return { name: obj.accion, raw: obj.args ?? {} };
+    }
+  } catch {
+    /* no era JSON válido: se trata como texto */
+  }
+  return null;
+}
+
+/**
+ * Como askAssistant pero además detecta PROPUESTAS DE ACCIÓN. Si el modelo
+ * devuelve un bloque JSON que matchea una tool y sus args son válidos, devuelve
+ * una propuesta para que el staff CONFIRME (no ejecuta nada acá). Si no, texto.
+ */
+export async function askAssistantSmart(
+  messages: AssistantMessage[],
+): Promise<AssistantReply> {
+  const provider = pickProvider();
+  if (!provider) throw new Error("ASSISTANT_NOT_CONFIGURED");
+  const snapshot = await buildBusinessSnapshot();
+  const system = `${SYSTEM_BASE}${SYSTEM_ACTIONS}\n\n=== DATOS ACTUALES DEL NEGOCIO ===\n${snapshot}`;
+  const normalized = normalizeTurns(messages);
+  if (normalized.length === 0) throw new Error("ASSISTANT_EMPTY_INPUT");
+
+  const text =
+    provider === "anthropic"
+      ? await callAnthropic(system, normalized)
+      : await callGemini(system, normalized);
+  if (!text) throw new Error("ASSISTANT_EMPTY_REPLY");
+
+  const block = parseActionBlock(text);
+  if (block) {
+    const tool = findTool(block.name);
+    if (tool) {
+      const parsed = tool.parse(block.raw);
+      if (parsed.ok) {
+        return {
+          type: "action",
+          name: block.name,
+          args: parsed.args,
+          summary: parsed.summary,
+        };
+      }
+      return {
+        type: "text",
+        text: `Para hacer eso necesito un dato más: ${parsed.error}`,
+      };
+    }
+  }
+  return { type: "text", text };
 }

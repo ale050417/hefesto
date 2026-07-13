@@ -2,8 +2,21 @@
 
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
+import { runAction } from "@/lib/run-action";
+import { runAssistantToolAction } from "../actions";
 
-type ChatMessage = { role: "user" | "assistant"; content: string };
+type ActionProposal = {
+  name: string;
+  args: Record<string, unknown>;
+  summary: string;
+};
+type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+  /** Acción que el asistente propone ejecutar (requiere confirmación). */
+  action?: ActionProposal;
+  actionState?: "pending" | "done" | "cancelled";
+};
 
 /**
  * Widget flotante del asistente IA del admin (burbuja abajo a la derecha).
@@ -46,14 +59,25 @@ export function AssistantWidget() {
       const data = (await res.json().catch(() => null)) as {
         reply?: string;
         error?: string;
+        action?: ActionProposal;
       } | null;
-      if (!res.ok || !data?.reply) {
+      if (!res.ok || (!data?.reply && !data?.action)) {
         setError(data?.error ?? "El asistente no pudo responder.");
         // Rollback del turno fallido: si quedara en el historial, el reintento
         // mandaría dos mensajes "user" seguidos y la API los rechaza (400,
         // roles alternados). El texto vuelve al input para reintentar fácil.
         setMessages(messages);
         setInput(text);
+      } else if (data.action) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content: "",
+            action: data.action,
+            actionState: "pending",
+          },
+        ]);
       } else {
         setMessages((prev) => [
           ...prev,
@@ -65,6 +89,32 @@ export function AssistantWidget() {
     } finally {
       setBusy(false);
     }
+  }
+
+  // Ejecuta la acción propuesta SOLO cuando el staff confirma.
+  async function confirmAction(i: number) {
+    const m = messages[i];
+    if (!m?.action || m.actionState !== "pending" || busy) return;
+    setBusy(true);
+    setError(null);
+    const res = await runAction(
+      () =>
+        runAssistantToolAction({ name: m.action!.name, args: m.action!.args }),
+      { silent: true },
+    );
+    setBusy(false);
+    setMessages((prev) =>
+      prev.map((x, j) =>
+        j === i ? { ...x, actionState: res.ok ? "done" : "pending" } : x,
+      ),
+    );
+    if (!res.ok) setError(res.error.message);
+  }
+
+  function cancelAction(i: number) {
+    setMessages((prev) =>
+      prev.map((x, j) => (j === i ? { ...x, actionState: "cancelled" } : x)),
+    );
   }
 
   return (
@@ -126,7 +176,7 @@ export function AssistantWidget() {
           >
             <div className="eyebrow">Hefesto IA</div>
             <div className="text-dim text-xs">
-              Preguntame por ventas, stock, pedidos o impresión 3D
+              Preguntame por tus datos o pedime que cree un filamento
             </div>
           </div>
 
@@ -137,25 +187,67 @@ export function AssistantWidget() {
                 por agotarse?” · “¿por qué se me despega la primera capa?”
               </div>
             ) : null}
-            {messages.map((m, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "max-w-[85%] rounded-lg px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap",
-                  m.role === "user" ? "ml-auto" : "mr-auto",
-                )}
-                style={
-                  m.role === "user"
-                    ? {
-                        background: "rgba(var(--gold-rgb), 0.16)",
-                        color: "var(--text)",
-                      }
-                    : { background: "var(--hover)", color: "var(--text)" }
-                }
-              >
-                {m.content}
-              </div>
-            ))}
+            {messages.map((m, i) =>
+              m.action ? (
+                <div
+                  key={i}
+                  className="mr-auto max-w-[92%] rounded-lg border px-3 py-2.5 text-[13px]"
+                  style={{
+                    borderColor: "rgba(var(--gold-rgb),.4)",
+                    background: "rgba(var(--gold-rgb),.08)",
+                  }}
+                >
+                  <div className="text-dim mb-1 text-[11px] font-semibold">
+                    Acción propuesta
+                  </div>
+                  <div className="text-fg">{m.action.summary}</div>
+                  {m.actionState === "done" ? (
+                    <div className="text-success mt-2 text-[12px] font-medium">
+                      ✓ Hecho
+                    </div>
+                  ) : m.actionState === "cancelled" ? (
+                    <div className="text-faint mt-2 text-[12px]">Cancelada</div>
+                  ) : (
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        disabled={busy}
+                        onClick={() => void confirmAction(i)}
+                      >
+                        Confirmar
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        disabled={busy}
+                        onClick={() => cancelAction(i)}
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div
+                  key={i}
+                  className={cn(
+                    "max-w-[85%] rounded-lg px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap",
+                    m.role === "user" ? "ml-auto" : "mr-auto",
+                  )}
+                  style={
+                    m.role === "user"
+                      ? {
+                          background: "rgba(var(--gold-rgb), 0.16)",
+                          color: "var(--text)",
+                        }
+                      : { background: "var(--hover)", color: "var(--text)" }
+                  }
+                >
+                  {m.content}
+                </div>
+              ),
+            )}
             {busy ? (
               <div
                 className="text-dim mr-auto rounded-lg px-3 py-2 text-[13px]"
