@@ -16,6 +16,15 @@ import { AssistantWidget } from "@/features/assistant/components/assistant-widge
  * drawer off-canvas con backdrop; se cierra al navegar, al tocar el backdrop
  * o con Escape.
  */
+function readNavCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem("admin-nav-collapsed") === "1";
+  } catch {
+    return false;
+  }
+}
+
 export function AdminShell({
   perms,
   children,
@@ -24,6 +33,28 @@ export function AdminShell({
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  // Colapsar el sidebar en desktop: el burger lo oculta/muestra para "ver mejor".
+  // La preferencia se lee de localStorage en el INICIALIZADOR del useState (un
+  // sistema externo), no en un effect: evita el setState-en-effect y renders de más.
+  const [collapsed, setCollapsed] = useState(readNavCollapsed);
+  // Un solo botón para ambos casos: en desktop (sidebar fijo) alterna colapsado;
+  // en móvil abre/cierra el drawer off-canvas.
+  const toggleNav = () => {
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(min-width: 768px)").matches
+    ) {
+      setCollapsed((c) => {
+        const next = !c;
+        try {
+          localStorage.setItem("admin-nav-collapsed", next ? "1" : "0");
+        } catch {}
+        return next;
+      });
+    } else {
+      setMenuOpen((o) => !o);
+    }
+  };
 
   // El menú se cierra al tocar un link (onNavigate en el Sidebar), el backdrop
   // o Escape. Con el drawer abierto: bloquear el scroll del fondo y cerrar con Escape.
@@ -42,14 +73,17 @@ export function AdminShell({
   }, [menuOpen]);
 
   return (
-    <div className="admin-shell">
+    <div
+      suppressHydrationWarning
+      className={`admin-shell${collapsed ? "nav-collapsed" : ""}`}
+    >
       <header className="admin-topbar">
         <button
           type="button"
           className="admin-burger"
-          aria-label="Abrir menú"
+          aria-label="Mostrar u ocultar menú"
           aria-expanded={menuOpen}
-          onClick={() => setMenuOpen(true)}
+          onClick={toggleNav}
         >
           <svg
             viewBox="0 0 24 24"
