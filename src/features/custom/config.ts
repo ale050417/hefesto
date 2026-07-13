@@ -5,4 +5,4 @@
  *
  * TODO: volver a true cuando el flujo a medida esté listo para producción.
  */
-export const CUSTOM_ORDERS_ENABLED: boolean = false;
+export const CUSTOM_ORDERS_ENABLED: boolean = true;

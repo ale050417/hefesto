@@ -4,10 +4,46 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser, isStaff } from "@/core/auth/session";
 import { can } from "@/core/auth/permissions";
 import { type ActionResult, toActionError } from "@/core/errors";
-import { customRequestSchema, messageSchema, quoteSchema } from "./schemas";
+import {
+  customRequestSchema,
+  guestCustomRequestSchema,
+  messageSchema,
+  quoteSchema,
+} from "./schemas";
+import { rateLimit } from "@/core/security/rate-limit";
+import { getClientIp } from "@/core/security/request";
+import { notifyAdmins } from "@/features/notifications/service";
 import * as service from "./service";
 import * as repo from "./repository";
 import type { CustomRequestStatus } from "./types";
+
+export async function createGuestCustomRequestAction(
+  input: unknown,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const ip = await getClientIp();
+  if (!(await rateLimit(`amedida:${ip}`, { limit: 5, windowMs: 60_000 })).ok) {
+    return { ok: false, error: "Muchos intentos. Esperá un momento." };
+  }
+  const parsed = guestCustomRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: parsed.error.issues[0]?.message ?? "Revisá los datos.",
+    };
+  }
+  try {
+    const r = await service.createGuestCustomRequest(parsed.data);
+    await notifyAdmins({
+      title: "Nuevo pedido a medida",
+      body: `${parsed.data.name}: ${parsed.data.description.slice(0, 80)}`,
+      link: "/admin/medida",
+    }).catch(() => undefined);
+    revalidatePath("/admin/medida");
+    return { ok: true, id: r.id };
+  } catch {
+    return { ok: false, error: "No se pudo enviar. Probá de nuevo." };
+  }
+}
 
 export async function createCustomRequestAction(
   input: unknown,

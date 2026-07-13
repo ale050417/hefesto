@@ -236,7 +236,7 @@ export default async function AdminCustomPage({
               <div className="flex flex-col gap-2">
                 {list.map((r) => {
                   const reply = requestNeedsReply(r);
-                  const name = r.customerName ?? "Cliente";
+                  const name = r.customerName ?? r.guestName ?? "Cliente";
                   const preview = r.lastMessage
                     ? (r.lastMessage.fromStaff ? "Vos: " : "") +
                       r.lastMessage.body
@@ -284,26 +284,32 @@ export default async function AdminCustomPage({
               <>
                 <div className="chat-header">
                   <span className="cavatar">
-                    {(selected.customerName ?? "C")[0]?.toUpperCase()}
+                    {(selected.customerName ??
+                      selected.guestName ??
+                      "C")[0]?.toUpperCase()}
                   </span>
                   <div className="grow">
                     <div className="ch-name flex items-center gap-2">
-                      {selected.customerName ?? "Cliente"}
+                      {selected.customerName ?? selected.guestName ?? "Cliente"}
                       <CustomStatusBadge status={selected.status} />
                     </div>
                     <div className="ch-status">
                       <span className="live" />{" "}
-                      {selected.customerPhone ?? "Sin teléfono"}
+                      {selected.customerPhone ??
+                        selected.guestPhone ??
+                        "Sin teléfono"}
                     </div>
                   </div>
                   <MedidaStatusSelect
                     id={selected.id}
                     status={selected.status}
                   />
-                  {selected.customerPhone ? (
+                  {(selected.customerPhone ?? selected.guestPhone) ? (
                     <a
                       className="chat-clip"
-                      href={waLink(selected.customerPhone)}
+                      href={waLink(
+                        selected.customerPhone ?? selected.guestPhone ?? "",
+                      )}
                       target="_blank"
                       rel="noopener noreferrer"
                       title="Abrir en WhatsApp"

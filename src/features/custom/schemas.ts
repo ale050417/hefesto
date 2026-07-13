@@ -28,4 +28,21 @@ export const quoteSchema = z.object({
   amount: z.coerce.number().positive("El monto debe ser mayor a 0."),
 });
 
+// Pedido a medida de INVITADO (sin login): suma datos de contacto.
+export const guestCustomRequestSchema = z.object({
+  name: z.string().trim().min(2, "Ingresá tu nombre."),
+  phone: z.string().trim().min(6, "Ingresá tu WhatsApp."),
+  email: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.string().email("Email inválido.").optional(),
+  ),
+  description: z
+    .string()
+    .trim()
+    .min(10, "Contanos un poco más (mínimo 10 caracteres)."),
+  budget: optionalBudget,
+  referenceImageUrl: z.string().trim().url().optional().or(z.literal("")),
+});
+export type GuestCustomRequestInput = z.infer<typeof guestCustomRequestSchema>;
+
 export type CustomRequestInput = z.infer<typeof customRequestSchema>;

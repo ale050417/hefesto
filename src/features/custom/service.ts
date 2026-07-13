@@ -6,7 +6,7 @@ import {
 } from "@/core/errors";
 import { optimizeImage, uploadObject } from "@/core/storage";
 import * as repo from "./repository";
-import type { CustomRequestInput } from "./schemas";
+import type { CustomRequestInput, GuestCustomRequestInput } from "./schemas";
 import { canQuote, canTransitionCustom } from "./transitions";
 import type {
   CustomMessage,
@@ -27,6 +27,22 @@ export async function createCustomRequest(
   return repo.createRequest({
     customerId,
     title: input.title,
+    description: input.description,
+    referenceImageUrl: input.referenceImageUrl || null,
+    budget: input.budget != null ? String(input.budget) : null,
+  });
+}
+
+export async function createGuestCustomRequest(
+  input: GuestCustomRequestInput,
+): Promise<CustomRequest> {
+  const title = input.description.trim().slice(0, 60) || "Pedido a medida";
+  return repo.createRequest({
+    customerId: null,
+    guestName: input.name,
+    guestPhone: input.phone,
+    guestEmail: input.email ?? null,
+    title,
     description: input.description,
     referenceImageUrl: input.referenceImageUrl || null,
     budget: input.budget != null ? String(input.budget) : null,

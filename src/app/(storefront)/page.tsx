@@ -695,7 +695,7 @@ export default async function Home({
                     ))}
                   </div>
                   <Link
-                    href="/cuenta/a-medida"
+                    href="/a-medida"
                     className={cn(buttonVariants({ size: "lg" }))}
                   >
                     <Icon name="sparkles" size={17} /> Pedir presupuesto a

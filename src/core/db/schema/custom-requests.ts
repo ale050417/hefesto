@@ -14,9 +14,14 @@ export const customRequests = pgTable(
   "custom_requests",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    customerId: uuid("customer_id")
-      .notNull()
-      .references(() => profiles.id, { onDelete: "cascade" }),
+    // Nullable: los pedidos a medida de INVITADO (sin login) no tienen cuenta.
+    customerId: uuid("customer_id").references(() => profiles.id, {
+      onDelete: "cascade",
+    }),
+    // Datos de contacto del invitado (cuando no hay cuenta). La charla sigue por WhatsApp.
+    guestName: text("guest_name"),
+    guestPhone: text("guest_phone"),
+    guestEmail: text("guest_email"),
     title: text("title").notNull(),
     description: text("description").notNull(),
     referenceImageUrl: text("reference_image_url"),
