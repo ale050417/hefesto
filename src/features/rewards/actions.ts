@@ -9,6 +9,9 @@ import {
   deleteReward,
   getBalance,
   getHistory,
+  getReward,
+  refundPoints,
+  spendPoints,
   updateReward,
 } from "./service";
 import { rewardSchema } from "./schemas";
@@ -25,6 +28,62 @@ export async function getMyPointsAction(): Promise<{
     getHistory(user.id),
   ]);
   return { balance, history };
+}
+
+export async function redeemRewardAction(
+  rewardId: string,
+): Promise<
+  | { ok: true; message: string; couponCode?: string }
+  | { ok: false; error: string }
+> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Iniciá sesión para canjear." };
+  try {
+    const reward = await getReward(rewardId);
+    if (!reward || !reward.isActive) {
+      return { ok: false, error: "Esa recompensa no está disponible." };
+    }
+    const balance = await getBalance(user.id);
+    if (balance < reward.costPoints) {
+      return {
+        ok: false,
+        error: `Te faltan ${reward.costPoints - balance} puntos para este premio.`,
+      };
+    }
+    // Descontamos los puntos (el movimiento negativo es el registro del canje).
+    await spendPoints(user.id, reward.costPoints, `Canje: ${reward.title}`);
+    if (reward.type === "discount") {
+      try {
+        const { createRewardCoupon } =
+          await import("@/features/discounts/queries");
+        const code = await createRewardCoupon({
+          isPercent: reward.discountIsPercent,
+          value: Number(reward.discountValue ?? 0),
+          description: `Premio de fidelidad: ${reward.title}`,
+        });
+        revalidatePath("/cuenta/puntos");
+        return {
+          ok: true,
+          message: `¡Listo! Usá el cupón ${code} en tu próxima compra.`,
+          couponCode: code,
+        };
+      } catch (e) {
+        // Si falló generar el cupón, devolvemos los puntos.
+        await refundPoints(user.id, reward.costPoints, "Reverso de canje");
+        throw e;
+      }
+    }
+    revalidatePath("/cuenta/puntos");
+    return {
+      ok: true,
+      message:
+        reward.type === "shipping"
+          ? "¡Canjeaste envío gratis! Te lo aplicamos en tu próximo pedido; escribinos para coordinar."
+          : "¡Canjeaste tu producto! Te contactamos para coordinar la entrega.",
+    };
+  } catch {
+    return { ok: false, error: "No se pudo canjear. Probá de nuevo." };
+  }
 }
 
 const NOT_STAFF = {

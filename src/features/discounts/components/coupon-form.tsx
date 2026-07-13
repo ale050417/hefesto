@@ -196,6 +196,7 @@ export function CouponForm({
   });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [prodQuery, setProdQuery] = useState("");
 
   const set = (k: keyof typeof form, v: string | boolean) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -331,18 +332,72 @@ export function CouponForm({
             <option value="category">Una categoría</option>
           </select>
           {form.scope === "product" ? (
-            <select
-              className="select mt-2"
-              value={form.targetId}
-              onChange={(e) => set("targetId", e.target.value)}
-            >
-              <option value="">— Elegí un producto —</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <div className="mt-2">
+              {products.find((p) => p.id === form.targetId) ? (
+                <div className="flex items-center gap-2">
+                  <span className="chip active">
+                    {products.find((p) => p.id === form.targetId)?.name}
+                  </span>
+                  <button
+                    type="button"
+                    className="text-[12px]"
+                    style={{ color: "var(--gold-bright)" }}
+                    onClick={() => {
+                      set("targetId", "");
+                      setProdQuery("");
+                    }}
+                  >
+                    Cambiar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    className="input"
+                    placeholder="Buscar producto…"
+                    value={prodQuery}
+                    onChange={(e) => setProdQuery(e.target.value)}
+                  />
+                  {prodQuery.trim() ? (
+                    <div className="mt-1 max-h-44 overflow-auto rounded-md border border-[var(--border)]">
+                      {products
+                        .filter((p) =>
+                          p.name
+                            .toLowerCase()
+                            .includes(prodQuery.trim().toLowerCase()),
+                        )
+                        .slice(0, 30)
+                        .map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className="block w-full px-3 py-2 text-left text-sm transition hover:bg-[var(--surface-2)]"
+                            onClick={() => {
+                              set("targetId", p.id);
+                              setProdQuery("");
+                            }}
+                          >
+                            {p.name}
+                          </button>
+                        ))}
+                      {products.filter((p) =>
+                        p.name
+                          .toLowerCase()
+                          .includes(prodQuery.trim().toLowerCase()),
+                      ).length === 0 ? (
+                        <div className="text-faint px-3 py-2 text-[12px]">
+                          Sin resultados
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="text-faint mt-1 text-[11.5px]">
+                      Escribí para buscar el producto.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           ) : form.scope === "category" ? (
             <select
               className="select mt-2"

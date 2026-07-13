@@ -8,6 +8,28 @@ export async function getBalance(customerId: string): Promise<number> {
   return repo.getBalance(customerId);
 }
 
+export async function getReward(id: string): Promise<Reward | null> {
+  return repo.findRewardById(id);
+}
+
+/** Gasta puntos (canje). Registra un movimiento NEGATIVO en el ledger. */
+export async function spendPoints(
+  customerId: string,
+  points: number,
+  reason: string,
+): Promise<void> {
+  await repo.addTransaction({ customerId, delta: -points, reason });
+}
+
+/** Devuelve puntos (reverso si el canje falla después de descontar). */
+export async function refundPoints(
+  customerId: string,
+  points: number,
+  reason: string,
+): Promise<void> {
+  await repo.addTransaction({ customerId, delta: points, reason });
+}
+
 export async function getHistory(customerId: string) {
   return repo.listTransactions(customerId);
 }

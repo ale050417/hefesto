@@ -40,6 +40,30 @@ function toValues(input: CouponInput) {
   };
 }
 
+/**
+ * Cupón PERSONAL generado por un canje de puntos (Recompensas). Código único
+ * "PREMIO-XXXX", un solo uso. Devuelve el código para mostrárselo al cliente.
+ */
+export async function createRewardCoupon(params: {
+  isPercent: boolean;
+  value: number;
+  description: string;
+}): Promise<string> {
+  for (let i = 0; i < 6; i++) {
+    const code = `PREMIO-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+    if (await getCouponByCode(code)) continue;
+    await repo.insertCoupon({
+      code,
+      type: params.isPercent ? "percentage" : "fixed",
+      value: String(params.value),
+      maxUses: 1,
+      description: params.description,
+    });
+    return code;
+  }
+  throw new Error("No se pudo generar el cupón del premio.");
+}
+
 export async function addCoupon(input: CouponInput): Promise<Coupon> {
   return repo.insertCoupon(toValues(input));
 }

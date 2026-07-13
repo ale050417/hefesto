@@ -1,6 +1,11 @@
 import { requireUser } from "@/core/auth/session";
 import { AccountShell } from "@/features/customers/components/account-shell";
-import { getBalance, getHistory } from "@/features/rewards/service";
+import {
+  getBalance,
+  getHistory,
+  listRewards,
+} from "@/features/rewards/service";
+import { RewardsCatalog } from "@/features/rewards/components/rewards-catalog";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Mis puntos" };
@@ -27,10 +32,22 @@ function Spark({ size = 28 }: { size?: number }) {
 
 export default async function PointsPage() {
   const user = await requireUser("/cuenta/puntos");
-  const [balance, history] = await Promise.all([
+  const [balance, history, allRewards] = await Promise.all([
     getBalance(user.id),
     getHistory(user.id),
+    listRewards(),
   ]);
+  const rewards = allRewards
+    .filter((r) => r.isActive)
+    .map((r) => ({
+      id: r.id,
+      type: r.type,
+      title: r.title,
+      description: r.description,
+      costPoints: r.costPoints,
+      discountValue: r.discountValue != null ? Number(r.discountValue) : null,
+      discountIsPercent: r.discountIsPercent,
+    }));
 
   const nextTier = balance < 2000 ? 2000 : balance < 4000 ? 4000 : 5000;
   const pct = Math.min((balance / nextTier) * 100, 100);
@@ -127,13 +144,15 @@ export default async function PointsPage() {
           )}
         </section>
 
+        <RewardsCatalog rewards={rewards} balance={balance} />
+
         <div className="ui-card text-faint flex items-start gap-3 p-4 text-[12.5px] leading-relaxed">
           <span className="text-[var(--gold-bright)]">
             <Spark size={18} />
           </span>
           <p>
             Los puntos se acreditan automáticamente con cada compra entregada.
-            Pronto vas a poder canjearlos por descuentos y productos.
+            Canjealos por descuentos, envío o productos cuando te alcancen.
           </p>
         </div>
       </div>

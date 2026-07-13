@@ -139,27 +139,35 @@ export function RewardForm({
 
       {type === "discount" ? (
         <div className="field">
-          <label htmlFor="rw-value">Valor del descuento</label>
-          <div className="flex gap-2">
-            <input
-              id="rw-value"
-              type="number"
-              className="input"
-              placeholder="2000"
-              value={form.discountValue}
-              onChange={(e) => set("discountValue", e.target.value)}
-            />
-            <select
-              className="select"
-              style={{ width: 130 }}
-              value={form.discountIsPercent ? "pct" : "ars"}
-              onChange={(e) =>
-                set("discountIsPercent", e.target.value === "pct")
-              }
+          <label>Valor del descuento</label>
+          <div className="mb-2 flex gap-2">
+            <button
+              type="button"
+              className={`chip flex-1 justify-center ${!form.discountIsPercent ? "active" : ""}`}
+              onClick={() => set("discountIsPercent", false)}
             >
-              <option value="ars">$ pesos</option>
-              <option value="pct">% porcentaje</option>
-            </select>
+              <b style={{ fontSize: 15 }}>$</b> Monto fijo
+            </button>
+            <button
+              type="button"
+              className={`chip flex-1 justify-center ${form.discountIsPercent ? "active" : ""}`}
+              onClick={() => set("discountIsPercent", true)}
+            >
+              <b style={{ fontSize: 15 }}>%</b> Porcentaje
+            </button>
+          </div>
+          <input
+            id="rw-value"
+            type="number"
+            className="input"
+            placeholder={form.discountIsPercent ? "15" : "2000"}
+            value={form.discountValue}
+            onChange={(e) => set("discountValue", e.target.value)}
+          />
+          <div className="text-faint text-[11.5px]">
+            {form.discountIsPercent
+              ? "Un porcentaje de descuento (%)."
+              : "Un monto fijo en pesos ($)."}
           </div>
         </div>
       ) : type === "product" ? (
