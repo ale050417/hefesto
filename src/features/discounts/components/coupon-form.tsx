@@ -460,27 +460,32 @@ export function CouponForm({
           </div>
         </div>
 
-        <div className="grid-2">
-          <div className="field">
-            <label htmlFor="cp-limit">Límite total (vacío = ilimitado)</label>
-            <input
-              id="cp-limit"
-              type="number"
-              className="input"
-              placeholder="0"
-              value={form.maxUses}
-              onChange={(e) => set("maxUses", e.target.value)}
-            />
+        <div className="field">
+          <label htmlFor="cp-limit">Usos máximos</label>
+          <input
+            id="cp-limit"
+            type="number"
+            className="input"
+            placeholder="Sin límite"
+            value={form.maxUses}
+            onChange={(e) => set("maxUses", e.target.value)}
+          />
+          <div className="text-faint text-[11.5px]">
+            Vacío = se puede usar sin límite.
           </div>
-          <div className="field">
-            <label htmlFor="cp-exp">Fecha de expiración</label>
-            <input
-              id="cp-exp"
-              type="date"
-              className="input"
-              value={form.expiresAt}
-              onChange={(e) => set("expiresAt", e.target.value)}
-            />
+        </div>
+
+        <div className="field">
+          <label htmlFor="cp-exp">Vence el</label>
+          <input
+            id="cp-exp"
+            type="date"
+            className="input"
+            value={form.expiresAt}
+            onChange={(e) => set("expiresAt", e.target.value)}
+          />
+          <div className="text-faint text-[11.5px]">
+            Vacío = sin fecha de vencimiento.
           </div>
         </div>
 

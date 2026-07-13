@@ -12,14 +12,10 @@ import {
   setJobStatusAction,
   setPrinterStatusAction,
 } from "../actions";
-import {
-  JOB_STATUS_LABEL,
-  JOB_STATUS_VARIANT,
-  PRINTER_STATUS_LABEL,
-  PRINTER_STATUS_VARIANT,
-} from "../constants";
+import { PRINTER_STATUS_LABEL, PRINTER_STATUS_VARIANT } from "../constants";
 import type { JobRow, JobStatus, Printer, PrinterStatus } from "../repository";
 import { runAction } from "@/lib/run-action";
+import { ProductionKanban } from "./production-kanban";
 
 const PRINTER_STATES: PrinterStatus[] = [
   "idle",
@@ -27,7 +23,6 @@ const PRINTER_STATES: PrinterStatus[] = [
   "maintenance",
   "offline",
 ];
-const JOB_STATES: JobStatus[] = ["queued", "printing", "done", "failed"];
 
 const ic = (path: string, size?: number) => (
   <svg
@@ -156,7 +151,7 @@ export function ProductionBoard({
         />
       </div>
 
-      <div className="dash-grid">
+      <div className="grid gap-5">
         {/* GRANJA */}
         <div className="grid gap-3">
           <div className="section-title">Granja de impresoras</div>
@@ -226,53 +221,7 @@ export function ProductionBoard({
               + Encolar
             </Button>
           </div>
-          <div className="ui-card section-card" style={{ padding: 16 }}>
-            {jobs.length === 0 ? (
-              <div className="text-dim py-8 text-center text-sm">
-                Cola vacía · todo asignado.
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {jobs.map((j) => (
-                  <div
-                    key={j.id}
-                    className="ui-card flex items-center justify-between"
-                    style={{ padding: "11px 13px" }}
-                  >
-                    <div className="min-w-0">
-                      <b className="block truncate text-[13px]">{j.title}</b>
-                      <div className="text-faint text-[11.5px]">
-                        {j.printerName ?? "Sin asignar"}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={JOB_STATUS_VARIANT[j.status]}>
-                        {JOB_STATUS_LABEL[j.status]}
-                      </Badge>
-                      <select
-                        className="select"
-                        style={{
-                          width: "auto",
-                          padding: "6px 26px 6px 9px",
-                          fontSize: "12px",
-                        }}
-                        value={j.status}
-                        onChange={(e) =>
-                          changeJob(j.id, e.target.value as JobStatus)
-                        }
-                      >
-                        {JOB_STATES.map((s) => (
-                          <option key={s} value={s}>
-                            {JOB_STATUS_LABEL[s]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <ProductionKanban jobs={jobs} onMove={changeJob} />
           <div className="ui-card text-faint flex items-start gap-2 p-4 text-[12px] leading-relaxed">
             <span className="text-[var(--gold-bright)]">
               {ic(
