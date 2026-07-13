@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { registerAction } from "../actions";
 import { PasswordStrengthMeter } from "./password-strength-meter";
@@ -24,7 +24,7 @@ export function RegisterForm() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<Values>({
     defaultValues: {
@@ -34,6 +34,8 @@ export function RegisterForm() {
       confirmPassword: "",
     },
   });
+  // useWatch (no watch()) para ser compatible con el React Compiler.
+  const password = useWatch({ control, name: "password" });
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
@@ -96,7 +98,7 @@ export function RegisterForm() {
           className={field}
           {...register("password")}
         />
-        <PasswordStrengthMeter password={watch("password")} />
+        <PasswordStrengthMeter password={password} />
         {errors.password ? (
           <p className="text-danger mt-1 text-xs">{errors.password.message}</p>
         ) : null}
