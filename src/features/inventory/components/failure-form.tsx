@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { registerFailureAction, updateFailureAction } from "../actions";
 import { runAction } from "@/lib/run-action";
+import { useFormErrors } from "@/hooks/use-form-errors";
 import {
   FAIL_REASONS,
   FILAMENT_COLORS,
@@ -54,6 +55,7 @@ export function FailureForm({
   const [notes, setNotes] = useState(failure?.notes ?? "");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const fe = useFormErrors();
 
   // Edicion (un color, no toca stock - igual que antes)
   const [material, setMaterial] = useState(
@@ -83,13 +85,15 @@ export function FailureForm({
 
   async function submitCreate() {
     setErr(null);
-    if (!pieceName.trim()) return setErr("Ingresa la pieza / producto.");
     const valid = colorLines.filter((l) => l.filamentId && Number(l.grams) > 0);
-    if (valid.length === 0) {
-      return setErr(
-        "Elegi al menos un carrete y los gramos perdidos (se descuentan del stock).",
-      );
-    }
+    const ok = fe.check({
+      pieceName: !pieceName.trim() ? "Ingresá la pieza / producto." : null,
+      colorLines:
+        valid.length === 0
+          ? "Elegí al menos un carrete y los gramos perdidos."
+          : null,
+    });
+    if (!ok) return;
     const primary = filaments.find((f) => f.id === valid[0]!.filamentId);
     setBusy(true);
     const payload = {
@@ -109,7 +113,7 @@ export function FailureForm({
       const res = await runAction(() => registerFailureAction(payload), {
         silent: true,
       });
-      if (!res.ok) return setErr(res.error.message);
+      if (!res.ok) return fe.fromAction(res.error);
       toast("Falla registrada", "success");
       onDone?.();
     } catch {
@@ -121,7 +125,12 @@ export function FailureForm({
 
   async function submitEdit() {
     setErr(null);
-    if (!(Number(gramsLost) > 0)) return setErr("Ingresa los gramos perdidos.");
+    const ok = fe.check({
+      gramsLost: !(Number(gramsLost) > 0)
+        ? "Ingresá los gramos perdidos."
+        : null,
+    });
+    if (!ok) return;
     setBusy(true);
     const payload = {
       pieceName,
@@ -136,7 +145,7 @@ export function FailureForm({
         () => updateFailureAction(failure!.id!, payload),
         { silent: true },
       );
-      if (!res.ok) return setErr(res.error.message);
+      if (!res.ok) return fe.fromAction(res.error);
       toast("Falla actualizada", "success");
       onDone?.();
     } catch {
@@ -154,15 +163,19 @@ export function FailureForm({
         </p>
       ) : null}
 
-      <div className="field">
+      <div className={`field ${fe.errors.pieceName ? "invalid" : ""}`}>
         <label htmlFor="fa-piece">Pieza / producto</label>
         <input
           id="fa-piece"
           className="input"
           placeholder="Ej: Lampara Lunar"
+          aria-invalid={!!fe.errors.pieceName}
           value={pieceName}
           onChange={(e) => setPieceName(e.target.value)}
         />
+        {fe.errors.pieceName ? (
+          <p className="field-error">{fe.errors.pieceName}</p>
+        ) : null}
       </div>
 
       {edit ? (
@@ -199,7 +212,7 @@ export function FailureForm({
           </div>
         </div>
       ) : (
-        <div className="field">
+        <div className={`field ${fe.errors.colorLines ? "invalid" : ""}`}>
           <label>Colores perdidos (descuenta stock)</label>
           <p className="text-faint text-[12px] leading-relaxed">
             Elegi el/los carrete(s) y cuantos gramos se perdieron de cada uno.
@@ -252,21 +265,28 @@ export function FailureForm({
               Total perdido: {colorGramsTotal} g
             </span>
           </div>
+          {fe.errors.colorLines ? (
+            <p className="field-error">{fe.errors.colorLines}</p>
+          ) : null}
         </div>
       )}
 
       <div className={edit ? "grid-2" : "field"}>
         {edit ? (
-          <div className="field">
+          <div className={`field ${fe.errors.gramsLost ? "invalid" : ""}`}>
             <label htmlFor="fa-grams">Gramos perdidos</label>
             <input
               id="fa-grams"
               type="number"
               className="input"
               placeholder="0"
+              aria-invalid={!!fe.errors.gramsLost}
               value={gramsLost}
               onChange={(e) => setGramsLost(e.target.value)}
             />
+            {fe.errors.gramsLost ? (
+              <p className="field-error">{fe.errors.gramsLost}</p>
+            ) : null}
           </div>
         ) : null}
         <div className="field">
