@@ -18,6 +18,7 @@ import { PERM_ACTIONS, PERM_MODULES } from "@/core/auth/perm-defs";
 import type { Role, TeamMember } from "../types";
 import { runAction } from "@/lib/run-action";
 import { useDeleteResource } from "@/hooks/use-delete-resource";
+import { useFormErrors } from "@/hooks/use-form-errors";
 
 /* ---------- íconos inline ---------- */
 const ic = (path: string) => (
@@ -533,19 +534,26 @@ function InviteModal({
   );
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const fe = useFormErrors();
 
   async function submit() {
     setErr(null);
-    if (!email.trim()) return setErr("Ingresá el email de la persona.");
-    if (!/.+@.+\..+/.test(email)) return setErr("Ingresá un email válido.");
-    if (!roleId) return setErr("Elegí un rol.");
+    const ok = fe.check({
+      email: !email.trim()
+        ? "Ingresá el email de la persona."
+        : !/.+@.+\..+/.test(email)
+          ? "Ingresá un email válido."
+          : null,
+      roleId: !roleId ? "Elegí un rol." : null,
+    });
+    if (!ok) return;
     setBusy(true);
     const res = await runAction(
       () => inviteTeamMemberAction({ fullName, email, roleId }),
       { silent: true },
     );
     setBusy(false);
-    if (!res.ok) return setErr(res.error.message);
+    if (!res.ok) return fe.fromAction(res.error);
     onCreated(res.data);
   }
 
@@ -581,10 +589,11 @@ function InviteModal({
               placeholder="Ej: Carla Videla"
             />
           </div>
-          <div className="field">
+          <div className={`field ${fe.errors.roleId ? "invalid" : ""}`}>
             <label>Rol</label>
             <select
               className="select"
+              aria-invalid={!!fe.errors.roleId}
               value={roleId}
               onChange={(e) => setRoleId(e.target.value)}
             >
@@ -594,17 +603,24 @@ function InviteModal({
                 </option>
               ))}
             </select>
+            {fe.errors.roleId ? (
+              <p className="field-error">{fe.errors.roleId}</p>
+            ) : null}
           </div>
         </div>
-        <div className="field">
+        <div className={`field ${fe.errors.email ? "invalid" : ""}`}>
           <label>Email</label>
           <input
             className="input"
             type="email"
+            aria-invalid={!!fe.errors.email}
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="persona@email.com"
           />
+          {fe.errors.email ? (
+            <p className="field-error">{fe.errors.email}</p>
+          ) : null}
         </div>
         {err ? (
           <p className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
@@ -720,6 +736,7 @@ function RoleModal({
   );
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const fe = useFormErrors();
 
   const has = (m: string, a: string) => (perms[m] ?? []).includes(a);
   const toggle = (m: string, a: string) =>
@@ -732,7 +749,12 @@ function RoleModal({
 
   async function submit() {
     setErr(null);
-    if (!name.trim()) return setErr("Ingresá un nombre para el rol.");
+    if (
+      !fe.check({
+        name: !name.trim() ? "Ingresá un nombre para el rol." : null,
+      })
+    )
+      return;
     setBusy(true);
     const clean: Record<string, string[]> = {};
     for (const [m, a] of Object.entries(perms)) if (a.length) clean[m] = a;
@@ -745,7 +767,7 @@ function RoleModal({
           silent: true,
         });
     setBusy(false);
-    if (!res.ok) return setErr(res.error.message);
+    if (!res.ok) return fe.fromAction(res.error);
     toast(role ? "Rol actualizado" : "Rol creado", "success");
     onDone();
   }
@@ -768,14 +790,18 @@ function RoleModal({
       }
     >
       <div className="grid gap-4">
-        <div className="field">
+        <div className={`field ${fe.errors.name ? "invalid" : ""}`}>
           <label>Nombre del rol</label>
           <input
             className="input"
+            aria-invalid={!!fe.errors.name}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Ej: Atención al cliente"
           />
+          {fe.errors.name ? (
+            <p className="field-error">{fe.errors.name}</p>
+          ) : null}
         </div>
         <div className="field">
           <label>Permisos por módulo</label>

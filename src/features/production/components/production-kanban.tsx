@@ -8,6 +8,7 @@ import { ORDER_STATUS_LABEL } from "@/features/orders/constants";
 import type { OrderStatus } from "@/features/orders/types";
 import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
+import { runAction } from "@/lib/run-action";
 
 export type KanbanOrder = {
   id: string;
@@ -42,7 +43,9 @@ export function OrdersKanban({ orders }: { orders: KanbanOrder[] }) {
   async function move(id: string, status: OrderStatus) {
     const cur = orders.find((o) => o.id === id);
     if (!cur || cur.status === status) return;
-    const res = await transitionOrderAction(id, status);
+    const res = await runAction(() => transitionOrderAction(id, status), {
+      silent: true,
+    });
     if (!res.ok) {
       toast(res.error.message, "danger");
       return;

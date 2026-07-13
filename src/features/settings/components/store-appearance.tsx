@@ -22,6 +22,7 @@ import { StoreLivePreview } from "./store-live-preview";
 import { runAction } from "@/lib/run-action";
 import { useDeleteResource } from "@/hooks/use-delete-resource";
 import { useDragReframe } from "@/hooks/use-drag-reframe";
+import { useFormErrors } from "@/hooks/use-form-errors";
 
 const ACCENTS = [
   "#C9A84C",
@@ -152,6 +153,7 @@ export function StoreAppearance({
     setBf((f) => ({ ...f, [k]: v }));
   const bannerFileRef = useRef<HTMLInputElement>(null);
   const [imgBusy, setImgBusy] = useState(false);
+  const fe = useFormErrors();
 
   async function onBannerFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -218,7 +220,10 @@ export function StoreAppearance({
     setBannerOpen(true);
   }
   async function saveBanner() {
-    if (!bf.title.trim()) return toast("Ingresá un título", "danger");
+    if (
+      !fe.check({ bannerTitle: !bf.title.trim() ? "Ingresá un título." : null })
+    )
+      return;
     setBusy(true);
     const payload = {
       title: bf.title,
@@ -670,14 +675,18 @@ export function StoreAppearance({
             onReframe={(x, y) => setBf((f) => ({ ...f, posX: x, posY: y }))}
           />
 
-          <div className="field">
+          <div className={`field ${fe.errors.bannerTitle ? "invalid" : ""}`}>
             <label>Título</label>
             <input
               className="input"
+              aria-invalid={!!fe.errors.bannerTitle}
               value={bf.title}
               onChange={(e) => setB("title", e.target.value)}
               placeholder="Impresión 3D a pedido"
             />
+            {fe.errors.bannerTitle ? (
+              <p className="field-error">{fe.errors.bannerTitle}</p>
+            ) : null}
           </div>
           <div className="field">
             <label>Subtítulo</label>

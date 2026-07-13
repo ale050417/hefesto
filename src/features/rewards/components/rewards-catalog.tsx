@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { redeemRewardAction } from "../actions";
 import { toast } from "@/stores/toastStore";
+import { runAction } from "@/lib/run-action";
 
 export type RewardItem = {
   id: string;
@@ -47,10 +48,15 @@ export function RewardsCatalog({
   async function redeem(r: RewardItem) {
     setBusy(r.id);
     setResult(null);
-    const res = await redeemRewardAction(r.id);
+    const res = await runAction(() => redeemRewardAction(r.id), {
+      silent: true,
+    });
     setBusy(null);
     if (!res.ok) {
-      toast(res.error, "danger");
+      toast(
+        typeof res.error === "string" ? res.error : res.error.message,
+        "danger",
+      );
       return;
     }
     setResult(res.message);
