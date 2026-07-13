@@ -344,13 +344,6 @@
       "when": 1783305200000,
       "tag": "0048_coupon_scope_birthday",
       "breakpoints": true
-    },
-    {
-      "idx": 49,
-      "version": "7",
-      "when": 1783305300000,
-      "tag": "0049_custom_request_guest",
-      "breakpoints": true
     }
   ]
 }

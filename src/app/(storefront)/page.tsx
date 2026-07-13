@@ -669,7 +669,9 @@ export default async function Home({
               <div className="cust-grid">
                 <div style={{ padding: "42px 44px" }}>
                   <div className="eyebrow">¿No encontrás lo que buscás?</div>
-                  <h2 className="sec-title mt-2 mb-3">Pedí algo a medida</h2>
+                  <h2 className="sec-title mt-2 mb-3">
+                    Pedí tu pieza personalizada
+                  </h2>
                   <p className="text-dim mb-5 max-w-[420px] text-[15px] leading-relaxed">
                     Contanos qué necesitás y mandanos una foto de referencia. Lo
                     diseñamos e imprimimos para vos. Te contactamos con un
@@ -698,8 +700,7 @@ export default async function Home({
                     href="/a-medida"
                     className={cn(buttonVariants({ size: "lg" }))}
                   >
-                    <Icon name="sparkles" size={17} /> Pedir presupuesto a
-                    medida
+                    <Icon name="sparkles" size={17} /> Pedí la tuya
                   </Link>
                 </div>
                 <div className="cust-art">
