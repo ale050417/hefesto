@@ -280,7 +280,9 @@ export function ProductsAdmin({
           <div className="text-dim">No se encontraron productos.</div>
         </div>
       ) : view === "grid" ? (
-        <div className="grid-4">
+        // grid-3 = adaptable (auto-fit ≥210px): 2 col en tablet con imágenes
+        // cómodas en vez de 3 tarjetas chicas. En desktop ancho da 3-4 col.
+        <div className="grid-3">
           {list.map((p) => (
             <div
               key={p.id}

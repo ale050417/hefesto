@@ -74,7 +74,9 @@ export function PaymentSettingsForm({
 
   return (
     <div className="grid gap-4">
-      <div className="grid-3">
+      {/* Tarjetas ricas (con campos): 1 columna en tablet para que respiren;
+          3 columnas recién en desktop ancho. Evita el look "aplastado". */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         {/* Transferencia */}
         <div className="ui-card section-card flex flex-col gap-3">
           <div className="flex items-center justify-between">

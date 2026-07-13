@@ -329,15 +329,18 @@ body > * {
     grid-template-columns: repeat(2, 1fr);
   }
   .grid-3 {
-    grid-template-columns: 1fr;
+    /* Grilla de TARJETAS (filamentos, clientes, categorías, recompensas, pagos):
+       adaptable al ancho REAL. En tablet el sidebar fijo (214px) achica el ancho
+       útil y con 3 columnas fijas las tarjetas quedaban ~146px (badges y botones
+       cortados). auto-fit mantiene tarjetas ≥210px y elige las columnas según el
+       espacio: 1 en móvil, 2 en tablet, 3+ en desktop. Sin media queries. */
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   }
   .grid-4 {
     grid-template-columns: repeat(2, 1fr);
   }
   @media (min-width: 768px) {
-    .grid-3 {
-      grid-template-columns: repeat(3, 1fr);
-    }
+    /* .grid-3 lo maneja auto-fit (arriba); acá solo grid-4. */
     .grid-4 {
       grid-template-columns: repeat(3, 1fr);
     }
@@ -1643,6 +1646,9 @@ body > * {
     display: flex;
     flex-direction: column;
     min-height: 100dvh;
+    /* Red de seguridad: nada genera scroll horizontal en móvil. `clip` NO rompe
+       el sticky del topbar ni recuadra el sidebar fixed (a diferencia de hidden). */
+    overflow-x: clip;
   }
   .admin-body {
     display: flex;
@@ -1662,20 +1668,29 @@ body > * {
     z-index: 40;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     height: var(--admin-topbar-h, 54px);
-    padding: 0 12px;
+    padding: 0 10px;
     background: color-mix(in srgb, var(--surface-1) 92%, transparent);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--border);
+  }
+  /* En pantallas angostas el nombre de marca se trunca antes que empujar los
+     íconos de la derecha fuera del viewport (causaba scroll horizontal). */
+  .admin-topbar .brand {
+    min-width: 0;
+  }
+  .admin-topbar .brand-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   @media (min-width: 768px) {
     .admin-topbar {
       padding: 0 20px;
     }
-    .admin-burger {
-      display: none;
-    }
+    /* El burger queda visible en desktop: ahora oculta/muestra el sidebar
+       (colapsable) para que el contenido use todo el ancho. */
   }
   .admin-burger {
     display: inline-flex;
@@ -1740,6 +1755,13 @@ body > * {
       box-shadow: none;
     }
     .sidebar-backdrop {
+      display: none;
+    }
+  }
+  /* Sidebar colapsable en desktop: el burger togglea .nav-collapsed y el
+     sidebar se oculta para que el contenido ocupe todo el ancho ("ver mejor"). */
+  @media (min-width: 768px) {
+    .admin-shell.nav-collapsed .admin-sidebar {
       display: none;
     }
   }
@@ -1972,10 +1994,11 @@ body > * {
     }
   }
 
-  /* Pestañas (Configuración, etc.): las 5 pestañas miden ~560-600px, así que
-     el scroll horizontal tiene que cubrir hasta 767px (antes cortaba en 600 y
-     entre 601-767 desbordaban sin scroll). */
-  @media (max-width: 767px) {
+  /* Pestañas (Configuración, etc.): las 5 pestañas miden ~560-600px. En tablet
+     el sidebar fijo reduce el ancho útil, así que el scroll horizontal tiene que
+     cubrir hasta 1023px (antes cortaba en 767 y "Roles y permisos" quedaba
+     tapada en tablet). A ≥1024 el contenido ya es lo bastante ancho y entran. */
+  @media (max-width: 1023px) {
     .tabs {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
@@ -2031,11 +2054,12 @@ body > * {
     border-bottom: none;
   }
 
-  /* Móvil: las tablas marcadas con .tbl-cards se apilan como tarjetas legibles
-     (sin scroll horizontal). Cada celda usa su data-label como etiqueta. Las
-     tablas sin esta clase (ej. matrices de permisos) mantienen su scroll
-     interno contenido en .table-wrap. */
-  @media (max-width: 768px) {
+  /* Móvil y tablet (≤1023): las tablas .tbl-cards se apilan como tarjetas
+     legibles (sin scroll horizontal). Cada celda usa su data-label como
+     etiqueta. Hasta 1023 porque en tablet el sidebar fijo achica el ancho y una
+     tabla de varias columnas quedaría apretada. Las tablas sin esta clase (ej.
+     matrices de permisos) mantienen su scroll interno contenido en .table-wrap. */
+  @media (max-width: 1023px) {
     table.tbl-cards,
     table.tbl-cards thead,
     table.tbl-cards tbody,
@@ -2095,6 +2119,19 @@ body > * {
     /* Celda de acciones: sin etiqueta y alineada a la derecha. */
     table.tbl-cards tbody td[data-label=""]::before,
     table.tbl-cards tfoot td[data-label=""]::before {
+      content: none;
+    }
+    /* Primera celda = encabezado de la tarjeta (identidad del ítem): sin
+       etiqueta, alineada a la izquierda y destacada, en vez de empujar el
+       nombre a la derecha. Look de tarjeta profesional, no de "formulario". */
+    table.tbl-cards tbody td:first-child {
+      justify-content: flex-start;
+      text-align: left;
+      font-size: 14.5px;
+      padding: 4px 0 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    table.tbl-cards tbody td:first-child::before {
       content: none;
     }
   }
@@ -2811,19 +2848,48 @@ body > * {
     color: var(--success);
     font-family: var(--font-display), sans-serif;
   }
-  @media (max-width: 760px) {
+  /* Tablet y móvil (≤1023): el sidebar fijo achica el ancho y la fila de 5
+     columnas quedaba "pegada" (nombre/rol/% cortados). Cada socio pasa a ser
+     una tarjeta: el nombre y el rol ocupan el ancho, y el % + el monto van
+     debajo. El punto de color abarca las dos filas y el borrar queda arriba. */
+  @media (max-width: 1023px) {
     .gn-row {
-      grid-template-columns: 14px 1fr 80px;
+      grid-template-columns: 14px 1fr auto;
+      grid-template-areas:
+        "dot who del"
+        "dot pct amount";
+      column-gap: 12px;
+      row-gap: 10px;
+      align-items: center;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface-1);
+    }
+    .gn-dot {
+      grid-area: dot;
+      align-self: start;
+      margin-top: 6px;
     }
     .gn-who {
+      grid-area: who;
       flex-direction: column;
+      gap: 6px;
+    }
+    .gn-who .gn-role {
+      max-width: none;
+    }
+    .gn-pct {
+      grid-area: pct;
     }
     .gn-amount {
-      grid-column: 2 / 4;
-      text-align: left;
+      grid-area: amount;
+      text-align: right;
+      font-size: 16px;
     }
-    .gn-row [data-gn-del] {
-      grid-column: 3;
+    .gn-del {
+      grid-area: del;
+      justify-self: end;
     }
   }
   .progress {

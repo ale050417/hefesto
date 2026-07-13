@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { TIER_BADGE_CLASS, TIER_LABEL } from "../tier";
 import type { AdminCustomer } from "../service";
@@ -13,6 +14,7 @@ const sinceFmt = new Intl.DateTimeFormat("es-AR", {
 
 export function CustomersView({ customers }: { customers: AdminCustomer[] }) {
   const [view, setView] = useState<"grilla" | "lista">("grilla");
+  const router = useRouter();
 
   return (
     <div className="grid gap-3">
@@ -107,45 +109,61 @@ export function CustomersView({ customers }: { customers: AdminCustomer[] }) {
           ))}
         </div>
       ) : (
-        <div className="ui-card section-card" style={{ padding: 0 }}>
-          <div className="flex flex-col">
-            {customers.map((c, i) => (
-              <Link
-                key={`${c.source}-${c.id}`}
-                href={`/admin/clientes/${c.id}`}
-                className="flex items-center gap-3 px-4 py-3 transition hover:bg-[var(--surface-2)]"
-                style={{
-                  borderTop: i === 0 ? "none" : "1px solid var(--border)",
-                }}
-              >
-                <span
-                  className="avatar flex-shrink-0"
-                  style={{ width: 38, height: 38, fontSize: 15 }}
-                >
-                  {(c.name[0] ?? "?").toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[14px] font-semibold">
-                    {c.name}
-                  </div>
-                  <div className="text-faint text-[12px]">{c.city ?? "—"}</div>
-                </div>
-                <span
-                  className={`badge ${TIER_BADGE_CLASS[c.tier]} hidden sm:inline-flex`}
-                >
-                  {TIER_LABEL[c.tier]}
-                </span>
-                <div className="text-dim w-16 text-right text-[13px]">
-                  {c.orders} ped.
-                </div>
-                <div
-                  className="w-24 text-right text-[13px] font-semibold"
-                  style={{ color: "var(--gold-bright)" }}
-                >
-                  {compactPrice(c.spent)}
-                </div>
-              </Link>
-            ))}
+        <div
+          className="ui-card section-card"
+          style={{ padding: 0, overflow: "hidden" }}
+        >
+          <div className="table-wrap" style={{ border: "none" }}>
+            {/* Lista estándar: tabla con encabezados en desktop; en móvil se
+                apila como tarjetas (.tbl-cards). Fila clickeable → ficha. */}
+            <table className="tbl tbl-cards">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th>Ciudad</th>
+                  <th>Nivel</th>
+                  <th>Pedidos</th>
+                  <th>Gastado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {customers.map((c) => (
+                  <tr
+                    key={`${c.source}-${c.id}`}
+                    onClick={() => router.push(`/admin/clientes/${c.id}`)}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <td data-label="Cliente">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="avatar flex-shrink-0"
+                          style={{ width: 34, height: 34, fontSize: 13 }}
+                        >
+                          {(c.name[0] ?? "?").toUpperCase()}
+                        </span>
+                        <b>{c.name}</b>
+                      </div>
+                    </td>
+                    <td className="muted" data-label="Ciudad">
+                      {c.city ?? "—"}
+                    </td>
+                    <td data-label="Nivel">
+                      <span className={`badge ${TIER_BADGE_CLASS[c.tier]}`}>
+                        {TIER_LABEL[c.tier]}
+                      </span>
+                    </td>
+                    <td data-label="Pedidos">{c.orders} ped.</td>
+                    <td
+                      className="price"
+                      data-label="Gastado"
+                      style={{ color: "var(--gold-bright)", fontWeight: 700 }}
+                    >
+                      {compactPrice(c.spent)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

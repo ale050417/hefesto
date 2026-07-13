@@ -131,7 +131,7 @@ export function OrdersBoard({
         </div>
       ) : (
         <>
-          <div className="ui-card hidden overflow-hidden md:block">
+          <div className="ui-card hidden overflow-hidden lg:block">
             <div className="table-wrap" style={{ border: "none" }}>
               <table className="tbl">
                 <thead>
@@ -197,7 +197,7 @@ export function OrdersBoard({
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 md:hidden">
+          <div className="flex flex-col gap-3 lg:hidden">
             {list.map((o) => (
               <div key={`${o.source}-${o.id}`} className="ui-card p-4">
                 <div className="flex items-start justify-between gap-3">

@@ -158,7 +158,7 @@ export function RolesManager({
         </div>
 
         <div className="table-wrap" style={{ border: "none" }}>
-          <table className="tbl">
+          <table className="tbl tbl-cards">
             <thead>
               <tr>
                 <th>Miembro</th>
@@ -186,7 +186,7 @@ export function RolesManager({
                   const editable = canManage && !isSelf && !isLastAdmin;
                   return (
                     <tr key={t.id} style={{ cursor: "default" }}>
-                      <td>
+                      <td data-label="Miembro">
                         <div className="flex items-center gap-3">
                           <span
                             className="avatar"
@@ -204,8 +204,10 @@ export function RolesManager({
                           </b>
                         </div>
                       </td>
-                      <td className="muted">{t.email ?? "—"}</td>
-                      <td>
+                      <td className="muted" data-label="Email">
+                        {t.email ?? "—"}
+                      </td>
+                      <td data-label="Rol">
                         {editable ? (
                           <select
                             className="select"
@@ -238,14 +240,14 @@ export function RolesManager({
                           </Badge>
                         )}
                       </td>
-                      <td>
+                      <td data-label="Estado">
                         {t.status === "activo" ? (
                           <Badge variant="success">Activo</Badge>
                         ) : (
                           <Badge variant="warning">Invitación pendiente</Badge>
                         )}
                       </td>
-                      <td>
+                      <td data-label="">
                         <div
                           className="flex items-center gap-2"
                           style={{ justifyContent: "flex-end" }}

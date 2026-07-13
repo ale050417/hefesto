@@ -78,6 +78,7 @@ export function OrdersKanban({ orders }: { orders: KanbanOrder[] }) {
             style={{
               width: 250,
               padding: 12,
+              borderTop: `3px solid ${col.color}`,
               background: active ? "rgba(var(--gold-rgb),.07)" : undefined,
               borderColor: active ? "var(--gold)" : undefined,
             }}
@@ -92,7 +93,17 @@ export function OrdersKanban({ orders }: { orders: KanbanOrder[] }) {
                 }}
               />
               <b className="text-[13px]">{ORDER_STATUS_LABEL[col.status]}</b>
-              <span className="text-faint ml-auto text-[12px]">
+              <span
+                className="ml-auto inline-flex items-center justify-center text-[11px] font-bold"
+                style={{
+                  minWidth: 22,
+                  height: 20,
+                  padding: "0 6px",
+                  borderRadius: 999,
+                  background: "var(--surface-3)",
+                  color: "var(--text-dim)",
+                }}
+              >
                 {items.length}
               </span>
             </div>
@@ -149,7 +160,10 @@ export function OrdersKanban({ orders }: { orders: KanbanOrder[] }) {
                 );
               })}
               {items.length === 0 ? (
-                <div className="text-faint rounded-md border border-dashed border-[var(--border)] py-3 text-center text-[11.5px]">
+                <div
+                  className="text-faint flex items-center justify-center rounded-lg border border-dashed border-[var(--border)] text-center text-[11.5px]"
+                  style={{ minHeight: 76 }}
+                >
                   Soltá un pedido acá
                 </div>
               ) : null}

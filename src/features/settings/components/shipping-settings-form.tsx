@@ -57,7 +57,7 @@ export function ShippingSettingsForm({
   }
 
   return (
-    <div className="grid-2" style={{ alignItems: "start" }}>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
       <div className="ui-card section-card flex flex-col gap-3">
         <div className="section-title">Envíos y retiro</div>
         <div className="text-faint -mt-2 text-[12.5px]">
