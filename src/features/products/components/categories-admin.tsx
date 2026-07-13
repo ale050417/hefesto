@@ -72,6 +72,7 @@ export function CategoriesAdmin({
   const totalProducts = categories.reduce((acc, c) => acc + c.productCount, 0);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryFormData | null>(null);
+  const [view, setView] = useState<"grilla" | "lista">("grilla");
   const [newParentId, setNewParentId] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<CategoryWithCount | null>(null);
 
@@ -156,9 +157,52 @@ export function CategoriesAdmin({
               {totalProducts} producto{totalProducts === 1 ? "" : "s"}{" "}
               categorizados
             </span>
+            <div className="mode-switch ml-auto">
+              <button
+                className={view === "grilla" ? "active" : ""}
+                onClick={() => setView("grilla")}
+                title="Grilla"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden
+                >
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+              </button>
+              <button
+                className={view === "lista" ? "active" : ""}
+                onClick={() => setView("lista")}
+                title="Lista"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden
+                >
+                  <line x1="8" y1="6" x2="21" y2="6" />
+                  <line x1="8" y1="12" x2="21" y2="12" />
+                  <line x1="8" y1="18" x2="21" y2="18" />
+                  <line x1="3" y1="6" x2="3.01" y2="6" />
+                  <line x1="3" y1="12" x2="3.01" y2="12" />
+                  <line x1="3" y1="18" x2="3.01" y2="18" />
+                </svg>
+              </button>
+            </div>
           </div>
 
-          <div className="grid-3" style={{ alignItems: "start" }}>
+          <div
+            className={view === "grilla" ? "grid-3" : "flex flex-col gap-3"}
+            style={{ alignItems: "start" }}
+          >
             {roots.map((c) => {
               const color = c.color ?? "#888";
               const children = byParent.get(c.id) ?? [];

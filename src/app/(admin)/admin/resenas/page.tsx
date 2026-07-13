@@ -30,8 +30,30 @@ export default async function ResenasPage() {
       </div>
 
       {reviews.length === 0 ? (
-        <div className="ui-card text-dim p-10 text-center text-sm">
-          Todavía no hay reseñas.
+        <div className="space-y-3">
+          <div className="ui-card text-dim p-4 text-sm">
+            Todavía no hay reseñas de clientes. Cuando las haya, las moderás acá
+            (aprobar u ocultar) y las aprobadas se ven en la ficha del producto.
+            Así se ve una reseña:
+          </div>
+          <div className="ui-card p-4" style={{ opacity: 0.9 }}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <b className="text-fg text-sm">Camila R.</b>
+                  <Stars value={5} size={13} />
+                  <span className="badge">Ejemplo</span>
+                </div>
+                <div className="text-faint mt-0.5 text-xs">
+                  Lámpara Lunar · {dateFmt.format(new Date())}
+                </div>
+                <p className="text-dim mt-2 text-sm">
+                  &ldquo;Quedó hermosa, la calidad de impresión es impecable y
+                  llegó súper rápido. ¡Ya encargué otra!&rdquo;
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       ) : (
         <div className="space-y-3">

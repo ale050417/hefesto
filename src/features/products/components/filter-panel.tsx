@@ -35,6 +35,13 @@ export function FilterPanel({
 
   const activeCategory = get("category");
 
+  // Jerarquía padre → subcategorías (estándar e-commerce). Elegir un padre ya
+  // trae los productos de sus hijas (lo resuelve el repository).
+  const ids = new Set(categories.map((c) => c.id));
+  const roots = categories.filter((c) => !c.parentId || !ids.has(c.parentId));
+  const childrenOf = (id: string) =>
+    categories.filter((c) => c.parentId === id);
+
   return (
     <div className="ui-card filter-panel p-5">
       <div className="mb-1 flex items-center justify-between">
@@ -62,18 +69,37 @@ export function FilterPanel({
           <span className="rdot" />
           Todas
         </label>
-        {categories.map((c) => (
-          <label key={c.id} className="f-radio">
-            <input
-              type="radio"
-              name="cat"
-              className="sr-only"
-              checked={activeCategory === c.slug}
-              onChange={() => setParams({ category: c.slug })}
-            />
-            <span className="rdot" />
-            {c.name}
-          </label>
+        {roots.map((root) => (
+          <div key={root.id}>
+            <label className="f-radio">
+              <input
+                type="radio"
+                name="cat"
+                className="sr-only"
+                checked={activeCategory === root.slug}
+                onChange={() => setParams({ category: root.slug })}
+              />
+              <span className="rdot" />
+              {root.name}
+            </label>
+            {childrenOf(root.id).map((sub) => (
+              <label
+                key={sub.id}
+                className="f-radio"
+                style={{ paddingLeft: 22 }}
+              >
+                <input
+                  type="radio"
+                  name="cat"
+                  className="sr-only"
+                  checked={activeCategory === sub.slug}
+                  onChange={() => setParams({ category: sub.slug })}
+                />
+                <span className="rdot" />
+                {sub.name}
+              </label>
+            ))}
+          </div>
         ))}
       </div>
 

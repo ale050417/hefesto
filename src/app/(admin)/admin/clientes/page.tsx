@@ -1,11 +1,10 @@
-import Link from "next/link";
 import { requirePermissionPage } from "@/core/auth/permissions";
 import { DegradedNotice } from "@/components/shared/degraded-notice";
 import { listAdminCustomers } from "@/features/customers/service";
-import { TIER_BADGE_CLASS, TIER_LABEL } from "@/features/customers/tier";
 import { CustomerSearch } from "@/features/customers/components/customer-search";
 import { NuevoClienteButton } from "@/features/customers/components/nuevo-cliente-button";
-import { compactPrice, formatPrice } from "@/lib/format";
+import { CustomersView } from "@/features/customers/components/customers-view";
+import { formatPrice } from "@/lib/format";
 import { safeLoad } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
@@ -17,11 +16,6 @@ function first(v: string | string[] | undefined): string | undefined {
   const x = Array.isArray(v) ? v[0] : v;
   return x && x !== "" ? x : undefined;
 }
-
-const sinceFmt = new Intl.DateTimeFormat("es-AR", {
-  month: "short",
-  year: "numeric",
-});
 
 export default async function ClientesAdminPage({
   searchParams,
@@ -84,52 +78,7 @@ export default async function ClientesAdminPage({
           <div className="text-dim">No se encontraron clientes.</div>
         </div>
       ) : (
-        <div className="grid-3">
-          {list.map((c) => (
-            <Link
-              key={`${c.source}-${c.id}`}
-              href={`/admin/clientes/${c.id}`}
-              className="ui-card card-hover block"
-              style={{ padding: 18 }}
-            >
-              <div className="mb-3.5 flex items-center gap-3">
-                <span
-                  className="avatar flex-shrink-0"
-                  style={{ width: 46, height: 46, fontSize: 17 }}
-                >
-                  {(c.name[0] ?? "?").toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold">{c.name}</div>
-                  <div className="text-faint text-[12px]">{c.city ?? "—"}</div>
-                </div>
-                <span className={`badge ${TIER_BADGE_CLASS[c.tier]}`}>
-                  {TIER_LABEL[c.tier]}
-                </span>
-              </div>
-              <div className="grid-2" style={{ gap: 10 }}>
-                <div className="ui-card text-center" style={{ padding: 11 }}>
-                  <div className="kpi-val" style={{ fontSize: 20 }}>
-                    {c.orders}
-                  </div>
-                  <div className="text-faint text-[11px]">pedidos</div>
-                </div>
-                <div className="ui-card text-center" style={{ padding: 11 }}>
-                  <div
-                    className="kpi-val"
-                    style={{ fontSize: 20, color: "var(--gold-bright)" }}
-                  >
-                    {compactPrice(c.spent)}
-                  </div>
-                  <div className="text-faint text-[11px]">gastado</div>
-                </div>
-              </div>
-              <div className="text-faint mt-3 text-[11.5px]">
-                Cliente desde {sinceFmt.format(c.since)}
-              </div>
-            </Link>
-          ))}
-        </div>
+        <CustomersView customers={list} />
       )}
     </div>
   );
