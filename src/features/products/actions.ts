@@ -353,7 +353,12 @@ export async function uploadProductImageAction(
   }
   try {
     const bytes = Buffer.from(await file.arrayBuffer());
-    const image = await addProductImage(productId, bytes);
+    const posRaw = formData.get("position");
+    const position =
+      typeof posRaw === "string" && /^\d{1,3}% \d{1,3}%$/.test(posRaw)
+        ? posRaw
+        : "50% 50%";
+    const image = await addProductImage(productId, bytes, position);
     revalidatePath(`/admin/productos/${productId}/editar`);
     return { ok: true, data: { id: image.id, url: image.url } };
   } catch {

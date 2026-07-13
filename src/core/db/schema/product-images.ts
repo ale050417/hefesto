@@ -21,6 +21,8 @@ export const productImages = pgTable(
     alt: text("alt"),
     sortOrder: integer("sort_order").notNull().default(0),
     isPrimary: boolean("is_primary").notNull().default(false),
+    // Encuadre (object-position CSS, ej. "50% 30%") para acomodar el recorte.
+    position: text("position").notNull().default("50% 50%"),
   },
   (t) => [
     // Una sola imagen principal por producto (índice único parcial).

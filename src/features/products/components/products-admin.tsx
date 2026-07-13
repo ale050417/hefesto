@@ -15,32 +15,11 @@ import type {
 } from "../types";
 import type { EstimatorContext } from "@/features/calculator/service";
 import { ProductForm, type ProductFormValues } from "./product-form";
+import { ProductWizard } from "./product-wizard";
 import { ImageUpload } from "./image-upload";
 import { ProductStatusActions } from "./product-status-actions";
 import { runAction } from "@/lib/run-action";
 import { useDeleteResource } from "@/hooks/use-delete-resource";
-
-const EMPTY_DEFAULTS: ProductFormValues = {
-  name: "",
-  slug: "",
-  description: "",
-  categoryId: "",
-  price: "",
-  salePrice: "",
-  material: "",
-  printTimeMinutes: "",
-  weightGrams: "",
-  dimensions: "",
-  colorMode: "single",
-  colors: [],
-  colorPrices: {},
-  layerHeight: "",
-  infillPercent: "",
-  productionTime: "",
-  isFeatured: false,
-  isNew: false,
-  status: "draft",
-};
 
 type View = "grid" | "list";
 type ModalState =
@@ -124,10 +103,14 @@ export function ProductsAdmin({
   products,
   categories,
   estimator,
+  colorCatalog,
+  sections,
 }: {
   products: AdminProductRow[];
   categories: Category[];
   estimator: EstimatorContext;
+  colorCatalog: Array<{ name: string; hex: string | null }>;
+  sections: { nuevos: boolean; destacados: boolean };
 }) {
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
@@ -502,12 +485,12 @@ export function ProductsAdmin({
         size="lg"
       >
         {modal.open && modal.mode === "create" ? (
-          <ProductForm
-            mode="create"
+          <ProductWizard
             categories={categories}
-            defaultValues={EMPTY_DEFAULTS}
             estimator={estimator}
-            onSaved={handleSaved}
+            colorCatalog={colorCatalog}
+            sections={sections}
+            onCreated={handleSaved}
           />
         ) : modal.open && modal.mode === "edit" ? (
           <div className="flex flex-col gap-5">

@@ -16,6 +16,7 @@ export function ProductCard({ product }: { product: ProductView }) {
             fill
             sizes="(max-width: 768px) 50vw, 25vw"
             className="object-cover"
+            style={{ objectPosition: product.primaryImage.position }}
           />
         ) : null}
         <div className="prod-badges">

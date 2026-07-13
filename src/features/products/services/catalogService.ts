@@ -83,7 +83,11 @@ export function toProductView(p: ProductWithRelations): ProductView {
       ? { name: p.category.name, slug: p.category.slug }
       : null,
     primaryImage: primary
-      ? { url: primary.url, alt: primary.alt ?? p.name }
+      ? {
+          url: primary.url,
+          alt: primary.alt ?? p.name,
+          position: primary.position,
+        }
       : null,
   };
 }
@@ -153,7 +157,11 @@ export async function getProductBySlug(
     layerHeight: p.layerHeight,
     infillPercent: p.infillPercent,
     productionTime: p.productionTime,
-    images: p.images.map((i) => ({ url: i.url, alt: i.alt ?? p.name })),
+    images: p.images.map((i) => ({
+      url: i.url,
+      alt: i.alt ?? p.name,
+      position: i.position,
+    })),
     variants: p.variants.map((v) => ({
       id: v.id,
       label: v.label,
@@ -322,6 +330,7 @@ function storagePathFromUrl(url: string): string | null {
 export async function addProductImage(
   productId: string,
   bytes: Buffer,
+  position = "50% 50%",
 ): Promise<ProductImage> {
   const webp = await optimizeImage(bytes);
   const path = `${productId}/${randomUUID()}.webp`;
@@ -333,6 +342,7 @@ export async function addProductImage(
     alt: null,
     sortOrder: count,
     isPrimary: count === 0,
+    position,
   });
 }
 

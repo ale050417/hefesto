@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { requirePermissionPage } from "@/core/auth/permissions";
-import {
-  ProductForm,
-  type ProductFormValues,
-} from "@/features/products/components/product-form";
+import { ProductWizard } from "@/features/products/components/product-wizard";
 import { listCategories } from "@/features/products/services/catalogService";
 import { getEstimatorContext } from "@/features/calculator/service";
 import { listColorCatalog } from "@/features/inventory/queries";
@@ -12,28 +9,6 @@ import { sectionOn } from "@/features/settings/home-sections";
 import { loadOrThrow } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
-
-const emptyDefaults: ProductFormValues = {
-  name: "",
-  slug: "",
-  description: "",
-  categoryId: "",
-  price: "",
-  salePrice: "",
-  material: "",
-  printTimeMinutes: "",
-  weightGrams: "",
-  dimensions: "",
-  colorMode: "single",
-  colors: [],
-  colorPrices: {},
-  layerHeight: "",
-  infillPercent: "",
-  productionTime: "",
-  isFeatured: false,
-  isNew: false,
-  status: "draft",
-};
 
 export default async function NuevoProductoPage() {
   await requirePermissionPage("productos", "crear");
@@ -48,7 +23,10 @@ export default async function NuevoProductoPage() {
       getBrandSettings(),
     ]),
   );
-  const newsSectionActive = sectionOn(brand.homeSections, "nuevos");
+  const sections = {
+    nuevos: sectionOn(brand.homeSections, "nuevos"),
+    destacados: true, // "Destacado" no depende de una sección togglable del home
+  };
   if (categories.length === 0) {
     return (
       <div className="mx-auto max-w-2xl">
@@ -80,13 +58,11 @@ export default async function NuevoProductoPage() {
         </div>
       </div>
       <div className="mt-2">
-        <ProductForm
-          mode="create"
+        <ProductWizard
           categories={categories}
-          defaultValues={emptyDefaults}
           estimator={estimator}
           colorCatalog={colorCatalog}
-          newsSectionActive={newsSectionActive}
+          sections={sections}
         />
       </div>
     </div>
