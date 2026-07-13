@@ -179,7 +179,7 @@ export function ProfitSharesEditor({
             </div>
             <button
               type="button"
-              className="btn-icon btn-ghost"
+              className="btn-icon btn-ghost gn-del"
               onClick={() => removeRow(r.key)}
               style={
                 rows.length <= 1 || !canEdit
