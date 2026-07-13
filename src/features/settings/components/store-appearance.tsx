@@ -21,6 +21,7 @@ import { BrandImageUpload } from "./brand-image-upload";
 import { StoreLivePreview } from "./store-live-preview";
 import { runAction } from "@/lib/run-action";
 import { useDeleteResource } from "@/hooks/use-delete-resource";
+import { useDragReframe } from "@/hooks/use-drag-reframe";
 
 const ACCENTS = [
   "#C9A84C",
@@ -666,6 +667,7 @@ export function StoreAppearance({
           <BannerLivePreview
             banner={bf}
             accent={seasonActive ? SEASONS[form.season].accent : form.accent}
+            onReframe={(x, y) => setBf((f) => ({ ...f, posX: x, posY: y }))}
           />
 
           <div className="field">
@@ -739,36 +741,9 @@ export function StoreAppearance({
               Tamaño recomendado: <b>1600 × 600 px</b> (apaisado, relación 8:3).
             </div>
             {bf.imageUrl ? (
-              <div className="mt-3 flex flex-col gap-2">
-                <label className="text-faint text-[11.5px] font-medium">
-                  Encuadre de la imagen · movés qué parte se ve
-                </label>
-                <div className="flex items-center gap-2">
-                  <span className="text-faint w-16 text-[11px]">
-                    Horizontal
-                  </span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={bf.posX}
-                    onChange={(e) => setB("posX", Number(e.target.value))}
-                    className="flex-1"
-                    aria-label="Posición horizontal"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-faint w-16 text-[11px]">Vertical</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={bf.posY}
-                    onChange={(e) => setB("posY", Number(e.target.value))}
-                    className="flex-1"
-                    aria-label="Posición vertical"
-                  />
-                </div>
+              <div className="text-faint mt-2 text-[11.5px]">
+                Arrastrá la imagen de la vista previa (arriba) para acomodar el
+                encuadre.
               </div>
             ) : null}
           </div>
@@ -859,12 +834,20 @@ export function StoreAppearance({
 function BannerLivePreview({
   banner,
   accent,
+  onReframe,
 }: {
   banner: BannerForm;
   accent: string;
+  onReframe?: (x: number, y: number) => void;
 }) {
   const align = banner.align ?? "left";
   const hasImg = Boolean(banner.imageUrl);
+  const reframe = useDragReframe(
+    banner.posX,
+    banner.posY,
+    onReframe ?? (() => {}),
+  );
+  const canDrag = hasImg && !!onReframe;
   const title = banner.title.trim() || "Título del banner";
   const words = title.split(" ");
   const last = words.length > 1 ? words.pop() : null;
@@ -880,6 +863,7 @@ function BannerLivePreview({
     <div className="field">
       <label>Vista previa</label>
       <div
+        {...(canDrag ? reframe.handlers : {})}
         style={{
           position: "relative",
           aspectRatio: "8 / 3",
@@ -897,6 +881,12 @@ function BannerLivePreview({
           textAlign: align,
           padding: "20px 22px",
           gap: 8,
+          touchAction: canDrag ? "none" : undefined,
+          cursor: canDrag
+            ? reframe.dragging
+              ? "grabbing"
+              : "grab"
+            : undefined,
         }}
       >
         <div

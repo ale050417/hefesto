@@ -14,6 +14,7 @@ import {
 } from "../actions";
 import type { Category } from "../types";
 import { runAction } from "@/lib/run-action";
+import { useDragReframe } from "@/hooks/use-drag-reframe";
 
 function slugify(text: string): string {
   return text
@@ -59,6 +60,11 @@ export function ProductWizard({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [posX, setPosX] = useState(50);
   const [posY, setPosY] = useState(50);
+  // Reencuadre por arrastre sobre la vista previa (mouse y touch).
+  const reframe = useDragReframe(posX, posY, (x, y) => {
+    setPosX(x);
+    setPosY(y);
+  });
 
   // Paso 2
   const [colorMode, setColorMode] = useState<"single" | "multi">("single");
@@ -419,35 +425,10 @@ export function ProductWizard({
                       Centra el objeto para que quede prolijo en la publicación.
                     </span>
                   </div>
-                  <details>
-                    <summary className="text-faint cursor-pointer text-[11.5px]">
-                      Ajuste manual (opcional)
-                    </summary>
-                    <div className="mt-2 flex flex-col gap-2">
-                      <label className="flex items-center gap-2 text-[12px]">
-                        <span className="text-faint w-24">Horizontal</span>
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          value={posX}
-                          onChange={(e) => setPosX(Number(e.target.value))}
-                          className="range flex-1"
-                        />
-                      </label>
-                      <label className="flex items-center gap-2 text-[12px]">
-                        <span className="text-faint w-24">Vertical</span>
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          value={posY}
-                          onChange={(e) => setPosY(Number(e.target.value))}
-                          className="range flex-1"
-                        />
-                      </label>
-                    </div>
-                  </details>
+                  <div className="text-faint text-[11.5px]">
+                    Arrastrá la imagen en la vista previa para acomodar el
+                    encuadre.
+                  </div>
                 </div>
               ) : (
                 <div className="text-faint text-[11.5px]">
@@ -738,10 +719,17 @@ export function ProductWizard({
         <div className="text-faint mb-2 text-[12px]">Vista previa</div>
         <div className="ui-card overflow-hidden" style={{ padding: 0 }}>
           <div
+            {...(imageUrl ? reframe.handlers : {})}
             style={{
               aspectRatio: "1 / 1",
               background: "var(--surface-2)",
               position: "relative",
+              touchAction: imageUrl ? "none" : undefined,
+              cursor: imageUrl
+                ? reframe.dragging
+                  ? "grabbing"
+                  : "grab"
+                : undefined,
             }}
           >
             {imageUrl ? (
