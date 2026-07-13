@@ -1545,6 +1545,25 @@ body > * {
     background-position: right 12px center;
     padding-right: 34px;
   }
+  /* Estado de error de campos (validación uniforme) */
+  .input[aria-invalid="true"],
+  .select[aria-invalid="true"],
+  .textarea[aria-invalid="true"] {
+    border-color: var(--danger);
+  }
+  .input[aria-invalid="true"]:focus,
+  .select[aria-invalid="true"]:focus,
+  .textarea[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 3px rgba(217, 106, 90, 0.2);
+  }
+  .field.invalid > label {
+    color: var(--danger);
+  }
+  .field-error {
+    color: var(--danger);
+    font-size: 12px;
+    margin-top: 2px;
+  }
 
   .spec-row {
     display: flex;

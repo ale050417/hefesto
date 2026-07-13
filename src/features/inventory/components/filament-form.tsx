@@ -13,6 +13,7 @@ import {
   saveFilamentAction,
 } from "../actions";
 import { runAction } from "@/lib/run-action";
+import { useFormErrors } from "@/hooks/use-form-errors";
 import { FILAMENT_DIAMETERS } from "../constants";
 
 export type FilamentFormData = {
@@ -80,6 +81,7 @@ export function FilamentForm({
   });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const fe = useFormErrors();
 
   // Alta inline de color / marca (botón "＋"): quedan guardados en el catálogo.
   const [addingColor, setAddingColor] = useState(false);
@@ -223,13 +225,14 @@ export function FilamentForm({
 
   async function submit() {
     setErr(null);
+    fe.clear();
     setBusy(true);
     try {
       const res = await runAction(
         () => saveFilamentAction(form, filament?.id),
         { silent: true },
       );
-      if (!res.ok) return setErr(res.error.message);
+      if (!res.ok) return fe.fromAction(res.error);
       toast(edit ? "Filamento actualizado" : "Filamento agregado", "success");
       onDone?.();
     } catch {
@@ -541,50 +544,68 @@ export function FilamentForm({
       </div>
 
       <div className="grid-2">
-        <div className="field">
+        <div className={`field ${fe.errors.stockGrams ? "invalid" : ""}`}>
           <label htmlFor="fm-stock">Stock actual (g)</label>
           <input
             id="fm-stock"
             type="number"
             className="input"
             placeholder="0"
+            aria-invalid={!!fe.errors.stockGrams}
             value={form.stockGrams}
             onChange={(e) => set("stockGrams", e.target.value)}
           />
+          {fe.errors.stockGrams ? (
+            <p className="field-error">{fe.errors.stockGrams}</p>
+          ) : null}
         </div>
-        <div className="field">
+        <div className={`field ${fe.errors.spoolGrams ? "invalid" : ""}`}>
           <label htmlFor="fm-spool">Tamaño del carrete (g)</label>
           <input
             id="fm-spool"
             type="number"
             className="input"
             placeholder="1000"
+            aria-invalid={!!fe.errors.spoolGrams}
             value={form.spoolGrams}
             onChange={(e) => set("spoolGrams", e.target.value)}
           />
+          {fe.errors.spoolGrams ? (
+            <p className="field-error">{fe.errors.spoolGrams}</p>
+          ) : null}
         </div>
       </div>
 
       <div className="grid-2">
-        <div className="field">
+        <div className={`field ${fe.errors.costPerKg ? "invalid" : ""}`}>
           <label htmlFor="fm-cost">Costo por kg</label>
           <input
             id="fm-cost"
             type="number"
             className="input"
+            aria-invalid={!!fe.errors.costPerKg}
             value={form.costPerKg}
             onChange={(e) => set("costPerKg", e.target.value)}
           />
+          {fe.errors.costPerKg ? (
+            <p className="field-error">{fe.errors.costPerKg}</p>
+          ) : null}
         </div>
-        <div className="field">
+        <div
+          className={`field ${fe.errors.alertThresholdGrams ? "invalid" : ""}`}
+        >
           <label htmlFor="fm-alert">Alerta de stock bajo (g)</label>
           <input
             id="fm-alert"
             type="number"
             className="input"
+            aria-invalid={!!fe.errors.alertThresholdGrams}
             value={form.alertThresholdGrams}
             onChange={(e) => set("alertThresholdGrams", e.target.value)}
           />
+          {fe.errors.alertThresholdGrams ? (
+            <p className="field-error">{fe.errors.alertThresholdGrams}</p>
+          ) : null}
         </div>
       </div>
 

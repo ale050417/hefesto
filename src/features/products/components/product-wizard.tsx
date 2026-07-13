@@ -15,6 +15,7 @@ import {
 import type { Category } from "../types";
 import { runAction } from "@/lib/run-action";
 import { useDragReframe } from "@/hooks/use-drag-reframe";
+import { useFormErrors } from "@/hooks/use-form-errors";
 
 function slugify(text: string): string {
   return text
@@ -51,6 +52,7 @@ export function ProductWizard({
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [genBusy, setGenBusy] = useState(false);
+  const fe = useFormErrors();
 
   // Paso 1
   const [name, setName] = useState("");
@@ -240,9 +242,18 @@ export function ProductWizard({
     return null;
   }
   function next() {
-    const problem = canAdvance();
-    if (problem) return setErr(problem);
     setErr(null);
+    if (step === 0) {
+      const ok = fe.check({
+        name: !name.trim() ? "Ingresá el nombre del producto." : null,
+        category: !categoryId ? "Elegí una categoría." : null,
+      });
+      if (!ok) return;
+    } else {
+      const problem = canAdvance();
+      if (problem) return setErr(problem);
+    }
+    fe.clear();
     setStep((s) => Math.min(2, s + 1));
   }
   function back() {
@@ -352,21 +363,26 @@ export function ProductWizard({
         {/* PASO 1 — Básicos + imagen */}
         {step === 0 ? (
           <div className="flex flex-col gap-4">
-            <div className="field">
+            <div className={cn("field", fe.errors.name && "invalid")}>
               <label htmlFor="w-name">Nombre del producto</label>
               <input
                 id="w-name"
                 className="input"
                 placeholder="Ej: Lámpara Lunar Levitante"
+                aria-invalid={!!fe.errors.name}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />
+              {fe.errors.name ? (
+                <p className="field-error">{fe.errors.name}</p>
+              ) : null}
             </div>
-            <div className="field">
+            <div className={cn("field", fe.errors.category && "invalid")}>
               <label htmlFor="w-cat">Categoría</label>
               <select
                 id="w-cat"
                 className="select"
+                aria-invalid={!!fe.errors.category}
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
               >
@@ -377,6 +393,9 @@ export function ProductWizard({
                   </option>
                 ))}
               </select>
+              {fe.errors.category ? (
+                <p className="field-error">{fe.errors.category}</p>
+              ) : null}
             </div>
             <div className="field">
               <div className="mb-1 flex items-center justify-between gap-2">
