@@ -1,13 +1,30 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import type { JobRow, JobStatus } from "../repository";
+import { useRouter } from "next/navigation";
+import { transitionOrderAction } from "@/features/orders/actions";
+import { ORDER_STATUS_LABEL } from "@/features/orders/constants";
+import type { OrderStatus } from "@/features/orders/types";
+import { toast } from "@/stores/toastStore";
+import { formatPrice } from "@/lib/format";
 
-const COLUMNS: { status: JobStatus; label: string; color: string }[] = [
-  { status: "queued", label: "En cola", color: "var(--warning)" },
-  { status: "printing", label: "Imprimiendo", color: "var(--gold)" },
-  { status: "done", label: "Terminado", color: "var(--success)" },
-  { status: "failed", label: "Falló", color: "var(--danger)" },
+export type KanbanOrder = {
+  id: string;
+  orderNumber: string;
+  customerName: string | null;
+  total: number;
+  status: OrderStatus;
+  createdAt: Date | string;
+};
+
+// Flujo de producción: son los estados reales del pedido (state machine).
+const COLUMNS: { status: OrderStatus; color: string }[] = [
+  { status: "confirmed", color: "#3a72c4" },
+  { status: "in_production", color: "var(--gold)" },
+  { status: "ready", color: "var(--gold-bright)" },
+  { status: "shipped", color: "#3a72c4" },
+  { status: "delivered", color: "var(--success)" },
 ];
 
 function since(d: Date | string): { text: string; hours: number } {
@@ -17,20 +34,27 @@ function since(d: Date | string): { text: string; hours: number } {
   return { text: `hace ${Math.floor(h / 24)} d`, hours: h };
 }
 
-export function ProductionKanban({
-  jobs,
-  onMove,
-}: {
-  jobs: JobRow[];
-  onMove: (id: string, status: JobStatus) => void;
-}) {
-  const [over, setOver] = useState<JobStatus | null>(null);
+export function OrdersKanban({ orders }: { orders: KanbanOrder[] }) {
+  const router = useRouter();
+  const [over, setOver] = useState<OrderStatus | null>(null);
   const [dragId, setDragId] = useState<string | null>(null);
+
+  async function move(id: string, status: OrderStatus) {
+    const cur = orders.find((o) => o.id === id);
+    if (!cur || cur.status === status) return;
+    const res = await transitionOrderAction(id, status);
+    if (!res.ok) {
+      toast(res.error.message, "danger");
+      return;
+    }
+    toast(`Pedido → ${ORDER_STATUS_LABEL[status]}`, "success");
+    router.refresh();
+  }
 
   return (
     <div className="flex gap-3 overflow-x-auto pb-2">
       {COLUMNS.map((col) => {
-        const items = jobs.filter((j) => j.status === col.status);
+        const items = orders.filter((o) => o.status === col.status);
         const active = over === col.status;
         return (
           <div
@@ -44,12 +68,12 @@ export function ProductionKanban({
               e.preventDefault();
               setOver(null);
               const id = e.dataTransfer.getData("text/plain") || dragId;
-              if (id) onMove(id, col.status);
+              if (id) void move(id, col.status);
               setDragId(null);
             }}
             className="ui-card section-card flex-shrink-0"
             style={{
-              width: 234,
+              width: 250,
               padding: 12,
               background: active ? "rgba(var(--gold-rgb),.07)" : undefined,
               borderColor: active ? "var(--gold)" : undefined,
@@ -64,41 +88,55 @@ export function ProductionKanban({
                   background: col.color,
                 }}
               />
-              <b className="text-[13px]">{col.label}</b>
+              <b className="text-[13px]">{ORDER_STATUS_LABEL[col.status]}</b>
               <span className="text-faint ml-auto text-[12px]">
                 {items.length}
               </span>
             </div>
             <div className="flex flex-col gap-2" style={{ minHeight: 44 }}>
-              {items.map((j) => {
-                const s = since(j.createdAt);
+              {items.map((o) => {
+                const s = since(o.createdAt);
                 const late =
-                  (col.status === "queued" || col.status === "printing") &&
-                  s.hours >= 24;
+                  (col.status === "confirmed" ||
+                    col.status === "in_production") &&
+                  s.hours >= 48;
                 return (
                   <div
-                    key={j.id}
+                    key={o.id}
                     draggable
                     onDragStart={(e) => {
-                      e.dataTransfer.setData("text/plain", j.id);
-                      setDragId(j.id);
+                      e.dataTransfer.setData("text/plain", o.id);
+                      setDragId(o.id);
                     }}
                     onDragEnd={() => setDragId(null)}
                     className="ui-card"
                     style={{
                       padding: "9px 11px",
                       cursor: "grab",
-                      opacity: dragId === j.id ? 0.5 : 1,
+                      opacity: dragId === o.id ? 0.5 : 1,
                     }}
                   >
-                    <b className="block truncate text-[13px]">{j.title}</b>
-                    <div className="text-faint mt-0.5 flex items-center justify-between gap-2 text-[11px]">
-                      <span className="truncate">
-                        {j.printerName ?? "Sin asignar"}
+                    <div className="flex items-center justify-between gap-2">
+                      <b className="truncate text-[13px]">{o.orderNumber}</b>
+                      <Link
+                        href={`/admin/pedidos/${o.id}`}
+                        prefetch={false}
+                        className="flex-shrink-0 text-[11px]"
+                        style={{ color: "var(--gold-bright)" }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Ver
+                      </Link>
+                    </div>
+                    <div className="text-faint truncate text-[12px]">
+                      {o.customerName ?? "Cliente"}
+                    </div>
+                    <div className="mt-0.5 flex items-center justify-between gap-2 text-[11.5px]">
+                      <span className="font-semibold">
+                        {formatPrice(o.total)}
                       </span>
                       <span
-                        className="flex-shrink-0"
-                        style={{ color: late ? "var(--danger)" : undefined }}
+                        style={{ color: late ? "var(--danger)" : "var(--dim)" }}
                       >
                         {late ? "⚠ " : ""}
                         {s.text}
@@ -109,7 +147,7 @@ export function ProductionKanban({
               })}
               {items.length === 0 ? (
                 <div className="text-faint rounded-md border border-dashed border-[var(--border)] py-3 text-center text-[11.5px]">
-                  Soltá acá
+                  Soltá un pedido acá
                 </div>
               ) : null}
             </div>
