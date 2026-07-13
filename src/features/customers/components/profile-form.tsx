@@ -6,14 +6,16 @@ import { Button } from "@/components/ui/button";
 import { updateProfileAction } from "../actions";
 import { runAction } from "@/lib/run-action";
 
-type Values = { fullName: string; phone: string };
+type Values = { fullName: string; phone: string; birthDate: string };
 
 export function ProfileForm({
   fullName,
   phone,
+  birthDate,
 }: {
   fullName: string;
   phone: string;
+  birthDate: string;
 }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export function ProfileForm({
     register,
     handleSubmit,
     formState: { isSubmitting },
-  } = useForm<Values>({ defaultValues: { fullName, phone } });
+  } = useForm<Values>({ defaultValues: { fullName, phone, birthDate } });
 
   const onSubmit = handleSubmit(async (values) => {
     setMsg(null);
@@ -63,6 +65,13 @@ export function ProfileForm({
             Teléfono / WhatsApp
           </label>
           <input className="input" {...register("phone")} />
+        </div>
+        <div>
+          <label className="text-dim mb-1.5 block text-xs">
+            Cumpleaños{" "}
+            <span className="text-faint">(para cupones de cumple)</span>
+          </label>
+          <input type="date" className="input" {...register("birthDate")} />
         </div>
       </div>
       <Button type="submit" loading={isSubmitting}>

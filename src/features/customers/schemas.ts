@@ -10,6 +10,12 @@ const optional = z
 export const profileSchema = z.object({
   fullName: z.string().trim().min(2, "Ingresá tu nombre y apellido."),
   phone: optional,
+  // Fecha de nacimiento (opcional) para cupones de cumpleaños. "YYYY-MM-DD".
+  birthDate: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v ? v : undefined)),
 });
 
 export const addressSchema = z.object({

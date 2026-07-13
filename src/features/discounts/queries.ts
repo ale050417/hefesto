@@ -31,6 +31,12 @@ function toValues(input: CouponInput) {
     startsAt: toDate(input.startsAt),
     expiresAt: toDate(input.expiresAt),
     isActive: input.isActive ?? true,
+    scope: input.scope ?? "all",
+    targetId:
+      input.scope && input.scope !== "all" ? (input.targetId ?? null) : null,
+    targetLabel:
+      input.scope && input.scope !== "all" ? (input.targetLabel ?? null) : null,
+    birthdayOnly: input.birthdayOnly ?? false,
   };
 }
 

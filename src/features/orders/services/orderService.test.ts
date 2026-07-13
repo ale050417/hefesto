@@ -16,6 +16,7 @@ function makeProduct(over: Partial<ProductDetailView> = {}): ProductDetailView {
     id: "11111111-1111-1111-1111-111111111111",
     name: "Dragón articulado",
     slug: "dragon",
+    categoryId: null,
     price: 1000,
     salePrice: null,
     effectivePrice: 1000,

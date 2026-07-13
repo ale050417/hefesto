@@ -21,7 +21,11 @@ export async function getProfile(
 
 export async function updateProfileRow(
   id: string,
-  fields: { fullName?: string | null; phone?: string | null },
+  fields: {
+    fullName?: string | null;
+    phone?: string | null;
+    birthDate?: string | null;
+  },
   database: Database = db,
 ): Promise<Profile> {
   const [row] = await database

@@ -14,4 +14,7 @@ export type CouponForValidation = Pick<
   | "startsAt"
   | "expiresAt"
   | "isActive"
+  | "scope"
+  | "targetId"
+  | "birthdayOnly"
 >;

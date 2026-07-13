@@ -1,4 +1,11 @@
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  date,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { userRole } from "./enums";
 import { roles } from "./roles";
 
@@ -9,6 +16,8 @@ export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey(),
   fullName: text("full_name"),
   phone: text("phone"),
+  // Fecha de nacimiento (opcional) para el cupón de cumpleaños.
+  birthDate: date("birth_date"),
   // Nota interna del taller sobre el cliente (solo admin; no la ve el cliente).
   adminNote: text("admin_note"),
   role: userRole("role").notNull().default("customer"),

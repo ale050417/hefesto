@@ -24,6 +24,12 @@ export const coupons = pgTable(
     minPurchase: numeric("min_purchase", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
+    // A qué aplica: 'all' (todo el carrito) | 'product' | 'category'.
+    scope: text("scope").notNull().default("all"),
+    targetId: uuid("target_id"),
+    targetLabel: text("target_label"),
+    // Solo vale en la semana del cumpleaños del cliente logueado.
+    birthdayOnly: boolean("birthday_only").notNull().default(false),
     maxUses: integer("max_uses"), // null = ilimitado
     usedCount: integer("used_count").notNull().default(0),
     startsAt: timestamp("starts_at", { withTimezone: true }),
@@ -41,5 +47,9 @@ export const coupons = pgTable(
     check("coupons_value_positive", sql`${t.value} > 0`),
     check("coupons_min_purchase_non_negative", sql`${t.minPurchase} >= 0`),
     check("coupons_used_count_non_negative", sql`${t.usedCount} >= 0`),
+    check(
+      "coupons_scope_valid",
+      sql`${t.scope} IN ('all','product','category')`,
+    ),
   ],
 );

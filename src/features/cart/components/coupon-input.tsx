@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { validateCouponAction } from "@/features/discounts/actions";
 import { formatPrice } from "@/lib/format";
@@ -14,14 +14,17 @@ export function CouponInput() {
   const [code, setCode] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const autoTried = useRef(false);
 
-  async function apply() {
-    if (!code.trim()) return;
+  async function applyCode(c: string) {
+    if (!c.trim()) return;
     setBusy(true);
     setErr(null);
     const res = await runAction(
-      () => validateCouponAction(code.trim(), subtotal),
-      { silent: true },
+      () => validateCouponAction(c.trim(), subtotal),
+      {
+        silent: true,
+      },
     );
     setBusy(false);
     if (!res.ok) {
@@ -32,6 +35,19 @@ export function CouponInput() {
     setCoupon({ code: res.code, discount: res.discount });
     setCode("");
   }
+  const apply = () => applyCode(code);
+
+  // Link directo: si la URL trae ?cupon=CODE, lo aplica solo (una vez que el
+  // carrito cargó su subtotal). Así se comparte un link con el cupón puesto.
+  useEffect(() => {
+    if (autoTried.current || applied || subtotal <= 0) return;
+    const c = new URLSearchParams(window.location.search).get("cupon");
+    if (!c) return;
+    autoTried.current = true;
+    const t = setTimeout(() => void applyCode(c.trim().toUpperCase()), 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subtotal, applied]);
 
   if (applied) {
     return (

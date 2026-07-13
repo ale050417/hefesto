@@ -67,6 +67,7 @@ export async function updateProfile(customerId: string, input: ProfileInput) {
   return updateProfileRow(customerId, {
     fullName: input.fullName,
     phone: input.phone ?? null,
+    birthDate: input.birthDate ?? null,
   });
 }
 

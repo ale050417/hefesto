@@ -98,7 +98,11 @@ export async function createOrderAction(
   }
 
   try {
-    const order = await createOrder({ ...parsed.data, customerId: user.id });
+    const order = await createOrder({
+      ...parsed.data,
+      customerId: user.id,
+      customerBirthDate: user.profile?.birthDate ?? null,
+    });
 
     // Aviso al panel: entró un pedido nuevo (best-effort; no bloquea la venta).
     await notifyAdmins({

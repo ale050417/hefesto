@@ -38,7 +38,14 @@ export async function validateCouponAction(
   }
   const coupon = await queries.getCouponByCode(code);
   if (!coupon) return { ok: false, error: "El cupón no existe." };
-  const result = validateCoupon(coupon, subtotal);
+  // Cumpleaños del cliente logueado (para el cupón de cumple). El scope
+  // producto/categoría se calcula exacto en el servidor al crear el pedido;
+  // en el preview el descuento es sobre el subtotal (estimado).
+  const user = await getCurrentUser();
+  const result = validateCoupon(coupon, {
+    subtotal,
+    customerBirthDate: user?.profile?.birthDate ?? null,
+  });
   if (!result.valid) return { ok: false, error: result.reason };
   return { ok: true, code: coupon.code, discount: result.discount };
 }
@@ -59,6 +66,33 @@ export async function saveCouponAction(
         fields: fieldErrors(parsed.error),
       },
     };
+  }
+  // Si el cupón apunta a un producto/categoría, validamos que exista (Cap. 11).
+  const d = parsed.data;
+  if (d.scope && d.scope !== "all") {
+    if (!d.targetId) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION",
+          message: "Elegí el producto o la categoría.",
+        },
+      };
+    }
+    const cat = await import("@/features/products/services/catalogService");
+    const exists =
+      d.scope === "product"
+        ? (await cat.getProductAdmin(d.targetId)) != null
+        : (await cat.listCategoriesAdmin()).some((c) => c.id === d.targetId);
+    if (!exists) {
+      return {
+        ok: false,
+        error: {
+          code: "VALIDATION",
+          message: "El producto o categoría elegido no existe.",
+        },
+      };
+    }
   }
   try {
     if (id) await queries.updateCoupon(id, parsed.data);

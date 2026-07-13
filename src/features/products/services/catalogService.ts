@@ -79,6 +79,7 @@ export function toProductView(p: ProductWithRelations): ProductView {
     isNew: p.isNew,
     isFeatured: p.isFeatured,
     material: p.material,
+    categoryId: p.categoryId,
     category: p.category
       ? { name: p.category.name, slug: p.category.slug }
       : null,

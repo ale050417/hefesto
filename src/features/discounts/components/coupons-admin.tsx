@@ -67,7 +67,15 @@ function couponStatus(c: Coupon): Status {
   return { label: "Activo", cls: "badge-success", faded: false };
 }
 
-export function CouponsAdmin({ coupons }: { coupons: Coupon[] }) {
+export function CouponsAdmin({
+  coupons,
+  products = [],
+  categories = [],
+}: {
+  coupons: Coupon[];
+  products?: Array<{ id: string; name: string }>;
+  categories?: Array<{ id: string; name: string }>;
+}) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CouponFormData | null>(null);
   const [confirming, setConfirming] = useState<Coupon | null>(null);
@@ -97,6 +105,10 @@ export function CouponsAdmin({ coupons }: { coupons: Coupon[] }) {
       startsAt: c.startsAt ? new Date(c.startsAt).toISOString() : null,
       expiresAt: c.expiresAt ? new Date(c.expiresAt).toISOString() : null,
       isActive: c.isActive,
+      scope: c.scope as "all" | "product" | "category",
+      targetId: c.targetId,
+      targetLabel: c.targetLabel,
+      birthdayOnly: c.birthdayOnly,
     });
     setOpen(true);
   }
@@ -246,6 +258,8 @@ export function CouponsAdmin({ coupons }: { coupons: Coupon[] }) {
       >
         <CouponForm
           coupon={editing ?? undefined}
+          products={products}
+          categories={categories}
           onDone={() => setOpen(false)}
           onCancel={() => setOpen(false)}
         />

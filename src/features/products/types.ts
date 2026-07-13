@@ -35,6 +35,7 @@ export type ProductView = {
   isNew: boolean;
   isFeatured: boolean;
   material: string | null;
+  categoryId: string | null;
   category: { name: string; slug: string } | null;
   primaryImage: {
     url: string;

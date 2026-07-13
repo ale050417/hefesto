@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { AppError, type ErrorCode } from "@/core/errors";
-import { validateCoupon } from "@/features/discounts/service";
+import { validateCoupon, eligibleSubtotal } from "@/features/discounts/service";
 import type { Coupon } from "@/features/discounts/types";
 import type { ProductDetailView } from "@/features/products/types";
 import type { CreateOrderInput } from "../repository";
@@ -9,7 +9,11 @@ import type { Order } from "../types";
 
 // El pedido se crea desde una entrada YA validada (Zod) más el id del cliente,
 // que viene de la sesión en el servidor (nunca del cliente).
-export type CreateOrderParams = CheckoutInput & { customerId: string };
+export type CreateOrderParams = CheckoutInput & {
+  customerId: string;
+  /** Fecha de nacimiento del cliente ("YYYY-MM-DD") para cupones de cumpleaños. */
+  customerBirthDate?: string | null;
+};
 
 // Error de negocio de pedidos. Extiende AppError (Cap. 12) para integrarse con
 // el mapeo uniforme de las actions; conserva su constructor (code, message).
@@ -67,6 +71,12 @@ export async function createOrder(
   }
 
   const lines: CreateOrderInput["items"] = [];
+  // Para el scope de cupones (producto/categoría): qué se descuenta.
+  const scopeItems: {
+    productId: string;
+    categoryId: string | null;
+    lineTotal: number;
+  }[] = [];
   let subtotal = 0;
 
   for (const line of params.items) {
@@ -138,6 +148,11 @@ export async function createOrder(
       quantity: line.quantity,
       lineTotal: money(lineTotal),
     });
+    scopeItems.push({
+      productId: product.id,
+      categoryId: product.categoryId,
+      lineTotal,
+    });
   }
 
   // Cupón: se revalida en el servidor contra el subtotal recalculado.
@@ -146,7 +161,11 @@ export async function createOrder(
   if (params.couponCode) {
     const coupon = await deps.getCoupon(params.couponCode);
     if (!coupon) throw new OrderError("INVALID_COUPON", "El cupón no existe.");
-    const result = validateCoupon(coupon, subtotal);
+    const result = validateCoupon(coupon, {
+      subtotal,
+      eligibleSubtotal: eligibleSubtotal(coupon, scopeItems, subtotal),
+      customerBirthDate: params.customerBirthDate ?? null,
+    });
     if (!result.valid) throw new OrderError("INVALID_COUPON", result.reason);
     discountAmount = result.discount;
     couponId = coupon.id;

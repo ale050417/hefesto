@@ -18,6 +18,7 @@ export default async function ProfilePage() {
         <ProfileForm
           fullName={profile?.fullName ?? ""}
           phone={profile?.phone ?? ""}
+          birthDate={profile?.birthDate ?? ""}
         />
         <AddressManager addresses={addresses} />
         <ChangePasswordForm />
