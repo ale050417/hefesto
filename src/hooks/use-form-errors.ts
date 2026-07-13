@@ -41,7 +41,7 @@ export function useFormErrors() {
       for (const [k, v] of Object.entries(fields)) if (v) next[k] = v;
       setErrors(next);
       if (Object.keys(next).length > 0) {
-        toast("Completá los campos marcados", "danger");
+        // Sin toast genérico: cada campo se marca en rojo con su mensaje debajo.
         focusFirst();
         return false;
       }
@@ -54,10 +54,11 @@ export function useFormErrors() {
   const fromAction = useCallback(
     (err: { message?: string; fields?: Record<string, string> }): void => {
       if (err.fields && Object.keys(err.fields).length > 0) {
+        // Con detalle por campo: rojo + mensaje debajo, sin toast genérico.
         setErrors(err.fields);
-        toast(err.message || "Revisá los campos marcados", "danger");
         focusFirst();
       } else if (err.message) {
+        // Sin detalle por campo: recién ahí mostramos el mensaje en un toast.
         toast(err.message, "danger");
       }
     },
