@@ -397,71 +397,6 @@ export function ManualSaleForm({
             </div>
           ) : null}
 
-          {colorLines.length > 0 ? (
-            <div className="field">
-              <label>Colores usados (descuenta stock)</label>
-              <p className="text-faint text-[12px] leading-relaxed">
-                Obligatorio: elegí el/los color(es) y cuántos gramos de cada
-                carrete. Se descuenta de cada uno; si falta stock, la venta se
-                registra igual y te avisa por notificación para reponer.
-              </p>
-              {colorLines.map((ln, i) => (
-                <div key={i} className="mt-2 flex items-center gap-2">
-                  <select
-                    className="select flex-1"
-                    value={ln.filamentId}
-                    onChange={(e) =>
-                      setColorLine(i, "filamentId", e.target.value)
-                    }
-                  >
-                    <option value="">— Elegí color / carrete —</option>
-                    {estimator.filaments.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.material} · {f.color}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    className="input"
-                    style={{ width: 100 }}
-                    type="number"
-                    min={0}
-                    placeholder="gramos"
-                    value={ln.grams}
-                    onChange={(e) => setColorLine(i, "grams", e.target.value)}
-                  />
-                  <span className="text-faint text-[12px]">g</span>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-icon"
-                    onClick={() => removeColorLine(i)}
-                    aria-label="Quitar color"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={addColorLine}
-                >
-                  + Agregar color
-                </button>
-                <span className="text-faint ml-auto text-[12px]">
-                  Calculado: {calcGrams ?? "—"} g · Colores: {colorGramsTotal} g
-                </span>
-              </div>
-              {gramsMismatch ? (
-                <p className="bg-warning/10 text-warning mt-2 rounded-md px-3 py-2 text-[12px]">
-                  ⚠ El total de los colores ({colorGramsTotal} g) no coincide
-                  con el peso calculado ({calcGrams} g). Ajustá los gramos: del
-                  stock se descuenta lo que pongas acá.
-                </p>
-              ) : null}
-            </div>
-          ) : null}
           <div className="grid-2">
             <div className="field">
               <label htmlFor="ms-date">Fecha</label>
@@ -575,6 +510,71 @@ export function ManualSaleForm({
             </div>
           </div>
 
+          {colorLines.length > 0 ? (
+            <div className="field">
+              <label>Colores usados (descuenta stock)</label>
+              <p className="text-faint text-[12px] leading-relaxed">
+                Obligatorio: elegí el/los color(es) y cuántos gramos de cada
+                carrete. Se descuenta de cada uno; si falta stock, la venta se
+                registra igual y te avisa por notificación para reponer.
+              </p>
+              {colorLines.map((ln, i) => (
+                <div key={i} className="mt-2 flex items-center gap-2">
+                  <select
+                    className="select flex-1"
+                    value={ln.filamentId}
+                    onChange={(e) =>
+                      setColorLine(i, "filamentId", e.target.value)
+                    }
+                  >
+                    <option value="">— Elegí color / carrete —</option>
+                    {estimator.filaments.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.material} · {f.color}
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    className="input"
+                    style={{ width: 100 }}
+                    type="number"
+                    min={0}
+                    placeholder="gramos"
+                    value={ln.grams}
+                    onChange={(e) => setColorLine(i, "grams", e.target.value)}
+                  />
+                  <span className="text-faint text-[12px]">g</span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-icon"
+                    onClick={() => removeColorLine(i)}
+                    aria-label="Quitar color"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={addColorLine}
+                >
+                  + Agregar color
+                </button>
+                <span className="text-faint ml-auto text-[12px]">
+                  Calculado: {calcGrams ?? "—"} g · Colores: {colorGramsTotal} g
+                </span>
+              </div>
+              {gramsMismatch ? (
+                <p className="bg-warning/10 text-warning mt-2 rounded-md px-3 py-2 text-[12px]">
+                  ⚠ El total de los colores ({colorGramsTotal} g) no coincide
+                  con el peso calculado ({calcGrams} g). Ajustá los gramos: del
+                  stock se descuenta lo que pongas acá.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <div className="field">
             <label>Insumos adicionales (opcional)</label>
             <p className="text-faint text-[12px] leading-relaxed">
