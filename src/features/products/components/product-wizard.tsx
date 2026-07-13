@@ -59,7 +59,6 @@ export function ProductWizard({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [posX, setPosX] = useState(50);
   const [posY, setPosY] = useState(50);
-  const [posScale, setPosScale] = useState(1);
 
   // Paso 2
   const [colorMode, setColorMode] = useState<"single" | "multi">("single");
@@ -134,6 +133,62 @@ export function ProductWizard({
     if (imageUrl) URL.revokeObjectURL(imageUrl);
     setImageFile(file);
     setImageUrl(file ? URL.createObjectURL(file) : null);
+    if (file) setTimeout(autoFrame, 60); // encuadra bien apenas se sube
+  }
+
+  // Auto-encuadre: analiza la imagen (canvas), encuentra el objeto (píxeles que
+  // no son fondo blanco/transparente) y centra el recorte en él. Sin IA, rápido
+  // y estable: la publicación queda prolija sin tocar nada.
+  function autoFrame() {
+    const url = imageUrl;
+    if (!url) return;
+    const img = new window.Image();
+    img.onload = () => {
+      const w = 96;
+      const h = 96;
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.drawImage(img, 0, 0, w, h);
+      let data: Uint8ClampedArray;
+      try {
+        data = ctx.getImageData(0, 0, w, h).data;
+      } catch {
+        return;
+      }
+      let minX = w;
+      let minY = h;
+      let maxX = 0;
+      let maxY = 0;
+      let found = false;
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          const r = data[i]!;
+          const g = data[i + 1]!;
+          const b = data[i + 2]!;
+          const a = data[i + 3]!;
+          const isBg = a < 20 || (r > 240 && g > 240 && b > 240);
+          if (!isBg) {
+            found = true;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (!found) {
+        setPosX(50);
+        setPosY(50);
+        return;
+      }
+      setPosX(Math.round(((minX + maxX) / 2 / w) * 100));
+      setPosY(Math.round(((minY + maxY) / 2 / h) * 100));
+    };
+    img.src = url;
   }
   function toggleColor(n: string) {
     setColors((p) => (p.includes(n) ? p.filter((x) => x !== n) : [...p, n]));
@@ -158,7 +213,12 @@ export function ProductWizard({
       silent: true,
     });
     setGenBusy(false);
-    if (!res.ok) return setErr(res.error.message);
+    if (!res.ok) {
+      setErr(
+        "Hefi tardó o no respondió esta vez. Probá de nuevo — suele andar a la segunda.",
+      );
+      return;
+    }
     setDescription(res.data.description);
   }
 
@@ -231,7 +291,6 @@ export function ProductWizard({
         fd.set("productId", id);
         fd.set("file", imageFile);
         fd.set("position", `${posX}% ${posY}%`);
-        fd.set("scale", String(posScale));
         await runAction(() => uploadProductImageAction(fd), { silent: true });
       }
       setBusy(false);
@@ -347,47 +406,48 @@ export function ProductWizard({
               />
               {imageUrl ? (
                 <div className="mt-2 flex flex-col gap-2">
-                  <div className="text-faint text-[12px]">
-                    Acomodá el encuadre (lo ves en la preview):
-                  </div>
-                  <label className="flex items-center gap-2 text-[12px]">
-                    <span className="text-faint w-24">Horizontal</span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={posX}
-                      onChange={(e) => setPosX(Number(e.target.value))}
-                      className="range flex-1"
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-[12px]">
-                    <span className="text-faint w-24">Vertical</span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={posY}
-                      onChange={(e) => setPosY(Number(e.target.value))}
-                      className="range flex-1"
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-[12px]">
-                    <span className="text-faint w-24">Zoom</span>
-                    <input
-                      type="range"
-                      min={60}
-                      max={250}
-                      value={Math.round(posScale * 100)}
-                      onChange={(e) =>
-                        setPosScale(Number(e.target.value) / 100)
-                      }
-                      className="range flex-1"
-                    />
-                    <span className="text-faint w-10 text-right">
-                      {Math.round(posScale * 100)}%
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={autoFrame}
+                    >
+                      ✨ Auto-encuadre
+                    </Button>
+                    <span className="text-faint text-[11.5px]">
+                      Centra el objeto para que quede prolijo en la publicación.
                     </span>
-                  </label>
+                  </div>
+                  <details>
+                    <summary className="text-faint cursor-pointer text-[11.5px]">
+                      Ajuste manual (opcional)
+                    </summary>
+                    <div className="mt-2 flex flex-col gap-2">
+                      <label className="flex items-center gap-2 text-[12px]">
+                        <span className="text-faint w-24">Horizontal</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={posX}
+                          onChange={(e) => setPosX(Number(e.target.value))}
+                          className="range flex-1"
+                        />
+                      </label>
+                      <label className="flex items-center gap-2 text-[12px]">
+                        <span className="text-faint w-24">Vertical</span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={posY}
+                          onChange={(e) => setPosY(Number(e.target.value))}
+                          className="range flex-1"
+                        />
+                      </label>
+                    </div>
+                  </details>
                 </div>
               ) : (
                 <div className="text-faint text-[11.5px]">
@@ -453,27 +513,33 @@ export function ProductWizard({
                 Obligatorio: elegí al menos un color.
               </div>
             </div>
-            <div className="grid-2">
-              <div className="field">
-                <label htmlFor="w-time">Tiempo de producción / entrega</label>
-                <input
-                  id="w-time"
-                  className="input"
-                  placeholder="Ej: 24-48 hs"
-                  value={productionTime}
-                  onChange={(e) => setProductionTime(e.target.value)}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="w-dim">Dimensiones</label>
-                <input
-                  id="w-dim"
-                  className="input"
-                  placeholder="Ej: 10 × 8 × 12 cm"
-                  value={dimensions}
-                  onChange={(e) => setDimensions(e.target.value)}
-                />
-              </div>
+            <div className="field">
+              <label htmlFor="w-time">
+                Tiempo de producción / entrega{" "}
+                <span className="text-faint font-normal">
+                  (lo que ve el cliente)
+                </span>
+              </label>
+              <input
+                id="w-time"
+                className="input"
+                placeholder="Ej: 24-48 hs · 2-3 días hábiles"
+                value={productionTime}
+                onChange={(e) => setProductionTime(e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="w-dim">
+                Dimensiones{" "}
+                <span className="text-faint font-normal">(opcional)</span>
+              </label>
+              <input
+                id="w-dim"
+                className="input"
+                placeholder="Ej: 10 × 8 × 12 cm"
+                value={dimensions}
+                onChange={(e) => setDimensions(e.target.value)}
+              />
             </div>
           </div>
         ) : null}
@@ -688,7 +754,6 @@ export function ProductWizard({
                   height: "100%",
                   objectFit: "cover",
                   objectPosition: `${posX}% ${posY}%`,
-                  transform: `scale(${posScale})`,
                 }}
               />
             ) : (

@@ -151,6 +151,7 @@ function normalizeTurns(messages: AssistantMessage[]): AssistantMessage[] {
 async function callAnthropic(
   system: string,
   normalized: AssistantMessage[],
+  timeoutMs = 25_000,
 ): Promise<string> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -165,7 +166,7 @@ async function callAnthropic(
       system,
       messages: normalized,
     }),
-    signal: AbortSignal.timeout(25_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) {
     const detail = await res.text().catch(() => "");
@@ -189,6 +190,7 @@ async function callAnthropic(
 async function callGemini(
   system: string,
   normalized: AssistantMessage[],
+  timeoutMs = 25_000,
 ): Promise<string> {
   const body = JSON.stringify({
     system_instruction: { parts: [{ text: system }] },
@@ -215,7 +217,7 @@ async function callGemini(
           "x-goog-api-key": env.GEMINI_API_KEY as string,
         },
         body,
-        signal: AbortSignal.timeout(25_000),
+        signal: AbortSignal.timeout(timeoutMs),
       },
     );
     if (res.status === 404) {
@@ -294,9 +296,11 @@ export async function generateProductDescription(
       content: `Nombre del producto: "${name}". Escribí su descripción para la tienda.`,
     },
   ];
+  // Timeout corto: es una tarea chica. Si Gemini gratis se cuelga, mejor cortar
+  // a los 18s y que el admin reintente (suele andar a la segunda) que esperar 25.
   const text =
     provider === "gemini"
-      ? await callGemini(system, messages)
-      : await callAnthropic(system, messages);
+      ? await callGemini(system, messages, 18_000)
+      : await callAnthropic(system, messages, 18_000);
   return text.trim();
 }
