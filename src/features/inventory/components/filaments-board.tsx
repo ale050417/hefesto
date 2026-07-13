@@ -277,7 +277,7 @@ export function FilamentsBoard({
           <div className="text-dim">No hay filamentos con estos filtros.</div>
         </div>
       ) : view === "grilla" ? (
-        <div className="grid-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((f) => {
             const b = CARD_BADGE[f.status];
             // Barra sobre 1000 g = capacidad de un carrete estándar (pedido

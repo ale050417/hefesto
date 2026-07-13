@@ -179,7 +179,7 @@ export default async function AdminDashboard() {
             >
               <Icon name={n.icon} size={18} />
             </span>
-            <span className="min-w-0">
+            <span className="min-w-0 flex-1">
               <span className="text-fg block text-[14px] font-semibold">
                 {n.label}
               </span>
@@ -188,11 +188,25 @@ export default async function AdminDashboard() {
                   {n.badge.value} {n.badge.label}
                 </span>
               ) : (
-                <span className="text-faint text-[12px]">
-                  Ir a la sección →
-                </span>
+                <span className="text-faint text-[12px]">Ir a la sección</span>
               )}
             </span>
+            {/* Flecha a la derecha, centrada: antes iba en el texto ("→") y en
+                celular caía sola abajo. */}
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-faint flex-shrink-0"
+              aria-hidden
+            >
+              <path d="M9 18l6-6-6-6" />
+            </svg>
           </Link>
         ))}
       </div>
