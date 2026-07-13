@@ -37,7 +37,7 @@ function NavIcon({ name }: { name: string }) {
 
 const tabs = [
   { href: "/cuenta/perfil", label: "Perfil y direcciones", icon: "user" },
-  { href: "/cuenta/a-medida", label: "A medida", icon: "sparkles" },
+  { href: "/a-medida", label: "A medida", icon: "sparkles" },
   { href: "/cuenta/favoritos", label: "Favoritos", icon: "heart" },
   { href: "/cuenta/puntos", label: "Puntos", icon: "star" },
 ];

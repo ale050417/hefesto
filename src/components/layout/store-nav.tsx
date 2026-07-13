@@ -49,7 +49,7 @@ const links: NavLink[] = [
     ),
   },
   {
-    href: "/cuenta/a-medida",
+    href: "/a-medida",
     label: "A medida",
     variant: "gold",
     icon: (

@@ -153,13 +153,15 @@ const links: NavLink[] = [
     group: "Ventas",
     module: "pedidos",
   },
-  {
-    href: "/admin/medida",
-    label: "A medida",
-    icon: icons.medida,
-    group: "Ventas",
-    module: "medida",
-  },
+  // A medida oculto (2026-07): el flujo pasó a WhatsApp (/a-medida público).
+  // Para reactivar el panel, restaurar este item y poner CUSTOM_ORDERS_ENABLED=true.
+  // {
+  //   href: "/admin/medida",
+  //   label: "A medida",
+  //   icon: icons.medida,
+  //   group: "Ventas",
+  //   module: "medida",
+  // },
   {
     href: "/admin/clientes",
     label: "Clientes",
