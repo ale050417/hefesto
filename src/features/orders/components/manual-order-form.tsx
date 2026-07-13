@@ -11,6 +11,7 @@ import { createManualSaleAction } from "../actions";
 import { ORDER_STATUS_LABEL } from "../constants";
 import type { OrderStatus } from "../types";
 import { runAction } from "@/lib/run-action";
+import { useFormErrors } from "@/hooks/use-form-errors";
 
 const PAYS = [
   { v: "cash", l: "Efectivo" },
@@ -213,26 +214,32 @@ export function ManualSaleForm({
 
   const splitTotal = parts.reduce((a, p) => a + (Number(p.pct) || 0), 0);
 
+  const fe = useFormErrors();
+  // El pedido valida por sección (precio/colores/socios): banner + toast visible
+  // en cualquier paso del wizard.
+  const fail = (msg: string) => {
+    setErr(msg);
+    fe.fromAction({ message: msg });
+  };
+
   async function submit() {
     setErr(null);
     if (splitMode === "custom") {
       const valid = parts.filter((p) => p.name.trim() && Number(p.pct) > 0);
       if (valid.length === 0)
-        return setErr("Cargá al menos una persona con su porcentaje.");
+        return fail("Cargá al menos una persona con su porcentaje.");
       if (Math.round(splitTotal) !== 100)
-        return setErr(
-          `Los porcentajes deben sumar 100% (suman ${splitTotal}%).`,
-        );
+        return fail(`Los porcentajes deben sumar 100% (suman ${splitTotal}%).`);
     }
     if (!estData) {
-      return setErr(
+      return fail(
         "Calculá el precio con la calculadora (la amortización es obligatoria).",
       );
     }
     if (
       colorLines.filter((l) => l.filamentId && Number(l.grams) > 0).length === 0
     ) {
-      return setErr(
+      return fail(
         "Elegí al menos un color/carrete y sus gramos (se descuenta del stock).",
       );
     }
@@ -269,7 +276,7 @@ export function ManualSaleForm({
           }),
         { silent: true },
       );
-      if (!res.ok) return setErr(res.error.message);
+      if (!res.ok) return fe.fromAction(res.error);
       if (onDone) {
         onDone();
       } else {

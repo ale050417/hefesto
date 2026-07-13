@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { saveCouponAction } from "../actions";
 import { runAction } from "@/lib/run-action";
+import { useFormErrors } from "@/hooks/use-form-errors";
 
 export type CouponFormData = {
   id?: string;
@@ -197,13 +198,18 @@ export function CouponForm({
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [prodQuery, setProdQuery] = useState("");
+  const fe = useFormErrors();
 
   const set = (k: keyof typeof form, v: string | boolean) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   async function submit() {
     setErr(null);
-    if (!form.code.trim()) return setErr("Ingresá un código");
+    const ok = fe.check({
+      code: !form.code.trim() ? "Ingresá un código." : null,
+      value: !(Number(form.value) > 0) ? "Ingresá un valor mayor a 0." : null,
+    });
+    if (!ok) return;
     setBusy(true);
     const payload = {
       code: form.code,
@@ -230,7 +236,7 @@ export function CouponForm({
       const res = await runAction(() => saveCouponAction(payload, coupon?.id), {
         silent: true,
       });
-      if (!res.ok) return setErr(res.error.message);
+      if (!res.ok) return fe.fromAction(res.error);
       toast(edit ? "Cupón actualizado" : "Cupón creado", "success");
       onDone?.();
     } catch {
@@ -250,7 +256,7 @@ export function CouponForm({
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_300px] lg:items-start">
       <div className="flex flex-col gap-4">
-        <div className="field">
+        <div className={`field ${fe.errors.code ? "invalid" : ""}`}>
           <label htmlFor="cp-code">Código del cupón</label>
           <input
             id="cp-code"
@@ -261,9 +267,13 @@ export function CouponForm({
               fontFamily: "var(--font-display), sans-serif",
               letterSpacing: ".05em",
             }}
+            aria-invalid={!!fe.errors.code}
             value={form.code}
             onChange={(e) => set("code", e.target.value)}
           />
+          {fe.errors.code ? (
+            <p className="field-error">{fe.errors.code}</p>
+          ) : null}
         </div>
 
         <div className="field">
@@ -306,9 +316,13 @@ export function CouponForm({
             type="number"
             className="input"
             placeholder={form.type === "percentage" ? "15" : "2000"}
+            aria-invalid={!!fe.errors.value}
             value={form.value}
             onChange={(e) => set("value", e.target.value)}
           />
+          {fe.errors.value ? (
+            <p className="field-error">{fe.errors.value}</p>
+          ) : null}
           <div className="text-faint text-[11.5px]">
             {form.type === "percentage"
               ? "Un número de 1 a 100 (%)."

@@ -6,6 +6,7 @@ import { toast } from "@/stores/toastStore";
 import { createRewardAction, updateRewardAction } from "../actions";
 import { REWARD_TYPES, type RewardTypeKey } from "../reward-types";
 import { runAction } from "@/lib/run-action";
+import { useFormErrors } from "@/hooks/use-form-errors";
 
 export type RewardFormData = {
   id?: string;
@@ -45,15 +46,20 @@ export function RewardForm({
   });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const fe = useFormErrors();
 
   const set = (k: keyof typeof form, v: string | boolean) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   async function submit() {
     setErr(null);
-    if (!form.title.trim()) return setErr("Ingresá un título");
-    if (!(Number(form.costPoints) > 0))
-      return setErr("Ingresá el costo en puntos");
+    const ok = fe.check({
+      title: !form.title.trim() ? "Ingresá un título." : null,
+      costPoints: !(Number(form.costPoints) > 0)
+        ? "Ingresá el costo en puntos."
+        : null,
+    });
+    if (!ok) return;
     setBusy(true);
     const payload = {
       type,
@@ -74,7 +80,7 @@ export function RewardForm({
           : await runAction(() => createRewardAction(payload), {
               silent: true,
             });
-      if (!res.ok) return setErr(res.error.message);
+      if (!res.ok) return fe.fromAction(res.error);
       toast(edit ? "Recompensa actualizada" : "Recompensa creada", "success");
       onDone?.();
     } catch {
@@ -103,26 +109,34 @@ export function RewardForm({
       </div>
 
       <div className="grid-2">
-        <div className="field">
+        <div className={`field ${fe.errors.title ? "invalid" : ""}`}>
           <label htmlFor="rw-title">Título</label>
           <input
             id="rw-title"
             className="input"
             placeholder="Ej: $2.000 de descuento"
+            aria-invalid={!!fe.errors.title}
             value={form.title}
             onChange={(e) => set("title", e.target.value)}
           />
+          {fe.errors.title ? (
+            <p className="field-error">{fe.errors.title}</p>
+          ) : null}
         </div>
-        <div className="field">
+        <div className={`field ${fe.errors.costPoints ? "invalid" : ""}`}>
           <label htmlFor="rw-cost">Costo en puntos</label>
           <input
             id="rw-cost"
             type="number"
             className="input"
             placeholder="500"
+            aria-invalid={!!fe.errors.costPoints}
             value={form.costPoints}
             onChange={(e) => set("costPoints", e.target.value)}
           />
+          {fe.errors.costPoints ? (
+            <p className="field-error">{fe.errors.costPoints}</p>
+          ) : null}
         </div>
       </div>
 

@@ -6,6 +6,7 @@ import { toast } from "@/stores/toastStore";
 import { createCategoryAction, updateCategoryAction } from "../actions";
 import { CAT_COLORS, CAT_ICONS, catIconPath } from "../category-icons";
 import { runAction } from "@/lib/run-action";
+import { useFormErrors } from "@/hooks/use-form-errors";
 
 export type CategoryFormData = {
   id?: string;
@@ -68,11 +69,12 @@ export function CategoryForm({
   );
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const fe = useFormErrors();
   const parentOptions = parents.filter((c) => c.id !== category?.id);
 
   async function submit() {
     setErr(null);
-    if (!name.trim()) return setErr("Ingresá un nombre");
+    if (!fe.check({ name: !name.trim() ? "Ingresá un nombre." : null })) return;
     setBusy(true);
     const payload = {
       name: name.trim(),
@@ -92,7 +94,7 @@ export function CategoryForm({
           : await runAction(() => createCategoryAction(payload), {
               silent: true,
             });
-      if (!res.ok) return setErr(res.error.message);
+      if (!res.ok) return fe.fromAction(res.error);
       toast(edit ? "Categoría actualizada" : "Categoría creada", "success");
       onDone?.();
     } catch {
@@ -116,15 +118,19 @@ export function CategoryForm({
         >
           <IconSvg name={icon} />
         </div>
-        <div className="field grow">
+        <div className={`field grow ${fe.errors.name ? "invalid" : ""}`}>
           <label htmlFor="cat-name">Nombre de la categoría</label>
           <input
             id="cat-name"
             className="input"
             placeholder="Ej: Decoración"
+            aria-invalid={!!fe.errors.name}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+          {fe.errors.name ? (
+            <p className="field-error">{fe.errors.name}</p>
+          ) : null}
         </div>
       </div>
 
