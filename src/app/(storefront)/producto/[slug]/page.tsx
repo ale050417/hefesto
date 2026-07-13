@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCurrentUser } from "@/core/auth/session";
 import { PriceTag } from "@/components/shared/price-tag";
 import { Badge } from "@/components/ui/badge";
 import { AddToCart } from "@/features/cart/components/add-to-cart";
 import { ProductGallery } from "@/features/products/components/product-gallery";
 import { ProductGrid } from "@/features/products/components/product-grid";
-import { ProductReviews } from "@/features/reviews/components/product-reviews";
-import { getProductReviewsFor } from "@/features/reviews/service";
 import {
   getProductBySlug,
   getRelatedProducts,
@@ -40,16 +37,14 @@ export default async function ProductPage({ params }: Params) {
   const { slug } = await params;
   // Antes: 4 awaits secuenciales (waterfall). Ahora 2 tandas paralelas; el
   // producto además se dedupea con generateMetadata (React cache en el service).
-  const [product, user] = await Promise.all([
-    getProductBySlug(slug),
-    getCurrentUser(),
-  ]);
+  // Reseñas ocultas (2026-07): ya no se necesita el user acá (era para "puede
+  // reseñar"). Reactivar reseñas → volver a traer el usuario en paralelo.
+  const product = await getProductBySlug(slug);
   if (!product) notFound();
 
-  const [related, reviews] = await Promise.all([
-    getRelatedProducts(slug),
-    getProductReviewsFor(product.id, user?.id ?? null),
-  ]);
+  // Reseñas ocultas (2026-07): no se traen ni se muestran. Reactivar: volver a
+  // pedir getProductReviewsFor y renderizar <ProductReviews/> más abajo.
+  const related = await getRelatedProducts(slug);
 
   // Solo lo que le interesa al cliente. Nada técnico (gramos, tiempo de
   // impresión, material, altura de capa): eso es interno del taller.
@@ -167,15 +162,6 @@ export default async function ProductPage({ params }: Params) {
           </p>
         </div>
       </div>
-
-      <ProductReviews
-        productId={product.id}
-        slug={product.slug}
-        stats={reviews.stats}
-        items={reviews.items}
-        canReview={Boolean(user)}
-        alreadyReviewed={reviews.alreadyReviewed}
-      />
 
       {related.length > 0 ? (
         <section className="mt-16">

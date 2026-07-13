@@ -216,13 +216,14 @@ const links: NavLink[] = [
     group: "Crecimiento",
     module: "recompensas",
   },
-  {
-    href: "/admin/resenas",
-    label: "Reseñas",
-    icon: icons.resenas,
-    group: "Crecimiento",
-    module: "resenas",
-  },
+  // Reseñas ocultas (2026-07): reactivar restaurando este item del nav.
+  // {
+  //   href: "/admin/resenas",
+  //   label: "Reseñas",
+  //   icon: icons.resenas,
+  //   group: "Crecimiento",
+  //   module: "resenas",
+  // },
   {
     href: "/admin/reportes",
     label: "Reportes",

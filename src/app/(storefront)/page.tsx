@@ -583,7 +583,8 @@ export default async function Home({
         </section>
       ) : null}
 
-      {show("testimonios") ? (
+      {/* Reseñas ocultas (2026-07): reactivar → show("testimonios") */}
+      {false ? (
         <section
           data-home-section="testimonios"
           style={previewHidden("testimonios")}
