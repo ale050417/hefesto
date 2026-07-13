@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
@@ -112,6 +113,7 @@ export function ProductsAdmin({
   colorCatalog: Array<{ name: string; hex: string | null }>;
   sections: { nuevos: boolean; destacados: boolean };
 }) {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
   const [view, setView] = useState<View>("grid");
@@ -149,25 +151,6 @@ export function ProductsAdmin({
   }
 
   // Tras crear, pasamos el mismo modal a edición (para subir imágenes).
-  async function handleSaved(id: string) {
-    const res = await runAction(() => getProductFormDataAction(id), {
-      silent: true,
-    });
-    if (!res.ok) {
-      setModal({ open: false });
-      return;
-    }
-    setModal({
-      open: true,
-      mode: "edit",
-      productId: id,
-      name: res.data.name,
-      status: res.data.status,
-      defaults: res.data.defaults,
-      images: res.data.images,
-    });
-  }
-
   async function reloadEdit() {
     if (!modal.open || modal.mode !== "edit") return;
     const res = await runAction(
@@ -490,7 +473,11 @@ export function ProductsAdmin({
             estimator={estimator}
             colorCatalog={colorCatalog}
             sections={sections}
-            onCreated={handleSaved}
+            onCreated={() => {
+              setModal({ open: false });
+              toast("Producto creado", "success");
+              router.refresh();
+            }}
           />
         ) : modal.open && modal.mode === "edit" ? (
           <div className="flex flex-col gap-5">

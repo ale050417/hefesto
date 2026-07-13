@@ -59,13 +59,14 @@ export function ProductWizard({
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [posX, setPosX] = useState(50);
   const [posY, setPosY] = useState(50);
+  const [posScale, setPosScale] = useState(1);
 
   // Paso 2
   const [colorMode, setColorMode] = useState<"single" | "multi">("single");
   const [colors, setColors] = useState<string[]>([]);
+  const [colorPrices, setColorPrices] = useState<Record<string, number>>({});
   const [dimensions, setDimensions] = useState("");
   const [productionTime, setProductionTime] = useState("");
-  const [infill, setInfill] = useState("20");
 
   // Paso 3
   const [price, setPrice] = useState("");
@@ -97,6 +98,37 @@ export function ProductWizard({
   const catName =
     categories.find((c) => c.id === categoryId)?.name ?? "Sin categoría";
   const priceN = Number(price) || 0;
+  const baseFil =
+    estimator.filaments.find((f) => f.id === est.filamentId) ?? null;
+  function filamentForColor(color: string) {
+    return (
+      estimator.filaments.find(
+        (f) => f.material === est.material && f.color === color,
+      ) ??
+      estimator.filaments.find((f) => f.color === color) ??
+      null
+    );
+  }
+  function suggestPrices(
+    base: typeof baseFil,
+    grams: number,
+    material: string,
+  ) {
+    if (!base || !(grams > 0)) return;
+    const next: Record<string, number> = {};
+    for (const c of colors) {
+      const fil =
+        estimator.filaments.find(
+          (f) => f.material === material && f.color === c,
+        ) ??
+        estimator.filaments.find((f) => f.color === c) ??
+        null;
+      next[c] = fil
+        ? Math.round(((fil.costPerKg - base.costPerKg) * grams) / 1000)
+        : 0;
+    }
+    setColorPrices(next);
+  }
 
   function pickImage(file: File | null) {
     if (imageUrl) URL.revokeObjectURL(imageUrl);
@@ -109,6 +141,13 @@ export function ProductWizard({
   function handleEstUse(v: EstimatorValue) {
     setEst(v);
     if (v.price != null) setPrice(String(v.price));
+    // La calculadora "contempla" el costo real de cada filamento: sugiere el
+    // ajuste por color (dorado silk cuesta más que rojo, etc.). Editable.
+    if (colorMode === "single") {
+      const base =
+        estimator.filaments.find((f) => f.id === v.filamentId) ?? null;
+      suggestPrices(base, v.grams, v.material);
+    }
   }
 
   async function generateWithHefi() {
@@ -163,9 +202,16 @@ export function ProductWizard({
       dimensions,
       colorMode,
       colors,
-      colorPrices: {},
+      colorPrices:
+        colorMode === "single"
+          ? Object.fromEntries(
+              colors
+                .filter((c) => colorPrices[c])
+                .map((c) => [c, colorPrices[c]!]),
+            )
+          : {},
       layerHeight: est.layerHeight,
-      infillPercent: infill,
+      infillPercent: "",
       productionTime,
       isFeatured,
       isNew,
@@ -185,6 +231,7 @@ export function ProductWizard({
         fd.set("productId", id);
         fd.set("file", imageFile);
         fd.set("position", `${posX}% ${posY}%`);
+        fd.set("scale", String(posScale));
         await runAction(() => uploadProductImageAction(fd), { silent: true });
       }
       setBusy(false);
@@ -325,6 +372,22 @@ export function ProductWizard({
                       className="range flex-1"
                     />
                   </label>
+                  <label className="flex items-center gap-2 text-[12px]">
+                    <span className="text-faint w-24">Zoom</span>
+                    <input
+                      type="range"
+                      min={60}
+                      max={250}
+                      value={Math.round(posScale * 100)}
+                      onChange={(e) =>
+                        setPosScale(Number(e.target.value) / 100)
+                      }
+                      className="range flex-1"
+                    />
+                    <span className="text-faint w-10 text-right">
+                      {Math.round(posScale * 100)}%
+                    </span>
+                  </label>
                 </div>
               ) : (
                 <div className="text-faint text-[11.5px]">
@@ -390,27 +453,6 @@ export function ProductWizard({
                 Obligatorio: elegí al menos un color.
               </div>
             </div>
-            <div className="field">
-              <label htmlFor="w-infill">Relleno (infill)</label>
-              <div className="flex items-center gap-2">
-                <input
-                  id="w-infill"
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={5}
-                  className="range"
-                  value={infill}
-                  onChange={(e) => setInfill(e.target.value)}
-                />
-                <b
-                  className="min-w-[42px] text-right"
-                  style={{ color: "var(--gold-bright)" }}
-                >
-                  {infill || 0}%
-                </b>
-              </div>
-            </div>
             <div className="grid-2">
               <div className="field">
                 <label htmlFor="w-time">Tiempo de producción / entrega</label>
@@ -460,6 +502,69 @@ export function ProductWizard({
                 Descuentos.
               </div>
             </div>
+
+            {colorMode === "single" && colors.length > 0 ? (
+              <div className="field">
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <label className="mb-0">Ajuste de precio por color</label>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={!baseFil || !(est.grams > 0)}
+                    onClick={() =>
+                      suggestPrices(baseFil, est.grams, est.material)
+                    }
+                  >
+                    Sugerir según filamento
+                  </Button>
+                </div>
+                <div className="text-faint text-[11.5px] leading-relaxed">
+                  El precio base es para el filamento que calculaste. Un color
+                  más caro (ej. Dorado Silk) suma; uno más barato resta.
+                  &ldquo;Sugerir&rdquo; usa la diferencia de costo real de cada
+                  carrete.
+                </div>
+                <div className="mt-2 flex flex-col gap-2">
+                  {colors.map((c) => {
+                    const fil = filamentForColor(c);
+                    return (
+                      <div key={c} className="flex items-center gap-2">
+                        <span className="flex w-32 items-center gap-2 text-sm">
+                          <span
+                            style={{
+                              width: 13,
+                              height: 13,
+                              borderRadius: "50%",
+                              background: hexOf(c),
+                              border: "1px solid var(--border)",
+                              flexShrink: 0,
+                            }}
+                          />
+                          {c}
+                        </span>
+                        <span className="text-faint w-20 text-[11px]">
+                          {fil ? `${money(fil.costPerKg)}/kg` : "s/carrete"}
+                        </span>
+                        <input
+                          type="number"
+                          className="input"
+                          style={{ maxWidth: 120 }}
+                          placeholder="0"
+                          value={colorPrices[c] ?? ""}
+                          onChange={(e) =>
+                            setColorPrices((prev) => ({
+                              ...prev,
+                              [c]: Number(e.target.value) || 0,
+                            }))
+                          }
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             <div className="field">
               <label>Estado</label>
@@ -583,6 +688,7 @@ export function ProductWizard({
                   height: "100%",
                   objectFit: "cover",
                   objectPosition: `${posX}% ${posY}%`,
+                  transform: `scale(${posScale})`,
                 }}
               />
             ) : (

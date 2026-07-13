@@ -36,7 +36,12 @@ export type ProductView = {
   isFeatured: boolean;
   material: string | null;
   category: { name: string; slug: string } | null;
-  primaryImage: { url: string; alt: string; position: string } | null;
+  primaryImage: {
+    url: string;
+    alt: string;
+    position: string;
+    scale: number;
+  } | null;
 };
 
 export type ProductDetailView = ProductView & {
@@ -50,7 +55,7 @@ export type ProductDetailView = ProductView & {
   layerHeight: string | null;
   infillPercent: number | null;
   productionTime: string | null;
-  images: { url: string; alt: string; position: string }[];
+  images: { url: string; alt: string; position: string; scale: number }[];
   variants: { id: string; label: string; price: number | null }[];
 };
 

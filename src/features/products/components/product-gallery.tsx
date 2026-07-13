@@ -4,7 +4,12 @@ import Image from "next/image";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-type GalleryImage = { url: string; alt: string; position: string };
+type GalleryImage = {
+  url: string;
+  alt: string;
+  position: string;
+  scale: number;
+};
 
 export function ProductGallery({ images }: { images: GalleryImage[] }) {
   const [active, setActive] = useState(0);
@@ -16,7 +21,10 @@ export function ProductGallery({ images }: { images: GalleryImage[] }) {
         {main ? (
           <Image
             src={main.url}
-            style={{ objectPosition: main.position }}
+            style={{
+              objectPosition: main.position,
+              transform: `scale(${main.scale})`,
+            }}
             alt={main.alt}
             fill
             sizes="(max-width: 1024px) 100vw, 50vw"

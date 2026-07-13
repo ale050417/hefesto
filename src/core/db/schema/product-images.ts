@@ -3,6 +3,7 @@ import {
   boolean,
   index,
   integer,
+  numeric,
   pgTable,
   text,
   uniqueIndex,
@@ -23,6 +24,8 @@ export const productImages = pgTable(
     isPrimary: boolean("is_primary").notNull().default(false),
     // Encuadre (object-position CSS, ej. "50% 30%") para acomodar el recorte.
     position: text("position").notNull().default("50% 50%"),
+    // Zoom (factor de scale del transform, 1 = normal). Alejar <1 / acercar >1.
+    scale: numeric("scale", { precision: 4, scale: 2 }).notNull().default("1"),
   },
   (t) => [
     // Una sola imagen principal por producto (índice único parcial).

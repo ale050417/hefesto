@@ -358,7 +358,12 @@ export async function uploadProductImageAction(
       typeof posRaw === "string" && /^\d{1,3}% \d{1,3}%$/.test(posRaw)
         ? posRaw
         : "50% 50%";
-    const image = await addProductImage(productId, bytes, position);
+    const scaleRaw = formData.get("scale");
+    const scale =
+      typeof scaleRaw === "string" && /^\d(\.\d{1,2})?$/.test(scaleRaw)
+        ? scaleRaw
+        : "1";
+    const image = await addProductImage(productId, bytes, position, scale);
     revalidatePath(`/admin/productos/${productId}/editar`);
     return { ok: true, data: { id: image.id, url: image.url } };
   } catch {
