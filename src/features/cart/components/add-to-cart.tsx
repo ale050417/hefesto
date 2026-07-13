@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format";
@@ -49,6 +50,7 @@ export function AddToCart({ product }: { product: AddToCartProduct }) {
   const [qty, setQty] = useState(1);
   const addItem = useCartStore((s) => s.addItem);
   const openCart = useUiStore((s) => s.openCart);
+  const router = useRouter();
 
   const selected = product.variants.find((v) => v.id === variantId) ?? null;
   const basePrice =
@@ -66,21 +68,26 @@ export function AddToCart({ product }: { product: AddToCartProduct }) {
       : null
     : color;
 
+  function buildItem() {
+    return {
+      productId: product.id,
+      slug: product.slug,
+      name: product.name,
+      unitPrice,
+      image: product.image,
+      variantId: selected?.id ?? null,
+      variantLabel: selected?.label ?? null,
+      color: lineColor,
+    };
+  }
   function handleAdd() {
-    addItem(
-      {
-        productId: product.id,
-        slug: product.slug,
-        name: product.name,
-        unitPrice,
-        image: product.image,
-        variantId: selected?.id ?? null,
-        variantLabel: selected?.label ?? null,
-        color: lineColor,
-      },
-      qty,
-    );
+    addItem(buildItem(), qty);
     openCart();
+  }
+  // "Comprar ahora": agrega y va directo al checkout.
+  function handleBuyNow() {
+    addItem(buildItem(), qty);
+    router.push("/checkout");
   }
 
   return (
@@ -155,7 +162,8 @@ export function AddToCart({ product }: { product: AddToCartProduct }) {
         </div>
       ) : null}
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        <span className="text-fg text-sm font-medium">Cantidad</span>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -175,8 +183,26 @@ export function AddToCart({ product }: { product: AddToCartProduct }) {
             +
           </button>
         </div>
-        <Button type="button" size="lg" onClick={handleAdd}>
-          Agregar al carrito · {formatPrice(unitPrice * qty)}
+      </div>
+
+      {/* Comprar ahora (directo al checkout) + agregar al carrito. */}
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Button
+          type="button"
+          size="lg"
+          onClick={handleBuyNow}
+          className="flex-1"
+        >
+          Comprar ahora · {formatPrice(unitPrice * qty)}
+        </Button>
+        <Button
+          type="button"
+          size="lg"
+          variant="secondary"
+          onClick={handleAdd}
+          className="flex-1"
+        >
+          Agregar al carrito
         </Button>
       </div>
     </div>

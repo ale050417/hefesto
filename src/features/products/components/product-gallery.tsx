@@ -4,37 +4,40 @@ import Image from "next/image";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-type GalleryImage = {
+export type GalleryImage = {
   url: string;
   alt: string;
   position: string;
   scale: number;
+  color?: string | null;
 };
 
-export function ProductGallery({ images }: { images: GalleryImage[] }) {
-  const [active, setActive] = useState(0);
+/**
+ * Galería con miniaturas en BARRA LATERAL IZQUIERDA + imagen grande a la
+ * derecha. Puede funcionar sola (no controlada) o controlada por un padre
+ * (activeIndex/onSelect) para, por ejemplo, cambiar la foto al elegir un color.
+ */
+export function ProductGallery({
+  images,
+  activeIndex,
+  onSelect,
+}: {
+  images: GalleryImage[];
+  activeIndex?: number;
+  onSelect?: (i: number) => void;
+}) {
+  const [internal, setInternal] = useState(0);
+  const active = activeIndex ?? internal;
+  const setActive = (i: number) => {
+    onSelect?.(i);
+    setInternal(i);
+  };
   const main = images[active] ?? images[0];
 
   return (
-    <div>
-      <div className="border-surface-2 bg-surface-2 relative aspect-square overflow-hidden rounded-lg border">
-        {main ? (
-          <Image
-            src={main.url}
-            style={{
-              objectPosition: main.position,
-              transform: `scale(${main.scale})`,
-            }}
-            alt={main.alt}
-            fill
-            sizes="(max-width: 1024px) 100vw, 50vw"
-            className="object-cover"
-            priority
-          />
-        ) : null}
-      </div>
+    <div className="flex gap-3">
       {images.length > 1 ? (
-        <div className="mt-3 grid grid-cols-4 gap-2">
+        <div className="flex shrink-0 flex-col gap-2" style={{ width: 64 }}>
           {images.map((img, i) => (
             <button
               key={i}
@@ -52,13 +55,30 @@ export function ProductGallery({ images }: { images: GalleryImage[] }) {
                 src={img.url}
                 alt={img.alt}
                 fill
-                sizes="120px"
+                sizes="64px"
                 className="object-cover"
+                style={{ objectPosition: img.position }}
               />
             </button>
           ))}
         </div>
       ) : null}
+      <div className="border-surface-2 bg-surface-2 relative aspect-square flex-1 overflow-hidden rounded-lg border">
+        {main ? (
+          <Image
+            src={main.url}
+            style={{
+              objectPosition: main.position,
+              transform: `scale(${main.scale})`,
+            }}
+            alt={main.alt}
+            fill
+            sizes="(max-width: 1024px) 100vw, 50vw"
+            className="object-cover"
+            priority
+          />
+        ) : null}
+      </div>
     </div>
   );
 }
