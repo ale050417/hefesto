@@ -172,12 +172,13 @@ describe("createOrder", () => {
     expect(persist.mock.calls[0]![0].items[0]!.unitPrice).toBe("1000.00");
   });
 
-  it("el color elegido no cambia el precio (precio único) en color único", async () => {
+  it("cobra el precio EXACTO del color elegido (color único)", async () => {
     const { deps, persist } = makeDeps({
       dragon: makeProduct({
         effectivePrice: 1000,
         colorMode: "single",
-        colors: ["Negro", "Dorado"],
+        colors: ["Amarillo", "Dorado"],
+        colorPrices: { Dorado: 1300, Amarillo: 800 },
       }),
     });
 
@@ -197,9 +198,65 @@ describe("createOrder", () => {
     );
 
     const item = persist.mock.calls[0]![0].items[0]!;
-    expect(item.unitPrice).toBe("1000.00");
-    expect(item.lineTotal).toBe("2000.00");
+    expect(item.unitPrice).toBe("1300.00");
+    expect(item.lineTotal).toBe("2600.00");
     expect(item.variantLabel).toBe("Dorado");
+  });
+
+  it("un color más barato también manda (precio absoluto, no recargo)", async () => {
+    const { deps, persist } = makeDeps({
+      dragon: makeProduct({
+        effectivePrice: 1000,
+        colorMode: "single",
+        colors: ["Amarillo", "Dorado"],
+        colorPrices: { Dorado: 1300, Amarillo: 800 },
+      }),
+    });
+
+    await createOrder(
+      params({
+        items: [
+          {
+            productId: "p1",
+            slug: "dragon",
+            variantId: null,
+            color: "Amarillo",
+            quantity: 1,
+          },
+        ],
+      }),
+      deps,
+    );
+
+    expect(persist.mock.calls[0]![0].items[0]!.unitPrice).toBe("800.00");
+  });
+
+  it("color sin precio propio cae al precio base (color único)", async () => {
+    const { deps, persist } = makeDeps({
+      dragon: makeProduct({
+        effectivePrice: 1000,
+        colorMode: "single",
+        colors: ["Negro", "Dorado"],
+        colorPrices: { Dorado: 1300 },
+      }),
+    });
+
+    await createOrder(
+      params({
+        items: [
+          {
+            productId: "p1",
+            slug: "dragon",
+            variantId: null,
+            color: "Negro",
+            quantity: 1,
+          },
+        ],
+      }),
+      deps,
+    );
+
+    expect(persist.mock.calls[0]![0].items[0]!.unitPrice).toBe("1000.00");
   });
 
   it("no ajusta el precio en multicolor (combinación fija)", async () => {

@@ -177,11 +177,11 @@ export async function existsMovementByRef(
 /**
  * Aplica N deltas de stock y registra sus movimientos, todo en UNA transacción.
  * Reglas (diseño 2026-07, toca stock → tests en el service):
- *  - El stock nunca baja de 0 (la tabla tiene CHECK >= 0): se aplica
- *    GREATEST(stock + delta, 0) y el movimiento registra el delta REAL
- *    aplicado (pedía -80 con 50 en stock → queda -50).
- *  - Se registra el movimiento AUNQUE el delta real sea 0 (stock ya estaba en
- *    0): el registro es el marcador de idempotencia y la traza de auditoría.
+ *  - El stock PUEDE ir a NEGATIVO (sobreventa/backorder, migración 0053): se
+ *    aplica el delta ENTERO (pedía -80 con 50 → queda -30) y `shortfall` marca
+ *    que quedó en deuda; al reponer filamento se compensa el déficit.
+ *  - Se registra el movimiento SIEMPRE: es el marcador de idempotencia y la
+ *    traza de auditoría.
  *  - La fila del filamento se bloquea (FOR UPDATE) para que dos ventas
  *    concurrentes no pisen la misma lectura de stock.
  *  - Si el filamento fue borrado en el medio, no hay stock que tocar y el

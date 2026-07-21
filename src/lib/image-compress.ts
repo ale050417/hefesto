@@ -21,6 +21,43 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 /**
+ * Recorta (cover, centrado) la imagen a `targetW`×`targetH` y devuelve WebP. Se
+ * usa en banners: cualquier foto queda a la relación recomendada (ej. 1920×720,
+ * 16/6) prolija y del mismo tamaño, sin que el admin tenga que redimensionar.
+ */
+export async function cropCoverToWebp(
+  file: File,
+  targetW: number,
+  targetH: number,
+  quality = 0.85,
+): Promise<File> {
+  if (typeof window === "undefined" || !file.type.startsWith("image/")) {
+    return file;
+  }
+  try {
+    const img = await loadImage(await readAsDataURL(file));
+    const canvas = document.createElement("canvas");
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    // Cover: escala para LLENAR el destino y recorta el sobrante (centrado).
+    const scale = Math.max(targetW / img.width, targetH / img.height);
+    const dw = img.width * scale;
+    const dh = img.height * scale;
+    ctx.drawImage(img, (targetW - dw) / 2, (targetH - dh) / 2, dw, dh);
+    const blob = await new Promise<Blob | null>((res) =>
+      canvas.toBlob(res, "image/webp", quality),
+    );
+    if (!blob) return file;
+    const name = file.name.replace(/\.[^.]+$/, "") || "banner";
+    return new File([blob], `${name}.webp`, { type: "image/webp" });
+  } catch {
+    return file;
+  }
+}
+
+/**
  * Devuelve un File WebP redimensionado al lado máximo `maxSize` (px).
  * `quality` 0..1. No agranda imágenes más chicas que `maxSize`.
  */

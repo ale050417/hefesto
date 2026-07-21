@@ -372,6 +372,13 @@
       "when": 1783305700000,
       "tag": "0052_banner_mobile_image",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1783305800000,
+      "tag": "0053_filament_negative_stock",
+      "breakpoints": true
     }
   ]
 }

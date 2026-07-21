@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { AppError, type ErrorCode } from "@/core/errors";
 import { validateCoupon, eligibleSubtotal } from "@/features/discounts/service";
 import type { Coupon } from "@/features/discounts/types";
+import { colorUnitPrice } from "@/features/products/pricing";
 import type { ProductDetailView } from "@/features/products/types";
 import type { CreateOrderInput } from "../repository";
 import type { CheckoutInput } from "../schemas";
@@ -120,9 +121,12 @@ export async function createOrder(
       );
     }
 
-    // El color elegido NO cambia el precio: el producto tiene un precio único
-    // (el de la calculadora). Solo validamos que el color pertenezca al producto
-    // (en "color único") y lo guardamos en la etiqueta de la línea.
+    // Precio por color (solo "color único"): el precio cargado por color es el
+    // EXACTO que paga el cliente al elegirlo — Dorado y Amarillo cuestan distinto
+    // porque el filamento cuesta distinto. Se resuelve acá, en el SERVIDOR (fuente
+    // de verdad del cobro): nunca se confía en el precio que mandó el navegador.
+    // Sin precio propio queda el precio base/tamaño. En "multicolor" no se elige
+    // color (la combinación es fija; `colorPrices` ahí guarda gramos, no precio).
     const lineColor = line.color ?? null;
     if (lineColor && product.colorMode === "single") {
       if (!product.colors.includes(lineColor)) {
@@ -131,6 +135,9 @@ export async function createOrder(
           `El color elegido para "${product.name}" ya no está disponible.`,
         );
       }
+      unitPrice = round2(
+        colorUnitPrice(unitPrice, "single", product.colorPrices, lineColor),
+      );
     }
     const lineLabel =
       [variantLabel, lineColor].filter(Boolean).join(" · ") || null;

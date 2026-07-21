@@ -77,11 +77,15 @@ export function ProductForm({
     defaultValues.colorMode ?? "single",
   );
   const [colors, setColors] = useState<string[]>(defaultValues.colors ?? []);
-  // Multicolor: gramos por color (para descontar stock). Se leen/guardan de la
-  // columna color_prices (reusada; ya no existe el "precio por color").
+  // La columna color_prices se reusa según el modo: MULTICOLOR = gramos por color
+  // (para descontar stock); COLOR ÚNICO = precio exacto por color (opcional). Como
+  // un producto es de un solo modo, cargamos el mismo dato en el estado que toca.
   const [colorGrams, setColorGrams] = useState<Record<string, number>>(
     defaultValues.colorPrices ?? {},
   );
+  const [colorPricesSingle, setColorPricesSingle] = useState<
+    Record<string, number>
+  >(defaultValues.colorPrices ?? {});
   // Ficha técnica (material/peso/tiempo/altura) la maneja el PriceEstimator;
   // acá guardamos su último valor para el payload.
   const [est, setEst] = useState<EstimatorValue>({
@@ -161,8 +165,8 @@ export function ProductForm({
       layerHeight: est.layerHeight,
       colorMode,
       colors,
-      // Multicolor: gramos por color (para descontar stock), en la columna
-      // color_prices. En color único no aplica.
+      // color_prices reusada: multicolor = GRAMOS por color (stock); color único
+      // = PRECIO exacto por color (opcional). Un producto es de un solo modo.
       colorPrices:
         colorMode === "multi"
           ? Object.fromEntries(
@@ -170,7 +174,11 @@ export function ProductForm({
                 .filter((c) => colorGrams[c])
                 .map((c) => [c, colorGrams[c]!]),
             )
-          : {},
+          : Object.fromEntries(
+              colors
+                .filter((c) => colorPricesSingle[c])
+                .map((c) => [c, colorPricesSingle[c]!]),
+            ),
     };
     const result =
       mode === "create"
@@ -427,6 +435,42 @@ export function ProductForm({
                     }
                   />
                   <span className="text-faint text-[12px]">g</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Color único: precio por color (opcional). El cliente paga el del color
+            que elige; vacío = el precio base del producto. */}
+        {colorMode === "single" && colors.length > 0 ? (
+          <div className="field mb-3.5">
+            <label>
+              Precio por color{" "}
+              <span className="text-faint font-normal">
+                (opcional; el cliente paga el del color elegido; vacío = precio
+                base)
+              </span>
+            </label>
+            <div className="flex flex-col gap-2">
+              {colors.map((c) => (
+                <div key={c} className="flex items-center gap-3">
+                  <span className="w-28 text-sm">{c}</span>
+                  <span className="text-faint text-[12px]">$</span>
+                  <input
+                    type="number"
+                    step="1"
+                    className="input"
+                    style={{ maxWidth: 140 }}
+                    placeholder="precio base"
+                    value={colorPricesSingle[c] ?? ""}
+                    onChange={(e) =>
+                      setColorPricesSingle((prev) => ({
+                        ...prev,
+                        [c]: Number(e.target.value) || 0,
+                      }))
+                    }
+                  />
                 </div>
               ))}
             </div>

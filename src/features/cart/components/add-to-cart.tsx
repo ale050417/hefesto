@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format";
+import { colorUnitPrice } from "@/features/products/pricing";
 import { useCartStore } from "@/stores/cartStore";
 import { useUiStore } from "@/stores/uiStore";
 
@@ -57,8 +58,14 @@ export function AddToCart({ product }: { product: AddToCartProduct }) {
     product.isOnSale && product.salePrice != null
       ? product.salePrice
       : product.price;
-  // El color NO cambia el precio: el producto tiene un precio único.
-  const unitPrice = Math.max(0, selected?.price ?? basePrice);
+  // Precio por color (solo "color único"): el color elegido con precio propio
+  // fija el precio EXACTO. Misma función pura que usa el servidor al cobrar.
+  const unitPrice = colorUnitPrice(
+    Math.max(0, selected?.price ?? basePrice),
+    product.colorMode,
+    product.colorPrices,
+    color,
+  );
   // En multicolor la pieza lleva la combinación fija; en color único, el elegido.
   const lineColor = isMulti
     ? hasColors
@@ -148,6 +155,9 @@ export function AddToCart({ product }: { product: AddToCartProduct }) {
                     }}
                   />
                   {c}
+                  {!isMulti && (product.colorPrices[c] ?? 0) > 0
+                    ? ` · ${formatPrice(product.colorPrices[c]!)}`
+                    : ""}
                 </button>
               );
             })}

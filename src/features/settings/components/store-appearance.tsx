@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
-import { compressImageToWebp } from "@/lib/image-compress";
+import { cropCoverToWebp } from "@/lib/image-compress";
 import {
   createBannerAction,
   deleteBannerAction,
@@ -159,7 +159,9 @@ export function StoreAppearance({
     const file = e.target.files?.[0];
     if (!file) return;
     setImgBusy(true);
-    const compact = await compressImageToWebp(file, 1600);
+    // Auto-recorte al tamaño recomendado del hero (1920×720, 16/6): cualquier
+    // foto queda prolija y del mismo tamaño, sin redimensionar a mano.
+    const compact = await cropCoverToWebp(file, 1920, 720);
     const fd = new FormData();
     fd.set("file", compact);
     const res = await runAction(() => uploadBannerImageAction(fd), {
@@ -746,31 +748,9 @@ export function StoreAppearance({
                 </button>
               ) : null}
             </div>
-            <div
-              className="mt-2 rounded-lg border p-3 text-[11.5px] leading-relaxed"
-              style={{
-                borderColor: "var(--border)",
-                background: "var(--surface-2)",
-              }}
-            >
-              <b className="text-fg text-[12px]">Tamaño recomendado</b>
-              <div className="text-faint mt-1.5 flex flex-col gap-1">
-                <span>
-                  <b className="text-fg">Notebook y tablet:</b> 1600 × 600 px
-                  (apaisado, relación 8:3). Se ve la imagen completa.
-                </span>
-                <span>
-                  <b className="text-fg">Celular:</b> esa misma imagen se
-                  muestra entera dentro de un marco oscuro. Para que ocupe toda
-                  la pantalla del celular conviene una imagen vertical de{" "}
-                  <b className="text-fg">1080 × 1350 px</b> (relación 4:5); se
-                  sube aparte (te lo activo en un paso).
-                </span>
-                <span>
-                  Tip: dejá el motivo (logo, producto, texto) centrado y con
-                  aire a los costados, así queda bien en las 3 pantallas.
-                </span>
-              </div>
+            <div className="text-faint mt-1.5 text-[11.5px]">
+              Subí cualquier imagen: se ajusta sola a 1920×720 (16/6). El
+              encuadre lo elegís arriba, en la vista previa.
             </div>
             {bf.imageUrl ? (
               <div className="text-faint mt-2 text-[11.5px]">
@@ -862,7 +842,10 @@ export function StoreAppearance({
   );
 }
 
-/** Vista previa en vivo del banner del hero mientras se carga (admin). */
+/** Vista previa POR DISPOSITIVO del banner del hero (admin): Compu 16/6, Tablet
+ *  16/9 y Celular 4/3. La foto va con object-cover (llena sin deformar) y el
+ *  ENCUADRE (posX/posY) elige el foco; se arrastra sobre el recuadro "Compu" y
+ *  los tres se actualizan en vivo, así ves cómo recorta cada pantalla. */
 function BannerLivePreview({
   banner,
   accent,
@@ -872,7 +855,6 @@ function BannerLivePreview({
   accent: string;
   onReframe?: (x: number, y: number) => void;
 }) {
-  const align = banner.align ?? "left";
   const hasImg = Boolean(banner.imageUrl);
   const reframe = useDragReframe(
     banner.posX,
@@ -880,109 +862,156 @@ function BannerLivePreview({
     onReframe ?? (() => {}),
   );
   const canDrag = hasImg && !!onReframe;
+  const pos = `${banner.posX}% ${banner.posY}%`;
   const title = banner.title.trim() || "Título del banner";
   const words = title.split(" ");
   const last = words.length > 1 ? words.pop() : null;
 
-  const justify =
-    align === "center"
-      ? "center"
-      : align === "right"
-        ? "flex-end"
-        : "flex-start";
+  const frame = (
+    label: string,
+    ratio: string,
+    draggable: boolean,
+    withText: boolean,
+  ) => {
+    const drag = draggable && canDrag;
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="text-faint text-[11px]">{label}</span>
+        <div
+          {...(drag ? reframe.handlers : {})}
+          style={{
+            position: "relative",
+            containerType: "inline-size",
+            aspectRatio: ratio,
+            borderRadius: "var(--radius-md)",
+            overflow: "hidden",
+            border: "1px solid var(--border)",
+            background: hasImg
+              ? `${pos}/cover no-repeat url('${banner.imageUrl}')`
+              : `linear-gradient(135deg, ${accent}33, var(--surface-2))`,
+            color: "#fff",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems:
+              banner.align === "center"
+                ? "center"
+                : banner.align === "right"
+                  ? "flex-end"
+                  : "flex-start",
+            padding: 0,
+            touchAction: drag ? "none" : undefined,
+            cursor: drag ? (reframe.dragging ? "grabbing" : "grab") : "default",
+          }}
+        >
+          {hasImg ? (
+            <div
+              aria-hidden
+              style={{
+                position: "absolute",
+                inset: 0,
+                background:
+                  "linear-gradient(90deg, rgba(8,6,3,.75) 0%, rgba(8,6,3,.3) 45%, rgba(8,6,3,0) 72%)",
+              }}
+            />
+          ) : null}
+          {withText ? (
+            <div
+              style={{
+                position: "relative",
+                zIndex: 1,
+                maxWidth: "82%",
+                padding: "clamp(8px, 5cqw, 20px)",
+                textAlign: banner.align,
+                textShadow: "0 2px 12px rgba(0,0,0,.5)",
+              }}
+            >
+              <div
+                className="font-display"
+                style={{
+                  fontSize: "clamp(11px, 4.4cqw, 30px)",
+                  fontWeight: 900,
+                  lineHeight: 1.1,
+                }}
+              >
+                {last ? (
+                  <>
+                    {words.join(" ")}{" "}
+                    <span style={{ color: accent }}>{last}</span>
+                  </>
+                ) : (
+                  title
+                )}
+              </div>
+              {banner.subtitle.trim() ? (
+                <div
+                  style={{
+                    fontSize: "clamp(8px, 2.6cqw, 15px)",
+                    opacity: 0.9,
+                    marginTop: "0.15em",
+                  }}
+                >
+                  {banner.subtitle}
+                </div>
+              ) : null}
+              <span
+                className="font-semibold"
+                style={{
+                  marginTop: "clamp(4px, 2cqw, 8px)",
+                  display: "inline-flex",
+                  background: accent,
+                  color: "#1a1505",
+                  borderRadius: 999,
+                  padding: "clamp(3px, 1.4cqw, 6px) clamp(7px, 3.2cqw, 14px)",
+                  fontSize: "clamp(8px, 2.5cqw, 13px)",
+                }}
+              >
+                {banner.ctaText.trim() || "Ver catálogo"}
+              </span>
+            </div>
+          ) : null}
+          {!banner.isActive ? (
+            <span
+              style={{
+                position: "absolute",
+                top: 6,
+                right: 6,
+                zIndex: 2,
+                background: "rgba(0,0,0,.6)",
+                color: "#fff",
+                borderRadius: 999,
+                padding: "2px 8px",
+                fontSize: 10,
+              }}
+            >
+              Oculto
+            </span>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="field">
-      <label>Vista previa</label>
-      <div
-        {...(canDrag ? reframe.handlers : {})}
-        style={{
-          position: "relative",
-          aspectRatio: "8 / 3",
-          borderRadius: "var(--radius-md)",
-          overflow: "hidden",
-          border: "1px solid var(--border)",
-          background: hasImg
-            ? `linear-gradient(rgba(10,8,4,.55), rgba(10,8,4,.55)), ${banner.posX}% ${banner.posY}%/cover url('${banner.imageUrl}')`
-            : `linear-gradient(135deg, ${accent}33, var(--surface-2))`,
-          color: hasImg ? "#fff" : "var(--fg)",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          alignItems: justify,
-          textAlign: align,
-          padding: "20px 22px",
-          gap: 8,
-          touchAction: canDrag ? "none" : undefined,
-          cursor: canDrag
-            ? reframe.dragging
-              ? "grabbing"
-              : "grab"
-            : undefined,
-        }}
-      >
-        <div
-          className="font-display"
-          style={{
-            fontSize: 22,
-            fontWeight: 900,
-            lineHeight: 1.1,
-            maxWidth: "85%",
-          }}
-        >
-          {last ? (
-            <>
-              {words.join(" ")} <span style={{ color: accent }}>{last}</span>
-            </>
-          ) : (
-            title
-          )}
+      <label>Vista previa por dispositivo</label>
+      <div className="flex flex-col gap-3">
+        {frame("Compu (16/6)", "16 / 6", true, true)}
+        <div className="grid grid-cols-2 gap-3">
+          {frame("Tablet (16/9)", "16 / 9", false, true)}
+          {frame("Celular (4/3)", "4 / 3", false, true)}
         </div>
-        {banner.subtitle.trim() ? (
-          <div
-            style={{
-              fontSize: 12,
-              opacity: hasImg ? 0.9 : 0.7,
-              maxWidth: "80%",
-            }}
-          >
-            {banner.subtitle}
-          </div>
-        ) : null}
-        <span
-          className="font-semibold"
-          style={{
-            marginTop: 4,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            background: accent,
-            color: "#1a1505",
-            borderRadius: 999,
-            padding: "7px 14px",
-            fontSize: 12,
-            width: "fit-content",
-          }}
-        >
-          {banner.ctaText.trim() || "Ver catálogo"}
-        </span>
-        {!banner.isActive ? (
-          <span
-            style={{
-              position: "absolute",
-              top: 8,
-              right: 8,
-              background: "rgba(0,0,0,.6)",
-              color: "#fff",
-              borderRadius: 999,
-              padding: "3px 9px",
-              fontSize: 10,
-            }}
-          >
-            Oculto
-          </span>
-        ) : null}
       </div>
+      {canDrag ? (
+        <div className="text-faint mt-1 text-[11.5px]">
+          Arrastrá la imagen del recuadro <b>Compu</b> para elegir el foco; los
+          tres se actualizan solos. Así ves cómo se recorta en cada pantalla.
+        </div>
+      ) : hasImg ? null : (
+        <div className="text-faint mt-1 text-[11.5px]">
+          Subí una imagen para ver la vista previa.
+        </div>
+      )}
     </div>
   );
 }

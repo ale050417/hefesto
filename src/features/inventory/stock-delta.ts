@@ -1,13 +1,16 @@
 /**
- * Logica pura del descuento de stock con tope en 0 (sin tocar la DB). El
- * repository aplica exactamente esto dentro de la transaccion; separarlo aca lo
- * hace testeable (Cap. 15) para ventas y fallas por igual.
+ * Logica pura del descuento de stock (sin tocar la DB). El repository aplica
+ * exactamente esto dentro de la transaccion; separarlo aca lo hace testeable
+ * (Cap. 15) para ventas y fallas por igual.
  *
- *  - `newStock` = GREATEST(stock + delta, 0): nunca baja de 0.
- *  - `appliedDelta` = lo REAL que se movio (pedia -80 con 50 -> -50).
+ * El stock PUEDE ir a NEGATIVO (sobreventa/backorder, decision 2026-07): si se
+ * vende sin stock de un color, queda en negativo y al REPONER filamento se
+ * compensa solo el deficit (mantiene el orden). Por eso ya NO se topa en 0.
+ *
+ *  - `newStock` = stock + delta (puede ser negativo).
+ *  - `appliedDelta` = el delta completo (siempre se aplica entero).
  *  - `atThreshold` = tras una BAJA quedo en/bajo el umbral de alerta.
- *  - `shortfall` = se pidio MAS de lo que habia (stock + delta < 0): falta
- *    filamento y conviene COMPRAR.
+ *  - `shortfall` = quedo NEGATIVO: se debe MAS de lo que hay, conviene COMPRAR.
  */
 export function resolveStockDelta(
   current: number,
@@ -19,13 +22,12 @@ export function resolveStockDelta(
   atThreshold: boolean;
   shortfall: boolean;
 } {
-  const wouldBe = current + delta;
-  const newStock = Math.max(0, wouldBe);
+  const newStock = current + delta;
   const down = delta < 0;
   return {
     newStock,
-    appliedDelta: newStock - current,
+    appliedDelta: delta,
     atThreshold: down && newStock <= threshold,
-    shortfall: down && wouldBe < 0,
+    shortfall: down && newStock < 0,
   };
 }

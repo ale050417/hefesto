@@ -86,11 +86,11 @@ describe("resolveStockDelta (shortfall / umbral)", () => {
       shortfall: false,
     });
   });
-  it("pide MAS de lo que hay: shortfall + delta real capado", () => {
-    // pedia -80 con 50: queda 0, se aplico -50, y falto filamento.
+  it("pide MAS de lo que hay: queda NEGATIVO (backorder), delta completo", () => {
+    // pedia -80 con 50: queda -30 (se aplica el delta entero) y falto filamento.
     expect(resolveStockDelta(50, -80, 200)).toEqual({
-      newStock: 0,
-      appliedDelta: -50,
+      newStock: -30,
+      appliedDelta: -80,
       atThreshold: true,
       shortfall: true,
     });

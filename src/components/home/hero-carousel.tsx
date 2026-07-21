@@ -67,7 +67,7 @@ type Banner = {
   sub: string;
   cta: string;
   href: string;
-  align: "left" | "center";
+  align: "left" | "center" | "right";
   /** Imagen de fondo opcional (banner del hero o imagen del hero configurada). */
   image?: string | null;
   /** Encuadre de la imagen de fondo (background-position). Ej: "50% 30%". */
@@ -151,18 +151,51 @@ export function HeroCarousel({ slides }: { slides?: Banner[] } = {}) {
           const copy = (
             <div
               className="hc-copy"
-              style={hasImg ? { color: "#fff" } : undefined}
+              style={
+                hasImg
+                  ? {
+                      color: "#fff",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems:
+                        b.align === "center"
+                          ? "center"
+                          : b.align === "right"
+                            ? "flex-end"
+                            : "flex-start",
+                      textAlign: b.align,
+                      textShadow: "0 2px 14px rgba(0,0,0,.5)",
+                    }
+                  : undefined
+              }
             >
               <div className={`hero-tag${hasImg ? "max-md:hidden" : ""}`}>
                 <Icon name="sparkles" size={15} /> Impresión 3D premium · Hecho
                 en Argentina
               </div>
-              <h1 className="hero-title">
+              <h1
+                className="hero-title"
+                style={
+                  hasImg
+                    ? {
+                        fontSize: "clamp(1.6rem, 5.2vw, 3.2rem)",
+                        lineHeight: 1.08,
+                      }
+                    : undefined
+                }
+              >
                 <HeroTitle title={b.title} />
               </h1>
               <p
                 className="hero-sub"
-                style={hasImg ? { color: "rgba(255,255,255,.92)" } : undefined}
+                style={
+                  hasImg
+                    ? {
+                        color: "rgba(255,255,255,.92)",
+                        fontSize: "clamp(.9rem, 2.4vw, 1.15rem)",
+                      }
+                    : undefined
+                }
               >
                 {b.sub}
               </p>
@@ -186,59 +219,44 @@ export function HeroCarousel({ slides }: { slides?: Banner[] } = {}) {
           return (
             <div
               key={i}
-              className={`hc-slide ${i === idx ? "on" : ""} ${hasImg ? "aspect-[16/10] overflow-hidden rounded-b-[26px] sm:aspect-[16/6] sm:rounded-none md:aspect-auto" : ""}`}
+              className={`hc-slide ${i === idx ? "on" : ""} ${hasImg ? "relative aspect-[4/3] overflow-hidden rounded-2xl shadow-lg sm:aspect-[16/9] md:aspect-[16/6]" : ""}`}
               aria-hidden={i !== idx}
               style={hasImg ? { padding: 0, minHeight: 0 } : undefined}
             >
               {hasImg ? (
                 <>
-                  {/* Banner: la imagen se ve ENTERA (nada cortado) en todo
-                      dispositivo. En móvil, como es ancha, va centrada sobre un
-                      fondo difuminado de sí misma → se ve premium, no una tira
-                      finita, y sin depender del encuadre ni perder el motivo. En
-                      desktop, entera a su aspecto natural. Cualquier banner que
-                      subas se acopla solo. */}
-                  {/* Fondo: imagen difuminada + capa oscura = marco premium (no
-                      queda "embarrado"). Solo móvil/tablet. */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={b.image ?? ""}
-                    alt=""
-                    aria-hidden
-                    className="absolute inset-0 h-full w-full scale-125 object-cover blur-2xl md:hidden"
-                  />
-                  <div
-                    aria-hidden
-                    className="absolute inset-0 z-[1] md:hidden"
-                    style={{ background: "rgba(9,7,4,.64)" }}
-                  />
-                  {/* Imagen ENTERA, nítida y enmarcada (padding en móvil). */}
+                  {/* Aspecto FIJO por breakpoint (móvil 4/3, tablet 16/9, desktop
+                      16/6): todos los slides miden IGUAL, la altura NO depende de
+                      la foto. La imagen llena el contenedor con object-cover (sin
+                      deformar ni barras) y el ENCUADRE del banner define qué parte
+                      se ve (object-position). */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={b.image ?? ""}
                     alt={b.title}
-                    className="relative z-[2] block h-full w-full object-contain p-4 md:h-auto md:p-0"
+                    className="absolute inset-0 h-full w-full object-cover"
+                    style={{ objectPosition: b.position || "center" }}
                   />
-                  {/* Velo móvil: oscurece abajo (ahí va el texto). */}
+                  {/* Overlay para contraste: más oscuro abajo (móvil, texto abajo)
+                      y a la izquierda (desktop, texto a la izquierda). */}
                   <div
                     aria-hidden
-                    className="pointer-events-none absolute inset-0 z-[3] md:hidden"
+                    className="pointer-events-none absolute inset-0 z-[1]"
                     style={{
                       background:
-                        "linear-gradient(to top, rgba(8,6,3,.92) 0%, rgba(8,6,3,.55) 34%, rgba(8,6,3,0) 66%)",
+                        "linear-gradient(to top, rgba(8,6,3,.85) 0%, rgba(8,6,3,.35) 48%, rgba(8,6,3,0) 78%)",
                     }}
                   />
-                  {/* Velo desktop: oscurece a la izquierda (ahí va el texto). */}
                   <div
                     aria-hidden
-                    className="pointer-events-none absolute inset-0 z-[3] hidden md:block"
+                    className="pointer-events-none absolute inset-0 z-[1] hidden md:block"
                     style={{
                       background:
-                        "linear-gradient(90deg, rgba(8,6,3,.82) 0%, rgba(8,6,3,.45) 42%, rgba(8,6,3,0) 68%)",
+                        "linear-gradient(90deg, rgba(8,6,3,.8) 0%, rgba(8,6,3,.35) 45%, rgba(8,6,3,0) 70%)",
                     }}
                   />
-                  <div className="absolute inset-0 z-[4] flex items-end md:items-center">
-                    <div className="store-wrap w-full pb-6 md:pb-0">{copy}</div>
+                  <div className="absolute inset-0 z-[2] flex items-center">
+                    <div className="store-wrap w-full">{copy}</div>
                   </div>
                 </>
               ) : (

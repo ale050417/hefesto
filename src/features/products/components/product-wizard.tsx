@@ -85,6 +85,12 @@ export function ProductWizard({
   const [colors, setColors] = useState<string[]>([]);
   // Multicolor: gramos de cada color que lleva la pieza (para descontar stock).
   const [colorGrams, setColorGrams] = useState<Record<string, number>>({});
+  // Color único: precio EXACTO por color (opcional; vacío = precio de la
+  // calculadora). El mismo producto en Dorado o Amarillo puede costar distinto
+  // porque el filamento cuesta distinto.
+  const [colorPricesSingle, setColorPricesSingle] = useState<
+    Record<string, number>
+  >({});
   const [dimensions, setDimensions] = useState("");
   const [productionTime, setProductionTime] = useState("");
 
@@ -215,9 +221,9 @@ export function ProductWizard({
     });
     setGenBusy(false);
     if (!res.ok) {
-      setErr(
-        "Hefi tardó o no respondió esta vez. Probá de nuevo — suele andar a la segunda.",
-      );
+      // Mostramos el error REAL (antes decía siempre "tardó", ocultando que la
+      // IA no estaba configurada — la API key de Gemini/Anthropic falta).
+      setErr(res.error.message);
       return;
     }
     setDescription(res.data.description);
@@ -273,8 +279,9 @@ export function ProductWizard({
       dimensions,
       colorMode,
       colors,
-      // En multicolor guardamos los GRAMOS por color (para descontar stock) en
-      // la columna color_prices. En color único no aplica.
+      // La columna color_prices se reusa según el modo: en MULTICOLOR guarda los
+      // GRAMOS por color (para descontar stock); en COLOR ÚNICO guarda el PRECIO
+      // exacto por color (opcional). Un producto es de un solo modo → no chocan.
       colorPrices:
         colorMode === "multi"
           ? Object.fromEntries(
@@ -282,7 +289,11 @@ export function ProductWizard({
                 .filter((c) => colorGrams[c])
                 .map((c) => [c, colorGrams[c]!]),
             )
-          : {},
+          : Object.fromEntries(
+              colors
+                .filter((c) => colorPricesSingle[c])
+                .map((c) => [c, colorPricesSingle[c]!]),
+            ),
       layerHeight: est.layerHeight,
       infillPercent: "",
       productionTime,
@@ -744,6 +755,52 @@ export function ProductWizard({
                         }
                       />
                       <span className="text-faint text-[12px]">g</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* COLOR ÚNICO: precio por color (opcional). El cliente paga el precio
+                del color que elige; vacío = precio de la calculadora. */}
+            {colorMode === "single" && colors.length > 0 ? (
+              <div className="field">
+                <label className="mb-0">Precio por color (opcional)</label>
+                <div className="text-faint text-[11.5px] leading-relaxed">
+                  Si un color cuesta distinto (ej. Dorado vs Amarillo), poné su
+                  precio acá y el cliente paga ese al elegirlo. Vacío = el
+                  precio de la calculadora ({money(priceN)}).
+                </div>
+                <div className="mt-2 flex flex-col gap-2">
+                  {colors.map((c) => (
+                    <div key={c} className="flex items-center gap-2">
+                      <span className="flex w-32 items-center gap-2 text-sm">
+                        <span
+                          style={{
+                            width: 13,
+                            height: 13,
+                            borderRadius: "50%",
+                            background: hexOf(c),
+                            border: "1px solid var(--border)",
+                            flexShrink: 0,
+                          }}
+                        />
+                        {c}
+                      </span>
+                      <span className="text-faint text-[12px]">$</span>
+                      <input
+                        type="number"
+                        className="input"
+                        style={{ maxWidth: 140 }}
+                        placeholder={String(priceN || 0)}
+                        value={colorPricesSingle[c] ?? ""}
+                        onChange={(e) =>
+                          setColorPricesSingle((prev) => ({
+                            ...prev,
+                            [c]: Number(e.target.value) || 0,
+                          }))
+                        }
+                      />
                     </div>
                   ))}
                 </div>

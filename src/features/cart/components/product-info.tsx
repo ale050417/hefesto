@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format";
+import { colorUnitPrice } from "@/features/products/pricing";
 import { useCartStore } from "@/stores/cartStore";
 import { useUiStore } from "@/stores/uiStore";
 
@@ -71,13 +72,25 @@ export function ProductInfo({ product }: { product: ProductInfoData }) {
     product.isOnSale && product.salePrice != null
       ? product.salePrice
       : product.price;
-  // El color NO cambia el precio: el producto tiene un precio único. El precio
-  // sale de la variante/tamaño elegido o del precio base.
-  const unitPrice = Math.max(0, selected?.price ?? basePrice);
-  // ¿Mostrar el precio original tachado? Solo si es oferta y no hay precio propio
-  // de tamaño.
+  // Precio base según variante/tamaño o precio (oferta) del producto.
+  const beforeColor = Math.max(0, selected?.price ?? basePrice);
+  // Precio por color (solo "color único"): si el color elegido tiene precio
+  // propio, ese es el precio EXACTO (Dorado y Amarillo cuestan distinto). Misma
+  // función pura que usa el servidor para cobrar → nunca divergen.
+  const unitPrice = colorUnitPrice(
+    beforeColor,
+    product.colorMode,
+    product.colorPrices,
+    color,
+  );
+  const hasColorPrice = !isMulti && color != null && unitPrice !== beforeColor;
+  // ¿Mostrar el precio original tachado? Solo si es oferta y el precio no lo
+  // reemplaza ni el tamaño ni el color.
   const showStrike =
-    product.isOnSale && product.salePrice != null && !selected?.price;
+    product.isOnSale &&
+    product.salePrice != null &&
+    !selected?.price &&
+    !hasColorPrice;
   const lineColor = isMulti
     ? hasColors
       ? product.colors.join(" + ")
@@ -196,6 +209,9 @@ export function ProductInfo({ product }: { product: ProductInfoData }) {
                       }}
                     />
                     {c}
+                    {!isMulti && (product.colorPrices[c] ?? 0) > 0
+                      ? ` · ${formatPrice(product.colorPrices[c]!)}`
+                      : ""}
                   </button>
                 );
               })}

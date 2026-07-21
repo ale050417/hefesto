@@ -44,7 +44,8 @@ export const filaments = pgTable(
       .$onUpdate(() => new Date()),
   },
   (t) => [
-    check("filaments_stock_non_negative", sql`${t.stockGrams} >= 0`),
+    // Sin check de stock >= 0: el stock PUEDE ir a negativo (sobreventa /
+    // backorder); al reponer filamento se compensa el deficit (migración 0053).
     check(
       "filaments_threshold_non_negative",
       sql`${t.alertThresholdGrams} >= 0`,
