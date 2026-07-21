@@ -4,7 +4,6 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ProductGrid } from "@/features/products/components/product-grid";
 import { getHomeData } from "@/features/products/services/catalogService";
-import { Newsletter } from "@/features/cart/components/newsletter";
 import { HeroCarousel } from "@/components/home/hero-carousel";
 import {
   getActiveBanners,
@@ -156,16 +155,6 @@ const materials: Array<[string, string, string, string]> = [
     "Máximo detalle",
     "Figuras y miniaturas con acabado ultra fino 8K.",
   ],
-];
-const gallery = [
-  "Lámpara lunar",
-  "Dragón flex",
-  "Set de dados",
-  "Maceta hexa",
-  "Llaveros custom",
-  "Reloj engranaje",
-  "Figura golem",
-  "Soporte joystick",
 ];
 const steps = [
   {
@@ -516,49 +505,6 @@ export default async function Home({
         </div>
       ) : null}
 
-      {show("galeria") ? (
-        <section
-          data-home-section="galeria"
-          style={previewHidden("galeria")}
-          className="store-section pt-0"
-        >
-          <div className="store-wrap">
-            <div className="sec-head">
-              <div>
-                <div className="eyebrow flex items-center gap-1.5">
-                  <Icon name="sparkles" size={14} /> De nuestro taller
-                </div>
-                <h2 className="sec-title">Hecho por Hefesto</h2>
-                <div className="sec-sub">
-                  Algunas piezas que imprimimos recientemente
-                </div>
-              </div>
-              <a
-                href="https://instagram.com/hefesto3d"
-                target="_blank"
-                rel="noreferrer noopener"
-                className={buttonVariants({ variant: "ghost" })}
-              >
-                Seguinos <Icon name="send" size={15} />
-              </a>
-            </div>
-            <div className="gallery-grid">
-              {gallery.map((cap, i) => (
-                <div
-                  key={cap}
-                  className={`gal-item ${i === 0 ? "gal-lg" : ""}`}
-                >
-                  <div className="ph h-full w-full" />
-                  <div className="gal-cap">
-                    <Icon name="heart" size={13} /> {cap}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      ) : null}
-
       {show("comoFunciona") ? (
         <section
           data-home-section="comoFunciona"
@@ -739,7 +685,6 @@ export default async function Home({
         </section>
       ) : null}
 
-      <Newsletter />
       {isPreview ? <PreviewBridge /> : null}
     </div>
   );

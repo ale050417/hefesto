@@ -8,7 +8,6 @@ export const HOME_SECTIONS: Array<{ id: string; label: string; icon: string }> =
     { id: "ofertas", label: "Ofertas de la semana", icon: "zap" },
     { id: "materiales", label: "Materiales", icon: "layers" },
     { id: "masVendidos", label: "Más vendidos", icon: "star" },
-    { id: "galeria", label: "Galería (hecho por Hefesto)", icon: "grid" },
     { id: "comoFunciona", label: "¿Cómo funciona?", icon: "printer" },
     { id: "testimonios", label: "Testimonios", icon: "heart" },
     { id: "faq", label: "Preguntas frecuentes", icon: "alert" },

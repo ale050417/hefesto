@@ -70,7 +70,6 @@ export function FailureForm({
   const [colorLines, setColorLines] = useState<
     Array<{ filamentId: string; grams: string }>
   >([{ filamentId: "", grams: "" }]);
-  const [deduct, setDeduct] = useState(true);
 
   const setColorLine = (i: number, k: "filamentId" | "grams", v: string) =>
     setColorLines((ls) => ls.map((l, j) => (j === i ? { ...l, [k]: v } : l)));
@@ -103,7 +102,8 @@ export function FailureForm({
       gramsLost: valid.reduce((a, l) => a + Number(l.grams), 0),
       reason,
       notes: notes.trim() || undefined,
-      deducted: deduct,
+      // Una falla SIEMPRE consume filamento: se descuenta sí o sí (ya no es opcional).
+      deducted: true,
       colorLines: valid.map((l) => ({
         filamentId: l.filamentId,
         grams: Number(l.grams),
@@ -321,25 +321,11 @@ export function FailureForm({
 
       {edit ? null : (
         <div
-          className="ui-card flex items-center justify-between"
+          className="ui-card text-faint text-[12px]"
           style={{ padding: "13px 15px" }}
         >
-          <div>
-            <div className="text-[13.5px] font-semibold">
-              Descontar del stock
-            </div>
-            <div className="text-faint text-[12px]">
-              Resta los gramos de cada carrete elegido
-            </div>
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={deduct}
-            aria-label="Descontar del stock"
-            className={`switch ${deduct ? "on" : ""}`}
-            onClick={() => setDeduct((d) => !d)}
-          />
+          Se descuentan del stock los gramos de cada carrete elegido (una falla
+          siempre consume filamento).
         </div>
       )}
 

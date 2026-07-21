@@ -182,12 +182,18 @@ export async function getEarningsOverview(month?: string | null) {
     .sort((a, b) => b.localeCompare(a))
     .map((value) => ({ value, label: monthLabel(value) }));
 
-  // Filtro de mes (solo si el valor pedido existe en los datos).
+  // Filtro de mes. Default (sin pedido) = el mes MÁS NUEVO con datos, así al
+  // entrar se ve el mes actual y no todo mezclado. "all" = todos los meses.
   const selectedMonth =
-    month && months.some((m) => m.value === month) ? month : "";
-  const rows = selectedMonth
-    ? allRows.filter((r) => monthKey(r.createdAt) === selectedMonth)
-    : allRows;
+    month === "all"
+      ? "all"
+      : month && months.some((m) => m.value === month)
+        ? month
+        : (months[0]?.value ?? "all");
+  const rows =
+    selectedMonth === "all"
+      ? allRows
+      : allRows.filter((r) => monthKey(r.createdAt) === selectedMonth);
 
   const totals = rows.reduce(
     (a, r) => ({

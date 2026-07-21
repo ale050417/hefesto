@@ -179,11 +179,13 @@ export function StoreAppearance({
       saveBusinessInfoAction({
         storeName: form.name,
         slogan: form.slogan,
-        description: form.desc,
-        whatsapp: form.whatsapp,
-        contactEmail: form.email,
-        addressText: form.address,
-        instagram: form.instagram,
+        // Contacto/redes/descripción se editan en Negocio: acá los reenviamos
+        // SIN cambiar (desde settings) para no pisarlos al guardar la apariencia.
+        description: settings?.description ?? "",
+        whatsapp: settings?.whatsapp ?? "",
+        contactEmail: settings?.contactEmail ?? "",
+        addressText: settings?.addressText ?? "",
+        instagram: settings?.instagram ?? "",
       }),
       saveAppearanceAction({
         accentColor: form.accent,
@@ -350,61 +352,8 @@ export function StoreAppearance({
           </div>
         </div>
 
-        {/* Contacto */}
-        <div className="ui-card section-card flex flex-col gap-3">
-          <div className="section-title">Contacto y redes</div>
-          <div className="text-faint -mt-2 text-[12.5px]">
-            Se muestran en el pie de la tienda y en los accesos de contacto.
-          </div>
-          <div className="grid-2">
-            <div className="field">
-              <label>WhatsApp</label>
-              <input
-                className="input"
-                value={form.whatsapp}
-                placeholder="+54 11 ..."
-                onChange={(e) => set("whatsapp", e.target.value)}
-              />
-            </div>
-            <div className="field">
-              <label>Instagram</label>
-              <input
-                className="input"
-                value={form.instagram}
-                placeholder="@tutienda"
-                onChange={(e) => set("instagram", e.target.value)}
-              />
-            </div>
-          </div>
-          <div className="field">
-            <label>Email de contacto</label>
-            <input
-              className="input"
-              value={form.email}
-              placeholder="hola@tutienda.com"
-              onChange={(e) => set("email", e.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label>Dirección / taller</label>
-            <input
-              className="input"
-              value={form.address}
-              placeholder="Calle 123, Ciudad"
-              onChange={(e) => set("address", e.target.value)}
-            />
-          </div>
-          <div className="field">
-            <label>Descripción del pie</label>
-            <textarea
-              className="textarea"
-              style={{ minHeight: 64 }}
-              value={form.desc}
-              placeholder="Breve descripción de tu tienda..."
-              onChange={(e) => set("desc", e.target.value)}
-            />
-          </div>
-        </div>
+        {/* Contacto y redes se editan solo en Config › Negocio (una sola fuente
+            de verdad). La tienda los toma de ahí; acá no se duplican. */}
 
         {/* Temporadas */}
         <div className="ui-card section-card flex flex-col gap-3">

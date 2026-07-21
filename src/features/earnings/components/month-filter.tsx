@@ -5,7 +5,7 @@ import type { EarningsMonth } from "../service";
 
 /**
  * Filtro de mes del panel Ganancias. Navega con ?mes=YYYY-MM (server filtra).
- * "" = todos los meses.
+ * Al entrar (sin ?mes) se muestra el mes más nuevo; "all" = todos los meses.
  */
 export function EarningsMonthFilter({
   months,
@@ -22,11 +22,10 @@ export function EarningsMonthFilter({
       value={selected}
       aria-label="Filtrar por mes"
       onChange={(e) => {
-        const v = e.target.value;
-        router.push(v ? `/admin/ganancias?mes=${v}` : "/admin/ganancias");
+        router.push(`/admin/ganancias?mes=${e.target.value}`);
       }}
     >
-      <option value="">Todos los meses</option>
+      <option value="all">Todos los meses</option>
       {months.map((m) => (
         <option key={m.value} value={m.value}>
           {m.label}

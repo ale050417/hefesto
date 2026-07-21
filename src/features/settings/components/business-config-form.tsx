@@ -231,9 +231,11 @@ export function BusinessConfigForm({
           <textarea
             id="b-desc"
             className="textarea"
+            rows={6}
+            style={{ minHeight: 150, resize: "vertical" }}
             value={form.description}
             onChange={(e) => set("description", e.target.value)}
-            placeholder="Impresión 3D a pedido…"
+            placeholder="Contá de qué se trata tu negocio, qué imprimís, tu diferencial…"
           />
         </div>
       </div>
@@ -253,13 +255,15 @@ export function BusinessConfigForm({
             />
           </div>
           <div className="field">
-            <label htmlFor="b-fb">Facebook</label>
+            {/* Reusamos la columna `facebook` para guardar el TikTok (sin
+                migración; misma idea que color_prices). Solo cambia la etiqueta. */}
+            <label htmlFor="b-tt">TikTok</label>
             <input
-              id="b-fb"
+              id="b-tt"
               className="input"
               value={form.facebook}
               onChange={(e) => set("facebook", e.target.value)}
-              placeholder="hefesto3d"
+              placeholder="@hefesto3d"
             />
           </div>
         </div>

@@ -19,6 +19,19 @@ const STATUS_ORDER: OrderStatus[] = [
   "refunded",
 ];
 
+// Color por estado (mismo criterio que los badges de pedidos online): tinte suave
+// + texto/borde del color, para leer el estado de un vistazo.
+const STATUS_VAR: Record<OrderStatus, string> = {
+  pending_payment: "--warning",
+  confirmed: "--info",
+  in_production: "--info",
+  ready: "--info",
+  shipped: "--info",
+  delivered: "--success",
+  cancelled: "--danger",
+  refunded: "--text-dim",
+};
+
 /**
  * Selector inline del estado de una venta manual (los mismos 8 estados que un
  * pedido). Optimista: cambia al instante y revierte si el servidor rechaza. Solo
@@ -33,6 +46,9 @@ export function ManualSaleStatusSelect({
 }) {
   const [value, setValue] = useState<OrderStatus>(status);
   const [busy, setBusy] = useState(false);
+  // Mientras se elige (con foco) el select va NEUTRO; al soltar muestra el color
+  // del estado cargado (más fácil de leer sin distraer al cambiarlo).
+  const [focused, setFocused] = useState(false);
 
   async function onChange(next: OrderStatus) {
     const prev = value;
@@ -50,13 +66,29 @@ export function ManualSaleStatusSelect({
     toast("Estado actualizado", "success");
   }
 
+  const cvar = STATUS_VAR[value];
+  const colored = !focused; // neutro con foco; color cuando muestra lo cargado
   return (
     <select
       className="select"
-      style={{ width: "auto", minWidth: 150 }}
+      style={{
+        width: "auto",
+        minWidth: 150,
+        fontWeight: 600,
+        transition: "background .15s, color .15s, border-color .15s",
+        color: colored ? `var(${cvar})` : "var(--text)",
+        borderColor: colored
+          ? `color-mix(in srgb, var(${cvar}) 45%, var(--border))`
+          : "var(--border)",
+        background: colored
+          ? `color-mix(in srgb, var(${cvar}) 12%, var(--surface-1))`
+          : "var(--surface-1)",
+      }}
       value={value}
       disabled={busy}
       aria-label="Estado de la venta"
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       onChange={(e) => onChange(e.target.value as OrderStatus)}
     >
       {STATUS_ORDER.map((s) => (

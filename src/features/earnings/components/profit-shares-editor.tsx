@@ -74,6 +74,15 @@ export function ProfitSharesEditor({
 
   async function save() {
     if (!canEdit) return;
+    // El reparto tiene que sumar 100% EXACTO (ni más ni menos): es el total de
+    // la ganancia. Antes se podía guardar 160% y quedaba mal el reparto.
+    if (Math.round(total) !== 100) {
+      toast(
+        `El reparto tiene que sumar 100%. Ahora suma ${Math.round(total)}%. Ajustá los porcentajes o usá "Igualar al 100%".`,
+        "danger",
+      );
+      return;
+    }
     setBusy(true);
     try {
       const localIds = new Set(rows.filter((r) => r.id).map((r) => r.id));
@@ -205,7 +214,7 @@ export function ProfitSharesEditor({
       </div>
 
       {canEdit ? (
-        <div className="mt-3.5 flex flex-wrap gap-2">
+        <div className="mt-3.5 flex flex-wrap items-center gap-2">
           <button
             type="button"
             className="btn btn-secondary btn-sm"
@@ -220,9 +229,20 @@ export function ProfitSharesEditor({
           >
             Igualar al 100%
           </button>
-          <Button type="button" size="sm" onClick={save} loading={busy}>
+          <Button
+            type="button"
+            size="sm"
+            onClick={save}
+            loading={busy}
+            disabled={!balanced}
+          >
             {busy ? "Guardando…" : "Guardar reparto"}
           </Button>
+          {!balanced ? (
+            <span className="text-danger text-[12px] font-medium">
+              Tiene que sumar 100% para guardar (ahora {Math.round(total)}%).
+            </span>
+          ) : null}
         </div>
       ) : (
         <div className="text-faint mt-3.5 text-[12px]">
