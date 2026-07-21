@@ -90,6 +90,11 @@ export function ProductWizard({
 
   // Paso 3
   const [price, setPrice] = useState("");
+  // Insumos adicionales (como en pedidos): nombre + costo × cantidad; su costo
+  // se SUMA al precio final del producto.
+  const [extras, setExtras] = useState<
+    Array<{ name: string; cost: string; qty: string }>
+  >([]);
   const [est, setEst] = useState<EstimatorValue>({
     filamentId: null,
     material: "",
@@ -117,9 +122,19 @@ export function ProductWizard({
   const hexOf = (n: string) => colorList.find((c) => c.n === n)?.c ?? "#888";
   const catName =
     categories.find((c) => c.id === categoryId)?.name ?? "Sin categoría";
-  // El producto tiene UN precio (el de la calculadora), igual para color único y
-  // multicolor.
-  const priceN = Number(price) || 0;
+  // Insumos: costo total (costo × cantidad de cada uno).
+  const extrasCost = extras.reduce(
+    (a, e) => a + (Number(e.cost) || 0) * (Number(e.qty) || 0),
+    0,
+  );
+  const setExtra = (i: number, k: "name" | "cost" | "qty", v: string) =>
+    setExtras((es) => es.map((e, j) => (j === i ? { ...e, [k]: v } : e)));
+  const addExtra = () =>
+    setExtras((es) => [...es, { name: "", cost: "", qty: "1" }]);
+  const removeExtra = (i: number) =>
+    setExtras((es) => es.filter((_, j) => j !== i));
+  // El precio final del producto = el de la calculadora + los insumos.
+  const priceN = (Number(price) || 0) + extrasCost;
 
   function pickImage(file: File | null) {
     if (imageUrl) URL.revokeObjectURL(imageUrl);
@@ -249,7 +264,8 @@ export function ProductWizard({
       slug: slugify(name),
       description,
       categoryId,
-      price,
+      // Precio final = calculadora + insumos.
+      price: String(priceN),
       salePrice: "",
       material: est.material,
       printTimeMinutes: est.printMinutes ? String(est.printMinutes) : "",
@@ -604,9 +620,88 @@ export function ProductWizard({
                 />
               </div>
               <div className="text-faint mt-1 text-[11.5px]">
-                El precio se calcula con la calculadora (uno solo). Las ofertas
-                van por Descuentos.
+                El precio se calcula con la calculadora. Los insumos de abajo se
+                suman. Las ofertas van por Descuentos.
               </div>
+            </div>
+
+            {/* Insumos adicionales (como en pedidos): se suman al precio final. */}
+            <div className="field">
+              <label>
+                Insumos adicionales{" "}
+                <span className="text-faint font-normal">(opcional)</span>
+              </label>
+              <p className="text-faint text-[12px] leading-relaxed">
+                Argollas, vaso, polímero, etc. Su costo se suma al precio final
+                del producto.
+              </p>
+              {extras.map((e, i) => (
+                <div key={i} className="mt-2 flex items-center gap-2">
+                  <input
+                    className="input flex-1"
+                    placeholder="Ej: argollas, vaso"
+                    value={e.name}
+                    onChange={(ev) => setExtra(i, "name", ev.target.value)}
+                  />
+                  <input
+                    className="input"
+                    style={{ width: 100 }}
+                    type="number"
+                    min={0}
+                    placeholder="Costo"
+                    value={e.cost}
+                    onChange={(ev) => setExtra(i, "cost", ev.target.value)}
+                  />
+                  <span className="text-faint text-[12px]">×</span>
+                  <input
+                    className="input"
+                    style={{ width: 64 }}
+                    type="number"
+                    min={1}
+                    placeholder="Cant."
+                    value={e.qty}
+                    onChange={(ev) => setExtra(i, "qty", ev.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="btn-icon btn-ghost"
+                    onClick={() => removeExtra(i)}
+                    aria-label="Quitar insumo"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={addExtra}
+                >
+                  + Agregar insumo
+                </button>
+                {extrasCost > 0 ? (
+                  <span className="text-faint ml-auto text-[12px]">
+                    Insumos: {money(extrasCost)}
+                  </span>
+                ) : null}
+              </div>
+              {extrasCost > 0 ? (
+                <div
+                  className="ui-card mt-2 flex items-center justify-between"
+                  style={{ padding: "10px 13px" }}
+                >
+                  <span className="text-[12.5px] font-semibold">
+                    Precio final (calculadora + insumos)
+                  </span>
+                  <b
+                    className="price text-[15px]"
+                    style={{ color: "var(--gold-bright)" }}
+                  >
+                    {money(priceN)}
+                  </b>
+                </div>
+              ) : null}
             </div>
 
             {/* MULTICOLOR: gramos de cada color, SOLO para descontar el stock de
