@@ -9,10 +9,42 @@ import type {
 } from "@/features/inventory/types";
 import { notifyLowStockAfterSale } from "@/features/inventory/lowStockNotify";
 import type { ManualSaleInput } from "../schemas";
+import type { OrderStatus } from "../types";
+import { canTransition } from "../transitions";
+import { ValidationError } from "@/core/errors";
 
 export type ManualSale = typeof manualSales.$inferSelect;
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+// Estados donde la venta YA está cobrada y consumió stock: desde "confirmado" en
+// adelante (mismo criterio que la facturación/reparto). El filamento se descuenta
+// al ENTRAR a uno de estos; salir a cancelado/reembolsado repone.
+const REVENUE_STATUSES: OrderStatus[] = [
+  "confirmed",
+  "in_production",
+  "ready",
+  "shipped",
+  "delivered",
+];
+
+/**
+ * Qué hacer con el stock al cambiar de estado una venta (PURO, testeable):
+ * - "deduct": al ENTRAR a "confirmado+" (la venta pasa a estar cobrada).
+ * - "restore": al pasar a cancelado/reembolsado (se revierte lo consumido).
+ * - "none": el resto (avances entre estados ya cobrados, o entre no cobrados).
+ * La idempotencia real la garantiza el ledger de filamento.
+ */
+export function stockActionForTransition(
+  from: OrderStatus,
+  to: OrderStatus,
+): "deduct" | "restore" | "none" {
+  const wasRevenue = REVENUE_STATUSES.includes(from);
+  const isRevenue = REVENUE_STATUSES.includes(to);
+  if (!wasRevenue && isRevenue) return "deduct";
+  if (to === "cancelled" || to === "refunded") return "restore";
+  return "none";
+}
 
 /**
  * Costos de la venta completa a partir del costo UNITARIO y la cantidad.
@@ -57,6 +89,12 @@ export function toManualSaleRow(
       input.profitSplit && input.profitSplit.length > 0
         ? input.profitSplit.filter((p) => p.pct > 0)
         : null,
+    // Stock (Bloque C): qué filamento consume la venta, para descontar al
+    // confirmar (ya no al crear). Nullable si la carga no trae ese dato.
+    filamentId: input.filamentId || null,
+    grams: input.grams != null ? String(input.grams) : null,
+    colorLines:
+      input.colorLines && input.colorLines.length > 0 ? input.colorLines : null,
     createdBy,
   };
 }
@@ -70,10 +108,13 @@ export async function createManualSale(
     .values(toManualSaleRow(input, createdBy))
     .returning();
   if (!row) throw new Error("No se pudo registrar la venta manual");
-  // Descuento de filamento (diseño 2026-07). La venta YA está guardada y no
-  // se bloquea: la función atrapa sus errores y deja warning en auditoría.
-  // La importación Excel entra por acá también (pasa material, rara vez id).
-  await deductFilamentForManualSale(row.id, input);
+  // Stock (Bloque C): solo se descuenta si la venta NACE cobrada (confirmado+),
+  // por ejemplo una importación de venta ya entregada. Si nace pendiente (flujo
+  // normal del form), el descuento ocurre al CONFIRMAR (updateManualSaleStatus).
+  // No bloquea la venta: la función atrapa sus errores y deja warning en auditoría.
+  if (REVENUE_STATUSES.includes(row.status)) {
+    await deductFilamentForManualSale(row.id, input);
+  }
   return row;
 }
 
@@ -249,17 +290,45 @@ export async function listManualSales(): Promise<ManualSale[]> {
 }
 
 /**
- * Cambia el estado de una venta manual (mismos 8 estados que un pedido). Solo
- * reetiqueta el registro histórico: NO dispara emails/puntos/tracking (la venta
- * manual está fuera del flujo de checkout). Qué cuenta como facturación/reparto
- * lo deciden reportes (SALES_STATUSES) y ganancias (solo `delivered`), así que
- * el estado impacta ahí automáticamente. La autorización se valida en la action.
+ * Cambia el estado de una venta manual respetando la MÁQUINA DE ESTADOS (Bloque
+ * C): mismas transiciones que un pedido; cancelado/reembolsado son terminales.
+ * Además dispara el stock: al ENTRAR a "confirmado+" descuenta el filamento
+ * guardado (idempotente), y al pasar a cancelado/reembolsado repone. Qué cuenta
+ * como facturación/reparto lo deciden reportes y ganancias por estado (desde
+ * confirmado). La autorización se valida en la action.
  */
 export async function updateManualSaleStatus(
   id: string,
   status: ManualSale["status"],
 ): Promise<void> {
+  const sale = await db.query.manualSales.findFirst({
+    where: eq(manualSales.id, id),
+  });
+  if (!sale) throw new ValidationError("No encontramos la venta.");
+  if (sale.status === status) return; // sin cambios
+  if (!canTransition(sale.status, status)) {
+    throw new ValidationError(
+      `No se puede pasar de "${sale.status}" a "${status}".`,
+    );
+  }
   await db.update(manualSales).set({ status }).where(eq(manualSales.id, id));
+
+  // Hooks de stock: entrar a "confirmado+" descuenta el filamento persistido en
+  // la venta; pasar a cancelado/reembolsado repone. Idempotente vía ledger.
+  const action = stockActionForTransition(sale.status, status);
+  if (action === "deduct") {
+    await deductFilamentForManualSale(id, {
+      filamentId: sale.filamentId ?? undefined,
+      material: undefined,
+      grams: sale.grams != null ? Number(sale.grams) : 0,
+      quantity: sale.quantity,
+      colorLines: sale.colorLines ?? undefined,
+    });
+  } else if (action === "restore") {
+    const { restoreFilamentMovements } =
+      await import("@/features/inventory/service");
+    await restoreFilamentMovements("manual_sale", id).catch(() => 0);
+  }
 }
 
 /**

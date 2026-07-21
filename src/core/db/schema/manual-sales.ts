@@ -11,6 +11,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { orderStatus, paymentMethod } from "./enums";
+import { filaments } from "./filaments";
 import { profiles } from "./profiles";
 
 // Ventas manuales / históricas (mostrador o ventas previas al sistema).
@@ -42,6 +43,18 @@ export const manualSales = pgTable(
     // Si es null, se divide por los socios actuales (ver earnings).
     profitSplit:
       jsonb("profit_split").$type<Array<{ name: string; pct: number }>>(),
+    // Stock (Bloque C, 2026-07): qué filamento consume la venta, para descontar
+    // al CONFIRMAR (ya no al crear). En "color único" se usa filament_id + grams;
+    // en multicolor, color_lines lleva gramos por carrete. Nullable para ventas
+    // viejas (que ya descontaron al crear) e importaciones sin ese dato.
+    filamentId: uuid("filament_id").references(() => filaments.id, {
+      onDelete: "set null",
+    }),
+    grams: numeric("grams", { precision: 10, scale: 2 }),
+    colorLines:
+      jsonb("color_lines").$type<
+        Array<{ filamentId: string; grams: number }>
+      >(),
     // Quién la cargó (staff). Se conserva el historial si se borra el usuario.
     createdBy: uuid("created_by").references(() => profiles.id, {
       onDelete: "set null",

@@ -5,6 +5,7 @@ import { manualSaleSchema } from "../schemas";
 import {
   computeManualSaleCosts,
   deductFilamentForManualSale,
+  stockActionForTransition,
   toManualSaleRow,
   type ManualSaleStockDeps,
 } from "./manualSaleService";
@@ -384,5 +385,62 @@ describe("toManualSaleRow (profit_split)", () => {
       null,
     );
     expect(row.profitSplit).toEqual([{ name: "Yo", pct: 100 }]);
+  });
+});
+
+describe("stockActionForTransition (cuándo tocar stock, Bloque C)", () => {
+  it("descuenta al ENTRAR a confirmado (la venta pasa a cobrada)", () => {
+    expect(stockActionForTransition("pending_payment", "confirmed")).toBe(
+      "deduct",
+    );
+  });
+
+  it("NO vuelve a descontar entre estados ya cobrados", () => {
+    expect(stockActionForTransition("confirmed", "in_production")).toBe("none");
+    expect(stockActionForTransition("ready", "shipped")).toBe("none");
+  });
+
+  it("repone al cancelar o reembolsar", () => {
+    expect(stockActionForTransition("confirmed", "cancelled")).toBe("restore");
+    expect(stockActionForTransition("delivered", "refunded")).toBe("restore");
+  });
+
+  it("cancelar desde pendiente (nunca descontó) pide restore (idempotente)", () => {
+    expect(stockActionForTransition("pending_payment", "cancelled")).toBe(
+      "restore",
+    );
+  });
+});
+
+describe("toManualSaleRow (filamento persistido, Bloque C)", () => {
+  const input = {
+    saleDate: "2025-11-02",
+    customerName: "Juan Pérez",
+    quantity: 2,
+    total: 12500,
+    paymentMethod: "cash" as const,
+    status: "pending_payment" as const,
+  };
+
+  it("guarda filamento, gramos y colores para descontar al confirmar", () => {
+    const row = toManualSaleRow(
+      {
+        ...input,
+        filamentId: "f1",
+        grams: 50,
+        colorLines: [{ filamentId: "f1", grams: 30 }],
+      },
+      null,
+    );
+    expect(row.filamentId).toBe("f1");
+    expect(row.grams).toBe("50");
+    expect(row.colorLines).toEqual([{ filamentId: "f1", grams: 30 }]);
+  });
+
+  it("sin filamento → columnas null", () => {
+    const row = toManualSaleRow(input, null);
+    expect(row.filamentId).toBeNull();
+    expect(row.grams).toBeNull();
+    expect(row.colorLines).toBeNull();
   });
 });

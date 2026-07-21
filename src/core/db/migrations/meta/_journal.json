@@ -379,6 +379,13 @@
       "when": 1783305800000,
       "tag": "0053_filament_negative_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1783305900000,
+      "tag": "0054_manual_sale_filament",
+      "breakpoints": true
     }
   ]
 }

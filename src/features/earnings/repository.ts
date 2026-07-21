@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/core/db";
 import {
   costSettings,
@@ -10,8 +10,20 @@ import {
   profiles,
   profitShares,
 } from "@/core/db/schema";
+import type { OrderStatus } from "@/features/orders/types";
 
 type Database = typeof db;
+
+// Estados que cuentan como venta COBRADA para el reparto: desde "pago confirmado"
+// en adelante (mismo criterio que la facturación en Reportes). Decisión de Ale
+// (2026-07): el reparto se cuenta al confirmar, no recién al entregar.
+const REVENUE_STATUSES: OrderStatus[] = [
+  "confirmed",
+  "in_production",
+  "ready",
+  "shipped",
+  "delivered",
+];
 
 export type CostSettingsRow = typeof costSettings.$inferSelect;
 export type ProfitShare = typeof profitShares.$inferSelect;
@@ -105,7 +117,7 @@ export async function getDeliveredOrders(
     })
     .from(orders)
     .leftJoin(profiles, eq(profiles.id, orders.customerId))
-    .where(eq(orders.status, "delivered"))
+    .where(inArray(orders.status, REVENUE_STATUSES))
     .orderBy(desc(orders.createdAt));
   return rows.map((r) => ({
     id: r.id,
@@ -138,7 +150,7 @@ export async function getDeliveredItems(
     .from(orderItems)
     .innerJoin(orders, eq(orderItems.orderId, orders.id))
     .leftJoin(products, eq(orderItems.productId, products.id))
-    .where(eq(orders.status, "delivered"));
+    .where(inArray(orders.status, REVENUE_STATUSES));
   return rows.map((r) => ({
     orderId: r.orderId,
     quantity: r.quantity,
@@ -179,7 +191,7 @@ export async function getDeliveredManualSales(
       createdAt: manualSales.saleDate,
     })
     .from(manualSales)
-    .where(eq(manualSales.status, "delivered"))
+    .where(inArray(manualSales.status, REVENUE_STATUSES))
     .orderBy(desc(manualSales.saleDate));
   return rows.map((r) => ({
     id: r.id,
