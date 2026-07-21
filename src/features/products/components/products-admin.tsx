@@ -7,7 +7,11 @@ import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
-import { archiveProductAction, getProductFormDataAction } from "../actions";
+import {
+  archiveProductAction,
+  deleteProductAction,
+  getProductFormDataAction,
+} from "../actions";
 import type {
   AdminProductRow,
   Category,
@@ -82,6 +86,21 @@ const Icon = {
       <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M10 11v6M14 11v6" />
     </svg>
   ),
+  archive: (
+    <svg
+      viewBox="0 0 24 24"
+      width={15}
+      height={15}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" />
+    </svg>
+  ),
   layers: (
     <svg
       viewBox="0 0 24 24"
@@ -120,6 +139,7 @@ export function ProductsAdmin({
   const [modal, setModal] = useState<ModalState>({ open: false });
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [archiving, setArchiving] = useState<AdminProductRow | null>(null);
+  const [deleting, setDeleting] = useState<AdminProductRow | null>(null);
 
   const list = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -170,10 +190,15 @@ export function ProductsAdmin({
     }
   }
 
-  // Mismo patrón que las eliminaciones (archivar es el "borrado" de productos).
+  // Archivar = esconder de la tienda (reversible). Eliminar = borrar para
+  // siempre (el historial de pedidos se conserva). Mismo patrón de borrado.
   const { deleteResource: archiveProduct } = useDeleteResource({
     action: (id: string) => archiveProductAction(id),
     successMessage: "Producto archivado",
+  });
+  const { deleteResource: deleteProduct } = useDeleteResource({
+    action: (id: string) => deleteProductAction(id),
+    successMessage: "Producto eliminado",
   });
 
   const off = (p: AdminProductRow) =>
@@ -314,6 +339,27 @@ export function ProductsAdmin({
                 </div>
                 <button
                   type="button"
+                  className="grid place-items-center rounded-full border border-[var(--border)] text-[var(--text-dim)] backdrop-blur transition-colors hover:text-[var(--danger)]"
+                  title="Eliminar para siempre"
+                  style={{
+                    position: "absolute",
+                    bottom: 10,
+                    right: 52,
+                    zIndex: 3,
+                    width: 34,
+                    height: 34,
+                    background:
+                      "color-mix(in srgb, var(--surface-1) 80%, transparent)",
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleting(p);
+                  }}
+                >
+                  {Icon.trash}
+                </button>
+                <button
+                  type="button"
                   className="grid place-items-center rounded-full border border-[var(--border)] text-[var(--text-dim)] backdrop-blur transition-colors hover:text-[var(--gold-bright)]"
                   title="Editar"
                   style={{
@@ -443,9 +489,17 @@ export function ProductsAdmin({
                         </button>
                         <button
                           className="btn-icon btn-ghost"
-                          title="Archivar"
+                          title="Archivar (esconder de la tienda)"
                           disabled={pendingId === p.id}
                           onClick={() => setArchiving(p)}
+                        >
+                          {Icon.archive}
+                        </button>
+                        <button
+                          className="btn-icon btn-ghost hover:text-[var(--danger)]"
+                          title="Eliminar para siempre"
+                          disabled={pendingId === p.id}
+                          onClick={() => setDeleting(p)}
                         >
                           {Icon.trash}
                         </button>
@@ -521,6 +575,21 @@ export function ProductsAdmin({
         confirmLabel="Archivar"
         onConfirm={() => {
           if (archiving) return archiveProduct(archiving.id);
+        }}
+      />
+
+      <ConfirmDialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        title={
+          deleting
+            ? `¿Eliminar "${deleting.name}" para siempre?`
+            : "¿Eliminar producto?"
+        }
+        description="Esta acción no se puede deshacer: se borran el producto, sus fotos y sus reseñas. Los pedidos que ya lo incluyen conservan su registro. Si solo querés sacarlo de la tienda, usá Archivar."
+        confirmLabel="Eliminar para siempre"
+        onConfirm={() => {
+          if (deleting) return deleteProduct(deleting.id);
         }}
       />
     </div>

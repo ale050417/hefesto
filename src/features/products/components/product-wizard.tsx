@@ -111,7 +111,9 @@ export function ProductWizard({
     presetId: "",
     price: null,
   });
-  const [status, setStatus] = useState<"draft" | "published">("draft");
+  // Por defecto PUBLICADO: el producto se ve en la tienda apenas se crea (Ale
+  // quiere que se publique solo; si no, lo pasa a Borrador a mano).
+  const [status, setStatus] = useState<"draft" | "published">("published");
   const [isFeatured, setIsFeatured] = useState(false);
   const [isNew, setIsNew] = useState(false);
 
@@ -812,17 +814,17 @@ export function ProductWizard({
               <div className="flex gap-2">
                 <button
                   type="button"
-                  className={cn("chip", status === "draft" && "active")}
-                  onClick={() => setStatus("draft")}
-                >
-                  Borrador
-                </button>
-                <button
-                  type="button"
                   className={cn("chip", status === "published" && "active")}
                   onClick={() => setStatus("published")}
                 >
                   Publicado
+                </button>
+                <button
+                  type="button"
+                  className={cn("chip", status === "draft" && "active")}
+                  onClick={() => setStatus("draft")}
+                >
+                  Borrador
                 </button>
               </div>
               <div className="text-faint text-[11.5px]">

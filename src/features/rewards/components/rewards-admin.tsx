@@ -212,8 +212,11 @@ export function RewardsAdmin({
         </span>
         <p>
           Tus clientes ganan <b className="text-fg">1 punto por cada $100</b> en
-          compras entregadas. (El canje de recompensas se habilitará
-          próximamente en la cuenta del cliente.)
+          compras entregadas. Los canjean desde su cuenta, en{" "}
+          <b className="text-fg">&ldquo;Canjear puntos&rdquo;</b>: las
+          recompensas de <b className="text-fg">descuento</b> generan un cupón
+          automático que usan en el checkout; las de envío o producto las
+          coordinás por WhatsApp.
         </p>
       </div>
 

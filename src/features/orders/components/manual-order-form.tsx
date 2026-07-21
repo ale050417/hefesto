@@ -571,6 +571,13 @@ export function ManualSaleForm({
                 </button>
                 <span className="text-faint ml-auto text-[12px]">
                   Calculado: {calcGrams ?? "—"} g · Colores: {colorGramsTotal} g
+                  {qtyN > 1 ? (
+                    <>
+                      {" · A descontar del stock: "}
+                      <b className="text-fg">{colorGramsTotal * qtyN} g</b> (
+                      {qtyN} × {colorGramsTotal} g)
+                    </>
+                  ) : null}
                 </span>
               </div>
               {gramsMismatch ? (

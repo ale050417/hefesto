@@ -10,7 +10,6 @@ import {
   getBalance,
   getHistory,
   getReward,
-  refundPoints,
   spendPoints,
   updateReward,
 } from "./service";
@@ -50,29 +49,38 @@ export async function redeemRewardAction(
         error: `Te faltan ${reward.costPoints - balance} puntos para este premio.`,
       };
     }
-    // Descontamos los puntos (el movimiento negativo es el registro del canje).
-    await spendPoints(user.id, reward.costPoints, `Canje: ${reward.title}`);
     if (reward.type === "discount") {
+      // Creamos el cupón PRIMERO (todavía sin cobrar puntos) y recién ahí
+      // descontamos los puntos, guardando el código en el movimiento: así el
+      // cliente NO pierde el cupón (queda visible para siempre en "Movimientos").
+      // Si el descuento de puntos falla, desactivamos el cupón para que no quede
+      // usable sin haberse pagado.
+      const { createRewardCoupon, deactivateRewardCoupon } =
+        await import("@/features/discounts/queries");
+      const code = await createRewardCoupon({
+        isPercent: reward.discountIsPercent,
+        value: Number(reward.discountValue ?? 0),
+        description: `Premio de fidelidad: ${reward.title}`,
+      });
       try {
-        const { createRewardCoupon } =
-          await import("@/features/discounts/queries");
-        const code = await createRewardCoupon({
-          isPercent: reward.discountIsPercent,
-          value: Number(reward.discountValue ?? 0),
-          description: `Premio de fidelidad: ${reward.title}`,
-        });
-        revalidatePath("/cuenta/puntos");
-        return {
-          ok: true,
-          message: `¡Listo! Usá el cupón ${code} en tu próxima compra.`,
-          couponCode: code,
-        };
+        await spendPoints(
+          user.id,
+          reward.costPoints,
+          `Canje: ${reward.title} · cupón ${code}`,
+        );
       } catch (e) {
-        // Si falló generar el cupón, devolvemos los puntos.
-        await refundPoints(user.id, reward.costPoints, "Reverso de canje");
+        await deactivateRewardCoupon(code).catch(() => {});
         throw e;
       }
+      revalidatePath("/cuenta/puntos");
+      return {
+        ok: true,
+        message: `¡Listo! Usá el cupón ${code} en tu compra. Queda guardado en tus movimientos.`,
+        couponCode: code,
+      };
     }
+    // Envío / producto: se descuentan los puntos y la entrega se coordina a mano.
+    await spendPoints(user.id, reward.costPoints, `Canje: ${reward.title}`);
     revalidatePath("/cuenta/puntos");
     return {
       ok: true,

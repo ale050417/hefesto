@@ -17,6 +17,7 @@ import {
   createCategory,
   createProduct,
   deleteCategory,
+  deleteProduct,
   getProductAdmin,
   makeImagePrimary,
   publishProduct,
@@ -317,6 +318,36 @@ export async function archiveProductAction(id: string): Promise<ActionResult> {
       error: {
         code: "INTERNAL",
         message: e instanceof Error ? e.message : "No se pudo archivar",
+      },
+    };
+  }
+}
+
+/**
+ * Borra un producto DEFINITIVAMENTE. Autorización en el servidor (permiso
+ * "productos"/"eliminar"). El historial de pedidos se conserva (snapshot +
+ * product_id → null). Queda registrado en auditoría.
+ */
+export async function deleteProductAction(id: string): Promise<ActionResult> {
+  const actor = await getStaffUser();
+  if (!actor) return UNAUTHORIZED;
+  if (!(await can("productos", "eliminar"))) return UNAUTHORIZED;
+  try {
+    await deleteProduct(id);
+    await recordAudit({
+      actorId: actor.id,
+      action: "product.deleted",
+      entityType: "product",
+      entityId: id,
+    });
+    revalidatePath("/admin/productos");
+    return { ok: true, data: undefined };
+  } catch (e) {
+    return {
+      ok: false,
+      error: {
+        code: "INTERNAL",
+        message: e instanceof Error ? e.message : "No se pudo eliminar",
       },
     };
   }

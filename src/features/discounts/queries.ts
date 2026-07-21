@@ -64,6 +64,16 @@ export async function createRewardCoupon(params: {
   throw new Error("No se pudo generar el cupón del premio.");
 }
 
+/**
+ * Desactiva un cupón de premio por su código. Se usa como reverso: si después de
+ * crear el cupón no se pudieron descontar los puntos, el cupón no debe quedar
+ * usable. Best-effort (si el código no existe, no hace nada).
+ */
+export async function deactivateRewardCoupon(code: string): Promise<void> {
+  const coupon = await getCouponByCode(code);
+  if (coupon) await repo.updateCouponRow(coupon.id, { isActive: false });
+}
+
 export async function addCoupon(input: CouponInput): Promise<Coupon> {
   return repo.insertCoupon(toValues(input));
 }

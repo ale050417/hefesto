@@ -11,6 +11,7 @@ import {
   findFeatured,
   findImageById,
   findMaterials,
+  deleteProductRow,
   findProductById,
   findPublished,
   findProductsForSale,
@@ -312,11 +313,26 @@ export async function publishProduct(id: string): Promise<Product> {
   return row;
 }
 
-/** Archiva un producto (borrado lógico). */
+/** Archiva un producto (borrado lógico: lo esconde de la tienda, se conserva). */
 export async function archiveProduct(id: string): Promise<Product> {
   const row = await setProductStatus(id, "archived");
   if (!row) throw new Error("Producto no encontrado");
   return row;
+}
+
+/**
+ * Borra un producto DEFINITIVAMENTE (no reversible). El historial de pedidos se
+ * conserva: la línea guarda su snapshot y su product_id queda en null. Se borran
+ * en cascada las imágenes/variantes/reseñas/favoritos del producto. Devuelve el
+ * id borrado.
+ */
+export async function deleteProduct(id: string): Promise<string> {
+  const product = await findProductById(id);
+  if (!product) throw new Error("Producto no encontrado");
+  await removeAllProductImageFiles(id);
+  const deletedId = await deleteProductRow(id);
+  if (!deletedId) throw new Error("Producto no encontrado");
+  return deletedId;
 }
 
 // --- Imágenes de producto (admin) ---
@@ -364,6 +380,25 @@ export async function removeProductImage(imageId: string): Promise<string> {
     await setPrimaryImage(image.productId, first.id);
   }
   return image.productId;
+}
+
+/**
+ * Borra los ARCHIVOS de Storage de todas las imágenes del producto. Best-effort:
+ * las FILAS caen por cascade al borrar el producto; esto evita archivos huérfanos.
+ * No lanza si algo falla (no queremos bloquear el borrado por la limpieza).
+ */
+async function removeAllProductImageFiles(productId: string): Promise<void> {
+  try {
+    const images = await listImagesByProduct(productId);
+    await Promise.all(
+      images.map(async (img) => {
+        const path = storagePathFromUrl(img.url);
+        if (path) await deleteObject(IMAGES_BUCKET, path).catch(() => {});
+      }),
+    );
+  } catch {
+    // Best-effort: si falla la limpieza de Storage, seguimos con el borrado.
+  }
 }
 
 export async function makeImagePrimary(

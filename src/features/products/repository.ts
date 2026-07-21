@@ -249,6 +249,24 @@ export async function setProductStatus(
   return row ?? null;
 }
 
+/**
+ * Borra un producto DEFINITIVAMENTE. Devuelve el id borrado (o null si no
+ * existía). Seguro para el historial: la FK `order_items.product_id` es
+ * ON DELETE SET NULL (el pedido conserva su snapshot de nombre/precio), y todo
+ * lo propio del producto (imágenes, variantes, reseñas, tags, favoritos) cae por
+ * ON DELETE CASCADE. Ver `order-items.ts` y el schema de products.
+ */
+export async function deleteProductRow(
+  id: string,
+  database: Database = db,
+): Promise<string | null> {
+  const [row] = await database
+    .delete(products)
+    .where(eq(products.id, id))
+    .returning({ id: products.id });
+  return row?.id ?? null;
+}
+
 /** Busca un producto por id sin filtrar por estado (admin). */
 export async function findProductById(
   id: string,
