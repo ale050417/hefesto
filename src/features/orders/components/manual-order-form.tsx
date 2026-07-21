@@ -36,10 +36,7 @@ const STATUSES = STATUS_ORDER.map((v) => ({ v, l: ORDER_STATUS_LABEL[v] }));
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-type SplitPart = { name: string; pct: string };
-
 export function ManualSaleForm({
-  partners = [],
   estimator,
   products = [],
   categories = [],
@@ -188,31 +185,14 @@ export function ManualSaleForm({
       category: p.categoryName ?? f.category,
     }));
   }
-  // Reparto de la ganancia de ESTA venta. "current" = dividir por los socios
-  // actuales (no se manda nada; lo resuelve Ganancias). "custom" = guardar este
-  // reparto fijo (útil para ventas viejas: cuando trabajabas solo o eran menos).
-  const [splitMode, setSplitMode] = useState<"current" | "custom">("current");
-  const [parts, setParts] = useState<SplitPart[]>(() =>
-    partners.length > 0
-      ? partners.map((p) => ({ name: p.name, pct: String(p.pct) }))
-      : [{ name: "", pct: "100" }],
-  );
+  // El reparto de la ganancia lo resuelve Ganancias (socios actuales); esta venta
+  // ya no lleva un reparto propio (se sacó "Personalizar").
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState(0);
 
   const set = (k: keyof typeof form, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
-
-  const setPart = (i: number, k: keyof SplitPart, v: string) =>
-    setParts((ps) => ps.map((p, j) => (j === i ? { ...p, [k]: v } : p)));
-  const addPart = () => setParts((ps) => [...ps, { name: "", pct: "0" }]);
-  const removePart = (i: number) =>
-    setParts((ps) => ps.filter((_, j) => j !== i));
-  const allForMe = () =>
-    setParts([{ name: partners[0]?.name ?? "Yo", pct: "100" }]);
-
-  const splitTotal = parts.reduce((a, p) => a + (Number(p.pct) || 0), 0);
 
   const fe = useFormErrors();
   // El pedido valida por sección (precio/colores/socios): banner + toast visible
@@ -224,13 +204,6 @@ export function ManualSaleForm({
 
   async function submit() {
     setErr(null);
-    if (splitMode === "custom") {
-      const valid = parts.filter((p) => p.name.trim() && Number(p.pct) > 0);
-      if (valid.length === 0)
-        return fail("Cargá al menos una persona con su porcentaje.");
-      if (Math.round(splitTotal) !== 100)
-        return fail(`Los porcentajes deben sumar 100% (suman ${splitTotal}%).`);
-    }
     if (!estData) {
       return fail(
         "Calculá el precio con la calculadora (la amortización es obligatoria).",
@@ -244,12 +217,6 @@ export function ManualSaleForm({
       );
     }
     setBusy(true);
-    const profitSplit =
-      splitMode === "custom"
-        ? parts
-            .filter((p) => p.name.trim() && Number(p.pct) > 0)
-            .map((p) => ({ name: p.name.trim(), pct: Number(p.pct) }))
-        : undefined;
     try {
       const validLines = colorLines
         .filter((l) => l.filamentId && Number(l.grams) > 0)
@@ -272,7 +239,6 @@ export function ManualSaleForm({
             grams: gramsFinal,
             printMinutes: estData.printMinutes,
             colorLines: validLines.length ? validLines : undefined,
-            profitSplit,
           }),
         { silent: true },
       );
@@ -298,7 +264,7 @@ export function ManualSaleForm({
       }
     >
       <div className="flex items-center gap-2">
-        {["Producto y cliente", "Precio e insumos", "Estado y reparto"].map(
+        {["Producto y cliente", "Precio e insumos", "Estado"].map(
           (label, i) => (
             <div key={label} className="flex flex-1 items-center gap-2">
               <div
@@ -668,97 +634,11 @@ export function ManualSaleForm({
             </select>
           </div>
 
-          <div className="field">
-            <label>Reparto de la ganancia</label>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className={`chip ${splitMode === "current" ? "active" : ""}`}
-                onClick={() => setSplitMode("current")}
-              >
-                Dividir por socios actuales
-              </button>
-              <button
-                type="button"
-                className={`chip ${splitMode === "custom" ? "active" : ""}`}
-                onClick={() => setSplitMode("custom")}
-              >
-                Personalizar
-              </button>
-            </div>
-            {splitMode === "current" ? (
-              <p className="text-faint mt-1.5 text-[12px] leading-relaxed">
-                {partners.length > 0
-                  ? `Se reparte entre los ${partners.length} socio(s) actuales según sus porcentajes, igual que las compras de la tienda.`
-                  : "No hay socios cargados: la ganancia queda sin repartir hasta que agregues socios en Ganancias."}
-              </p>
-            ) : (
-              <div className="mt-2 flex flex-col gap-2">
-                <p className="text-faint text-[12px] leading-relaxed">
-                  Reparto fijo para esta venta (no cambia si después sumás o
-                  sacás socios). Útil para ventas viejas.
-                </p>
-                {parts.map((p, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      className="input flex-1"
-                      placeholder="Nombre"
-                      value={p.name}
-                      onChange={(e) => setPart(i, "name", e.target.value)}
-                    />
-                    <input
-                      className="input"
-                      style={{ width: 90 }}
-                      type="number"
-                      min={0}
-                      max={100}
-                      placeholder="%"
-                      value={p.pct}
-                      onChange={(e) => setPart(i, "pct", e.target.value)}
-                    />
-                    <span className="text-faint text-[12px]">%</span>
-                    {parts.length > 1 ? (
-                      <button
-                        type="button"
-                        className="btn btn-ghost btn-icon"
-                        onClick={() => removePart(i)}
-                        aria-label="Quitar"
-                      >
-                        ×
-                      </button>
-                    ) : null}
-                  </div>
-                ))}
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={addPart}
-                  >
-                    + Agregar persona
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm"
-                    onClick={allForMe}
-                  >
-                    Todo para mí
-                  </button>
-                  <span
-                    className="ml-auto text-[12px]"
-                    style={{
-                      color:
-                        Math.round(splitTotal) === 100
-                          ? "var(--success)"
-                          : "var(--warning)",
-                    }}
-                  >
-                    Suma: {splitTotal}%
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
+          <p className="text-faint text-[12px] leading-relaxed">
+            La ganancia se reparte entre los socios actuales según sus
+            porcentajes (Ganancias y socios), igual que las compras de la
+            tienda.
+          </p>
         </>
       )}
 

@@ -11,6 +11,18 @@ import { transitionOrderStatus } from "./orderWorkflow";
 import { restoreFilamentForOrder } from "./orderInventory";
 import type { OrderListItem, OrderStatus } from "../types";
 
+/** Resumen legible de lo pedido: "Producto ×2 · Otro" (para la tabla de pedidos). */
+function summarizeItems(
+  items: Array<{ productName: string; quantity: number }>,
+): string {
+  if (!items || items.length === 0) return "";
+  return items
+    .map((i) =>
+      i.quantity > 1 ? `${i.productName} ×${i.quantity}` : i.productName,
+    )
+    .join(" · ");
+}
+
 export async function listOrdersAdmin(opts: {
   status?: OrderStatus;
   page: number;
@@ -31,6 +43,7 @@ export async function listOrdersAdmin(opts: {
       total: Number(o.total),
       status: o.status,
       createdAt: o.createdAt,
+      itemsSummary: summarizeItems(o.items),
     })),
     page: opts.page,
     totalPages: Math.max(1, Math.ceil(total / opts.pageSize)),

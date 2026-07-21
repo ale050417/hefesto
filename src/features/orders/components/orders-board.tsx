@@ -14,6 +14,7 @@ import type { OrderStatus, PaymentMethod } from "../types";
 import { DeleteOrderButton } from "./order-actions";
 import { DeleteManualSaleButton } from "./delete-manual-sale-button";
 import { ManualSaleStatusSelect } from "./manual-sale-status-select";
+import { OrderStatusSelect } from "./order-status-select";
 
 export type UnifiedSale = {
   id: string;
@@ -21,6 +22,8 @@ export type UnifiedSale = {
   date: string | Date;
   customerName: string | null;
   label: string;
+  /** Referencia secundaria bajo el detalle (número de pedido en los online). */
+  ref?: string | null;
   paymentMethod: PaymentMethod;
   status: OrderStatus;
   total: number;
@@ -36,8 +39,8 @@ type Tipo = "todo" | "online" | "manual";
  * grilla, con filtros tocables por TIPO (Todo/Online/Manual) y por ESTADO
  * (aplican a AMBOS, porque las manuales también tienen estado). Filtrado del
  * lado del cliente sobre el set ya cargado (mismo patrón que el board de
- * Filamentos). El estado de las manuales se edita inline; el de las online se
- * ve como badge y se gestiona en el detalle ("Ver").
+ * Filamentos). El estado se edita INLINE tanto en manuales como en online (con
+ * permiso); el online además tiene "Ver" para el detalle completo.
  */
 export function OrdersBoard({
   items,
@@ -71,12 +74,14 @@ export function OrdersBoard({
     </Badge>
   );
   const StatusCell = ({ o }: { o: UnifiedSale }) =>
-    o.source === "manual" && canEdit ? (
-      <ManualSaleStatusSelect id={o.id} status={o.status} />
-    ) : (
+    !canEdit ? (
       <Badge variant={ORDER_STATUS_VARIANT[o.status]}>
         {ORDER_STATUS_LABEL[o.status]}
       </Badge>
+    ) : o.source === "manual" ? (
+      <ManualSaleStatusSelect id={o.id} status={o.status} />
+    ) : (
+      <OrderStatusSelect id={o.id} status={o.status} />
     );
   const DeleteCell = ({ o }: { o: UnifiedSale }) =>
     !isAdmin ? null : o.source === "online" ? (
@@ -157,6 +162,7 @@ export function OrdersBoard({
                           {o.label || "—"}
                         </b>
                         <div className="text-faint text-[11.5px]">
+                          {o.ref ? `${o.ref} · ` : ""}
                           {dateFmt.format(new Date(o.date))}
                         </div>
                       </td>
@@ -209,6 +215,7 @@ export function OrdersBoard({
                       {o.label || "—"}
                     </b>
                     <div className="text-faint text-[11.5px]">
+                      {o.ref ? `${o.ref} · ` : ""}
                       {dateFmt.format(new Date(o.date))}
                     </div>
                   </div>

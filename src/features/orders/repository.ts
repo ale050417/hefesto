@@ -199,7 +199,13 @@ export async function findOrdersForAdmin(
   opts: { status?: OrderStatus; page: number; pageSize: number },
   database: Database = db,
 ): Promise<{
-  items: Array<Order & { customer: { fullName: string | null } | null }>;
+  items: Array<
+    Order & {
+      customer: { fullName: string | null } | null;
+      // Líneas del pedido (nombre + cantidad) para el resumen de la tabla.
+      items: Array<{ productName: string; quantity: number }>;
+    }
+  >;
   total: number;
 }> {
   const where = opts.status ? eq(orders.status, opts.status) : undefined;
@@ -208,7 +214,11 @@ export async function findOrdersForAdmin(
   const [items, totalRows] = await Promise.all([
     database.query.orders.findMany({
       where,
-      with: { customer: { columns: { fullName: true } } },
+      with: {
+        customer: { columns: { fullName: true } },
+        // Ítems (nombre + cantidad) para el resumen "qué se pidió" de la tabla.
+        items: { columns: { productName: true, quantity: true } },
+      },
       orderBy: [desc(orders.createdAt)],
       limit: opts.pageSize,
       offset,

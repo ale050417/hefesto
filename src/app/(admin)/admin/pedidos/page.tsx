@@ -80,7 +80,9 @@ export default async function PedidosAdminPage() {
         source: "online",
         date: o.createdAt,
         customerName: o.customerName,
-        label: o.orderNumber,
+        // Se muestra QUÉ se pidió (productos); el número queda como referencia.
+        label: o.itemsSummary || o.orderNumber,
+        ref: o.orderNumber,
         paymentMethod: o.paymentMethod,
         status: o.status,
         total: o.total,
