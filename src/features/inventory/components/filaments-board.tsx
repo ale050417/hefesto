@@ -109,6 +109,15 @@ export function FilamentsBoard({
     });
   }, [filaments, search, mat, color, brand]);
 
+  // Hex del color: primero el del CATÁLOGO (permite hexa/personalizado); si no
+  // está, el mapa de nombres conocidos. Antes solo miraba los nombres, así que
+  // los colores personalizados caían a gris.
+  const colorHex = useMemo(
+    () => new Map(colorCatalog.map((c) => [c.name, c.hex])),
+    [colorCatalog],
+  );
+  const hexOf = (name: string): string => colorHex.get(name) || filColor(name);
+
   const colorOpts = useMemo(
     () =>
       [...new Set(filaments.map((f) => f.color))].sort((a, b) =>
@@ -283,7 +292,9 @@ export function FilamentsBoard({
             // Barra sobre 1000 g = capacidad de un carrete estándar (pedido
             // 2026-07-11): llenado completo = 1000 g.
             const pct = Math.min((f.stockGrams / 1000) * 100, 100);
-            const spools = f.spoolGrams ? f.stockGrams / f.spoolGrams : 0;
+            const spools = f.spoolGrams
+              ? Math.max(0, f.stockGrams) / f.spoolGrams
+              : 0;
             const barColor =
               f.status === "agotado"
                 ? "var(--danger)"
@@ -297,13 +308,13 @@ export function FilamentsBoard({
                 style={{ padding: 0, overflow: "hidden" }}
                 onClick={() => setEditing(f)}
               >
-                <div style={{ height: 6, background: filColor(f.color) }} />
+                <div style={{ height: 6, background: hexOf(f.color) }} />
                 <div style={{ padding: 18 }}>
                   <div className="mb-3.5 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div
                         className="spool"
-                        style={{ "--spc": filColor(f.color) } as CSSProperties}
+                        style={{ "--spc": hexOf(f.color) } as CSSProperties}
                       >
                         <span />
                       </div>
@@ -320,8 +331,20 @@ export function FilamentsBoard({
                   </div>
                   <div className="mb-1.5 flex items-center justify-between text-[12.5px]">
                     <span className="text-faint">Stock</span>
-                    <b>{stockLabel(f.stockGrams)}</b>
+                    <b>{stockLabel(Math.max(0, f.stockGrams))}</b>
                   </div>
+                  {f.stockGrams < 0 ? (
+                    <div
+                      className="mb-1.5 rounded px-2 py-1 text-[11px] font-medium"
+                      style={{
+                        background: "rgba(var(--danger-rgb),.12)",
+                        color: "var(--danger)",
+                      }}
+                    >
+                      Debés {-f.stockGrams} g — se descuenta al reponer este
+                      color.
+                    </div>
+                  ) : null}
                   <div className="progress" style={{ height: 7 }}>
                     <div
                       style={{
@@ -407,7 +430,7 @@ export function FilamentsBoard({
                               width: 13,
                               height: 13,
                               borderRadius: "50%",
-                              background: filColor(f.color),
+                              background: hexOf(f.color),
                               border: "1px solid rgba(255,255,255,.25)",
                             }}
                           />
@@ -421,7 +444,15 @@ export function FilamentsBoard({
                         {f.diameter}
                       </td>
                       <td data-label="Stock">
-                        <b>{stockLabel(f.stockGrams)}</b>
+                        <b>{stockLabel(Math.max(0, f.stockGrams))}</b>
+                        {f.stockGrams < 0 ? (
+                          <div
+                            className="text-[11px] font-medium"
+                            style={{ color: "var(--danger)" }}
+                          >
+                            debés {-f.stockGrams} g
+                          </div>
+                        ) : null}
                       </td>
                       <td className="price" data-label="Costo/kg">
                         {formatPrice(f.costPerKg)}

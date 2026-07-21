@@ -522,6 +522,7 @@ export function ProductWizard({
               ) : null}
               <div className="text-faint mt-1 text-[11.5px]">
                 La foto principal es la de arriba (hasta 5 en total).
+                Recomendado: cuadrada, 1000×1000 px o más.
               </div>
             </div>
           </div>

@@ -83,7 +83,8 @@ export function ImageUpload({
     <div className="space-y-4">
       <div>
         <label className="text-dim mb-1 block text-xs font-medium">
-          Subir imagen (hasta 5, se convierte a WebP automáticamente)
+          Subir imagen (hasta 5, se convierte a WebP). Recomendado: cuadrada,
+          1000×1000 px o más — así llena la tarjeta sin recortes raros.
         </label>
         <input
           ref={inputRef}

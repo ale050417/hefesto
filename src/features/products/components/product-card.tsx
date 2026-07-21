@@ -18,7 +18,9 @@ export function ProductCard({ product }: { product: ProductView }) {
             className="object-cover"
             style={{
               objectPosition: product.primaryImage.position,
-              transform: `scale(${product.primaryImage.scale})`,
+              // Nunca por debajo de 1: el zoom del encuadre solo acerca, así la
+              // foto SIEMPRE llena la tarjeta (antes un scale<1 dejaba huecos).
+              transform: `scale(${Math.max(1, product.primaryImage.scale)})`,
             }}
           />
         ) : null}
