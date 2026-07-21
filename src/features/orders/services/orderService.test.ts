@@ -172,13 +172,13 @@ describe("createOrder", () => {
     expect(persist.mock.calls[0]![0].items[0]!.unitPrice).toBe("1000.00");
   });
 
-  it("aplica el ajuste de precio por color en modo color único", async () => {
+  it("usa el precio EXACTO del color (absoluto) en modo color único", async () => {
     const { deps, persist } = makeDeps({
       dragon: makeProduct({
         effectivePrice: 1000,
         colorMode: "single",
         colors: ["Negro", "Dorado"],
-        colorPrices: { Dorado: 300 },
+        colorPrices: { Dorado: 1300 },
       }),
     });
 
@@ -201,6 +201,34 @@ describe("createOrder", () => {
     expect(item.unitPrice).toBe("1300.00");
     expect(item.lineTotal).toBe("2600.00");
     expect(item.variantLabel).toBe("Dorado");
+  });
+
+  it("color sin precio propio → cobra la base (nunca 0) en color único", async () => {
+    const { deps, persist } = makeDeps({
+      dragon: makeProduct({
+        effectivePrice: 1000,
+        colorMode: "single",
+        colors: ["Negro", "Dorado"],
+        colorPrices: { Dorado: 1300 },
+      }),
+    });
+
+    await createOrder(
+      params({
+        items: [
+          {
+            productId: "p1",
+            slug: "dragon",
+            variantId: null,
+            color: "Negro",
+            quantity: 1,
+          },
+        ],
+      }),
+      deps,
+    );
+
+    expect(persist.mock.calls[0]![0].items[0]!.unitPrice).toBe("1000.00");
   });
 
   it("no ajusta el precio en multicolor (combinación fija)", async () => {

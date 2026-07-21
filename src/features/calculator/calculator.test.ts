@@ -121,6 +121,33 @@ describe("computeQuote", () => {
     expect(r.costoTotal).toBeCloseTo(11000, 5);
     expect(r.precioFinal).toBeCloseTo(11000, 5);
   });
+  it("multicolor: suma el costo de cada material (gramos × su propio precio)", () => {
+    const r = computeQuote({
+      grams: 0,
+      costPerKg: 0,
+      materials: [
+        { grams: 100, costPerKg: 35000 }, // 0.1kg × 35000 = 3500
+        { grams: 200, costPerKg: 20000 }, // 0.2kg × 20000 = 4000
+      ],
+      hours: 0,
+      ...cfg,
+      marginErrorPct: 0,
+      marginPct: 0,
+    });
+    expect(r.material).toBe(7500);
+    expect(r.precioFinal).toBeCloseTo(7500, 5);
+  });
+  it("sin lista de materiales usa el material único (retrocompat)", () => {
+    const r = computeQuote({
+      grams: 500,
+      costPerKg: 20000,
+      hours: 0,
+      ...cfg,
+      marginErrorPct: 0,
+      marginPct: 0,
+    });
+    expect(r.material).toBe(10000);
+  });
 });
 
 describe("selectActiveMargin", () => {

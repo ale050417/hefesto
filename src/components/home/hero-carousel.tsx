@@ -148,57 +148,105 @@ export function HeroCarousel({ slides }: { slides?: Banner[] } = {}) {
       <div className="hc-track">
         {data.map((b, i) => {
           const hasImg = Boolean(b.image);
+          const copy = (
+            <div
+              className="hc-copy"
+              style={hasImg ? { color: "#fff" } : undefined}
+            >
+              <div className={`hero-tag${hasImg ? "max-md:hidden" : ""}`}>
+                <Icon name="sparkles" size={15} /> Impresión 3D premium · Hecho
+                en Argentina
+              </div>
+              <h1 className="hero-title">
+                <HeroTitle title={b.title} />
+              </h1>
+              <p
+                className="hero-sub"
+                style={hasImg ? { color: "rgba(255,255,255,.92)" } : undefined}
+              >
+                {b.sub}
+              </p>
+              <div className="hc-cta flex flex-wrap gap-3">
+                <Link href={b.href} className="btn btn-primary btn-lg">
+                  <Icon name="cart" size={17} /> {b.cta}
+                </Link>
+              </div>
+              {hasImg ? null : (
+                <div className="hero-stats">
+                  {heroStats.map((s) => (
+                    <div key={s.l} className="hero-stat">
+                      <div className="n">{s.n}</div>
+                      <div className="l">{s.l}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
           return (
             <div
               key={i}
-              className={`hc-slide ${i === idx ? "on" : ""}`}
+              className={`hc-slide ${i === idx ? "on" : ""} ${hasImg ? "aspect-[16/10] overflow-hidden rounded-b-[26px] sm:aspect-[16/6] sm:rounded-none md:aspect-auto" : ""}`}
               aria-hidden={i !== idx}
-              style={
-                hasImg
-                  ? {
-                      backgroundImage: `linear-gradient(rgba(10,8,4,.55), rgba(10,8,4,.55)), url('${b.image}')`,
-                      backgroundSize: "cover",
-                      backgroundPosition: b.position || "center",
-                    }
-                  : undefined
-              }
+              style={hasImg ? { padding: 0, minHeight: 0 } : undefined}
             >
-              <div className={`store-wrap hc-inner align-${b.align}`}>
-                <div
-                  className="hc-copy"
-                  style={hasImg ? { color: "#fff" } : undefined}
-                >
-                  <div className="hero-tag">
-                    <Icon name="sparkles" size={15} /> Impresión 3D premium ·
-                    Hecho en Argentina
+              {hasImg ? (
+                <>
+                  {/* Banner: la imagen se ve ENTERA (nada cortado) en todo
+                      dispositivo. En móvil, como es ancha, va centrada sobre un
+                      fondo difuminado de sí misma → se ve premium, no una tira
+                      finita, y sin depender del encuadre ni perder el motivo. En
+                      desktop, entera a su aspecto natural. Cualquier banner que
+                      subas se acopla solo. */}
+                  {/* Fondo: imagen difuminada + capa oscura = marco premium (no
+                      queda "embarrado"). Solo móvil/tablet. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={b.image ?? ""}
+                    alt=""
+                    aria-hidden
+                    className="absolute inset-0 h-full w-full scale-125 object-cover blur-2xl md:hidden"
+                  />
+                  <div
+                    aria-hidden
+                    className="absolute inset-0 z-[1] md:hidden"
+                    style={{ background: "rgba(9,7,4,.64)" }}
+                  />
+                  {/* Imagen ENTERA, nítida y enmarcada (padding en móvil). */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={b.image ?? ""}
+                    alt={b.title}
+                    className="relative z-[2] block h-full w-full object-contain p-4 md:h-auto md:p-0"
+                  />
+                  {/* Velo móvil: oscurece abajo (ahí va el texto). */}
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 z-[3] md:hidden"
+                    style={{
+                      background:
+                        "linear-gradient(to top, rgba(8,6,3,.92) 0%, rgba(8,6,3,.55) 34%, rgba(8,6,3,0) 66%)",
+                    }}
+                  />
+                  {/* Velo desktop: oscurece a la izquierda (ahí va el texto). */}
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 z-[3] hidden md:block"
+                    style={{
+                      background:
+                        "linear-gradient(90deg, rgba(8,6,3,.82) 0%, rgba(8,6,3,.45) 42%, rgba(8,6,3,0) 68%)",
+                    }}
+                  />
+                  <div className="absolute inset-0 z-[4] flex items-end md:items-center">
+                    <div className="store-wrap w-full pb-6 md:pb-0">{copy}</div>
                   </div>
-                  <h1 className="hero-title">
-                    <HeroTitle title={b.title} />
-                  </h1>
-                  <p
-                    className="hero-sub"
-                    style={
-                      hasImg ? { color: "rgba(255,255,255,.9)" } : undefined
-                    }
-                  >
-                    {b.sub}
-                  </p>
-                  <div className="hc-cta flex flex-wrap gap-3">
-                    <Link href={b.href} className="btn btn-primary btn-lg">
-                      <Icon name="cart" size={17} /> {b.cta}
-                    </Link>
-                  </div>
-                  <div className="hero-stats">
-                    {heroStats.map((s) => (
-                      <div key={s.l} className="hero-stat">
-                        <div className="n">{s.n}</div>
-                        <div className="l">{s.l}</div>
-                      </div>
-                    ))}
-                  </div>
+                </>
+              ) : (
+                <div className={`store-wrap hc-inner align-${b.align}`}>
+                  {copy}
+                  <Cube />
                 </div>
-                {hasImg ? null : <Cube />}
-              </div>
+              )}
             </div>
           );
         })}
@@ -208,7 +256,7 @@ export function HeroCarousel({ slides }: { slides?: Banner[] } = {}) {
         <>
           <button
             type="button"
-            className="hc-arrow hc-prev"
+            className="hc-arrow hc-prev max-md:hidden"
             onClick={() => go(idx - 1)}
             aria-label="Anterior"
           >
@@ -216,7 +264,7 @@ export function HeroCarousel({ slides }: { slides?: Banner[] } = {}) {
           </button>
           <button
             type="button"
-            className="hc-arrow hc-next"
+            className="hc-arrow hc-next max-md:hidden"
             onClick={() => go(idx + 1)}
             aria-label="Siguiente"
           >

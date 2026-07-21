@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PriceTag } from "@/components/shared/price-tag";
-import { Badge } from "@/components/ui/badge";
-import { AddToCart } from "@/features/cart/components/add-to-cart";
+import { ProductInfo } from "@/features/cart/components/product-info";
 import { ProductGallery } from "@/features/products/components/product-gallery";
 import { ProductGrid } from "@/features/products/components/product-grid";
 import {
@@ -97,70 +95,26 @@ export default async function ProductPage({ params }: Params) {
       <div className="mt-6 grid gap-10 lg:grid-cols-2">
         <ProductGallery images={product.images} />
 
-        <div>
-          {product.category ? (
-            <p className="text-faint text-sm">{product.category.name}</p>
-          ) : null}
-          <h1 className="font-display text-fg mt-1 text-3xl">{product.name}</h1>
-
-          {product.isOnSale || product.isNew ? (
-            <div className="mt-3 flex items-center gap-2">
-              {product.isOnSale && product.discountPercent ? (
-                <Badge variant="danger">-{product.discountPercent}%</Badge>
-              ) : null}
-              {product.isNew ? <Badge variant="info">Nuevo</Badge> : null}
-            </div>
-          ) : null}
-
-          <PriceTag
-            className="mt-4"
-            price={product.price}
-            salePrice={product.salePrice}
-            isOnSale={product.isOnSale}
-            from={product.hasVariants}
-          />
-
-          {product.description ? (
-            <p className="text-dim mt-4">{product.description}</p>
-          ) : null}
-
-          <div className="mt-6">
-            <AddToCart
-              product={{
-                id: product.id,
-                slug: product.slug,
-                name: product.name,
-                price: product.price,
-                salePrice: product.salePrice,
-                isOnSale: product.isOnSale,
-                image: product.primaryImage?.url ?? null,
-                variants: product.variants,
-                colorMode: product.colorMode,
-                colors: product.colors,
-                colorPrices: product.colorPrices,
-              }}
-            />
-          </div>
-
-          {specs.length > 0 ? (
-            <dl className="border-surface-2 mt-8 border-t text-sm">
-              {specs.map((s) => (
-                <div
-                  key={s.label}
-                  className="border-surface-2 flex justify-between border-b py-2"
-                >
-                  <dt className="text-dim">{s.label}</dt>
-                  <dd className="text-fg">{s.value}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : null}
-
-          <p className="border-surface-2 bg-surface-1 text-dim mt-6 rounded-md border p-3 text-xs">
-            El costo de envío corre por cuenta del cliente. Coordinamos el envío
-            y registramos el código de seguimiento.
-          </p>
-        </div>
+        <ProductInfo
+          product={{
+            id: product.id,
+            slug: product.slug,
+            name: product.name,
+            categoryName: product.category?.name ?? null,
+            description: product.description,
+            price: product.price,
+            salePrice: product.salePrice,
+            isOnSale: product.isOnSale,
+            discountPercent: product.discountPercent,
+            isNew: product.isNew,
+            image: product.primaryImage?.url ?? null,
+            variants: product.variants,
+            colorMode: product.colorMode,
+            colors: product.colors,
+            colorPrices: product.colorPrices,
+            specs,
+          }}
+        />
       </div>
 
       {related.length > 0 ? (

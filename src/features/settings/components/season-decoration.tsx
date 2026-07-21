@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from "react";
 
 // Pseudo-aleatorio determinístico (puro): mismo seed → mismo valor. Evita
 // Math.random en el render y el mismatch de hidratación.
@@ -21,6 +26,14 @@ export function SeasonDecoration({
   durationSec?: number;
 }) {
   const [visible, setVisible] = useState(true);
+  // La decoración se renderiza SOLO en el cliente: el servidor no la manda, así
+  // que es imposible que haya mismatch de hidratación (venía por floats/
+  // extensiones). useSyncExternalStore evita el setState-en-effect del linter.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   // Con una duración > 0, la decoración corre ese rato al entrar y se apaga
   // sola (no anima para siempre → mejor rendimiento). 0 = siempre encendida.
@@ -30,7 +43,13 @@ export function SeasonDecoration({
     return () => clearTimeout(t);
   }, [durationSec]);
 
-  const count = Math.max(0, Math.min(40, intensity || 16));
+  const baseCount = Math.max(0, Math.min(40, intensity || 16));
+  // En pantallas chicas, la mitad: muchos copos tapan el contenido en el celular.
+  const count =
+    typeof window !== "undefined" &&
+    window.matchMedia("(max-width: 640px)").matches
+      ? Math.ceil(baseCount / 2)
+      : baseCount;
   const flakes = Array.from({ length: count }, (_, i) => ({
     glyph: glyphs[i % glyphs.length] ?? "•",
     left: rand(i + 1) * 100,
@@ -40,7 +59,7 @@ export function SeasonDecoration({
     sway: (rand(i + 5) * 2 - 1) * 40,
   }));
 
-  if (count === 0 || !visible) return null;
+  if (count === 0 || !visible || !mounted) return null;
 
   return (
     <div className="season-deco" aria-hidden>

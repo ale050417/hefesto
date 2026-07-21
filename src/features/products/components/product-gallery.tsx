@@ -63,18 +63,17 @@ export function ProductGallery({
           ))}
         </div>
       ) : null}
+      {/* object-contain: se ve la imagen ENTERA tal cual se cargó (sin recortar),
+          centrada y adaptada a cualquier dispositivo. El fondo rellena lo que
+          sobra si la imagen no es cuadrada. */}
       <div className="border-surface-2 bg-surface-2 relative aspect-square flex-1 overflow-hidden rounded-lg border">
         {main ? (
           <Image
             src={main.url}
-            style={{
-              objectPosition: main.position,
-              transform: `scale(${main.scale})`,
-            }}
             alt={main.alt}
             fill
             sizes="(max-width: 1024px) 100vw, 50vw"
-            className="object-cover"
+            className="object-contain"
             priority
           />
         ) : null}

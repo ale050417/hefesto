@@ -159,14 +159,12 @@ export function ProductForm({
       layerHeight: est.layerHeight,
       colorMode,
       colors,
-      colorPrices:
-        colorMode === "single"
-          ? Object.fromEntries(
-              colors
-                .filter((c) => colorPrices[c])
-                .map((c) => [c, colorPrices[c]!]),
-            )
-          : {},
+      // Precio por color = precio EXACTO (absoluto) del color. Se guarda en
+      // ambos modos (en multicolor queda de referencia; el server solo lo aplica
+      // en "color único"). Ver features/products/pricing.ts.
+      colorPrices: Object.fromEntries(
+        colors.filter((c) => colorPrices[c]).map((c) => [c, colorPrices[c]!]),
+      ),
     };
     const result =
       mode === "create"
@@ -395,13 +393,13 @@ export function ProductForm({
           </div>
         </div>
 
-        {/* Ajuste de precio por color (single) */}
+        {/* Precio por color (single): el precio EXACTO que paga el cliente. */}
         {colorMode === "single" && colors.length > 0 ? (
           <div className="field mb-3.5">
             <label>
-              Ajuste de precio por color{" "}
+              Precio por color{" "}
               <span className="text-faint font-normal">
-                (opcional · + más caro / − más barato)
+                (lo que paga el cliente por ese color; en blanco = precio base)
               </span>
             </label>
             <div className="flex flex-col gap-2">

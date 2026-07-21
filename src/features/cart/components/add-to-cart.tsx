@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format";
 import { useCartStore } from "@/stores/cartStore";
 import { useUiStore } from "@/stores/uiStore";
+import { colorUnitPrice } from "@/features/products/pricing";
 
 type Variant = { id: string; label: string; price: number | null };
 
@@ -57,10 +58,14 @@ export function AddToCart({ product }: { product: AddToCartProduct }) {
     product.isOnSale && product.salePrice != null
       ? product.salePrice
       : product.price;
-  // Ajuste de precio por color (solo en "color único"). Es de referencia para
-  // la UI; el servidor lo recalcula igual en el checkout (orderService).
-  const colorAdj = !isMulti && color ? (product.colorPrices[color] ?? 0) : 0;
-  const unitPrice = Math.max(0, (selected?.price ?? basePrice) + colorAdj);
+  // Precio por color (solo "color único"): el cargado es el precio EXACTO
+  // (absoluto). Misma función pura que el servidor (checkout, orderService).
+  const unitPrice = colorUnitPrice(
+    selected?.price ?? basePrice,
+    product.colorMode,
+    product.colorPrices,
+    color,
+  );
   // En multicolor la pieza lleva la combinación fija; en color único, el elegido.
   const lineColor = isMulti
     ? hasColors

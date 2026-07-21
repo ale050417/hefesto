@@ -5,6 +5,7 @@ import { ToTop } from "@/components/layout/to-top";
 import { WhatsappFab } from "@/components/layout/whatsapp-fab";
 import { TopBanner } from "@/components/layout/top-banner";
 import { CartDrawer } from "@/features/cart/components/cart-drawer";
+import { CartPopover } from "@/features/cart/components/cart-popover";
 import { AuthModal } from "@/features/auth/components/auth-modal";
 import { FavDrawer } from "@/features/wishlist/components/fav-drawer";
 import { WishlistLoader } from "@/features/wishlist/components/wishlist-loader";
@@ -22,6 +23,7 @@ export default function StorefrontLayout({
       <main className="flex-1">{children}</main>
       <Footer />
       <CartDrawer />
+      <CartPopover />
       <AuthModal />
       <FavDrawer />
       <WishlistLoader />

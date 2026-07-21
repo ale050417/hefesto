@@ -693,6 +693,42 @@ body > * {
     display: block;
     opacity: 1;
   }
+  /* Banner con imagen: se muestra ENTERA (aspecto natural, full-width) en todos
+     los dispositivos, sin recortar. La copy va superpuesta con un velo (::after)
+     para que se lea sobre la foto. */
+  .hc-slide-img {
+    padding: 0;
+    min-height: 0;
+    position: relative;
+  }
+  .hc-bg-img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .hc-slide-img::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(
+      90deg,
+      rgba(8, 6, 3, 0.78) 0%,
+      rgba(8, 6, 3, 0.42) 44%,
+      rgba(8, 6, 3, 0) 70%
+    );
+    pointer-events: none;
+  }
+  .hc-over {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+  }
+  .hc-over .store-wrap {
+    width: 100%;
+  }
   .hc-slide.on .hc-inner {
     animation: fadeIn 0.5s var(--ease);
   }

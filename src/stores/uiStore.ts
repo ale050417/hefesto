@@ -7,6 +7,11 @@ type UiState = {
   openCart: () => void;
   closeCart: () => void;
 
+  // Popover "agregado al carrito" que sale del ícono (en vez del cajón lateral).
+  cartFlash: boolean;
+  flashCart: () => void;
+  closeFlash: () => void;
+
   favOpen: boolean;
   openFav: () => void;
   closeFav: () => void;
@@ -22,6 +27,10 @@ export const useUiStore = create<UiState>((set) => ({
   cartOpen: false,
   openCart: () => set({ cartOpen: true }),
   closeCart: () => set({ cartOpen: false }),
+
+  cartFlash: false,
+  flashCart: () => set({ cartFlash: true, cartOpen: false }),
+  closeFlash: () => set({ cartFlash: false }),
 
   favOpen: false,
   openFav: () => set({ favOpen: true }),

@@ -3,6 +3,7 @@ import { AppError, type ErrorCode } from "@/core/errors";
 import { validateCoupon, eligibleSubtotal } from "@/features/discounts/service";
 import type { Coupon } from "@/features/discounts/types";
 import type { ProductDetailView } from "@/features/products/types";
+import { colorUnitPrice } from "@/features/products/pricing";
 import type { CreateOrderInput } from "../repository";
 import type { CheckoutInput } from "../schemas";
 import type { Order } from "../types";
@@ -120,9 +121,12 @@ export async function createOrder(
       );
     }
 
-    // Ajuste de precio por color: solo en "color único". En multicolor la pieza
-    // lleva una combinación fija y no ajusta el precio. El ajuste se aplica acá,
-    // en el servidor, desde la base (nunca se confía en el precio del cliente).
+    // Precio por color: solo en "color único". El precio cargado por color es el
+    // precio EXACTO (absoluto) que paga el cliente al elegirlo — se resuelve acá,
+    // en el servidor, nunca se confía en el precio del cliente. Sin precio propio
+    // queda la base/tamaño (nunca 0). En multicolor la pieza trae una combinación
+    // fija y su precio ya está armado (no se elige color). Ver features/products/
+    // pricing.ts (misma función pura que usa la página de producto).
     const lineColor = line.color ?? null;
     if (lineColor && product.colorMode === "single") {
       if (!product.colors.includes(lineColor)) {
@@ -131,8 +135,9 @@ export async function createOrder(
           `El color elegido para "${product.name}" ya no está disponible.`,
         );
       }
-      const adjustment = product.colorPrices[lineColor] ?? 0;
-      unitPrice = Math.max(0, round2(unitPrice + adjustment));
+      unitPrice = round2(
+        colorUnitPrice(unitPrice, "single", product.colorPrices, lineColor),
+      );
     }
     const lineLabel =
       [variantLabel, lineColor].filter(Boolean).join(" · ") || null;

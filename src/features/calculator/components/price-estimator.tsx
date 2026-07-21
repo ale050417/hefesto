@@ -80,6 +80,11 @@ export function PriceEstimator({
   const [grams, setGrams] = useState(
     initial?.grams ? String(initial.grams) : "",
   );
+  // Multicolor: materiales EXTRA (además del principal), cada uno con su
+  // filamento y sus gramos; el costo de material los suma a todos.
+  const [extras, setExtras] = useState<
+    Array<{ filamentId: string; grams: string }>
+  >([]);
   const [hours, setHours] = useState(
     initMin ? String(Math.floor(initMin / 60)) : "",
   );
@@ -105,10 +110,23 @@ export function PriceEstimator({
     ? (presets.find((p) => p.id === presetId)?.marginPct ?? 0)
     : 0;
 
+  // Materiales extra válidos (con gramos) → el core suma principal + extras.
+  const extraMats = extras
+    .map((e) => ({
+      grams: Number(e.grams) || 0,
+      costPerKg: filaments.find((f) => f.id === e.filamentId)?.costPerKg ?? 0,
+    }))
+    .filter((m) => m.grams > 0);
+  const materials =
+    extraMats.length > 0
+      ? [{ grams: gramsN, costPerKg }, ...extraMats]
+      : undefined;
+
   const q = computeQuote({
     grams: gramsN,
     hours: totalHours,
     costPerKg,
+    materials,
     kwhPrice: config.kwhPrice,
     machineWatts: config.machineWatts,
     machineLifeHours: config.machineLifeHours,
@@ -230,7 +248,9 @@ export function PriceEstimator({
       </div>
 
       <div className="field">
-        <label htmlFor="pe-grams">Gramos</label>
+        <label htmlFor="pe-grams">
+          Gramos{extras.length > 0 ? " (material principal)" : ""}
+        </label>
         <input
           id="pe-grams"
           className="input"
@@ -241,6 +261,79 @@ export function PriceEstimator({
           onChange={(e) => setGrams(e.target.value)}
         />
       </div>
+
+      {/* Multicolor: sumar más materiales, cada uno con su filamento y gramos.
+          Solo admin (el precio se calcula en el cliente). */}
+      {isAdmin && filaments.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {extras.map((ex, i) => (
+            <div key={i} className="grid-2" style={{ alignItems: "end" }}>
+              <div className="field">
+                <label>Material extra {i + 1}</label>
+                <select
+                  className="select"
+                  value={ex.filamentId}
+                  onChange={(e) =>
+                    setExtras((xs) =>
+                      xs.map((x, j) =>
+                        j === i ? { ...x, filamentId: e.target.value } : x,
+                      ),
+                    )
+                  }
+                >
+                  {filaments.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {filamentLabel(f)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label>Gramos</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    className="input"
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    value={ex.grams}
+                    onChange={(e) =>
+                      setExtras((xs) =>
+                        xs.map((x, j) =>
+                          j === i ? { ...x, grams: e.target.value } : x,
+                        ),
+                      )
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="btn-icon btn-ghost"
+                    aria-label="Quitar material"
+                    onClick={() =>
+                      setExtras((xs) => xs.filter((_, j) => j !== i))
+                    }
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            style={{ alignSelf: "flex-start" }}
+            onClick={() =>
+              setExtras((xs) => [
+                ...xs,
+                { filamentId: filaments[0]?.id ?? "", grams: "" },
+              ])
+            }
+          >
+            + Agregar material (multicolor)
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid-2">
         <div className="field">
