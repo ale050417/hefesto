@@ -746,13 +746,36 @@ export function StoreAppearance({
                 </button>
               ) : null}
             </div>
-            <div className="text-faint mt-2 text-[11.5px] leading-relaxed">
-              Tamaño recomendado: <b>1600 × 600 px</b> (apaisado, relación 8:3).
+            <div
+              className="mt-2 rounded-lg border p-3 text-[11.5px] leading-relaxed"
+              style={{
+                borderColor: "var(--border)",
+                background: "var(--surface-2)",
+              }}
+            >
+              <b className="text-fg text-[12px]">Tamaño recomendado</b>
+              <div className="text-faint mt-1.5 flex flex-col gap-1">
+                <span>
+                  <b className="text-fg">Notebook y tablet:</b> 1600 × 600 px
+                  (apaisado, relación 8:3). Se ve la imagen completa.
+                </span>
+                <span>
+                  <b className="text-fg">Celular:</b> esa misma imagen se
+                  muestra entera dentro de un marco oscuro. Para que ocupe toda
+                  la pantalla del celular conviene una imagen vertical de{" "}
+                  <b className="text-fg">1080 × 1350 px</b> (relación 4:5); se
+                  sube aparte (te lo activo en un paso).
+                </span>
+                <span>
+                  Tip: dejá el motivo (logo, producto, texto) centrado y con
+                  aire a los costados, así queda bien en las 3 pantallas.
+                </span>
+              </div>
             </div>
             {bf.imageUrl ? (
               <div className="text-faint mt-2 text-[11.5px]">
                 Arrastrá la imagen de la vista previa (arriba) para acomodar el
-                encuadre.
+                encuadre: elegís qué parte se ve recortada en pantallas chicas.
               </div>
             ) : null}
           </div>

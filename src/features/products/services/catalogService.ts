@@ -383,14 +383,22 @@ export async function listProductImages(
  * Material + peso de un producto, para el descuento de filamento por ventas
  * (hook de stock en orders). Liviano a propósito: no arrastra imágenes.
  */
-export async function getProductPrintSpecs(
-  id: string,
-): Promise<{ material: string | null; weightGrams: number | null } | null> {
+export async function getProductPrintSpecs(id: string): Promise<{
+  material: string | null;
+  weightGrams: number | null;
+  colorMode: "single" | "multi";
+  colors: string[];
+  /** Multicolor: gramos por color (columna color_prices reusada). */
+  colorGrams: Record<string, number>;
+} | null> {
   const product = await findProductById(id);
   if (!product) return null;
   return {
     material: product.material ?? null,
     weightGrams: product.weightGrams ?? null,
+    colorMode: product.colorMode === "multi" ? "multi" : "single",
+    colors: product.colors ?? [],
+    colorGrams: product.colorPrices ?? {},
   };
 }
 

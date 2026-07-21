@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format";
 import { useCartStore } from "@/stores/cartStore";
 import { useUiStore } from "@/stores/uiStore";
-import { colorUnitPrice } from "@/features/products/pricing";
 
 type Variant = { id: string; label: string; price: number | null };
 
@@ -72,24 +71,13 @@ export function ProductInfo({ product }: { product: ProductInfoData }) {
     product.isOnSale && product.salePrice != null
       ? product.salePrice
       : product.price;
-  // Precio por color: el precio cargado por color es el precio EXACTO (absoluto)
-  // que paga el cliente. Misma función pura que usa el servidor en el checkout,
-  // así la UI y el cobro nunca divergen.
-  const ownColorPrice =
-    !isMulti && color ? (product.colorPrices[color] ?? 0) : 0;
-  const unitPrice = colorUnitPrice(
-    selected?.price ?? basePrice,
-    product.colorMode,
-    product.colorPrices,
-    color,
-  );
-  // ¿Mostrar el precio original tachado? Solo si es oferta, sin precio propio de
-  // tamaño ni de color (si el color tiene su precio, ese manda y no hay tachado).
+  // El color NO cambia el precio: el producto tiene un precio único. El precio
+  // sale de la variante/tamaño elegido o del precio base.
+  const unitPrice = Math.max(0, selected?.price ?? basePrice);
+  // ¿Mostrar el precio original tachado? Solo si es oferta y no hay precio propio
+  // de tamaño.
   const showStrike =
-    product.isOnSale &&
-    product.salePrice != null &&
-    !selected?.price &&
-    !(ownColorPrice > 0);
+    product.isOnSale && product.salePrice != null && !selected?.price;
   const lineColor = isMulti
     ? hasColors
       ? product.colors.join(" + ")
@@ -182,7 +170,6 @@ export function ProductInfo({ product }: { product: ProductInfoData }) {
             <div className="flex flex-wrap gap-2">
               {product.colors.map((c) => {
                 const active = !isMulti && color === c;
-                const cp = product.colorPrices[c] ?? 0;
                 return (
                   <button
                     key={c}
@@ -209,11 +196,6 @@ export function ProductInfo({ product }: { product: ProductInfoData }) {
                       }}
                     />
                     {c}
-                    {!isMulti && cp > 0 ? (
-                      <span className="text-faint text-xs">
-                        {formatPrice(cp)}
-                      </span>
-                    ) : null}
                   </button>
                 );
               })}

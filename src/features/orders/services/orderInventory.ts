@@ -26,9 +26,14 @@ import type { OrderWithItems } from "../types";
  */
 export type OrderInventoryDeps = {
   getOrder: (id: string) => Promise<OrderWithItems | null>;
-  getProductSpecs: (
-    id: string,
-  ) => Promise<{ material: string | null; weightGrams: number | null } | null>;
+  getProductSpecs: (id: string) => Promise<{
+    material: string | null;
+    weightGrams: number | null;
+    colorMode: "single" | "multi";
+    colors: string[];
+    /** Multicolor: gramos por color (para descontar de cada color). */
+    colorGrams: Record<string, number>;
+  } | null>;
   listFilaments: () => Promise<Filament[]>;
   hasMovements: (reason: "order", refId: string) => Promise<boolean>;
   applyDeltas: (
@@ -116,6 +121,46 @@ export async function deductFilamentForOrder(
         result.skipped.push({ item: label, reason: "producto sin material" });
         continue;
       }
+
+      // MULTICOLOR: la pieza lleva varios colores; se descuenta de CADA color los
+      // gramos cargados en el producto (colorGrams), no un peso total sobre uno.
+      const gramsByColor = Object.entries(specs.colorGrams ?? {}).filter(
+        ([, g]) => g > 0,
+      );
+      if (specs.colorMode === "multi" && gramsByColor.length > 0) {
+        let any = false;
+        for (const [color, grams] of gramsByColor) {
+          const fil = resolve(filaments, {
+            material: specs.material,
+            variantLabel: color,
+          });
+          if (!fil) {
+            result.skipped.push({
+              item: `${label} · ${color}`,
+              reason: `sin filamento ${specs.material} ${color}`,
+            });
+            continue;
+          }
+          movements.push({
+            filamentId: fil.id,
+            material: fil.material,
+            color: fil.color,
+            deltaGrams: -(grams * item.quantity),
+            reason: "order",
+            refId: orderId,
+          });
+          any = true;
+        }
+        if (!any) {
+          result.skipped.push({
+            item: label,
+            reason: "multicolor sin filamentos para sus colores",
+          });
+        }
+        continue;
+      }
+
+      // COLOR ÚNICO: peso total del producto sobre el color elegido.
       if (!specs.weightGrams || specs.weightGrams <= 0) {
         result.skipped.push({ item: label, reason: "producto sin peso (g)" });
         continue;

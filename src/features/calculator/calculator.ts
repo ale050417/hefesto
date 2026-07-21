@@ -48,20 +48,10 @@ export function computePrintPrice(input: CalcInput): CalcResult {
 // --- Presupuesto detallado (espejo del index): material + luz + desgaste +
 //     margen de error, luego margen de ganancia. ---
 
-/** Un material de la pieza (multicolor): sus gramos y su costo por kg. */
-export type QuoteMaterial = { grams: number; costPerKg: number };
-
 export type QuoteInput = {
   grams: number;
   hours: number; // tiempo total en horas
   costPerKg: number; // costo del filamento por kg
-  /**
-   * Multicolor: varios materiales, cada uno con SUS gramos y SU precio. Si viene
-   * y no está vacío, el costo de material es la SUMA de todos (`grams`/`costPerKg`
-   * se ignoran). Si no, se usa el material único (retrocompat). El desgaste y la
-   * luz usan las horas totales, no se multiplican por la cantidad de colores.
-   */
-  materials?: QuoteMaterial[];
   kwhPrice: number;
   machineWatts: number;
   machineLifeHours: number;
@@ -128,16 +118,7 @@ export function resolveCostPerKg(
 
 export function computeQuote(input: QuoteInput): QuoteResult {
   const hours = clamp0(input.hours);
-  // Multicolor: sumar el costo de cada material (sus gramos × su precio). Sin
-  // lista de materiales → material único (retrocompat).
-  const mats =
-    input.materials && input.materials.length > 0
-      ? input.materials
-      : [{ grams: input.grams, costPerKg: input.costPerKg }];
-  const material = mats.reduce(
-    (sum, m) => sum + (clamp0(m.grams) / 1000) * clamp0(m.costPerKg),
-    0,
-  );
+  const material = (clamp0(input.grams) / 1000) * clamp0(input.costPerKg);
   const electricidad =
     ((clamp0(input.machineWatts) * clamp0(input.kwhPrice)) / 1000) * hours;
   const desgaste =

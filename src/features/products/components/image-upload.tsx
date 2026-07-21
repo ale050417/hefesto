@@ -38,8 +38,14 @@ export function ImageUpload({
 
   function handleUpload(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
-    const files = Array.from(fileList);
     setError(null);
+    const remaining = Math.max(0, 5 - images.length); // máximo 5 fotos
+    if (remaining === 0) {
+      setError("Máximo 5 fotos por producto.");
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+    const files = Array.from(fileList).slice(0, remaining);
     startTransition(async () => {
       for (const file of files) {
         const compact = await compressImageToWebp(file, 1600);
@@ -77,7 +83,7 @@ export function ImageUpload({
     <div className="space-y-4">
       <div>
         <label className="text-dim mb-1 block text-xs font-medium">
-          Subir imagen (se convierte a WebP automáticamente)
+          Subir imagen (hasta 5, se convierte a WebP automáticamente)
         </label>
         <input
           ref={inputRef}

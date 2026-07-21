@@ -37,7 +37,13 @@ function makeDeps(overrides: Partial<OrderInventoryDeps> = {}) {
   const audit = vi.fn(async () => undefined);
   const deps: OrderInventoryDeps = {
     getOrder: async () => makeOrder([{}]),
-    getProductSpecs: async () => ({ material: "PLA", weightGrams: 120 }),
+    getProductSpecs: async () => ({
+      material: "PLA",
+      weightGrams: 120,
+      colorMode: "single" as const,
+      colors: [],
+      colorGrams: {},
+    }),
     listFilaments: async () => filaments,
     hasMovements: async () => false,
     applyDeltas,
@@ -86,6 +92,42 @@ describe("deductFilamentForOrder", () => {
     ]);
   });
 
+  it("multicolor: descuenta los gramos de CADA color (colorGrams), no el peso total", async () => {
+    const { deps, applyDeltas } = makeDeps({
+      getOrder: async () =>
+        makeOrder([{ variantLabel: "Negro + Rojo", quantity: 2 }]),
+      getProductSpecs: async () => ({
+        material: "PLA",
+        weightGrams: 200,
+        colorMode: "multi" as const,
+        colors: ["Negro", "Rojo"],
+        colorGrams: { Negro: 30, Rojo: 20 },
+      }),
+    });
+    const res = await deductFilamentForOrder("o1", deps);
+
+    expect(res.deducted).toBe(2); // un movimiento por color
+    const movements = applyDeltas.mock.calls[0]![0] as NewFilamentMovement[];
+    expect(movements).toEqual([
+      {
+        filamentId: "f1",
+        material: "PLA",
+        color: "Negro",
+        deltaGrams: -60, // 30 g × 2
+        reason: "order",
+        refId: "o1",
+      },
+      {
+        filamentId: "f2",
+        material: "PLA",
+        color: "Rojo",
+        deltaGrams: -40, // 20 g × 2
+        reason: "order",
+        refId: "o1",
+      },
+    ]);
+  });
+
   it("es idempotente: si el ledger ya tiene movimientos del pedido, no repite", async () => {
     const { deps, applyDeltas } = makeDeps({ hasMovements: async () => true });
     const res = await deductFilamentForOrder("o1", deps);
@@ -114,7 +156,13 @@ describe("deductFilamentForOrder", () => {
 
   it("producto sin peso o sin material → se saltea con warning", async () => {
     const { deps, applyDeltas, audit } = makeDeps({
-      getProductSpecs: async () => ({ material: "PLA", weightGrams: null }),
+      getProductSpecs: async () => ({
+        material: "PLA",
+        weightGrams: null,
+        colorMode: "single" as const,
+        colors: [],
+        colorGrams: {},
+      }),
     });
     const res = await deductFilamentForOrder("o1", deps);
     expect(res.deducted).toBe(0);

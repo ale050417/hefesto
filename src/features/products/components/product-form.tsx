@@ -77,7 +77,9 @@ export function ProductForm({
     defaultValues.colorMode ?? "single",
   );
   const [colors, setColors] = useState<string[]>(defaultValues.colors ?? []);
-  const [colorPrices, setColorPrices] = useState<Record<string, number>>(
+  // Multicolor: gramos por color (para descontar stock). Se leen/guardan de la
+  // columna color_prices (reusada; ya no existe el "precio por color").
+  const [colorGrams, setColorGrams] = useState<Record<string, number>>(
     defaultValues.colorPrices ?? {},
   );
   // Ficha técnica (material/peso/tiempo/altura) la maneja el PriceEstimator;
@@ -159,12 +161,16 @@ export function ProductForm({
       layerHeight: est.layerHeight,
       colorMode,
       colors,
-      // Precio por color = precio EXACTO (absoluto) del color. Se guarda en
-      // ambos modos (en multicolor queda de referencia; el server solo lo aplica
-      // en "color único"). Ver features/products/pricing.ts.
-      colorPrices: Object.fromEntries(
-        colors.filter((c) => colorPrices[c]).map((c) => [c, colorPrices[c]!]),
-      ),
+      // Multicolor: gramos por color (para descontar stock), en la columna
+      // color_prices. En color único no aplica.
+      colorPrices:
+        colorMode === "multi"
+          ? Object.fromEntries(
+              colors
+                .filter((c) => colorGrams[c])
+                .map((c) => [c, colorGrams[c]!]),
+            )
+          : {},
     };
     const result =
       mode === "create"
@@ -393,13 +399,13 @@ export function ProductForm({
           </div>
         </div>
 
-        {/* Precio por color (single): el precio EXACTO que paga el cliente. */}
-        {colorMode === "single" && colors.length > 0 ? (
+        {/* Multicolor: gramos por color (descontar stock; no cambia el precio). */}
+        {colorMode === "multi" && colors.length > 0 ? (
           <div className="field mb-3.5">
             <label>
-              Precio por color{" "}
+              Gramos por color{" "}
               <span className="text-faint font-normal">
-                (lo que paga el cliente por ese color; en blanco = precio base)
+                (para descontar el stock de filamento; no cambia el precio)
               </span>
             </label>
             <div className="flex flex-col gap-2">
@@ -412,14 +418,15 @@ export function ProductForm({
                     className="input"
                     style={{ maxWidth: 140 }}
                     placeholder="0"
-                    value={colorPrices[c] ?? ""}
+                    value={colorGrams[c] ?? ""}
                     onChange={(e) =>
-                      setColorPrices((prev) => ({
+                      setColorGrams((prev) => ({
                         ...prev,
                         [c]: Number(e.target.value) || 0,
                       }))
                     }
                   />
+                  <span className="text-faint text-[12px]">g</span>
                 </div>
               ))}
             </div>
