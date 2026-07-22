@@ -400,6 +400,13 @@
       "when": 1783306100000,
       "tag": "0056_trust_bar",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1783306200000,
+      "tag": "0057_banner_interval",
+      "breakpoints": true
     }
   ]
 }

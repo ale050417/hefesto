@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { ReactNode, TouchEvent } from "react";
 
 const P: Record<string, ReactNode> = {
   sparkles: (
@@ -130,21 +130,42 @@ function Cube() {
   );
 }
 
-export function HeroCarousel({ slides }: { slides?: Banner[] } = {}) {
+export function HeroCarousel({
+  slides,
+  intervalMs = 5500,
+}: { slides?: Banner[]; intervalMs?: number } = {}) {
   const data = slides && slides.length > 0 ? slides : banners;
   const [idx, setIdx] = useState(0);
+  const [touchX, setTouchX] = useState<number | null>(null);
   const count = data.length;
 
   const go = (n: number) => setIdx(((n % count) + count) % count);
 
   useEffect(() => {
     if (count <= 1) return;
-    const t = setInterval(() => setIdx((i) => (i + 1) % count), 5500);
+    const ms = Math.max(2000, intervalMs || 5500); // duración configurable
+    const t = setInterval(() => setIdx((i) => (i + 1) % count), ms);
     return () => clearInterval(t);
-  }, [count, idx]);
+  }, [count, idx, intervalMs]);
+
+  // Arrastrar en celular (swipe): en móvil las flechas están ocultas, así que el
+  // swipe es la forma natural de cambiar de banner.
+  function onTouchStart(e: TouchEvent) {
+    setTouchX(e.touches[0]?.clientX ?? null);
+  }
+  function onTouchEnd(e: TouchEvent) {
+    if (touchX == null || count <= 1) return;
+    const dx = (e.changedTouches[0]?.clientX ?? touchX) - touchX;
+    if (Math.abs(dx) > 40) go(dx < 0 ? idx + 1 : idx - 1);
+    setTouchX(null);
+  }
 
   return (
-    <section className="hero-carousel">
+    <section
+      className="hero-carousel"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
       <div className="hc-track">
         {data.map((b, i) => {
           const hasImg = Boolean(b.image);

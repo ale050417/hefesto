@@ -38,6 +38,10 @@ export const businessSettings = pgTable(
     // título + texto. Null = usa los textos por defecto del home.
     trustBar:
       jsonb("trust_bar").$type<Array<{ ic: string; t: string; d: string }>>(),
+    // Segundos entre banners del hero (autoplay). Default 5; el mínimo/máximo
+    // razonables (3-12s) se validan en el servidor para no quedar ni muy rápido
+    // ni demasiado lento.
+    bannerIntervalSec: integer("banner_interval_sec").notNull().default(5),
     // Datos fiscales / operativos (pestaña Negocio).
     cuit: text("cuit"),
     // Cada día tiene dos turnos: mañana y tarde, cada uno con su on/desde/hasta.

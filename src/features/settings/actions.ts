@@ -266,6 +266,36 @@ export async function saveTrustBarAction(
   }
 }
 
+// Duración entre banners (H28): segundos de autoplay del carrusel, acotado a un
+// rango razonable (3 a 12 s) para que no quede ni muy rápido ni muy lento.
+const bannerIntervalSchema = z.object({
+  seconds: z.coerce.number().int().min(3).max(12),
+});
+
+export async function saveBannerIntervalAction(
+  input: unknown,
+): Promise<ActionResult> {
+  if (!(await can("config", "editar"))) return UNAUTH;
+  const parsed = bannerIntervalSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "La duración debe estar entre 3 y 12 segundos.",
+      },
+    };
+  }
+  try {
+    await saveAppearance({ bannerIntervalSec: parsed.data.seconds });
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/configuracion");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
 const bannerSchema = z.object({
   title: z.string().trim().min(1, "Ingresá un título."),
   subtitle: z.string().trim().max(200).optional().or(z.literal("")),

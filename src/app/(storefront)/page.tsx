@@ -299,7 +299,10 @@ export default async function Home({
 
   return (
     <div>
-      <HeroCarousel slides={slides} />
+      <HeroCarousel
+        slides={slides}
+        intervalMs={brand.bannerIntervalSec * 1000}
+      />
 
       {show("trustBar") ? (
         <section
