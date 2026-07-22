@@ -30,6 +30,8 @@ function toDateInput(value: string | null): string {
   return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
 }
 
+const STEPS = ["Descuento", "Aplica a", "Límites"];
+
 function CouponPreview({
   code,
   type,
@@ -203,6 +205,23 @@ export function CouponForm({
   const set = (k: keyof typeof form, v: string | boolean) =>
     setForm((f) => ({ ...f, [k]: v }));
 
+  // Wizard de 3 pasos. El paso 1 (Descuento) valida código + valor antes de
+  // avanzar; el resto es opcional. El preview del ticket queda siempre visible.
+  const [step, setStep] = useState(0);
+  function next() {
+    if (step === 0) {
+      const ok = fe.check({
+        code: !form.code.trim() ? "Ingresá un código." : null,
+        value: !(Number(form.value) > 0) ? "Ingresá un valor mayor a 0." : null,
+      });
+      if (!ok) return;
+    }
+    setStep((s) => Math.min(2, s + 1));
+  }
+  function back() {
+    setStep((s) => Math.max(0, s - 1));
+  }
+
   async function submit() {
     setErr(null);
     const ok = fe.check({
@@ -256,262 +275,299 @@ export function CouponForm({
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_300px] lg:items-start">
       <div className="flex flex-col gap-4">
-        <div className={`field ${fe.errors.code ? "invalid" : ""}`}>
-          <label htmlFor="cp-code">Código del cupón</label>
-          <input
-            id="cp-code"
-            className="input"
-            placeholder="HEFESTO15"
-            style={{
-              textTransform: "uppercase",
-              fontFamily: "var(--font-display), sans-serif",
-              letterSpacing: ".05em",
-            }}
-            aria-invalid={!!fe.errors.code}
-            value={form.code}
-            onChange={(e) => set("code", e.target.value)}
-          />
-          {fe.errors.code ? (
-            <p className="field-error">{fe.errors.code}</p>
-          ) : null}
+        <div className="flex items-center gap-2">
+          {STEPS.map((label, i) => (
+            <div key={label} className="flex flex-1 items-center gap-2">
+              <div
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold ${
+                  i === step
+                    ? "bg-[var(--gold)] text-black"
+                    : i < step
+                      ? "bg-[rgba(var(--gold-rgb),.2)] text-[var(--gold-bright)]"
+                      : "text-dim bg-[var(--surface-2)]"
+                }`}
+              >
+                {i < step ? "✓" : i + 1}
+              </div>
+              <span
+                className={`hidden text-[12.5px] sm:inline ${
+                  i === step ? "text-fg font-medium" : "text-faint"
+                }`}
+              >
+                {label}
+              </span>
+            </div>
+          ))}
         </div>
 
-        <div className="field">
-          <label htmlFor="cp-desc">Descripción</label>
-          <input
-            id="cp-desc"
-            className="input"
-            placeholder="15% en toda la tienda"
-            value={form.description}
-            onChange={(e) => set("description", e.target.value)}
-          />
-        </div>
+        {step === 0 ? (
+          <>
+            <div className={`field ${fe.errors.code ? "invalid" : ""}`}>
+              <label htmlFor="cp-code">Código del cupón</label>
+              <input
+                id="cp-code"
+                className="input"
+                placeholder="HEFESTO15"
+                style={{
+                  textTransform: "uppercase",
+                  fontFamily: "var(--font-display), sans-serif",
+                  letterSpacing: ".05em",
+                }}
+                aria-invalid={!!fe.errors.code}
+                value={form.code}
+                onChange={(e) => set("code", e.target.value)}
+              />
+              {fe.errors.code ? (
+                <p className="field-error">{fe.errors.code}</p>
+              ) : null}
+            </div>
 
-        <div className="field">
-          <label>Tipo de descuento</label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              className={`chip flex-1 justify-center ${form.type === "percentage" ? "active" : ""}`}
-              onClick={() => set("type", "percentage")}
-            >
-              <b style={{ fontSize: 15 }}>%</b> Porcentaje
-            </button>
-            <button
-              type="button"
-              className={`chip flex-1 justify-center ${form.type === "fixed" ? "active" : ""}`}
-              onClick={() => set("type", "fixed")}
-            >
-              <b style={{ fontSize: 15 }}>$</b> Monto fijo
-            </button>
-          </div>
-        </div>
+            <div className="field">
+              <label htmlFor="cp-desc">Descripción</label>
+              <input
+                id="cp-desc"
+                className="input"
+                placeholder="15% en toda la tienda"
+                value={form.description}
+                onChange={(e) => set("description", e.target.value)}
+              />
+            </div>
 
-        <div className="field">
-          <label htmlFor="cp-value">
-            Valor {form.type === "percentage" ? "(%)" : "($)"}
-          </label>
-          <input
-            id="cp-value"
-            type="number"
-            className="input"
-            placeholder={form.type === "percentage" ? "15" : "2000"}
-            aria-invalid={!!fe.errors.value}
-            value={form.value}
-            onChange={(e) => set("value", e.target.value)}
-          />
-          {fe.errors.value ? (
-            <p className="field-error">{fe.errors.value}</p>
-          ) : null}
-          <div className="text-faint text-[11.5px]">
-            {form.type === "percentage"
-              ? "Un número de 1 a 100 (%)."
-              : "Un monto en pesos ($)."}
-          </div>
-        </div>
+            <div className="field">
+              <label>Tipo de descuento</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className={`chip flex-1 justify-center ${form.type === "percentage" ? "active" : ""}`}
+                  onClick={() => set("type", "percentage")}
+                >
+                  <b style={{ fontSize: 15 }}>%</b> Porcentaje
+                </button>
+                <button
+                  type="button"
+                  className={`chip flex-1 justify-center ${form.type === "fixed" ? "active" : ""}`}
+                  onClick={() => set("type", "fixed")}
+                >
+                  <b style={{ fontSize: 15 }}>$</b> Monto fijo
+                </button>
+              </div>
+            </div>
 
-        <div className="field">
-          <label htmlFor="cp-scope">Aplica a</label>
-          <select
-            id="cp-scope"
-            className="select"
-            value={form.scope}
-            onChange={(e) => {
-              set("scope", e.target.value);
-              set("targetId", "");
-            }}
-          >
-            <option value="all">Todo el carrito</option>
-            <option value="product">Un producto</option>
-            <option value="category">Una categoría</option>
-          </select>
-          {form.scope === "product" ? (
-            <div className="mt-2">
-              {products.find((p) => p.id === form.targetId) ? (
-                <div className="flex items-center gap-2">
-                  <span className="chip active">
-                    {products.find((p) => p.id === form.targetId)?.name}
-                  </span>
-                  <button
-                    type="button"
-                    className="text-[12px]"
-                    style={{ color: "var(--gold-bright)" }}
-                    onClick={() => {
-                      set("targetId", "");
-                      setProdQuery("");
-                    }}
-                  >
-                    Cambiar
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <input
-                    className="input"
-                    placeholder="Buscar producto…"
-                    value={prodQuery}
-                    onChange={(e) => setProdQuery(e.target.value)}
-                  />
-                  {prodQuery.trim() ? (
-                    <div className="mt-1 max-h-44 overflow-auto rounded-md border border-[var(--border)]">
-                      {products
-                        .filter((p) =>
-                          p.name
-                            .toLowerCase()
-                            .includes(prodQuery.trim().toLowerCase()),
-                        )
-                        .slice(0, 30)
-                        .map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            className="block w-full px-3 py-2 text-left text-sm transition hover:bg-[var(--surface-2)]"
-                            onClick={() => {
-                              set("targetId", p.id);
-                              setProdQuery("");
-                            }}
-                          >
-                            {p.name}
-                          </button>
-                        ))}
-                      {products.filter((p) =>
-                        p.name
-                          .toLowerCase()
-                          .includes(prodQuery.trim().toLowerCase()),
-                      ).length === 0 ? (
-                        <div className="text-faint px-3 py-2 text-[12px]">
-                          Sin resultados
-                        </div>
-                      ) : null}
+            <div className="field">
+              <label htmlFor="cp-value">
+                Valor {form.type === "percentage" ? "(%)" : "($)"}
+              </label>
+              <input
+                id="cp-value"
+                type="number"
+                className="input"
+                placeholder={form.type === "percentage" ? "15" : "2000"}
+                aria-invalid={!!fe.errors.value}
+                value={form.value}
+                onChange={(e) => set("value", e.target.value)}
+              />
+              {fe.errors.value ? (
+                <p className="field-error">{fe.errors.value}</p>
+              ) : null}
+              <div className="text-faint text-[11.5px]">
+                {form.type === "percentage"
+                  ? "Un número de 1 a 100 (%)."
+                  : "Un monto en pesos ($)."}
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        {step === 1 ? (
+          <>
+            <div className="field">
+              <label htmlFor="cp-scope">Aplica a</label>
+              <select
+                id="cp-scope"
+                className="select"
+                value={form.scope}
+                onChange={(e) => {
+                  set("scope", e.target.value);
+                  set("targetId", "");
+                }}
+              >
+                <option value="all">Todo el carrito</option>
+                <option value="product">Un producto</option>
+                <option value="category">Una categoría</option>
+              </select>
+              {form.scope === "product" ? (
+                <div className="mt-2">
+                  {products.find((p) => p.id === form.targetId) ? (
+                    <div className="flex items-center gap-2">
+                      <span className="chip active">
+                        {products.find((p) => p.id === form.targetId)?.name}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-[12px]"
+                        style={{ color: "var(--gold-bright)" }}
+                        onClick={() => {
+                          set("targetId", "");
+                          setProdQuery("");
+                        }}
+                      >
+                        Cambiar
+                      </button>
                     </div>
                   ) : (
-                    <div className="text-faint mt-1 text-[11.5px]">
-                      Escribí para buscar el producto.
-                    </div>
+                    <>
+                      <input
+                        className="input"
+                        placeholder="Buscar producto…"
+                        value={prodQuery}
+                        onChange={(e) => setProdQuery(e.target.value)}
+                      />
+                      {prodQuery.trim() ? (
+                        <div className="mt-1 max-h-44 overflow-auto rounded-md border border-[var(--border)]">
+                          {products
+                            .filter((p) =>
+                              p.name
+                                .toLowerCase()
+                                .includes(prodQuery.trim().toLowerCase()),
+                            )
+                            .slice(0, 30)
+                            .map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                className="block w-full px-3 py-2 text-left text-sm transition hover:bg-[var(--surface-2)]"
+                                onClick={() => {
+                                  set("targetId", p.id);
+                                  setProdQuery("");
+                                }}
+                              >
+                                {p.name}
+                              </button>
+                            ))}
+                          {products.filter((p) =>
+                            p.name
+                              .toLowerCase()
+                              .includes(prodQuery.trim().toLowerCase()),
+                          ).length === 0 ? (
+                            <div className="text-faint px-3 py-2 text-[12px]">
+                              Sin resultados
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="text-faint mt-1 text-[11.5px]">
+                          Escribí para buscar el producto.
+                        </div>
+                      )}
+                    </>
                   )}
-                </>
-              )}
+                </div>
+              ) : form.scope === "category" ? (
+                <select
+                  className="select mt-2"
+                  value={form.targetId}
+                  onChange={(e) => set("targetId", e.target.value)}
+                >
+                  <option value="">— Elegí una categoría —</option>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
+              <div className="text-faint text-[11.5px]">
+                {form.scope === "all"
+                  ? "El descuento se aplica a toda la compra."
+                  : "El descuento se aplica SOLO a lo elegido."}
+              </div>
             </div>
-          ) : form.scope === "category" ? (
-            <select
-              className="select mt-2"
-              value={form.targetId}
-              onChange={(e) => set("targetId", e.target.value)}
-            >
-              <option value="">— Elegí una categoría —</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          ) : null}
-          <div className="text-faint text-[11.5px]">
-            {form.scope === "all"
-              ? "El descuento se aplica a toda la compra."
-              : "El descuento se aplica SOLO a lo elegido."}
-          </div>
-        </div>
 
-        <label className="text-fg flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="accent-[var(--gold)]"
-            checked={form.birthdayOnly}
-            onChange={(e) => set("birthdayOnly", e.target.checked)}
-          />
-          Solo en la semana del cumpleaños del cliente
-        </label>
+            <label className="text-fg flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="accent-[var(--gold)]"
+                checked={form.birthdayOnly}
+                onChange={(e) => set("birthdayOnly", e.target.checked)}
+              />
+              Solo en la semana del cumpleaños del cliente
+            </label>
+          </>
+        ) : null}
 
-        <div className="field">
-          <label>Link directo (opcional)</label>
-          <div className="flex items-center gap-2">
-            <input
-              className="input"
-              readOnly
-              placeholder="Escribí el código primero"
-              value={
-                form.code.trim()
-                  ? `${typeof window !== "undefined" ? window.location.origin : ""}/catalogo?cupon=${form.code.trim().toUpperCase()}`
-                  : ""
-              }
-            />
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              disabled={!form.code.trim()}
-              onClick={() => {
-                const url = `${window.location.origin}/catalogo?cupon=${form.code.trim().toUpperCase()}`;
-                void navigator.clipboard?.writeText(url);
-                toast("Link copiado", "success");
-              }}
-            >
-              Copiar
-            </button>
-          </div>
-          <div className="text-faint text-[11.5px]">
-            Compartilo: al abrirlo, el cupón queda aplicado solo.
-          </div>
-        </div>
+        {step === 2 ? (
+          <>
+            <div className="field">
+              <label>Link directo (opcional)</label>
+              <div className="flex items-center gap-2">
+                <input
+                  className="input"
+                  readOnly
+                  placeholder="Escribí el código primero"
+                  value={
+                    form.code.trim()
+                      ? `${typeof window !== "undefined" ? window.location.origin : ""}/catalogo?cupon=${form.code.trim().toUpperCase()}`
+                      : ""
+                  }
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={!form.code.trim()}
+                  onClick={() => {
+                    const url = `${window.location.origin}/catalogo?cupon=${form.code.trim().toUpperCase()}`;
+                    void navigator.clipboard?.writeText(url);
+                    toast("Link copiado", "success");
+                  }}
+                >
+                  Copiar
+                </button>
+              </div>
+              <div className="text-faint text-[11.5px]">
+                Compartilo: al abrirlo, el cupón queda aplicado solo.
+              </div>
+            </div>
 
-        <div className="field">
-          <label htmlFor="cp-limit">Usos máximos</label>
-          <input
-            id="cp-limit"
-            type="number"
-            className="input"
-            placeholder="Sin límite"
-            value={form.maxUses}
-            onChange={(e) => set("maxUses", e.target.value)}
-          />
-          <div className="text-faint text-[11.5px]">
-            Vacío = se puede usar sin límite.
-          </div>
-        </div>
+            <div className="field">
+              <label htmlFor="cp-limit">Usos máximos</label>
+              <input
+                id="cp-limit"
+                type="number"
+                className="input"
+                placeholder="Sin límite"
+                value={form.maxUses}
+                onChange={(e) => set("maxUses", e.target.value)}
+              />
+              <div className="text-faint text-[11.5px]">
+                Vacío = se puede usar sin límite.
+              </div>
+            </div>
 
-        <div className="field">
-          <label htmlFor="cp-exp">Vence el</label>
-          <input
-            id="cp-exp"
-            type="date"
-            className="input"
-            value={form.expiresAt}
-            onChange={(e) => set("expiresAt", e.target.value)}
-          />
-          <div className="text-faint text-[11.5px]">
-            Vacío = sin fecha de vencimiento.
-          </div>
-        </div>
+            <div className="field">
+              <label htmlFor="cp-exp">Vence el</label>
+              <input
+                id="cp-exp"
+                type="date"
+                className="input"
+                value={form.expiresAt}
+                onChange={(e) => set("expiresAt", e.target.value)}
+              />
+              <div className="text-faint text-[11.5px]">
+                Vacío = sin fecha de vencimiento.
+              </div>
+            </div>
 
-        <label className="text-dim flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            className="accent-[var(--gold)]"
-            checked={form.isActive}
-            onChange={(e) => set("isActive", e.target.checked)}
-          />
-          Cupón activo
-        </label>
+            <label className="text-dim flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="accent-[var(--gold)]"
+                checked={form.isActive}
+                onChange={(e) => set("isActive", e.target.checked)}
+              />
+              Cupón activo
+            </label>
+          </>
+        ) : null}
 
         {err ? (
           <p className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
@@ -519,17 +575,23 @@ export function CouponForm({
           </p>
         ) : null}
 
-        <div className="flex justify-end gap-2 border-t border-[var(--border)] pt-4">
+        <div className="flex justify-between gap-2 border-t border-[var(--border)] pt-4">
           <Button
             type="button"
             variant="secondary"
-            onClick={() => onCancel?.()}
+            onClick={step === 0 ? () => onCancel?.() : back}
           >
-            Cancelar
+            {step === 0 ? "Cancelar" : "← Atrás"}
           </Button>
-          <Button type="button" onClick={submit} loading={busy}>
-            {busy ? "Guardando…" : edit ? "Guardar" : "Crear cupón"}
-          </Button>
+          {step < 2 ? (
+            <Button type="button" onClick={next}>
+              Siguiente →
+            </Button>
+          ) : (
+            <Button type="button" onClick={submit} loading={busy}>
+              {busy ? "Guardando…" : edit ? "Guardar" : "Crear cupón"}
+            </Button>
+          )}
         </div>
       </div>
 
