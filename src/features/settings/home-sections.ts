@@ -9,7 +9,7 @@ export const HOME_SECTIONS: Array<{ id: string; label: string; icon: string }> =
     { id: "materiales", label: "Materiales", icon: "layers" },
     { id: "masVendidos", label: "Más vendidos", icon: "star" },
     { id: "comoFunciona", label: "¿Cómo funciona?", icon: "printer" },
-    { id: "galeria", label: "Galería", icon: "image" },
+    { id: "galeria", label: "Galería de Instagram", icon: "image" },
     { id: "faq", label: "Preguntas frecuentes", icon: "alert" },
     { id: "pedidoMedida", label: "Pedido a medida", icon: "palette" },
   ];

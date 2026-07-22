@@ -76,7 +76,8 @@ export function GalleryEditor({
     <div className="flex flex-col gap-3">
       <p className="text-faint text-[12.5px] leading-relaxed">
         Subí tus mejores fotos de impresiones (hasta 12). Se muestran en la
-        galería del home. Quedan mejor fotos parejas (cuadradas).
+        Galería de Instagram del home, con un botón que lleva a tu perfil (el
+        usuario sale de Config → Negocio). Quedan mejor fotos parejas.
       </p>
 
       {items.length > 0 ? (

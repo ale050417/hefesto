@@ -197,6 +197,12 @@ export default async function Home({
   // FAQ editable: si el dueño cargó preguntas desde Config, usamos esas; si no,
   // las de por defecto (compactas).
   const faqList = brand.faq?.length ? brand.faq : DEFAULT_FAQ;
+  // Link a Instagram desde el handle configurado (Config → Negocio).
+  const igUrl = brand.instagram
+    ? brand.instagram.startsWith("http")
+      ? brand.instagram
+      : `https://instagram.com/${brand.instagram.replace(/^@/, "")}`
+    : null;
   // "Hefesto en números": piezas y clientes REALES (pedidos finalizados); si la
   // consulta falla, el fallback deja el bloque en 0 sin romper el home.
   const stats = statsR.value;
@@ -486,8 +492,8 @@ export default async function Home({
           <div className="store-wrap">
             <div className="sec-head">
               <div>
-                <div className="eyebrow">Nuestro trabajo</div>
-                <h2 className="sec-title">Galería</h2>
+                <div className="eyebrow">{brand.instagram ?? "Seguinos"}</div>
+                <h2 className="sec-title">Galería de Instagram</h2>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
@@ -511,6 +517,18 @@ export default async function Home({
                 </div>
               ))}
             </div>
+            {igUrl ? (
+              <div className="mt-6 flex justify-center">
+                <a
+                  href={igUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={buttonVariants({ variant: "secondary" })}
+                >
+                  Seguinos en Instagram
+                </a>
+              </div>
+            ) : null}
           </div>
         </section>
       ) : null}
