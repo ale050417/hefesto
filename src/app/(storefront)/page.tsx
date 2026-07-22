@@ -14,6 +14,7 @@ import { safeLoad } from "@/lib/safe-load";
 import { sectionOn } from "@/features/settings/home-sections";
 import { PreviewBridge } from "@/features/settings/components/preview-bridge";
 import { CountUp } from "@/components/home/count-up";
+import { CategoryCircles } from "@/components/home/category-circles";
 import type { ProductView } from "@/features/products/types";
 
 export const dynamic = "force-dynamic";
@@ -235,6 +236,9 @@ export default async function Home({
       getBrandSettings(),
       safeLoad("estadísticas", getHomeStats(), { pieces: 0, customers: 0 }),
     ]);
+  // En el home mostramos SOLO las categorías padre (las subcategorías se
+  // navegan dentro del catálogo). Se ven como círculos en un carrusel.
+  const parentCategories = categories.filter((c) => !c.parentId);
   // "Hefesto en números": piezas y clientes REALES (pedidos finalizados); si la
   // consulta falla, el fallback deja el bloque en 0 sin romper el home.
   const stats = statsR.value;
@@ -328,7 +332,7 @@ export default async function Home({
         </section>
       ) : null}
 
-      {categories.length > 0 && show("categorias") ? (
+      {parentCategories.length > 0 && show("categorias") ? (
         <section
           data-home-section="categorias"
           style={previewHidden("categorias")}
@@ -347,60 +351,7 @@ export default async function Home({
                 Ver todo &rarr;
               </Link>
             </div>
-            <div className="cat-row">
-              {categories.map((category) => (
-                <Link
-                  key={category.id}
-                  href={`/catalogo?category=${category.slug}`}
-                  className="cat-chip"
-                  style={
-                    { "--cc": category.color ?? "var(--gold)" } as CSSProperties
-                  }
-                >
-                  <span className="cat-chip-ic" style={{ overflow: "hidden" }}>
-                    {category.imageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={category.imageUrl}
-                        alt=""
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          borderRadius: "inherit",
-                        }}
-                      />
-                    ) : category.icon && paths[category.icon] ? (
-                      <Icon name={category.icon} size={19} />
-                    ) : (
-                      <span>&#9670;</span>
-                    )}
-                  </span>
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="cat-chip-name truncate">
-                      {category.name}
-                    </span>
-                    <span className="cat-chip-count">
-                      {category.productCount}{" "}
-                      {category.productCount === 1 ? "producto" : "productos"}
-                    </span>
-                  </span>
-                  <span className="cat-chip-arrow">
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden
-                    >
-                      <path d="M5 12h14M13 6l6 6-6 6" />
-                    </svg>
-                  </span>
-                </Link>
-              ))}
-            </div>
+            <CategoryCircles categories={parentCategories} />
           </div>
         </section>
       ) : null}

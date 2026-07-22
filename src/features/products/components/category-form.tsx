@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import {
@@ -141,6 +141,30 @@ export function CategoryForm({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Vista previa: así se ve el círculo en el home, en vivo. */}
+      <div className="flex flex-col items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] py-4">
+        <span className="text-faint text-[10.5px] font-semibold tracking-wide uppercase">
+          Vista previa
+        </span>
+        <span
+          className="cat-circle-ring"
+          style={{ "--cc": color } as CSSProperties}
+        >
+          {imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt=""
+              width={90}
+              height={90}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <IconSvg name={icon} />
+          )}
+        </span>
+        <span className="cat-circle-name">{name.trim() || "Categoría"}</span>
+      </div>
+
       <div className="flex items-center gap-4">
         <div
           className="kpi-ic"

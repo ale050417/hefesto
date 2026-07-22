@@ -906,6 +906,99 @@ body > * {
     color: var(--cc, var(--gold));
   }
 
+  /* Carrusel de categorías (círculos tipo "historias") */
+  .cat-carousel {
+    display: flex;
+    gap: 20px;
+    overflow-x: auto;
+    padding: 8px 2px 12px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    cursor: grab;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 4%,
+      #000 96%,
+      transparent
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      #000 4%,
+      #000 96%,
+      transparent
+    );
+  }
+  .cat-carousel::-webkit-scrollbar {
+    display: none;
+  }
+  .cat-carousel:active {
+    cursor: grabbing;
+  }
+  /* Pocas categorías: no tiene sentido moverse, las centramos. */
+  .cat-carousel--static {
+    justify-content: center;
+    flex-wrap: wrap;
+    overflow: visible;
+    cursor: default;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .cat-circle {
+    flex: 0 0 auto;
+    width: 108px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    text-align: center;
+    scroll-snap-align: center;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  .cat-circle-ring {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--cc, var(--gold)) 14%, transparent);
+    border: 2px solid
+      color-mix(in srgb, var(--cc, var(--gold)) 42%, transparent);
+    color: var(--cc, var(--gold-bright));
+    transition:
+      transform 0.22s ease,
+      border-color 0.22s ease,
+      box-shadow 0.22s ease;
+  }
+  .cat-circle-ring svg {
+    width: 34px;
+    height: 34px;
+  }
+  .cat-circle:hover .cat-circle-ring {
+    transform: translateY(-3px) scale(1.04);
+    border-color: color-mix(in srgb, var(--cc, var(--gold)) 70%, transparent);
+    box-shadow: 0 10px 24px -10px
+      color-mix(in srgb, var(--cc, var(--gold)) 60%, transparent);
+  }
+  .cat-circle-name {
+    font-family: var(--font-display), sans-serif;
+    font-weight: 600;
+    font-size: 13.5px;
+    line-height: 1.15;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cat-circle-count {
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+
   /* Chips de filtro */
   .chip {
     padding: 8px 14px;
