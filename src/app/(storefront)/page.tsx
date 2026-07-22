@@ -109,7 +109,7 @@ const DEFAULT_TRUST = [
     t: "Pago 100% seguro",
     d: "MercadoPago, transferencia y efectivo",
   },
-  { ic: "layers", t: "Materiales premium", d: "PLA, PETG, TPU y resina" },
+  { ic: "layers", t: "Materiales premium", d: "PLA de primera calidad" },
   {
     ic: "refresh",
     t: "Reimpresión garantizada",
@@ -122,24 +122,6 @@ const materials: Array<[string, string, string, string]> = [
     "#4CB782",
     "Resistente y versátil",
     "Ideal para deco, figuras y prototipos. Amplia gama de colores.",
-  ],
-  [
-    "PETG",
-    "#5A9CD9",
-    "Fuerte y flexible",
-    "Soportes, piezas funcionales y de exterior. Muy durable.",
-  ],
-  [
-    "TPU",
-    "#C9A84C",
-    "Flexible tipo goma",
-    "Fundas, topes y piezas que necesitan elasticidad.",
-  ],
-  [
-    "Resina",
-    "#9B7BD4",
-    "Máximo detalle",
-    "Figuras y miniaturas con acabado ultra fino 8K.",
   ],
 ];
 const steps = [
@@ -158,14 +140,6 @@ const steps = [
     t: "Llega a tu puerta",
     d: "Envío a todo el país o retiro en el taller.",
   },
-];
-const testimonials: Array<[string, string]> = [
-  [
-    "Martina A.",
-    "La lámpara lunar superó mis expectativas. Calidad impecable y llegó en 2 días.",
-  ],
-  ["Lucas F.", "Pedí un set de dados personalizado. Detalle increíble."],
-  ["Sofía B.", "El dragón articulado es una locura. Mis hijos lo aman."],
 ];
 // Las preguntas del FAQ salen de brand.faq (editable desde Config → Tienda);
 // si no se editó nada, se usan las DEFAULT_FAQ (importadas arriba).
@@ -503,33 +477,37 @@ export default async function Home({
         </section>
       ) : null}
 
-      {/* Reseñas ocultas (2026-07): reactivar → show("testimonios") */}
-      {false ? (
+      {show("galeria") && (brand.gallery?.length ?? 0) > 0 ? (
         <section
-          data-home-section="testimonios"
-          style={previewHidden("testimonios")}
+          data-home-section="galeria"
+          style={previewHidden("galeria")}
           className="store-section pt-0"
         >
           <div className="store-wrap">
             <div className="sec-head">
               <div>
-                <div className="eyebrow">Lo que dicen</div>
-                <h2 className="sec-title">Clientes felices</h2>
+                <div className="eyebrow">Nuestro trabajo</div>
+                <h2 className="sec-title">Galería</h2>
               </div>
             </div>
-            <div className="grid-3">
-              {testimonials.map(([name, quote]) => (
-                <div key={name} className="testi">
-                  <div className="stars">
-                    {[0, 1, 2, 3, 4].map((i) => (
-                      <Icon key={i} name="star" size={16} />
-                    ))}
-                  </div>
-                  <p>&ldquo;{quote}&rdquo;</p>
-                  <div className="flex items-center gap-2">
-                    <span className="avatar">{name[0]}</span>
-                    <b className="text-sm">{name}</b>
-                  </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+              {brand.gallery?.map((g, i) => (
+                <div
+                  key={i}
+                  className="overflow-hidden rounded-lg border border-[var(--border)]"
+                  style={{ aspectRatio: "1 / 1" }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={g.url}
+                    alt=""
+                    loading="lazy"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
                 </div>
               ))}
             </div>

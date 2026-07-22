@@ -109,6 +109,70 @@ export async function uploadBannerImageAction(
   }
 }
 
+/** Sube una foto para la galería curada del home y devuelve su URL (sin tabla:
+ *  la lista de URLs se guarda en business_settings.gallery). */
+export async function uploadGalleryImageAction(
+  formData: FormData,
+): Promise<ActionResult<{ url: string }>> {
+  if (!(await can("config", "editar"))) {
+    return {
+      ok: false,
+      error: { code: "UNAUTHORIZED", message: "No autorizado" },
+    };
+  }
+  const file = formData.get("file");
+  if (!(file instanceof File)) return validationError("Falta el archivo");
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return validationError("Formato no permitido (JPG, PNG o WebP)");
+  }
+  if (file.size > MAX_BYTES) {
+    return validationError("El archivo supera los 8 MB");
+  }
+  try {
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const webp = await optimizeImage(bytes, 1200);
+    const url = await uploadObject(
+      "products",
+      `gallery/foto-${Date.now()}.webp`,
+      webp,
+      "image/webp",
+    );
+    return { ok: true, data: { url } };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+// Galería curada del home: lista de fotos (URLs). Se guarda en
+// business_settings.gallery. Vacío = no se muestra la sección.
+const gallerySchema = z.object({
+  items: z.array(z.object({ url: z.string().trim().url().max(2048) })).max(12),
+});
+
+export async function saveGalleryAction(input: unknown): Promise<ActionResult> {
+  if (!(await can("config", "editar"))) {
+    return {
+      ok: false,
+      error: { code: "UNAUTHORIZED", message: "No autorizado" },
+    };
+  }
+  const parsed = gallerySchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION", message: "Revisá la galería." },
+    };
+  }
+  try {
+    await saveAppearance({ gallery: parsed.data.items });
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/configuracion");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
 const businessInfoSchema = z.object({
   storeName: z.string().trim().max(120).optional().or(z.literal("")),
   slogan: z.string().trim().max(120).optional().or(z.literal("")),

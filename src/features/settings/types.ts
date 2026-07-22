@@ -55,5 +55,6 @@ export type BrandSettings = {
   homeSections: Record<string, boolean> | null;
   trustBar: Array<{ ic: string; t: string; d: string }> | null;
   faq: Array<{ q: string; a: string }> | null;
+  gallery: Array<{ url: string }> | null;
   bannerIntervalSec: number;
 };

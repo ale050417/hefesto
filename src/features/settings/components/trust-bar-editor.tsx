@@ -21,7 +21,7 @@ const DEFAULTS: TrustItem[] = [
     t: "Pago 100% seguro",
     d: "MercadoPago, transferencia y efectivo",
   },
-  { ic: "layers", t: "Materiales premium", d: "PLA, PETG, TPU y resina" },
+  { ic: "layers", t: "Materiales premium", d: "PLA de primera calidad" },
   {
     ic: "refresh",
     t: "Reimpresión garantizada",
@@ -36,7 +36,16 @@ const LABELS: Record<string, string> = {
   refresh: "Garantía",
 };
 
-export function TrustBarEditor({ initial }: { initial: TrustItem[] | null }) {
+export function TrustBarEditor({
+  initial,
+  onSaved,
+  bare = false,
+}: {
+  initial: TrustItem[] | null;
+  onSaved?: () => void;
+  /** Sin la tarjeta/título propios (los pone el contenedor SectionCard). */
+  bare?: boolean;
+}) {
   const [items, setItems] = useState<TrustItem[]>(
     initial && initial.length > 0 ? initial : DEFAULTS,
   );
@@ -53,18 +62,15 @@ export function TrustBarEditor({ initial }: { initial: TrustItem[] | null }) {
     setBusy(false);
     if (!res.ok) return toast(res.error.message, "danger");
     toast("Banda de confianza guardada", "success");
+    onSaved?.();
   }
 
-  return (
-    <div className="ui-card section-card flex flex-col gap-4">
-      <div>
-        <h2 className="section-title">Banda de confianza</h2>
-        <p className="text-faint text-[12.5px] leading-relaxed">
-          Los 4 puntos de confianza que se ven arriba en la tienda. Editá el
-          título y el texto de cada uno; el ícono queda fijo.
-        </p>
-      </div>
-
+  const inner = (
+    <>
+      <p className="text-faint text-[12.5px] leading-relaxed">
+        Editá el título y el texto de cada uno de los 4 puntos; el ícono queda
+        fijo.
+      </p>
       {items.map((it, i) => (
         <div
           key={i}
@@ -90,12 +96,22 @@ export function TrustBarEditor({ initial }: { initial: TrustItem[] | null }) {
           />
         </div>
       ))}
-
       <div className="flex justify-end">
         <Button type="button" onClick={save} loading={busy}>
           Guardar banda
         </Button>
       </div>
+    </>
+  );
+
+  if (bare) return <div className="flex flex-col gap-4">{inner}</div>;
+
+  return (
+    <div className="ui-card section-card flex flex-col gap-4">
+      <div>
+        <h2 className="section-title">Banda de confianza</h2>
+      </div>
+      {inner}
     </div>
   );
 }

@@ -41,6 +41,8 @@ export const businessSettings = pgTable(
     // FAQ del home (editable desde Config): lista de preguntas/respuestas.
     // Null/vacío = usa las preguntas por defecto del home.
     faq: jsonb("faq").$type<Array<{ q: string; a: string }>>(),
+    // Galería curada del home: fotos de impresiones reales (URLs de Storage).
+    gallery: jsonb("gallery").$type<Array<{ url: string }>>(),
     // Segundos entre banners del hero (autoplay). Default 5; el mínimo/máximo
     // razonables (3-12s) se validan en el servidor para no quedar ni muy rápido
     // ni demasiado lento.

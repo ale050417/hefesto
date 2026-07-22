@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -19,6 +19,10 @@ import { HOME_SECTIONS, sectionOn } from "../home-sections";
 import type { BusinessSettings, StoreBanner } from "../types";
 import { BrandImageUpload } from "./brand-image-upload";
 import { StoreLivePreview } from "./store-live-preview";
+import { TrustBarEditor } from "./trust-bar-editor";
+import { FaqEditor } from "./faq-editor";
+import { GalleryEditor } from "./gallery-editor";
+import { BannerDurationEditor } from "./banner-duration-editor";
 import { runAction } from "@/lib/run-action";
 import { useDeleteResource } from "@/hooks/use-delete-resource";
 import { useDragReframe } from "@/hooks/use-drag-reframe";
@@ -108,6 +112,104 @@ const EMPTY_BANNER: BannerForm = {
 function parsePos(pos: string | null | undefined): { x: number; y: number } {
   const m = /(-?\d+(?:\.\d+)?)%\s+(-?\d+(?:\.\d+)?)%/.exec(pos ?? "");
   return m ? { x: Number(m[1]), y: Number(m[2]) } : { x: 50, y: 50 };
+}
+
+// Por qué NO se editan a mano ciertas secciones (se arman solas con tus datos).
+const SECTION_WHY: Record<string, string> = {
+  categorias:
+    "Las categorías se crean y editan en Catálogo → Categorías. Acá solo elegís si se muestran.",
+  nuevos: "Se arma solo con los productos marcados como nuevos.",
+  stats:
+    "Usa tus datos reales: piezas entregadas y clientes. No se edita a mano.",
+  ofertas: "Se arma solo con los productos que tengan precio de oferta.",
+  materiales: "Bloque informativo de los materiales con los que imprimís.",
+  masVendidos: "Se arma solo según lo que más vendiste.",
+  comoFunciona:
+    "Los pasos son fijos por ahora; más adelante vas a poder editarlos.",
+  pedidoMedida:
+    "Un bloque con botón directo a WhatsApp para pedidos personalizados.",
+};
+
+/**
+ * Tarjeta de una sección del home con su interruptor. Si está apagada, colapsa
+ * el cuerpo (no muestra datos) y avisa que está oculta; el interruptor queda
+ * visible para volver a prenderla. La vista previa reacciona sola (draft).
+ */
+function SectionCard({
+  label,
+  enabled,
+  onToggle,
+  children,
+}: {
+  label: string;
+  enabled: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="ui-card section-card flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        {/* El título despliega/colapsa (solo si la sección está prendida). */}
+        <button
+          type="button"
+          onClick={() => enabled && setOpen((o) => !o)}
+          disabled={!enabled}
+          aria-expanded={open && enabled}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+          style={{
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: enabled ? "pointer" : "default",
+          }}
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width={16}
+            height={16}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+            style={{
+              flexShrink: 0,
+              opacity: enabled ? 0.7 : 0.25,
+              transform: open && enabled ? "rotate(90deg)" : "none",
+              transition: "transform 0.15s",
+            }}
+          >
+            <path d="M9 18l6-6-6-6" />
+          </svg>
+          <span className="section-title" style={{ margin: 0 }}>
+            {label}
+          </span>
+        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="text-faint text-[11.5px]">
+            {enabled ? "Visible" : "Oculta"}
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enabled}
+            aria-label={label}
+            className={`switch ${enabled ? "on" : ""}`}
+            onClick={onToggle}
+          />
+        </div>
+      </div>
+      {!enabled ? (
+        <p className="text-faint text-[12px]">
+          Oculta en la tienda. Prendé el interruptor para mostrarla.
+        </p>
+      ) : open ? (
+        children
+      ) : null}
+    </div>
+  );
 }
 
 export function StoreAppearance({
@@ -541,36 +643,69 @@ export function StoreAppearance({
               ))
             )}
           </div>
+          {/* Duración del carrusel: es parte del hero, va con los banners. */}
+          <div
+            className="mt-1 flex flex-col gap-2 border-t pt-3"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <div className="text-[13px] font-semibold">
+              Duración del carrusel
+            </div>
+            <BannerDurationEditor
+              bare
+              initial={settings?.bannerIntervalSec ?? null}
+              onSaved={bumpPreview}
+            />
+          </div>
         </div>
 
-        {/* Secciones del home */}
-        <div className="ui-card section-card flex flex-col gap-2">
-          <div>
-            <div className="section-title">Secciones del home</div>
-            <div className="text-faint mt-0.5 text-[12.5px]">
-              Activá o desactivá lo que ve tu cliente en la portada.
-            </div>
-          </div>
-          {HOME_SECTIONS.map((s) => (
-            <div
-              key={s.id}
-              className="ui-card flex items-center justify-between"
-              style={{ padding: "11px 14px" }}
-            >
-              <div className="text-[13.5px] font-semibold">{s.label}</div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={sections[s.id] !== false}
-                aria-label={s.label}
-                className={`switch ${sections[s.id] !== false ? "on" : ""}`}
-                onClick={() =>
-                  setSections((x) => ({ ...x, [s.id]: x[s.id] === false }))
-                }
+        {/* Secciones del home, en el orden en que se ven en la tienda. Cada una
+            con su interruptor: al apagarla se oculta acá y en la vista previa. */}
+        {HOME_SECTIONS.map((s) => {
+          const enabled = sections[s.id] !== false;
+          const toggle = () =>
+            setSections((x) => ({ ...x, [s.id]: x[s.id] === false }));
+          let sectionBody: ReactNode;
+          if (s.id === "trustBar")
+            sectionBody = (
+              <TrustBarEditor
+                bare
+                initial={settings?.trustBar ?? null}
+                onSaved={bumpPreview}
               />
-            </div>
-          ))}
-        </div>
+            );
+          else if (s.id === "faq")
+            sectionBody = (
+              <FaqEditor
+                bare
+                initial={settings?.faq ?? null}
+                onSaved={bumpPreview}
+              />
+            );
+          else if (s.id === "galeria")
+            sectionBody = (
+              <GalleryEditor
+                initial={settings?.gallery ?? null}
+                onSaved={bumpPreview}
+              />
+            );
+          else
+            sectionBody = (
+              <p className="text-faint text-[12.5px] leading-relaxed">
+                {SECTION_WHY[s.id] ?? ""}
+              </p>
+            );
+          return (
+            <SectionCard
+              key={s.id}
+              label={s.label}
+              enabled={enabled}
+              onToggle={toggle}
+            >
+              {sectionBody}
+            </SectionCard>
+          );
+        })}
 
         <button
           type="button"

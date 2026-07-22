@@ -10,9 +10,18 @@ import { DEFAULT_FAQ, type FaqItem } from "../faq-defaults";
 /**
  * Editor de las preguntas frecuentes del home. Lista variable: se pueden
  * agregar, editar y quitar preguntas (hasta 12). Si nunca se guardó nada,
- * arranca con las de por defecto.
+ * arranca con las de por defecto. Con `bare` se incrusta sin tarjeta/título
+ * propios (los pone el contenedor SectionCard).
  */
-export function FaqEditor({ initial }: { initial: FaqItem[] | null }) {
+export function FaqEditor({
+  initial,
+  onSaved,
+  bare = false,
+}: {
+  initial: FaqItem[] | null;
+  onSaved?: () => void;
+  bare?: boolean;
+}) {
   const [items, setItems] = useState<FaqItem[]>(
     initial && initial.length > 0 ? initial : DEFAULT_FAQ,
   );
@@ -42,19 +51,15 @@ export function FaqEditor({ initial }: { initial: FaqItem[] | null }) {
     }
     setItems(clean);
     toast("Preguntas frecuentes guardadas", "success");
+    onSaved?.();
   }
 
-  return (
-    <div className="ui-card section-card flex flex-col gap-4">
-      <div>
-        <h2 className="section-title">Preguntas frecuentes</h2>
-        <p className="text-faint text-[12.5px] leading-relaxed">
-          Las preguntas que se ven en la tienda. Editá, agregá o quitá las que
-          quieras (hasta 12). Si las dejás todas vacías, se usan las de por
-          defecto.
-        </p>
-      </div>
-
+  const inner = (
+    <>
+      <p className="text-faint text-[12.5px] leading-relaxed">
+        Editá, agregá o quitá las que quieras (hasta 12). Si las dejás todas
+        vacías, se usan las de por defecto.
+      </p>
       {items.map((it, i) => (
         <div
           key={i}
@@ -90,7 +95,6 @@ export function FaqEditor({ initial }: { initial: FaqItem[] | null }) {
           />
         </div>
       ))}
-
       <div className="flex items-center justify-between">
         <Button
           type="button"
@@ -104,6 +108,17 @@ export function FaqEditor({ initial }: { initial: FaqItem[] | null }) {
           Guardar preguntas
         </Button>
       </div>
+    </>
+  );
+
+  if (bare) return <div className="flex flex-col gap-4">{inner}</div>;
+
+  return (
+    <div className="ui-card section-card flex flex-col gap-4">
+      <div>
+        <h2 className="section-title">Preguntas frecuentes</h2>
+      </div>
+      {inner}
     </div>
   );
 }

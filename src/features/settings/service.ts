@@ -60,6 +60,7 @@ export const getBrandSettings = unstable_cache(
       homeSections: s?.homeSections ?? null,
       trustBar: s?.trustBar ?? null,
       faq: s?.faq ?? null,
+      gallery: s?.gallery ?? null,
       bannerIntervalSec: s?.bannerIntervalSec ?? 5,
     };
   },
@@ -419,6 +420,7 @@ export type AppearancePatch = {
   homeSections?: Record<string, boolean> | null;
   trustBar?: Array<{ ic: string; t: string; d: string }> | null;
   faq?: Array<{ q: string; a: string }> | null;
+  gallery?: Array<{ url: string }> | null;
   bannerIntervalSec?: number;
 };
 

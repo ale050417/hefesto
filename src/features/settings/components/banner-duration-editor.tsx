@@ -11,7 +11,15 @@ import { saveBannerIntervalAction } from "../actions";
 const MIN = 3;
 const MAX = 12;
 
-export function BannerDurationEditor({ initial }: { initial: number | null }) {
+export function BannerDurationEditor({
+  initial,
+  onSaved,
+  bare = false,
+}: {
+  initial: number | null;
+  onSaved?: () => void;
+  bare?: boolean;
+}) {
   const [sec, setSec] = useState<number>(
     initial && initial >= MIN && initial <= MAX ? initial : 5,
   );
@@ -26,17 +34,15 @@ export function BannerDurationEditor({ initial }: { initial: number | null }) {
     setBusy(false);
     if (!res.ok) return toast(res.error.message, "danger");
     toast("Duración de banners guardada", "success");
+    onSaved?.();
   }
 
-  return (
-    <div className="ui-card section-card flex flex-col gap-3">
-      <div>
-        <h2 className="section-title">Duración de los banners</h2>
-        <p className="text-faint text-[12.5px] leading-relaxed">
-          Segundos que se muestra cada banner antes de pasar al siguiente.
-          Recomendado entre {MIN} y {MAX} segundos.
-        </p>
-      </div>
+  const inner = (
+    <>
+      <p className="text-faint text-[12.5px] leading-relaxed">
+        Segundos que se muestra cada banner antes de pasar al siguiente.
+        Recomendado entre {MIN} y {MAX} segundos.
+      </p>
       <div className="flex flex-wrap items-center gap-3">
         <input
           type="number"
@@ -55,10 +61,21 @@ export function BannerDurationEditor({ initial }: { initial: number | null }) {
         </span>
         <div className="ml-auto">
           <Button type="button" onClick={save} loading={busy}>
-            Guardar
+            Guardar duración
           </Button>
         </div>
       </div>
+    </>
+  );
+
+  if (bare) return <div className="flex flex-col gap-2">{inner}</div>;
+
+  return (
+    <div className="ui-card section-card flex flex-col gap-3">
+      <div>
+        <h2 className="section-title">Duración de los banners</h2>
+      </div>
+      {inner}
     </div>
   );
 }

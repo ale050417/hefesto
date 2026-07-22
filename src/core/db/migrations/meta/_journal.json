@@ -428,6 +428,13 @@
       "when": 1783306500000,
       "tag": "0060_faq",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1783306600000,
+      "tag": "0061_gallery",
+      "breakpoints": true
     }
   ]
 }

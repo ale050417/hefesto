@@ -3468,13 +3468,17 @@ body > * {
     flex-direction: column;
     gap: 10px;
   }
-  /* Desktop: 2 columnas para que el FAQ ocupe menos alto (menos scroll). */
+  /* Desktop: 2 columnas (masonry con `columns`) para que ocupe menos alto SIN
+     acoplar las alturas: al abrir una pregunta, la de al lado NO se estira. */
   @media (min-width: 900px) {
     .faq-list {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px 12px;
-      align-content: start;
+      display: block;
+      columns: 2;
+      column-gap: 12px;
+    }
+    .faq-list > .faq-item {
+      margin-bottom: 10px;
+      break-inside: avoid;
     }
   }
   .faq-item {
