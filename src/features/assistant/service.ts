@@ -128,7 +128,7 @@ MANUAL DEL PANEL (secciones y para qué sirve cada una):
 - Calculadora 3D: presupuesto por pieza (filamento, gramos, horas → precio sugerido). Botones "Tipos y márgenes" y "Configuración global".
 - Configuración: pestañas Negocio, Métodos de pago, Tienda, Envíos y Roles y permisos.
 - Auditoría: registro de las acciones sensibles del equipo (quién hizo qué y cuándo).
-- Barra superior: "Volver a la tienda", selector de tema (claro/oscuro/cálido) y campana de notificaciones (pedido nuevo, mensaje de cliente, stock bajo).
+- Barra superior: "Volver a la tienda", selector de tema (claro/oscuro) y campana de notificaciones (pedido nuevo, mensaje de cliente, stock bajo).
 
 Reglas de datos: usá los DATOS ACTUALES de abajo cuando pregunten por ventas, stock, pedidos o clientes. No inventes números: si un dato no está, decilo y indicá en qué sección verlo. Respuestas cortas: 1 a 4 oraciones salvo que pidan detalle.`;
 

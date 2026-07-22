@@ -10,7 +10,7 @@ import { AssistantWidget } from "@/features/assistant/components/assistant-widge
 
 /**
  * Estructura del panel: topbar SIEMPRE visible (2026-07-11) con las acciones
- * globales — volver a la tienda, tema claro/oscuro/cálido y la campana de
+ * globales — volver a la tienda, tema claro/oscuro y la campana de
  * notificaciones (instancia ÚNICA: antes se montaba también en el sidebar y
  * duplicaba fetch/polling) — + sidebar compacto. En móvil el sidebar es un
  * drawer off-canvas con backdrop; se cierra al navegar, al tocar el backdrop
