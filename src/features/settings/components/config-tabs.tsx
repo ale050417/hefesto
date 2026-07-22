@@ -14,6 +14,7 @@ import { PaymentSettingsForm } from "./payment-settings-form";
 import { RolesManager } from "./roles-manager";
 import { ShippingSettingsForm } from "./shipping-settings-form";
 import { StoreAppearance } from "./store-appearance";
+import { TrustBarEditor } from "./trust-bar-editor";
 
 type Tab = "negocio" | "pagos" | "store" | "envios" | "roles";
 
@@ -66,7 +67,10 @@ export function ConfigTabs({
       {tab === "pagos" ? <PaymentSettingsForm settings={payment} /> : null}
 
       {tab === "store" ? (
-        <StoreAppearance settings={settings} banners={banners} />
+        <div className="flex flex-col gap-5">
+          <StoreAppearance settings={settings} banners={banners} />
+          <TrustBarEditor initial={settings?.trustBar ?? null} />
+        </div>
       ) : null}
 
       {tab === "envios" ? <ShippingSettingsForm settings={shipping} /> : null}

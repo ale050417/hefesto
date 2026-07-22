@@ -34,6 +34,10 @@ export const businessSettings = pgTable(
     seasonDurationSec: integer("season_duration_sec").notNull().default(0),
     // Visibilidad de las secciones del home: { [sectionId]: boolean }.
     homeSections: jsonb("home_sections").$type<Record<string, boolean>>(),
+    // Banda de confianza del home (editable desde Config): 4 ítems con ícono +
+    // título + texto. Null = usa los textos por defecto del home.
+    trustBar:
+      jsonb("trust_bar").$type<Array<{ ic: string; t: string; d: string }>>(),
     // Datos fiscales / operativos (pestaña Negocio).
     cuit: text("cuit"),
     // Cada día tiene dos turnos: mañana y tarde, cada uno con su on/desde/hasta.

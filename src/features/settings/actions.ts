@@ -231,6 +231,41 @@ export async function saveAppearanceAction(
   }
 }
 
+// Banda de confianza del home (H25): 4 ítems con ícono fijo + título/texto
+// editables. Se guarda en business_settings.trust_bar.
+const trustBarSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        ic: z.string().trim().max(24),
+        t: z.string().trim().max(60),
+        d: z.string().trim().max(140),
+      }),
+    )
+    .max(6),
+});
+
+export async function saveTrustBarAction(
+  input: unknown,
+): Promise<ActionResult> {
+  if (!(await can("config", "editar"))) return UNAUTH;
+  const parsed = trustBarSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION", message: "Revisá la banda de confianza." },
+    };
+  }
+  try {
+    await saveAppearance({ trustBar: parsed.data.items });
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/configuracion");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
 const bannerSchema = z.object({
   title: z.string().trim().min(1, "Ingresá un título."),
   subtitle: z.string().trim().max(200).optional().or(z.literal("")),

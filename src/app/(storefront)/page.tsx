@@ -96,7 +96,7 @@ function Icon({ name, size = 21 }: { name: string; size?: number }) {
   );
 }
 
-const trust = [
+const DEFAULT_TRUST = [
   {
     ic: "truck",
     t: "Producción en 48 h",
@@ -238,6 +238,8 @@ export default async function Home({
   // "Hefesto en números": piezas y clientes REALES (pedidos finalizados); si la
   // consulta falla, el fallback deja el bloque en 0 sin romper el home.
   const stats = statsR.value;
+  // Banda de confianza: textos editables desde Config; si no hay, los default.
+  const trust = brand.trustBar?.length ? brand.trustBar : DEFAULT_TRUST;
   const statsNums: Array<{
     value: number;
     suffix?: string;

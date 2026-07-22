@@ -52,6 +52,7 @@ export const getBrandSettings = unstable_cache(
       seasonIntensity: s?.seasonIntensity ?? 16,
       seasonDurationSec: s?.seasonDurationSec ?? 0,
       homeSections: s?.homeSections ?? null,
+      trustBar: s?.trustBar ?? null,
     };
   },
   ["brand-settings-public"],
@@ -408,6 +409,7 @@ export type AppearancePatch = {
   seasonIntensity?: number;
   seasonDurationSec?: number;
   homeSections?: Record<string, boolean> | null;
+  trustBar?: Array<{ ic: string; t: string; d: string }> | null;
 };
 
 export async function saveAppearance(patch: AppearancePatch): Promise<void> {
