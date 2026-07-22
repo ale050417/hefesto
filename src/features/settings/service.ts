@@ -36,7 +36,13 @@ import type {
 // El admin ve sus cambios propagados en ≤60 s, igual que la vidriera.
 export const getBrandSettings = unstable_cache(
   async (): Promise<BrandSettings> => {
-    const s = await getSettings();
+    // Resiliente: si la consulta falla (p. ej. una columna nueva todavía sin
+    // migrar, o la DB no responde), devolvemos los valores por defecto en vez de
+    // tirar toda la tienda/preview. Degrada, no cae (mismo criterio que el resto).
+    const s = await getSettings().catch((error) => {
+      console.error("[settings] getBrandSettings falló, uso defaults:", error);
+      return null;
+    });
     return {
       logoUrl: s?.logoUrl ?? null,
       heroImageUrl: s?.heroImageUrl ?? null,
