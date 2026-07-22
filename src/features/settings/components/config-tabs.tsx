@@ -15,6 +15,7 @@ import { RolesManager } from "./roles-manager";
 import { ShippingSettingsForm } from "./shipping-settings-form";
 import { StoreAppearance } from "./store-appearance";
 import { TrustBarEditor } from "./trust-bar-editor";
+import { FaqEditor } from "./faq-editor";
 import { BannerDurationEditor } from "./banner-duration-editor";
 
 type Tab = "negocio" | "pagos" | "store" | "envios" | "roles";
@@ -71,6 +72,7 @@ export function ConfigTabs({
         <div className="flex flex-col gap-5">
           <StoreAppearance settings={settings} banners={banners} />
           <TrustBarEditor initial={settings?.trustBar ?? null} />
+          <FaqEditor initial={settings?.faq ?? null} />
           <BannerDurationEditor initial={settings?.bannerIntervalSec ?? null} />
         </div>
       ) : null}

@@ -38,7 +38,7 @@ export function TopBanner() {
         <circle cx="5.5" cy="18.5" r="2" />
         <circle cx="17.5" cy="18.5" r="2" />
       </svg>
-      <span>Envío gratis en compras +$30.000</span>
+      <span>Envíos a todo el país · coordinamos el tuyo por WhatsApp</span>
       <button
         type="button"
         aria-label="Cerrar aviso"

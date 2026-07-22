@@ -266,6 +266,41 @@ export async function saveTrustBarAction(
   }
 }
 
+// FAQ del home editable: lista de preguntas/respuestas. Vacío = usa las
+// preguntas por defecto del home. Se guarda en business_settings.faq.
+const faqSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        q: z.string().trim().min(1).max(140),
+        a: z.string().trim().min(1).max(600),
+      }),
+    )
+    .max(12),
+});
+
+export async function saveFaqAction(input: unknown): Promise<ActionResult> {
+  if (!(await can("config", "editar"))) return UNAUTH;
+  const parsed = faqSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "Revisá las preguntas frecuentes.",
+      },
+    };
+  }
+  try {
+    await saveAppearance({ faq: parsed.data.items });
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/configuracion");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
 // Duración entre banners (H28): segundos de autoplay del carrusel, acotado a un
 // rango razonable (3 a 12 s) para que no quede ni muy rápido ni muy lento.
 const bannerIntervalSchema = z.object({

@@ -59,6 +59,7 @@ export const getBrandSettings = unstable_cache(
       seasonDurationSec: s?.seasonDurationSec ?? 0,
       homeSections: s?.homeSections ?? null,
       trustBar: s?.trustBar ?? null,
+      faq: s?.faq ?? null,
       bannerIntervalSec: s?.bannerIntervalSec ?? 5,
     };
   },
@@ -417,6 +418,7 @@ export type AppearancePatch = {
   seasonDurationSec?: number;
   homeSections?: Record<string, boolean> | null;
   trustBar?: Array<{ ic: string; t: string; d: string }> | null;
+  faq?: Array<{ q: string; a: string }> | null;
   bannerIntervalSec?: number;
 };
 

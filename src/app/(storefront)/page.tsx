@@ -15,6 +15,7 @@ import { sectionOn } from "@/features/settings/home-sections";
 import { PreviewBridge } from "@/features/settings/components/preview-bridge";
 import { CountUp } from "@/components/home/count-up";
 import { CategoryCircles } from "@/components/home/category-circles";
+import { DEFAULT_FAQ } from "@/features/settings/faq-defaults";
 import type { ProductView } from "@/features/products/types";
 
 export const dynamic = "force-dynamic";
@@ -166,40 +167,8 @@ const testimonials: Array<[string, string]> = [
   ["Lucas F.", "Pedí un set de dados personalizado. Detalle increíble."],
   ["Sofía B.", "El dragón articulado es una locura. Mis hijos lo aman."],
 ];
-const faqs: Array<[string, string]> = [
-  [
-    "¿Cuánto tarda mi pedido?",
-    "Todo se imprime a pedido, así que el tiempo depende de la pieza: el estimado figura en cada producto. Apenas confirmás el pedido, arrancamos.",
-  ],
-  [
-    "¿Puedo elegir el color?",
-    "¡Sí! Muchos productos te dejan elegir el color desde su página. Si no encontrás el que buscás, escribinos por WhatsApp y lo vemos.",
-  ],
-  [
-    "¿Hacen diseños personalizados?",
-    "Claro. Contanos tu idea por WhatsApp y te pasamos un presupuesto sin compromiso. Para arrancar pedimos un adelanto (lo coordinamos según el proyecto) y el resto al entregar.",
-  ],
-  [
-    "¿Cómo son los envíos?",
-    "Enviamos a todo el país. El costo del envío lo abona el cliente y lo coordinamos al confirmar tu pedido.",
-  ],
-  [
-    "¿Puedo retirar en persona?",
-    "Sí. Estamos en Iguazú y coordinamos el punto y el horario de entrega por WhatsApp.",
-  ],
-  [
-    "¿Qué medios de pago aceptan?",
-    "MercadoPago, transferencia bancaria y efectivo al retirar.",
-  ],
-  [
-    "¿Con qué materiales imprimen?",
-    "Trabajamos con PLA, PETG, TPU y resina, y elegimos el más adecuado según la pieza y el uso que le vayas a dar.",
-  ],
-  [
-    "¿Y si algo sale mal?",
-    "Si tu pieza llega con una falla de impresión, la rehacemos. Queremos que quede impecable.",
-  ],
-];
+// Las preguntas del FAQ salen de brand.faq (editable desde Config → Tienda);
+// si no se editó nada, se usan las DEFAULT_FAQ (importadas arriba).
 
 function ProductSection({
   eyebrow,
@@ -251,6 +220,9 @@ export default async function Home({
   // En el home mostramos SOLO las categorías padre (las subcategorías se
   // navegan dentro del catálogo). Se ven como círculos en un carrusel.
   const parentCategories = categories.filter((c) => !c.parentId);
+  // FAQ editable: si el dueño cargó preguntas desde Config, usamos esas; si no,
+  // las de por defecto (compactas).
+  const faqList = brand.faq?.length ? brand.faq : DEFAULT_FAQ;
   // "Hefesto en números": piezas y clientes REALES (pedidos finalizados); si la
   // consulta falla, el fallback deja el bloque en 0 sin romper el home.
   const stats = statsR.value;
@@ -591,10 +563,10 @@ export default async function Home({
                 </a>
               </div>
               <div className="faq-list">
-                {faqs.map(([q, a]) => (
-                  <details key={q} className="faq-item">
-                    <summary>{q}</summary>
-                    <p>{a}</p>
+                {faqList.map((f) => (
+                  <details key={f.q} className="faq-item">
+                    <summary>{f.q}</summary>
+                    <p>{f.a}</p>
                   </details>
                 ))}
               </div>

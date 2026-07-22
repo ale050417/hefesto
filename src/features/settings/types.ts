@@ -54,5 +54,6 @@ export type BrandSettings = {
   seasonDurationSec: number;
   homeSections: Record<string, boolean> | null;
   trustBar: Array<{ ic: string; t: string; d: string }> | null;
+  faq: Array<{ q: string; a: string }> | null;
   bannerIntervalSec: number;
 };

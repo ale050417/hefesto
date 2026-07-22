@@ -38,6 +38,9 @@ export const businessSettings = pgTable(
     // título + texto. Null = usa los textos por defecto del home.
     trustBar:
       jsonb("trust_bar").$type<Array<{ ic: string; t: string; d: string }>>(),
+    // FAQ del home (editable desde Config): lista de preguntas/respuestas.
+    // Null/vacío = usa las preguntas por defecto del home.
+    faq: jsonb("faq").$type<Array<{ q: string; a: string }>>(),
     // Segundos entre banners del hero (autoplay). Default 5; el mínimo/máximo
     // razonables (3-12s) se validan en el servidor para no quedar ni muy rápido
     // ni demasiado lento.
