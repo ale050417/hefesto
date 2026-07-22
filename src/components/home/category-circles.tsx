@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   CSSProperties,
   MouseEvent as RMouseEvent,
@@ -15,6 +15,8 @@ function CircleIcon({ name }: { name: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
+      width={34}
+      height={34}
       fill="none"
       stroke="currentColor"
       strokeWidth={2}
@@ -26,13 +28,34 @@ function CircleIcon({ name }: { name: string }) {
   );
 }
 
+/** Flecha de navegación (solo desktop). */
+function Chevron({ dir }: { dir: "left" | "right" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={20}
+      height={20}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d={dir === "left" ? "M15 18l-6-6 6-6" : "M9 18l6-6-6-6"} />
+    </svg>
+  );
+}
+
 /**
- * Carrusel de categorías padre en círculos (estilo "historias").
- * - Auto-scroll continuo con loop sin costura (duplicamos la lista).
+ * Carrusel de categorías padre en círculos (estilo "historias"), uno al lado
+ * del otro.
+ * - Auto-scroll LENTO y continuo con loop sin costura (duplicamos la lista).
  * - Se pausa al pasar el mouse / mientras se arrastra.
- * - Arrastrable con el mouse (desktop) y con scroll nativo en touch.
+ * - Desktop: flechas ‹ › cuando hay muchas y desbordan.
+ * - Tablet/celular: swipe con el dedo (scroll nativo); sin flechas.
  * - Respeta `prefers-reduced-motion` (sin animación).
- * Con pocas categorías (<5) no tiene sentido moverse: quedan centradas.
+ * La estructura va en estilos inline (no depende de recargar el CSS).
  */
 export function CategoryCircles({
   categories,
@@ -41,12 +64,38 @@ export function CategoryCircles({
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const pausedRef = useRef(false);
+  const arrowScrolling = useRef(false);
   const drag = useRef({ down: false, moved: false, startX: 0, startScroll: 0 });
+  const [overflowing, setOverflowing] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
 
   const loop = categories.length >= 5;
   // Duplicamos para que el loop no tenga costura (la 2da mitad continúa la 1ra).
   const items = loop ? [...categories, ...categories] : categories;
 
+  // ¿Es una compu con mouse? (para mostrar flechas). En touch, no.
+  // Patrón de suscripción (evita setState suelto en el effect) y de paso
+  // reacciona si cambia el tipo de puntero.
+  useEffect(() => {
+    const mq = window.matchMedia("(hover: hover) and (pointer: fine)");
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  // ¿El contenido desborda? (para mostrar flechas solo si hace falta).
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+    const measure = () =>
+      setOverflowing(track.scrollWidth > track.clientWidth + 8);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [items.length]);
+
+  // Auto-scroll lento y continuo.
   useEffect(() => {
     if (!loop) return;
     const track = trackRef.current;
@@ -55,8 +104,8 @@ export function CategoryCircles({
 
     let raf = 0;
     const step = () => {
-      if (!pausedRef.current && !drag.current.down) {
-        track.scrollLeft += 0.4;
+      if (!pausedRef.current && !drag.current.down && !arrowScrolling.current) {
+        track.scrollLeft += 0.3; // despacito
         const half = track.scrollWidth / 2;
         if (half > 0 && track.scrollLeft >= half) track.scrollLeft -= half;
       }
@@ -94,52 +143,169 @@ export function CategoryCircles({
     }
   }
 
+  // Flechas: desplazan ~2 círculos, con wrap para que se sienta infinito.
+  function nudge(dir: 1 | -1) {
+    const track = trackRef.current;
+    if (!track) return;
+    // Pausamos el auto-scroll mientras corre la animación suave (si no, el
+    // rAF le pisa el scrollLeft y la flecha no mueve).
+    arrowScrolling.current = true;
+    const half = track.scrollWidth / 2;
+    if (dir < 0 && loop && track.scrollLeft < 300) track.scrollLeft += half;
+    track.scrollBy({ left: dir * 300, behavior: "smooth" });
+    window.setTimeout(() => {
+      arrowScrolling.current = false;
+    }, 650);
+  }
+
+  const showArrows = isDesktop && overflowing;
+  const arrowStyle = (side: "left" | "right"): CSSProperties => ({
+    position: "absolute",
+    top: 53,
+    transform: "translateY(-50%)",
+    ...(side === "left" ? { left: -2 } : { right: -2 }),
+    zIndex: 3,
+    width: 40,
+    height: 40,
+    borderRadius: "50%",
+    display: "grid",
+    placeItems: "center",
+    background: "var(--surface-1)",
+    border: "1px solid var(--border)",
+    color: "var(--text-dim)",
+    cursor: "pointer",
+    boxShadow: "0 6px 16px -6px rgba(0,0,0,.45)",
+  });
+
   return (
-    <div
-      ref={trackRef}
-      className={`cat-carousel${loop ? "" : "cat-carousel--static"}`}
-      onMouseEnter={() => (pausedRef.current = true)}
-      onMouseLeave={() => {
-        pausedRef.current = false;
-        endDrag();
-      }}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={endDrag}
-      onPointerCancel={endDrag}
-    >
-      {items.map((category, i) => (
-        <Link
-          key={`${category.id}-${i}`}
-          href={`/catalogo?category=${category.slug}`}
-          className="cat-circle"
-          style={{ "--cc": category.color ?? "var(--gold)" } as CSSProperties}
-          draggable={false}
-          onClick={onLinkClick}
-          aria-label={category.name}
+    <div style={{ position: "relative" }}>
+      {showArrows ? (
+        <button
+          type="button"
+          aria-label="Anterior"
+          onClick={() => nudge(-1)}
+          style={arrowStyle("left")}
         >
-          <span className="cat-circle-ring">
-            {category.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={category.imageUrl}
-                alt=""
-                draggable={false}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            ) : category.icon ? (
-              <CircleIcon name={category.icon} />
-            ) : (
-              <span style={{ fontSize: 24 }}>&#9670;</span>
-            )}
-          </span>
-          <span className="cat-circle-name">{category.name}</span>
-          <span className="cat-circle-count">
-            {category.productCount}{" "}
-            {category.productCount === 1 ? "producto" : "productos"}
-          </span>
-        </Link>
-      ))}
+          <Chevron dir="left" />
+        </button>
+      ) : null}
+
+      <div
+        ref={trackRef}
+        className={`cat-carousel${loop ? "" : "cat-carousel--static"}`}
+        style={{
+          display: "flex",
+          gap: 20,
+          overflowX: "auto",
+          padding: "8px 2px 12px",
+          scrollSnapType: "none",
+          scrollbarWidth: "none",
+          cursor: loop ? "grab" : "default",
+          justifyContent: loop ? "flex-start" : "center",
+          flexWrap: loop ? "nowrap" : "wrap",
+        }}
+        onMouseEnter={() => (pausedRef.current = true)}
+        onMouseLeave={() => {
+          pausedRef.current = false;
+          endDrag();
+        }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      >
+        {items.map((category, i) => {
+          const cc = category.color ?? "#C9A84C";
+          return (
+            <Link
+              key={`${category.id}-${i}`}
+              href={`/catalogo?category=${category.slug}`}
+              className="cat-circle"
+              style={{
+                flex: "0 0 auto",
+                width: 108,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 10,
+                textAlign: "center",
+                scrollSnapAlign: "none",
+                userSelect: "none",
+                textDecoration: "none",
+              }}
+              draggable={false}
+              onClick={onLinkClick}
+              aria-label={category.name}
+            >
+              <span
+                className="cat-circle-ring"
+                style={{
+                  width: 90,
+                  height: 90,
+                  borderRadius: "50%",
+                  display: "grid",
+                  placeItems: "center",
+                  overflow: "hidden",
+                  background: `${cc}22`,
+                  border: `2px solid ${cc}66`,
+                  color: cc,
+                }}
+              >
+                {category.imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={category.imageUrl}
+                    alt=""
+                    draggable={false}
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                    }}
+                  />
+                ) : category.icon ? (
+                  <CircleIcon name={category.icon} />
+                ) : (
+                  <span style={{ fontSize: 24 }}>&#9670;</span>
+                )}
+              </span>
+              <span
+                className="cat-circle-name"
+                style={{
+                  fontFamily: "var(--font-display), sans-serif",
+                  fontWeight: 600,
+                  fontSize: 13.5,
+                  lineHeight: 1.15,
+                  maxWidth: "100%",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {category.name}
+              </span>
+              <span
+                className="cat-circle-count"
+                style={{ fontSize: 11, color: "var(--text-faint)" }}
+              >
+                {category.productCount}{" "}
+                {category.productCount === 1 ? "producto" : "productos"}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+
+      {showArrows ? (
+        <button
+          type="button"
+          aria-label="Siguiente"
+          onClick={() => nudge(1)}
+          style={arrowStyle("right")}
+        >
+          <Chevron dir="right" />
+        </button>
+      ) : null}
     </div>
   );
 }

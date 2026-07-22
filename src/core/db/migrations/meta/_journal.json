@@ -414,6 +414,13 @@
       "when": 1783306300000,
       "tag": "0058_category_image",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1783306400000,
+      "tag": "0059_seed_categories",
+      "breakpoints": true
     }
   ]
 }

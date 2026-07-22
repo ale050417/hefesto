@@ -180,7 +180,7 @@ export async function getProductBySlug(
 export const listCategories = unstable_cache(
   async (): Promise<Category[]> => findCategories(),
   ["categories-public"],
-  { revalidate: 60 },
+  { revalidate: 60, tags: ["categories"] },
 );
 
 /** Productos relacionados (misma categoría) a partir del slug. */
@@ -224,6 +224,7 @@ const getHomeDataUncached = async (): Promise<HomeData> => {
 
 export const getHomeData = unstable_cache(getHomeDataUncached, ["home-data"], {
   revalidate: 60,
+  tags: ["categories"],
 });
 
 /** Materiales disponibles para el filtro del catálogo. */

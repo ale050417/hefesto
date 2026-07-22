@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState, type ChangeEvent, type CSSProperties } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import {
@@ -37,10 +37,12 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-function IconSvg({ name }: { name: string }) {
+function IconSvg({ name, size }: { name: string; size?: number }) {
   return (
     <svg
       viewBox="0 0 24 24"
+      width={size}
+      height={size}
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -148,7 +150,17 @@ export function CategoryForm({
         </span>
         <span
           className="cat-circle-ring"
-          style={{ "--cc": color } as CSSProperties}
+          style={{
+            width: 90,
+            height: 90,
+            borderRadius: "50%",
+            display: "grid",
+            placeItems: "center",
+            overflow: "hidden",
+            background: `${color}22`,
+            border: `2px solid ${color}66`,
+            color,
+          }}
         >
           {imageUrl ? (
             <Image
@@ -159,10 +171,20 @@ export function CategoryForm({
               className="h-full w-full object-cover"
             />
           ) : (
-            <IconSvg name={icon} />
+            <IconSvg name={icon} size={34} />
           )}
         </span>
-        <span className="cat-circle-name">{name.trim() || "Categoría"}</span>
+        <span
+          className="cat-circle-name"
+          style={{
+            fontFamily: "var(--font-display), sans-serif",
+            fontWeight: 600,
+            fontSize: 13.5,
+            maxWidth: "100%",
+          }}
+        >
+          {name.trim() || "Categoría"}
+        </span>
       </div>
 
       <div className="flex items-center gap-4">

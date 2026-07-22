@@ -912,7 +912,6 @@ body > * {
     gap: 20px;
     overflow-x: auto;
     padding: 8px 2px 12px;
-    scroll-snap-type: x proximity;
     scrollbar-width: none;
     -ms-overflow-style: none;
     cursor: grab;
@@ -954,7 +953,6 @@ body > * {
     align-items: center;
     gap: 10px;
     text-align: center;
-    scroll-snap-align: center;
     user-select: none;
     -webkit-user-drag: none;
   }

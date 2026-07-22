@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { getStaffUser } from "@/core/auth/session";
 import { can } from "@/core/auth/permissions";
 import { recordAudit } from "@/core/audit";
@@ -431,6 +431,7 @@ export async function uploadCategoryImageAction(
     const bytes = Buffer.from(await file.arrayBuffer());
     const url = await setCategoryImage(categoryId, bytes);
     revalidatePath("/admin/categorias");
+    updateTag("categories");
     revalidatePath("/", "layout");
     return { ok: true, data: { url } };
   } catch {
@@ -524,6 +525,7 @@ export async function createCategoryAction(
       metadata: { name: parsed.data.name },
     });
     revalidatePath("/admin/categorias");
+    updateTag("categories");
     return { ok: true, data: { id: category.id } };
   } catch (e) {
     if (isUniqueViolation(e)) return CATEGORY_TAKEN;
@@ -562,6 +564,7 @@ export async function updateCategoryAction(
       metadata: { name: parsed.data.name },
     });
     revalidatePath("/admin/categorias");
+    updateTag("categories");
     return { ok: true, data: { id: category.id } };
   } catch (e) {
     if (isUniqueViolation(e)) return CATEGORY_TAKEN;
@@ -591,6 +594,7 @@ export async function deleteCategoryAction(id: string): Promise<ActionResult> {
       entityId: id,
     });
     revalidatePath("/admin/categorias");
+    updateTag("categories");
     return { ok: true, data: undefined };
   } catch (e) {
     return {
