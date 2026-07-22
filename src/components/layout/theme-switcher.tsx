@@ -4,17 +4,16 @@ import { useState } from "react";
 import { useMounted } from "@/hooks/use-mounted";
 import { cn } from "@/lib/utils";
 
-type Theme = "light" | "dark" | "warm";
+type Theme = "light" | "dark";
 const THEMES: { value: Theme; label: string; icon: string }[] = [
   { value: "light", label: "Claro", icon: "☀" },
   { value: "dark", label: "Oscuro", icon: "☾" },
-  { value: "warm", label: "Cálido", icon: "✦" },
 ];
 
 export function ThemeSwitcher({
   compact = false,
 }: {
-  /** true = un solo botón que va ciclando claro → oscuro → cálido. */
+  /** true = un solo botón que va ciclando claro → oscuro. */
   compact?: boolean;
 } = {}) {
   const mounted = useMounted();
