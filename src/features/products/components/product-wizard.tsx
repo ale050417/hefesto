@@ -232,9 +232,14 @@ export function ProductWizard({
   }
 
   function canAdvance(): string | null {
+    if (step === 1) {
+      if (!imageFile) return "Subí la imagen principal del producto.";
+    }
     if (step === 2) {
       if (colors.length === 0)
         return "Elegí al menos un color (es obligatorio).";
+      if (!productionTime.trim())
+        return "Ingresá el tiempo de producción / entrega.";
     }
     if (step === 3) {
       if (!(priceN > 0)) return "Calculá el precio con la calculadora.";
@@ -411,11 +416,25 @@ export function ProductWizard({
                 onChange={(e) => setCategoryId(e.target.value)}
               >
                 <option value="">Elegí una categoría</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {categories
+                  .filter((c) => !c.parentId)
+                  .map((p) => {
+                    const kids = categories.filter((c) => c.parentId === p.id);
+                    return kids.length > 0 ? (
+                      <optgroup key={p.id} label={p.name}>
+                        <option value={p.id}>{p.name} (toda)</option>
+                        {kids.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ) : (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    );
+                  })}
               </select>
               {fe.errors.category ? (
                 <p className="field-error">{fe.errors.category}</p>
@@ -452,7 +471,9 @@ export function ProductWizard({
         {step === 1 ? (
           <div className="flex flex-col gap-4">
             <div className="field">
-              <label>Imagen principal</label>
+              <label>
+                Imagen principal <span className="text-danger">*</span>
+              </label>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -481,7 +502,7 @@ export function ProductWizard({
                 </div>
               ) : (
                 <div className="text-faint text-[11.5px]">
-                  Imagen principal (opcional). Abajo podés sumar más.
+                  Obligatoria. Abajo podés sumar más (hasta 5 en total).
                 </div>
               )}
             </div>
@@ -643,9 +664,7 @@ export function ProductWizard({
             <div className="field">
               <label htmlFor="w-time">
                 Tiempo de producción / entrega{" "}
-                <span className="text-faint font-normal">
-                  (lo que ve el cliente)
-                </span>
+                <span className="text-danger">*</span>
               </label>
               <input
                 id="w-time"
@@ -977,7 +996,7 @@ export function ProductWizard({
             </Button>
           ) : (
             <Button type="button" onClick={submit} loading={busy}>
-              {busy ? "Creando..." : "Crear producto"}
+              Crear producto
             </Button>
           )}
         </div>

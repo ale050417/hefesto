@@ -49,7 +49,7 @@ export function CustomerNoteForm({
       />
       <div className="mt-2 flex justify-end">
         <Button type="button" size="sm" onClick={save} loading={busy}>
-          {busy ? "Guardando…" : "Guardar nota"}
+          Guardar nota
         </Button>
       </div>
     </div>

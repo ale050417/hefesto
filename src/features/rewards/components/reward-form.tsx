@@ -221,7 +221,7 @@ export function RewardForm({
           Cancelar
         </Button>
         <Button type="button" onClick={submit} loading={busy}>
-          {busy ? "Guardando…" : edit ? "Guardar" : "Crear recompensa"}
+          {edit ? "Guardar" : "Crear recompensa"}
         </Button>
       </div>
     </div>

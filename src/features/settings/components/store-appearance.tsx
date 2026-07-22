@@ -578,7 +578,7 @@ export function StoreAppearance({
           onClick={saveAll}
           disabled={busy}
         >
-          {sIc(I.check)} {busy ? "Guardando…" : "Guardar y publicar"}
+          {sIc(I.check)} Guardar y publicar
         </button>
       </div>
 
@@ -769,7 +769,7 @@ export function StoreAppearance({
               Cancelar
             </Button>
             <Button type="button" onClick={saveBanner} disabled={busy}>
-              {busy ? "Guardando…" : bf.id ? "Guardar" : "Agregar"}
+              {bf.id ? "Guardar" : "Agregar"}
             </Button>
           </div>
         </div>

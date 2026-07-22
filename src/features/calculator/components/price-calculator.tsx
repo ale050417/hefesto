@@ -452,7 +452,7 @@ export function PriceCalculator({
               />
             </div>
             <Button type="button" onClick={save} disabled={busy}>
-              {busy ? "Guardando…" : "Guardar en el historial"}
+              Guardar en el historial
             </Button>
           </div>
         </div>

@@ -197,7 +197,7 @@ export function MarginPresetsButton({ presets }: { presets: MarginPreset[] }) {
                 Cancelar
               </Button>
               <Button type="button" onClick={save} disabled={busy}>
-                {busy ? "Guardando…" : "Guardar"}
+                Guardar
               </Button>
             </div>
           </div>

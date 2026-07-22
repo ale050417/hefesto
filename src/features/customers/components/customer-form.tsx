@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { runAction } from "@/lib/run-action";
+import { useFormErrors } from "@/hooks/use-form-errors";
 import {
   createManualCustomerAction,
   updateManualCustomerAction,
@@ -37,12 +38,19 @@ export function CustomerForm({
   });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const fe = useFormErrors();
 
   const set = (k: keyof typeof form, v: string) =>
     setForm((f) => ({ ...f, [k]: v }));
 
   async function submit() {
     setErr(null);
+    if (
+      !fe.check({
+        name: !form.name.trim() ? "Ingresá el nombre del cliente." : null,
+      })
+    )
+      return;
     setBusy(true);
     try {
       const res =
@@ -82,15 +90,19 @@ export function CustomerForm({
         >
           {initial}
         </span>
-        <div className="field grow">
+        <div className={`field grow ${fe.errors.name ? "invalid" : ""}`}>
           <label htmlFor="cf-name">Nombre y apellido</label>
           <input
             id="cf-name"
             className="input"
             placeholder="Ej: Juan Pérez"
+            aria-invalid={!!fe.errors.name}
             value={form.name}
             onChange={(e) => set("name", e.target.value)}
           />
+          {fe.errors.name ? (
+            <p className="field-error">{fe.errors.name}</p>
+          ) : null}
         </div>
       </div>
 
@@ -156,7 +168,7 @@ export function CustomerForm({
           Cancelar
         </Button>
         <Button type="button" onClick={submit} loading={busy}>
-          {busy ? "Guardando…" : edit ? "Guardar cambios" : "Crear cliente"}
+          {edit ? "Guardar cambios" : "Crear cliente"}
         </Button>
       </div>
     </div>

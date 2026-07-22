@@ -198,7 +198,7 @@ export function CategoryForm({
           Cancelar
         </Button>
         <Button type="button" onClick={submit} loading={busy}>
-          {busy ? "Guardando…" : edit ? "Guardar" : "Crear categoría"}
+          {edit ? "Guardar" : "Crear categoría"}
         </Button>
       </div>
     </div>

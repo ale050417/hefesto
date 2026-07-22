@@ -62,28 +62,32 @@ export function CustomersView({ customers }: { customers: AdminCustomer[] }) {
       </div>
 
       {view === "grilla" ? (
-        <div className="grid-3">
+        <div
+          className="grid gap-3.5"
+          style={{
+            gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+          }}
+        >
           {customers.map((c) => (
             <Link
               key={`${c.source}-${c.id}`}
               href={`/admin/clientes/${c.id}`}
               className="ui-card card-hover block"
-              style={{ padding: 18 }}
+              style={{ padding: 24 }}
             >
               <div className="mb-3.5 flex items-center gap-3">
                 <span
                   className="avatar flex-shrink-0"
-                  style={{ width: 46, height: 46, fontSize: 17 }}
+                  style={{ width: 58, height: 58, fontSize: 22 }}
                 >
                   {(c.name[0] ?? "?").toUpperCase()}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-semibold">{c.name}</div>
-                  <div className="text-faint text-[12px]">{c.city ?? "—"}</div>
+                  <div className="text-faint truncate text-[12px]">
+                    {c.phone || c.email || c.city || "Sin contacto"}
+                  </div>
                 </div>
-                <span className={`badge ${TIER_BADGE_CLASS[c.tier]}`}>
-                  {TIER_LABEL[c.tier]}
-                </span>
               </div>
               <div className="grid-2" style={{ gap: 10 }}>
                 <div className="ui-card text-center" style={{ padding: 11 }}>
@@ -102,8 +106,13 @@ export function CustomersView({ customers }: { customers: AdminCustomer[] }) {
                   <div className="text-faint text-[11px]">gastado</div>
                 </div>
               </div>
-              <div className="text-faint mt-3 text-[11.5px]">
-                Cliente desde {sinceFmt.format(c.since)}
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <span className="text-faint text-[11.5px]">
+                  Cliente desde {sinceFmt.format(c.since)}
+                </span>
+                <span className={`badge ${TIER_BADGE_CLASS[c.tier]}`}>
+                  {TIER_LABEL[c.tier]}
+                </span>
               </div>
             </Link>
           ))}

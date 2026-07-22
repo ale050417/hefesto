@@ -200,8 +200,18 @@ export function CategoriesAdmin({
           </div>
 
           <div
-            className={view === "grilla" ? "grid-3" : "flex flex-col gap-3"}
-            style={{ alignItems: "start" }}
+            className={
+              view === "grilla" ? "grid gap-3.5" : "flex flex-col gap-3"
+            }
+            style={{
+              alignItems: "start",
+              ...(view === "grilla"
+                ? {
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(300px, 1fr))",
+                  }
+                : {}),
+            }}
           >
             {roots.map((c) => {
               const color = c.color ?? "#888";

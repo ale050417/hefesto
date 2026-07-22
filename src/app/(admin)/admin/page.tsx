@@ -262,7 +262,13 @@ export default async function AdminDashboard() {
                   <span className="text-dim">
                     {f.material} · {f.color}
                   </span>
-                  <Badge variant="warning">{f.stockGrams} g</Badge>
+                  {f.stockGrams < 0 ? (
+                    <Badge variant="warning">
+                      Debés {Math.abs(f.stockGrams)} g
+                    </Badge>
+                  ) : (
+                    <Badge variant="warning">{f.stockGrams} g</Badge>
+                  )}
                 </div>
               ))}
             </div>

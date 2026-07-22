@@ -368,7 +368,7 @@ export function BusinessConfigForm({
           </p>
         ) : null}
         <Button type="button" onClick={submit} loading={busy}>
-          {busy ? "Guardando…" : "Guardar cambios"}
+          Guardar cambios
         </Button>
       </div>
     </div>

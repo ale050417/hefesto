@@ -181,7 +181,7 @@ export function PaymentSettingsForm({
 
       <div>
         <Button type="button" onClick={submit} loading={busy}>
-          {ic(I.check)} {busy ? "Guardando…" : "Guardar métodos de pago"}
+          {ic(I.check)} Guardar métodos de pago
         </Button>
       </div>
     </div>

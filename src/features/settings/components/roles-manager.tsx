@@ -570,7 +570,7 @@ function InviteModal({
             Cancelar
           </Button>
           <Button type="button" onClick={submit} loading={busy}>
-            {busy ? "Creando…" : "Crear acceso"}
+            Crear acceso
           </Button>
         </>
       }
@@ -786,7 +786,7 @@ function RoleModal({
             Cancelar
           </Button>
           <Button type="button" onClick={submit} disabled={busy}>
-            {busy ? "Guardando…" : role ? "Guardar cambios" : "Crear rol"}
+            {role ? "Guardar cambios" : "Crear rol"}
           </Button>
         </>
       }

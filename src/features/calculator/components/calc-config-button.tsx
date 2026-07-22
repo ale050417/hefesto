@@ -111,7 +111,7 @@ export function CalcConfigButton({ config }: { config: CalcConfig }) {
               Cancelar
             </Button>
             <Button type="button" onClick={submit} disabled={busy}>
-              {busy ? "Guardando…" : "Guardar"}
+              Guardar
             </Button>
           </div>
         </div>

@@ -31,6 +31,9 @@ const GEMINI_CANDIDATES = [
   "gemini-flash-latest",
   "gemini-3.1-flash-lite",
   "gemini-2.5-flash",
+  // Fallbacks estables conocidos, por si los nombres nuevos no existen para tu key.
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
 ].filter((m): m is string => Boolean(m));
 let geminiWorkingModel: string | null = null;
 
@@ -221,21 +224,19 @@ async function callGemini(
         signal: AbortSignal.timeout(timeoutMs),
       },
     );
-    if (res.status === 404) {
-      // Modelo dado de baja/inexistente: probamos el siguiente candidato.
-      console.warn(`[asistente] modelo Gemini "${model}" no existe (404)`);
-      geminiWorkingModel = null;
-      lastStatus = 404;
-      continue;
-    }
     if (!res.ok) {
+      // CUALQUIER error del modelo actual (404 inexistente, 400 no habilitado
+      // para la key, 429, etc.): lo registramos y probamos el SIGUIENTE
+      // candidato en vez de cortar. Así un modelo dado de baja o no disponible
+      // para tu key no tumba al fallback "gemini-flash-latest" (que sí anda).
       const detail = await res.text().catch(() => "");
-      console.error(
-        "[asistente] la API de Gemini falló:",
-        res.status,
-        detail.slice(0, 300),
+      console.warn(
+        `[asistente] modelo Gemini "${model}" falló (${res.status}):`,
+        detail.slice(0, 200),
       );
-      throw new Error(`ASSISTANT_API_ERROR:${res.status}`);
+      geminiWorkingModel = null;
+      lastStatus = res.status;
+      continue;
     }
     geminiWorkingModel = model;
     const data = (await res.json()) as {

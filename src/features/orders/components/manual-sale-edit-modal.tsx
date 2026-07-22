@@ -238,7 +238,7 @@ function ManualSaleEditModal({
             Cancelar
           </Button>
           <Button type="button" onClick={submit} loading={busy}>
-            {busy ? "Guardando…" : "Guardar cambios"}
+            Guardar cambios
           </Button>
         </div>
       </div>

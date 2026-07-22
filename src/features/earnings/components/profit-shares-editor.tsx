@@ -236,7 +236,7 @@ export function ProfitSharesEditor({
             loading={busy}
             disabled={!balanced}
           >
-            {busy ? "Guardando…" : "Guardar reparto"}
+            Guardar reparto
           </Button>
           {!balanced ? (
             <span className="text-danger text-[12px] font-medium">

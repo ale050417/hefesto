@@ -335,7 +335,7 @@ body > * {
        cortados). auto-FILL mantiene tarjetas de tamaño UNIFORME (no se estiran
        según cuántas haya; deja el hueco a la derecha en vez de agrandarlas):
        1 en móvil, 2 en tablet, 3+ en desktop. Sin media queries. */
-    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(275px, 1fr));
   }
   .grid-products {
     /* Catálogo admin: tarjetas MÁS CHICAS que grid-3 (más productos por fila).

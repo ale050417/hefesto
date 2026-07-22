@@ -614,7 +614,7 @@ export function FilamentForm({
           Cancelar
         </Button>
         <Button type="button" onClick={submit} loading={busy}>
-          {busy ? "Guardando…" : edit ? "Guardar" : "Agregar filamento"}
+          {edit ? "Guardar" : "Agregar filamento"}
         </Button>
       </div>
     </div>

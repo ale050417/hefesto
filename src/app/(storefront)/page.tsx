@@ -9,6 +9,8 @@ import {
   getActiveBanners,
   getBrandSettings,
 } from "@/features/settings/service";
+import { getHomeStats } from "@/features/orders/services/publicStats";
+import { safeLoad } from "@/lib/safe-load";
 import { sectionOn } from "@/features/settings/home-sections";
 import { PreviewBridge } from "@/features/settings/components/preview-bridge";
 import { CountUp } from "@/components/home/count-up";
@@ -110,24 +112,6 @@ const trust = [
     ic: "refresh",
     t: "Reimpresión garantizada",
     d: "Si algo sale mal, lo rehacemos",
-  },
-];
-const statsNums: Array<{
-  value: number;
-  suffix?: string;
-  decimals?: number;
-  l: string;
-  ic: string;
-}> = [
-  { value: 3490, suffix: "+", l: "Piezas impresas", ic: "box" },
-  { value: 1200, suffix: "+", l: "Clientes felices", ic: "users" },
-  { value: 12, l: "Materiales y acabados", ic: "layers" },
-  {
-    value: 4.9,
-    decimals: 1,
-    suffix: "★",
-    l: "Valoración promedio",
-    ic: "star",
   },
 ];
 const materials: Array<[string, string, string, string]> = [
@@ -244,8 +228,44 @@ export default async function Home({
   // Modo preview (iframe del admin): se renderizan TODAS las secciones y el
   // PreviewBridge aplica el borrador (mostrar/ocultar, acento, textos) en vivo.
   const isPreview = "_preview" in (await searchParams);
-  const [{ featured, latest, onSale, categories }, banners, brand] =
-    await Promise.all([getHomeData(), getActiveBanners(), getBrandSettings()]);
+  const [{ featured, latest, onSale, categories }, banners, brand, statsR] =
+    await Promise.all([
+      getHomeData(),
+      getActiveBanners(),
+      getBrandSettings(),
+      safeLoad("estadísticas", getHomeStats(), { pieces: 0, customers: 0 }),
+    ]);
+  // "Hefesto en números": piezas y clientes REALES (pedidos finalizados); si la
+  // consulta falla, el fallback deja el bloque en 0 sin romper el home.
+  const stats = statsR.value;
+  const statsNums: Array<{
+    value: number;
+    suffix?: string;
+    decimals?: number;
+    l: string;
+    ic: string;
+  }> = [
+    {
+      value: stats.pieces,
+      suffix: stats.pieces > 0 ? "+" : "",
+      l: "Piezas impresas",
+      ic: "box",
+    },
+    {
+      value: stats.customers,
+      suffix: stats.customers > 0 ? "+" : "",
+      l: "Clientes felices",
+      ic: "users",
+    },
+    { value: 12, l: "Materiales y acabados", ic: "layers" },
+    {
+      value: 4.9,
+      decimals: 1,
+      suffix: "★",
+      l: "Valoración promedio",
+      ic: "star",
+    },
+  ];
   const show = (id: string) => isPreview || sectionOn(brand.homeSections, id);
   const previewHidden = (id: string) =>
     isPreview && !sectionOn(brand.homeSections, id)

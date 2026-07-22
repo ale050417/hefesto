@@ -338,7 +338,7 @@ export function FailureForm({
           onClick={edit ? submitEdit : submitCreate}
           loading={busy}
         >
-          {busy ? "Guardando..." : edit ? "Guardar" : "Registrar falla"}
+          {edit ? "Guardar" : "Registrar falla"}
         </Button>
       </div>
     </div>

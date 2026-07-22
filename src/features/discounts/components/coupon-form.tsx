@@ -589,7 +589,7 @@ export function CouponForm({
             </Button>
           ) : (
             <Button type="button" onClick={submit} loading={busy}>
-              {busy ? "Guardando…" : edit ? "Guardar" : "Crear cupón"}
+              {edit ? "Guardar" : "Crear cupón"}
             </Button>
           )}
         </div>

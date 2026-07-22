@@ -585,11 +585,7 @@ export function ProductForm({
 
       <div className="pt-1">
         <Button type="submit" loading={isSubmitting}>
-          {isSubmitting
-            ? "Guardando..."
-            : mode === "create"
-              ? "Crear producto"
-              : "Guardar cambios"}
+          {mode === "create" ? "Crear producto" : "Guardar cambios"}
         </Button>
       </div>
     </form>
