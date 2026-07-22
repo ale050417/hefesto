@@ -85,7 +85,9 @@ export function ManualSaleForm({
     (a, e) => a + (Number(e.cost) || 0) * (Number(e.qty) || 0),
     0,
   );
-  const total = Math.round(((unitPrice ?? 0) * qtyN + extrasCost) * 100) / 100;
+  // El total COBRADO es solo el precio × cantidad. Los insumos NO se cobran:
+  // son un costo (van a la amortización y bajan la ganancia), no al total.
+  const total = Math.round((unitPrice ?? 0) * qtyN * 100) / 100;
   const setExtra = (i: number, k: "name" | "cost" | "qty", v: string) =>
     setExtras((es) => es.map((e, j) => (j === i ? { ...e, [k]: v } : e)));
   const addExtra = () =>

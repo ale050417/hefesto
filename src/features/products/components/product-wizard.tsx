@@ -29,7 +29,7 @@ function slugify(text: string): string {
 
 const money = (n: number) => "$" + Math.round(n).toLocaleString("es-AR");
 
-const STEPS = ["Básicos e imagen", "Ficha y colores", "Precio y publicación"];
+const STEPS = ["Básicos", "Imágenes", "Detalle", "Precio", "Publicación"];
 
 type Props = {
   categories: Category[];
@@ -232,13 +232,12 @@ export function ProductWizard({
   }
 
   function canAdvance(): string | null {
-    if (step === 0) {
-      if (!name.trim()) return "Ingresá el nombre del producto.";
-      if (!categoryId) return "Elegí una categoría.";
-    }
-    if (step === 1) {
+    if (step === 2) {
       if (colors.length === 0)
         return "Elegí al menos un color (es obligatorio).";
+    }
+    if (step === 3) {
+      if (!(priceN > 0)) return "Calculá el precio con la calculadora.";
     }
     return null;
   }
@@ -255,7 +254,7 @@ export function ProductWizard({
       if (problem) return setErr(problem);
     }
     fe.clear();
-    setStep((s) => Math.min(2, s + 1));
+    setStep((s) => Math.min(4, s + 1));
   }
   function back() {
     setErr(null);
@@ -345,8 +344,9 @@ export function ProductWizard({
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
-      {/* Columna del formulario por pasos */}
-      <div className="flex flex-col gap-4">
+      {/* Columna del formulario por pasos. min-w-0: sin esto, el track 1fr no
+          puede achicarse y el contenido desborda el modal (se veía recortado). */}
+      <div className="flex min-w-0 flex-col gap-4">
         {/* Stepper */}
         <div className="flex items-center gap-2">
           {STEPS.map((label, i) => (
@@ -365,7 +365,7 @@ export function ProductWizard({
               </div>
               <span
                 className={cn(
-                  "text-[12.5px]",
+                  "hidden text-[12.5px] sm:inline",
                   i === step ? "text-fg font-medium" : "text-faint",
                 )}
               >
@@ -442,8 +442,14 @@ export function ProductWizard({
                 onChange={(e) => setDescription(e.target.value)}
               />
             </div>
+          </div>
+        ) : null}
+
+        {/* PASO 2 — Imágenes */}
+        {step === 1 ? (
+          <div className="flex flex-col gap-4">
             <div className="field">
-              <label>Imagen</label>
+              <label>Imagen principal</label>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -528,8 +534,8 @@ export function ProductWizard({
           </div>
         ) : null}
 
-        {/* PASO 2 — Ficha + colores */}
-        {step === 1 ? (
+        {/* PASO 3 — Detalle: colores y ficha */}
+        {step === 2 ? (
           <div className="flex flex-col gap-4">
             <div className="field">
               <label>Modo de color</label>
@@ -583,6 +589,54 @@ export function ProductWizard({
                 Obligatorio: elegí al menos un color.
               </div>
             </div>
+
+            {/* MULTICOLOR: gramos de cada color, SOLO para descontar el stock de
+                filamento al vender (no cambia el precio). Va acá, junto a los
+                colores, porque describe la composición de la pieza. */}
+            {colorMode === "multi" && colors.length > 0 ? (
+              <div className="field">
+                <label className="mb-0">Gramos por color</label>
+                <div className="text-faint text-[11.5px] leading-relaxed">
+                  Cuántos gramos de cada color lleva la pieza. Sirve para
+                  descontar el stock de filamento al vender; no cambia el
+                  precio.
+                </div>
+                <div className="mt-2 flex flex-col gap-2">
+                  {colors.map((c) => (
+                    <div key={c} className="flex items-center gap-2">
+                      <span className="flex w-32 items-center gap-2 text-sm">
+                        <span
+                          style={{
+                            width: 13,
+                            height: 13,
+                            borderRadius: "50%",
+                            background: hexOf(c),
+                            border: "1px solid var(--border)",
+                            flexShrink: 0,
+                          }}
+                        />
+                        {c}
+                      </span>
+                      <input
+                        type="number"
+                        className="input"
+                        style={{ maxWidth: 120 }}
+                        placeholder="0"
+                        value={colorGrams[c] ?? ""}
+                        onChange={(e) =>
+                          setColorGrams((prev) => ({
+                            ...prev,
+                            [c]: Number(e.target.value) || 0,
+                          }))
+                        }
+                      />
+                      <span className="text-faint text-[12px]">g</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="field">
               <label htmlFor="w-time">
                 Tiempo de producción / entrega{" "}
@@ -614,8 +668,8 @@ export function ProductWizard({
           </div>
         ) : null}
 
-        {/* PASO 3 — Precio + publicación */}
-        {step === 2 ? (
+        {/* PASO 4 — Precio */}
+        {step === 3 ? (
           <div className="flex flex-col gap-4">
             <div className="field">
               <label htmlFor="w-price">Precio</label>
@@ -718,52 +772,6 @@ export function ProductWizard({
               ) : null}
             </div>
 
-            {/* MULTICOLOR: gramos de cada color, SOLO para descontar el stock de
-                filamento al vender (no cambia el precio). */}
-            {colorMode === "multi" && colors.length > 0 ? (
-              <div className="field">
-                <label className="mb-0">Gramos por color</label>
-                <div className="text-faint text-[11.5px] leading-relaxed">
-                  Cuántos gramos de cada color lleva la pieza. Sirve para
-                  descontar el stock de filamento al vender; no cambia el
-                  precio.
-                </div>
-                <div className="mt-2 flex flex-col gap-2">
-                  {colors.map((c) => (
-                    <div key={c} className="flex items-center gap-2">
-                      <span className="flex w-32 items-center gap-2 text-sm">
-                        <span
-                          style={{
-                            width: 13,
-                            height: 13,
-                            borderRadius: "50%",
-                            background: hexOf(c),
-                            border: "1px solid var(--border)",
-                            flexShrink: 0,
-                          }}
-                        />
-                        {c}
-                      </span>
-                      <input
-                        type="number"
-                        className="input"
-                        style={{ maxWidth: 120 }}
-                        placeholder="0"
-                        value={colorGrams[c] ?? ""}
-                        onChange={(e) =>
-                          setColorGrams((prev) => ({
-                            ...prev,
-                            [c]: Number(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                      <span className="text-faint text-[12px]">g</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
             {/* COLOR ÚNICO: precio por color (opcional). El cliente paga el precio
                 del color que elige; vacío = precio de la calculadora. */}
             {colorMode === "single" && colors.length > 0 ? (
@@ -809,39 +817,87 @@ export function ProductWizard({
                 </div>
               </div>
             ) : null}
+          </div>
+        ) : null}
 
+        {/* PASO 5 — Publicación */}
+        {step === 4 ? (
+          <div className="flex flex-col gap-4">
             <div className="field">
-              <label>Estado</label>
-              <div className="flex gap-2">
+              <label>¿Cómo se publica?</label>
+              <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
-                  className={cn("chip", status === "published" && "active")}
                   onClick={() => setStatus("published")}
+                  className={cn(
+                    "rounded-xl border p-3 text-left transition",
+                    status === "published"
+                      ? "border-[var(--gold)] bg-[rgba(var(--gold-rgb),.08)]"
+                      : "border-[var(--border)] hover:border-[var(--border-strong)]",
+                  )}
                 >
-                  Publicado
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+                        status === "published"
+                          ? "border-[var(--gold)]"
+                          : "border-[var(--border-strong)]",
+                      )}
+                    >
+                      {status === "published" ? (
+                        <span className="h-2 w-2 rounded-full bg-[var(--gold)]" />
+                      ) : null}
+                    </span>
+                    <span className="text-fg text-[13.5px] font-semibold">
+                      Publicado
+                    </span>
+                  </span>
+                  <span className="text-faint mt-1 block text-[11.5px] leading-snug">
+                    Visible en la tienda apenas lo creás.
+                  </span>
                 </button>
                 <button
                   type="button"
-                  className={cn("chip", status === "draft" && "active")}
                   onClick={() => setStatus("draft")}
+                  className={cn(
+                    "rounded-xl border p-3 text-left transition",
+                    status === "draft"
+                      ? "border-[var(--gold)] bg-[rgba(var(--gold-rgb),.08)]"
+                      : "border-[var(--border)] hover:border-[var(--border-strong)]",
+                  )}
                 >
-                  Borrador
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded-full border",
+                        status === "draft"
+                          ? "border-[var(--gold)]"
+                          : "border-[var(--border-strong)]",
+                      )}
+                    >
+                      {status === "draft" ? (
+                        <span className="h-2 w-2 rounded-full bg-[var(--gold)]" />
+                      ) : null}
+                    </span>
+                    <span className="text-fg text-[13.5px] font-semibold">
+                      Borrador
+                    </span>
+                  </span>
+                  <span className="text-faint mt-1 block text-[11.5px] leading-snug">
+                    Queda oculto hasta que lo publiques.
+                  </span>
                 </button>
-              </div>
-              <div className="text-faint text-[11.5px]">
-                {status === "published"
-                  ? "Visible en la tienda apenas se cree."
-                  : "Queda oculto hasta que lo publiques."}
               </div>
             </div>
 
             <div className="field">
-              <label>Secciones del home</label>
+              <label>Mostrar en el inicio</label>
               <div className="flex flex-col gap-2">
                 <label
                   className={cn(
-                    "flex items-center gap-2 text-sm",
-                    !sections.destacados && "opacity-50",
+                    "flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] p-3",
+                    sections.destacados ? "cursor-pointer" : "opacity-50",
                   )}
                   title={
                     sections.destacados
@@ -849,19 +905,26 @@ export function ProductWizard({
                       : "Activá “Destacados” en Configuración › Apariencia"
                   }
                 >
+                  <span>
+                    <span className="text-fg block text-[13.5px] font-semibold">
+                      Destacado
+                    </span>
+                    <span className="text-faint block text-[11.5px] leading-snug">
+                      Aparece en la sección Destacados del inicio.
+                    </span>
+                  </span>
                   <input
                     type="checkbox"
-                    className="accent-[var(--gold)]"
+                    className="h-4 w-4 shrink-0 accent-[var(--gold)]"
                     disabled={!sections.destacados}
                     checked={isFeatured}
                     onChange={(e) => setIsFeatured(e.target.checked)}
                   />
-                  Destacado
                 </label>
                 <label
                   className={cn(
-                    "flex items-center gap-2 text-sm",
-                    !sections.nuevos && "opacity-50",
+                    "flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] p-3",
+                    sections.nuevos ? "cursor-pointer" : "opacity-50",
                   )}
                   title={
                     sections.nuevos
@@ -869,21 +932,27 @@ export function ProductWizard({
                       : "Activá “Nuevos lanzamientos” en Configuración › Apariencia"
                   }
                 >
+                  <span>
+                    <span className="text-fg block text-[13.5px] font-semibold">
+                      Nuevo lanzamiento
+                    </span>
+                    <span className="text-faint block text-[11.5px] leading-snug">
+                      Aparece en Nuevos lanzamientos del inicio.
+                    </span>
+                  </span>
                   <input
                     type="checkbox"
-                    className="accent-[var(--gold)]"
+                    className="h-4 w-4 shrink-0 accent-[var(--gold)]"
                     disabled={!sections.nuevos}
                     checked={isNew}
                     onChange={(e) => setIsNew(e.target.checked)}
                   />
-                  Nuevos lanzamientos
                 </label>
-                <div className="text-faint mt-1 text-[11.5px] leading-relaxed">
-                  <b>Ofertas de la semana</b> es automática: aparece cuando el
-                  producto tiene un descuento (sección Descuentos).{" "}
-                  <b>Más vendidos</b> es automática por las ventas. No se
-                  asignan a mano.
-                </div>
+              </div>
+              <div className="text-faint mt-2 rounded-lg bg-[var(--surface-2)] p-2.5 text-[11.5px] leading-relaxed">
+                <b className="text-dim">Ofertas de la semana</b> y{" "}
+                <b className="text-dim">Más vendidos</b> son automáticas (por
+                descuentos y por ventas). No se asignan a mano.
               </div>
             </div>
           </div>
@@ -899,7 +968,7 @@ export function ProductWizard({
           >
             ← Atrás
           </Button>
-          {step < 2 ? (
+          {step < 4 ? (
             <Button type="button" onClick={next}>
               Siguiente →
             </Button>

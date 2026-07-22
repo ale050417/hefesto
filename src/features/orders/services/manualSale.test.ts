@@ -4,6 +4,7 @@ import type { Filament, NewFilamentMovement } from "@/features/inventory/types";
 import { manualSaleSchema } from "../schemas";
 import {
   computeManualSaleCosts,
+  editedManualSaleEconomics,
   deductFilamentForManualSale,
   stockActionForTransition,
   toManualSaleRow,
@@ -18,6 +19,33 @@ const base = {
   paymentMethod: "cash" as const,
   status: "delivered" as const,
 };
+
+describe("editedManualSaleEconomics (edición de venta manual, plata)", () => {
+  it("ganancia = total − costo (el costo incluye los insumos)", () => {
+    const r = editedManualSaleEconomics(10000, 3000);
+    expect(r.amortization).toBe(3000);
+    expect(r.profit).toBe(7000);
+  });
+
+  it("el insumo baja la ganancia: subir el costo la reduce en ese monto", () => {
+    const sinVaso = editedManualSaleEconomics(10000, 3000);
+    const conVaso = editedManualSaleEconomics(10000, 3500); // +500 del vaso
+    expect(conVaso.profit).toBe(sinVaso.profit - 500);
+  });
+
+  it("NO multiplica por cantidad (el costo ya viene total)", () => {
+    expect(editedManualSaleEconomics(10000, 4000).amortization).toBe(4000);
+  });
+
+  it("clampa: costo > total ⇒ ganancia 0 (no negativa); costo ≥ 0", () => {
+    expect(editedManualSaleEconomics(1000, 1500).profit).toBe(0);
+    expect(editedManualSaleEconomics(1000, -50).amortization).toBe(0);
+  });
+
+  it("redondea a 2 decimales", () => {
+    expect(editedManualSaleEconomics(100.1, 33.33).profit).toBe(66.77);
+  });
+});
 
 describe("manualSaleSchema", () => {
   it("acepta una venta válida", () => {

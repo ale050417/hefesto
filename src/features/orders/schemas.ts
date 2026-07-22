@@ -122,6 +122,32 @@ export const manualSaleSchema = z.object({
 
 export type ManualSaleInput = z.infer<typeof manualSaleSchema>;
 
+// Edición de una venta manual YA cargada (fix insumos retroactivo 2026-07): SOLO
+// números + metadatos. NO toca stock/estado/filamento (esos tienen su propio
+// flujo). El costo (amortización) es TOTAL e incluye material + insumos; la
+// ganancia la recalcula el servidor = max(0, total − costo).
+export const manualSaleEditSchema = z.object({
+  saleDate: z.string().min(1, "Elegí la fecha."),
+  customerName: z
+    .string()
+    .trim()
+    .min(1, "Ingresá el nombre del cliente.")
+    .max(120),
+  detail: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().trim().max(300).optional(),
+  ),
+  category: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().trim().max(80).optional(),
+  ),
+  total: z.coerce.number().positive("Ingresá el total cobrado."),
+  amortization: z.coerce.number().min(0, "El costo no puede ser negativo."),
+  paymentMethod: z.enum(["transfer", "mercadopago", "cash"]),
+});
+
+export type ManualSaleEditInput = z.infer<typeof manualSaleEditSchema>;
+
 // Mensaje del chat del pedido (solo texto; el chat a medida, que sí acepta
 // foto, tiene SU schema en features/custom). Antes orders importaba el schema
 // de custom — cross-feature innecesario (Cap. 5). Auditoría 2026-07.

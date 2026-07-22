@@ -6,6 +6,7 @@ import {
   OrdersKanban,
   type KanbanOrder,
 } from "@/features/production/components/production-kanban";
+import type { OrderListItem, OrderStatus } from "@/features/orders/types";
 import { safeLoad } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,56 @@ const BOARD_STATES = [
   "shipped",
   "delivered",
 ];
+
+const DELIVERED_HIDE_MS = 24 * 60 * 60 * 1000;
+
+type BoardManualSale = {
+  id: string;
+  status: OrderStatus;
+  detail: string | null;
+  customerName: string;
+  total: string;
+  saleDate: Date;
+};
+
+// Arma las cards del tablero (online + manual) y oculta las entregadas hace más
+// de un día. Va en un helper y no en el cuerpo del componente porque usa
+// Date.now(): la regla de pureza de React no permite llamar funciones impuras
+// durante el render de un Server Component.
+function buildBoardOrders(
+  items: OrderListItem[],
+  sales: BoardManualSale[],
+): KanbanOrder[] {
+  const now = Date.now();
+  const stillOnBoard = (status: string, deliveredSince: Date) =>
+    BOARD_STATES.includes(status) &&
+    (status !== "delivered" ||
+      now - deliveredSince.getTime() < DELIVERED_HIDE_MS);
+
+  const online: KanbanOrder[] = items
+    .filter((o) => stillOnBoard(o.status, o.updatedAt))
+    .map((o) => ({
+      id: o.id,
+      source: "online",
+      label: o.itemsSummary || o.orderNumber,
+      customerName: o.customerName,
+      total: o.total,
+      status: o.status,
+      createdAt: o.createdAt,
+    }));
+  const manual: KanbanOrder[] = sales
+    .filter((s) => stillOnBoard(s.status, s.saleDate))
+    .map((s) => ({
+      id: s.id,
+      source: "manual",
+      label: s.detail ?? "Venta manual",
+      customerName: s.customerName,
+      total: Number(s.total),
+      status: s.status,
+      createdAt: s.saleDate,
+    }));
+  return [...online, ...manual];
+}
 
 export default async function ProductionPage() {
   await requirePermissionPage("produccion", "ver");
@@ -38,27 +89,9 @@ export default async function ProductionPage() {
     safeLoad("ventas manuales", listManualSales(), []),
   ]);
 
-  const online: KanbanOrder[] = ordersR.value.items.map((o) => ({
-    id: o.id,
-    source: "online",
-    label: o.itemsSummary || o.orderNumber,
-    customerName: o.customerName,
-    total: o.total,
-    status: o.status,
-    createdAt: o.createdAt,
-  }));
-  const manual: KanbanOrder[] = manualR.value.map((s) => ({
-    id: s.id,
-    source: "manual",
-    label: s.detail ?? "Venta manual",
-    customerName: s.customerName,
-    total: Number(s.total),
-    status: s.status,
-    createdAt: s.saleDate,
-  }));
-  const orders = [...online, ...manual].filter((o) =>
-    BOARD_STATES.includes(o.status),
-  );
+  // El tablero es de trabajo EN CURSO: una vez entregado, la tarjeta se queda
+  // 1 día (para verla al cierre del día) y después desaparece sola.
+  const orders = buildBoardOrders(ordersR.value.items, manualR.value);
 
   return (
     <div className="view grid gap-4">
@@ -72,7 +105,7 @@ export default async function ProductionPage() {
           <div className="page-sub">
             Tus ventas (online y manuales) por etapa. Arrastrá cada una según
             avanza el trabajo; al pasar a &ldquo;Pago confirmado&rdquo; se
-            descuenta el stock.
+            descuenta el stock. Las entregadas se ocultan solas un día después.
           </div>
         </div>
       </div>

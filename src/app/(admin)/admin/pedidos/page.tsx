@@ -100,6 +100,10 @@ export default async function PedidosAdminPage() {
         status: s.status,
         total: Number(s.total),
         colors: saleColors[s.id] ?? [],
+        // Para el editor de venta manual (números): detalle, categoría y costo.
+        detail: s.detail,
+        category: s.category,
+        amortization: s.amortization != null ? Number(s.amortization) : null,
       }),
     ),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

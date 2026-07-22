@@ -25,6 +25,8 @@ export type OrderListItem = {
   total: number;
   status: OrderStatus;
   createdAt: Date;
+  /** Último cambio (aprox. la fecha de entrega si el estado es "delivered"). */
+  updatedAt: Date;
   /** Resumen de lo pedido (productos + cantidades), para mostrar en la tabla. */
   itemsSummary: string;
 };

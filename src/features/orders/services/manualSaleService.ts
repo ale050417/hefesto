@@ -8,7 +8,7 @@ import type {
   NewFilamentMovement,
 } from "@/features/inventory/types";
 import { notifyLowStockAfterSale } from "@/features/inventory/lowStockNotify";
-import type { ManualSaleInput } from "../schemas";
+import type { ManualSaleInput, ManualSaleEditInput } from "../schemas";
 import type { OrderStatus } from "../types";
 import { canTransition } from "../transitions";
 import { ValidationError } from "@/core/errors";
@@ -61,6 +61,20 @@ export function computeManualSaleCosts(params: {
   const amortization = round2(Math.max(0, params.unitAmortization) * qty);
   const profit = round2(Math.max(0, params.total - amortization));
   return { amortization, profit };
+}
+
+/**
+ * Ganancia de una venta manual EDITADA a mano (fix insumos retroactivo): el costo
+ * (amortización) ya es TOTAL e incluye material + insumos, así que NO se
+ * multiplica por cantidad. Puro y testeable (toca dinero). Clampa igual que
+ * earnings.manualSaleEconomics: ganancia = max(0, total − costo); costo ≥ 0.
+ */
+export function editedManualSaleEconomics(
+  total: number,
+  amortization: number,
+): { amortization: number; profit: number } {
+  const a = round2(Math.max(0, amortization));
+  return { amortization: a, profit: round2(Math.max(0, total - a)) };
 }
 
 /**
@@ -329,6 +343,40 @@ export async function updateManualSaleStatus(
       await import("@/features/inventory/service");
     await restoreFilamentMovements("manual_sale", id).catch(() => 0);
   }
+}
+
+/**
+ * Edita SOLO números + metadatos de una venta manual ya cargada (fix insumos
+ * retroactivo 2026-07): total, costo (amortización = material + insumos),
+ * cliente, detalle, categoría, método y fecha. Recalcula la ganancia en el
+ * servidor (no confía en el cliente). NO toca stock, estado ni filamento: esos
+ * siguen su propio flujo (updateManualSaleStatus). Autorización en la action.
+ */
+export async function updateManualSale(
+  id: string,
+  input: ManualSaleEditInput,
+): Promise<void> {
+  const sale = await db.query.manualSales.findFirst({
+    where: eq(manualSales.id, id),
+  });
+  if (!sale) throw new ValidationError("No encontramos la venta.");
+  const { amortization, profit } = editedManualSaleEconomics(
+    input.total,
+    input.amortization,
+  );
+  await db
+    .update(manualSales)
+    .set({
+      saleDate: new Date(`${input.saleDate}T12:00:00`),
+      customerName: input.customerName,
+      detail: input.detail ?? null,
+      category: input.category ?? null,
+      total: input.total.toFixed(2),
+      amortization: amortization.toFixed(2),
+      profit: profit.toFixed(2),
+      paymentMethod: input.paymentMethod,
+    })
+    .where(eq(manualSales.id, id));
 }
 
 /**

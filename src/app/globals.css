@@ -332,9 +332,17 @@ body > * {
     /* Grilla de TARJETAS (filamentos, clientes, categorías, recompensas, pagos):
        adaptable al ancho REAL. En tablet el sidebar fijo (214px) achica el ancho
        útil y con 3 columnas fijas las tarjetas quedaban ~146px (badges y botones
-       cortados). auto-fit mantiene tarjetas ≥210px y elige las columnas según el
-       espacio: 1 en móvil, 2 en tablet, 3+ en desktop. Sin media queries. */
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+       cortados). auto-FILL mantiene tarjetas de tamaño UNIFORME (no se estiran
+       según cuántas haya; deja el hueco a la derecha en vez de agrandarlas):
+       1 en móvil, 2 en tablet, 3+ en desktop. Sin media queries. */
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  }
+  .grid-products {
+    /* Catálogo admin: tarjetas MÁS CHICAS que grid-3 (más productos por fila).
+       auto-fill = tamaño uniforme, no se estiran según cuántas haya. */
+    display: grid;
+    gap: 14px;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
   .grid-4 {
     grid-template-columns: repeat(2, 1fr);
@@ -3555,7 +3563,7 @@ body > * {
     animation: modalIn 0.28s var(--ease);
   }
   .modal-lg {
-    max-width: 760px;
+    max-width: 880px;
   }
   .modal-head {
     display: flex;

@@ -6,7 +6,8 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   pending_payment: ["confirmed", "cancelled"],
   confirmed: ["in_production", "cancelled", "refunded"],
   in_production: ["ready", "cancelled", "refunded"],
-  ready: ["shipped", "cancelled", "refunded"],
+  // "delivered" directo desde "ready": retiro en el taller (sin envío).
+  ready: ["shipped", "delivered", "cancelled", "refunded"],
   shipped: ["delivered", "refunded"],
   delivered: ["refunded"],
   cancelled: [],

@@ -16,6 +16,7 @@ import { getAmortization } from "@/features/calculator/service";
 import {
   checkoutSchema,
   manualSaleSchema,
+  manualSaleEditSchema,
   orderMessageSchema,
   orderStatusSchema,
   type CheckoutInput,
@@ -25,6 +26,7 @@ import {
   computeManualSaleCosts,
   createManualSale,
   deleteManualSale,
+  updateManualSale,
   updateManualSaleStatus,
 } from "./services/manualSaleService";
 import { getOrderCustomerId, sendOrderMessage } from "./services/orderChat";
@@ -185,8 +187,8 @@ export async function createManualSaleAction(
     total: parsed.data.total,
     quantity: parsed.data.quantity,
   });
-  // Insumos: su costo suma a la amortización (costo real). El total ya los
-  // incluye (los sumó el cliente), así la ganancia queda igual (pass-through).
+  // Insumos: son un COSTO real (vaso, argollas, etc.), NO se cobran aparte. Van a
+  // la amortización y BAJAN la ganancia; el total no los incluye (fix 2026-07).
   const extrasCost = parsed.data.extrasCost ?? 0;
   const amortization = costs.amortization + extrasCost;
   const withCosts = {
@@ -426,6 +428,59 @@ export async function deleteManualSaleAction(
     revalidatePath("/admin/pedidos");
     revalidatePath("/admin/ganancias");
     revalidatePath("/admin/reportes");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+/**
+ * Staff: edita los números + metadatos de una venta manual ya cargada (fix
+ * insumos retroactivo: el insumo/vaso baja la ganancia). Recalcula la ganancia
+ * en el servidor y NO toca stock ni estado. Valida rol + payload.
+ */
+export async function updateManualSaleAction(
+  saleId: string,
+  input: unknown,
+): Promise<
+  | { ok: true }
+  | {
+      ok: false;
+      error: { code: string; message: string; fields?: Record<string, string> };
+    }
+> {
+  if (!(await can("pedidos", "editar"))) return NOT_STAFF;
+  const idOk = z.string().uuid().safeParse(saleId);
+  if (!idOk.success) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION", message: "Venta inválida." },
+    };
+  }
+  const parsed = manualSaleEditSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "Revisá los datos de la venta.",
+        fields: fieldErrors(parsed.error),
+      },
+    };
+  }
+  const user = await getCurrentUser();
+  try {
+    await updateManualSale(idOk.data, parsed.data);
+    revalidatePath("/admin/pedidos");
+    revalidatePath("/admin/ganancias");
+    revalidatePath("/admin/reportes");
+    await recordAudit({
+      actorId: user?.id ?? null,
+      action: "manual_sale.updated",
+      entityType: "manual_sale",
+      entityId: saleId,
+      metadata: { total: parsed.data.total },
+    });
     return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };

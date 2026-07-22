@@ -159,7 +159,8 @@ export async function getEarningsOverview(month?: string | null) {
       m.profitSplit && m.profitSplit.length > 0 ? m.profitSplit : currentParts;
     return {
       id: m.id,
-      orderNumber: "Venta manual",
+      // Mostrar QUÉ se vendió (detalle), no solo "Venta manual".
+      orderNumber: m.detail ? `Manual · ${m.detail}` : "Venta manual",
       customerName: m.customerName,
       createdAt: m.createdAt,
       ingreso: e.ingreso,

@@ -15,6 +15,7 @@ import { DeleteOrderButton } from "./order-actions";
 import { DeleteManualSaleButton } from "./delete-manual-sale-button";
 import { ManualSaleStatusSelect } from "./manual-sale-status-select";
 import { OrderStatusSelect } from "./order-status-select";
+import { ManualSaleEditButton } from "./manual-sale-edit-modal";
 
 export type UnifiedSale = {
   id: string;
@@ -28,6 +29,10 @@ export type UnifiedSale = {
   status: OrderStatus;
   total: number;
   colors: string[];
+  // Solo ventas manuales: para editar los números desde el tablero.
+  detail?: string | null;
+  category?: string | null;
+  amortization?: number | null;
 };
 
 const dateFmt = new Intl.DateTimeFormat("es-AR", { dateStyle: "medium" });
@@ -89,6 +94,17 @@ export function OrdersBoard({
     ) : (
       <DeleteManualSaleButton id={o.id} label={o.customerName ?? ""} />
     );
+  // Datos de la venta manual para el modal de edición de números.
+  const toEditData = (o: UnifiedSale) => ({
+    id: o.id,
+    customerName: o.customerName,
+    detail: o.detail ?? null,
+    category: o.category ?? null,
+    saleDate: o.date,
+    paymentMethod: o.paymentMethod,
+    total: o.total,
+    amortization: o.amortization ?? null,
+  });
 
   return (
     <div className="space-y-3">
@@ -192,6 +208,8 @@ export function OrdersBoard({
                           >
                             Ver
                           </Link>
+                        ) : canEdit ? (
+                          <ManualSaleEditButton sale={toEditData(o)} />
                         ) : (
                           <span className="text-faint">—</span>
                         )}
@@ -243,6 +261,8 @@ export function OrdersBoard({
                       >
                         Ver
                       </Link>
+                    ) : canEdit ? (
+                      <ManualSaleEditButton sale={toEditData(o)} />
                     ) : null}
                   </div>
                 </div>

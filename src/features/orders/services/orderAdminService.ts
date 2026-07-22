@@ -43,6 +43,7 @@ export async function listOrdersAdmin(opts: {
       total: Number(o.total),
       status: o.status,
       createdAt: o.createdAt,
+      updatedAt: o.updatedAt,
       itemsSummary: summarizeItems(o.items),
     })),
     page: opts.page,
