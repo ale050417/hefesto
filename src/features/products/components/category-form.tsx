@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import Image from "next/image";
+import { useRef, useState, type ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
-import { createCategoryAction, updateCategoryAction } from "../actions";
+import {
+  createCategoryAction,
+  updateCategoryAction,
+  uploadCategoryImageAction,
+} from "../actions";
 import { CAT_COLORS, CAT_ICONS, catIconPath } from "../category-icons";
 import { runAction } from "@/lib/run-action";
+import { compressImageToWebp } from "@/lib/image-compress";
 import { useFormErrors } from "@/hooks/use-form-errors";
 
 export type CategoryFormData = {
@@ -16,6 +22,7 @@ export type CategoryFormData = {
   color: string | null;
   sortOrder: number;
   parentId?: string | null;
+  imageUrl?: string | null;
 };
 
 /** Opción de padre para el select (solo categorías raíz). */
@@ -69,8 +76,36 @@ export function CategoryForm({
   );
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(
+    category?.imageUrl ?? null,
+  );
+  const [imgBusy, setImgBusy] = useState(false);
+  const imgInputRef = useRef<HTMLInputElement>(null);
   const fe = useFormErrors();
   const parentOptions = parents.filter((c) => c.id !== category?.id);
+
+  async function onPickImage(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !category?.id) return;
+    setImgBusy(true);
+    // Comprimimos a WebP en el navegador (igual que logo/hero/productos) para
+    // no chocar con el límite del Server Action.
+    const compact = await compressImageToWebp(file, 1200);
+    const fd = new FormData();
+    fd.set("categoryId", category.id);
+    fd.set("file", compact);
+    const res = await runAction(() => uploadCategoryImageAction(fd), {
+      silent: true,
+    });
+    setImgBusy(false);
+    if (imgInputRef.current) imgInputRef.current.value = "";
+    if (!res.ok) {
+      toast(res.error.message, "danger");
+      return;
+    }
+    setImageUrl(res.data.url);
+    toast("Imagen actualizada", "success");
+  }
 
   async function submit() {
     setErr(null);
@@ -185,6 +220,57 @@ export function CategoryForm({
             />
           ))}
         </div>
+      </div>
+
+      <div className="field">
+        <label>Imagen de la categoría (opcional)</label>
+        {edit ? (
+          <div className="flex items-center gap-3">
+            <div
+              className="bg-surface-2 border-surface-3 relative overflow-hidden rounded-lg border"
+              style={{ width: 84, height: 84, flexShrink: 0 }}
+            >
+              {imageUrl ? (
+                <Image
+                  src={imageUrl}
+                  alt=""
+                  fill
+                  sizes="84px"
+                  className="object-cover"
+                />
+              ) : (
+                <span className="text-faint absolute inset-0 flex items-center justify-center text-[11px]">
+                  Sin foto
+                </span>
+              )}
+            </div>
+            <div className="flex flex-col items-start gap-1.5">
+              <input
+                ref={imgInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={onPickImage}
+                disabled={imgBusy}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={imgBusy}
+                onClick={() => imgInputRef.current?.click()}
+              >
+                {imageUrl ? "Cambiar imagen" : "Subir imagen"}
+              </Button>
+              <p className="text-faint text-[11.5px]">
+                Se muestra en la tarjeta. Si no cargás, se usa el ícono.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-faint text-[12px]">
+            Guardá la categoría y volvé a abrirla para subir una imagen.
+          </p>
+        )}
       </div>
 
       {err ? (

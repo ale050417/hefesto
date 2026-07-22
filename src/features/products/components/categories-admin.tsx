@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
@@ -95,6 +96,7 @@ export function CategoriesAdmin({
       color: c.color,
       sortOrder: c.sortOrder,
       parentId: c.parentId,
+      imageUrl: c.imageUrl,
     });
     setFormOpen(true);
   }
@@ -233,7 +235,7 @@ export function CategoriesAdmin({
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex min-w-0 items-center gap-3">
                         <div
-                          className="kpi-ic shrink-0"
+                          className="kpi-ic relative shrink-0 overflow-hidden"
                           style={{
                             width: 48,
                             height: 48,
@@ -242,7 +244,17 @@ export function CategoriesAdmin({
                             boxShadow: `0 0 0 1px ${color}33`,
                           }}
                         >
-                          <IconSvg name={c.icon} size={22} />
+                          {c.imageUrl ? (
+                            <Image
+                              src={c.imageUrl}
+                              alt=""
+                              fill
+                              sizes="48px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <IconSvg name={c.icon} size={22} />
+                          )}
                         </div>
                         <div className="min-w-0">
                           <div className="truncate text-[16.5px] font-bold">
@@ -336,7 +348,7 @@ export function CategoriesAdmin({
                             >
                               <div className="flex min-w-0 items-center gap-2.5">
                                 <span
-                                  className="kpi-ic shrink-0"
+                                  className="kpi-ic relative shrink-0 overflow-hidden"
                                   style={{
                                     width: 28,
                                     height: 28,
@@ -344,7 +356,17 @@ export function CategoriesAdmin({
                                     color: childColor,
                                   }}
                                 >
-                                  <IconSvg name={child.icon} size={14} />
+                                  {child.imageUrl ? (
+                                    <Image
+                                      src={child.imageUrl}
+                                      alt=""
+                                      fill
+                                      sizes="28px"
+                                      className="object-cover"
+                                    />
+                                  ) : (
+                                    <IconSvg name={child.icon} size={14} />
+                                  )}
                                 </span>
                                 <span className="truncate text-[13px] font-semibold">
                                   {child.name}

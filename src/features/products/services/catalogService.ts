@@ -379,6 +379,21 @@ export async function addProductImage(
   });
 }
 
+/**
+ * Sube/actualiza la imagen de una CATEGORÍA (además del ícono). Optimiza a webp,
+ * la guarda en Storage y setea `image_url`. Reusa la misma infra que productos.
+ */
+export async function setCategoryImage(
+  categoryId: string,
+  bytes: Buffer,
+): Promise<string> {
+  const webp = await optimizeImage(bytes);
+  const path = `categories/${categoryId}/${randomUUID()}.webp`;
+  const url = await uploadObject(IMAGES_BUCKET, path, webp, "image/webp");
+  await updateCategoryRow(categoryId, { imageUrl: url });
+  return url;
+}
+
 /** Borra una imagen (Storage + base) y devuelve el productId. */
 export async function removeProductImage(imageId: string): Promise<string> {
   const image = await findImageById(imageId);

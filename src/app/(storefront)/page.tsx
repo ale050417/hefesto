@@ -357,8 +357,20 @@ export default async function Home({
                     { "--cc": category.color ?? "var(--gold)" } as CSSProperties
                   }
                 >
-                  <span className="cat-chip-ic">
-                    {category.icon && paths[category.icon] ? (
+                  <span className="cat-chip-ic" style={{ overflow: "hidden" }}>
+                    {category.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={category.imageUrl}
+                        alt=""
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          borderRadius: "inherit",
+                        }}
+                      />
+                    ) : category.icon && paths[category.icon] ? (
                       <Icon name={category.icon} size={19} />
                     ) : (
                       <span>&#9670;</span>

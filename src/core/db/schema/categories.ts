@@ -13,6 +13,8 @@ export const categories = pgTable("categories", {
   slug: text("slug").notNull().unique(),
   icon: text("icon"),
   color: text("color"),
+  // Imagen opcional de la categoría (además del ícono). URL de Storage.
+  imageUrl: text("image_url"),
   sortOrder: integer("sort_order").notNull().default(0),
   // Subcategorías (1 nivel): null = categoría raíz. RESTRICT: no se borra un
   // padre con hijas. La regla "el padre debe ser raíz" vive en el servicio.

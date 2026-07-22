@@ -22,6 +22,7 @@ import {
   makeImagePrimary,
   publishProduct,
   removeProductImage,
+  setCategoryImage,
   updateCategory,
   updateProduct,
 } from "./services/catalogService";
@@ -398,6 +399,40 @@ export async function uploadProductImageAction(
     const image = await addProductImage(productId, bytes, position, scale);
     revalidatePath(`/admin/productos/${productId}/editar`);
     return { ok: true, data: { id: image.id, url: image.url } };
+  } catch {
+    return {
+      ok: false,
+      error: { code: "INTERNAL", message: "No se pudo subir la imagen" },
+    };
+  }
+}
+
+/** Sube/actualiza la imagen de una categoría (reusa el Storage de productos). */
+export async function uploadCategoryImageAction(
+  formData: FormData,
+): Promise<ActionResult<{ url: string }>> {
+  if (!(await can("productos", "editar"))) return UNAUTHORIZED;
+  const categoryId = formData.get("categoryId");
+  const file = formData.get("file");
+  if (
+    typeof categoryId !== "string" ||
+    !uuidSchema.safeParse(categoryId).success
+  ) {
+    return validationError("Categoría inválida");
+  }
+  if (!(file instanceof File)) return validationError("Falta el archivo");
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return validationError("Formato no permitido (JPG, PNG o WebP)");
+  }
+  if (file.size > MAX_BYTES) {
+    return validationError("El archivo supera los 8 MB");
+  }
+  try {
+    const bytes = Buffer.from(await file.arrayBuffer());
+    const url = await setCategoryImage(categoryId, bytes);
+    revalidatePath("/admin/categorias");
+    revalidatePath("/", "layout");
+    return { ok: true, data: { url } };
   } catch {
     return {
       ok: false,

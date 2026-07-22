@@ -451,6 +451,7 @@ export async function listCategoriesWithCount(
       sortOrder: categories.sortOrder,
       createdAt: categories.createdAt,
       parentId: categories.parentId,
+      imageUrl: categories.imageUrl,
       productCount: sql<number>`count(${products.id})::int`,
     })
     .from(categories)
