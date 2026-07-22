@@ -95,7 +95,10 @@ export function CategoryCircles({
     return () => window.removeEventListener("resize", measure);
   }, [items.length]);
 
-  // Auto-scroll lento y continuo.
+  // Auto-scroll lento y continuo. Usamos un acumulador en JS (`pos`) porque el
+  // navegador redondea `scrollLeft` a enteros: si hiciéramos `scrollLeft += 0.3`
+  // leyendo el valor ya redondeado, nunca avanzaría (por eso "no se movía").
+  // Con el float aparte, cada ~3 frames avanza 1px real → movimiento suave.
   useEffect(() => {
     if (!loop) return;
     const track = trackRef.current;
@@ -103,11 +106,19 @@ export function CategoryCircles({
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     let raf = 0;
-    const step = () => {
+    let pos = track.scrollLeft;
+    let last = performance.now();
+    const SPEED = 22; // px por segundo: despacito, e igual en cualquier monitor
+    const step = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000); // clamp si hubo un lag
+      last = now;
       if (!pausedRef.current && !drag.current.down && !arrowScrolling.current) {
-        track.scrollLeft += 0.3; // despacito
         const half = track.scrollWidth / 2;
-        if (half > 0 && track.scrollLeft >= half) track.scrollLeft -= half;
+        pos += SPEED * dt;
+        if (half > 0 && pos >= half) pos -= half;
+        track.scrollLeft = pos;
+      } else {
+        pos = track.scrollLeft; // el usuario movió a mano: resincronizamos
       }
       raf = requestAnimationFrame(step);
     };
