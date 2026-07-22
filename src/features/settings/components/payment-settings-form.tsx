@@ -238,14 +238,13 @@ export function PaymentSettingsForm({
                     >
                       Conectar
                     </Button>
-                    <button
+                    <Button
                       type="button"
-                      className="text-[12.5px] font-semibold"
-                      style={{ color: "var(--gold-bright)" }}
+                      variant="secondary"
                       onClick={() => setHowOpen(true)}
                     >
-                      ¿De dónde saco mi token?
-                    </button>
+                      ¿Cómo lo consigo?
+                    </Button>
                   </div>
                 </>
               )}
@@ -305,28 +304,44 @@ export function PaymentSettingsForm({
       >
         <div className="flex flex-col gap-3 text-[13.5px] leading-relaxed">
           <p>
-            Necesitás tu <b>Access Token de producción</b>. Lo conseguís así:
+            Tu app <b>Hefesto3D</b> ya está creada en MercadoPago (no crees una
+            nueva). Solo falta traer su token:
           </p>
           <ol
             className="flex flex-col gap-2"
             style={{ listStyle: "decimal", paddingLeft: 18 }}
           >
             <li>
-              Entrá a <b>mercadopago.com.ar/developers</b> con tu cuenta y andá
-              a <b>Tus integraciones</b>.
+              Abrí MercadoPago con el botón de abajo y entrá a{" "}
+              <b>Tus aplicaciones</b>.
             </li>
             <li>
-              Creá una aplicación (o usá una existente) del tipo{" "}
-              <b>Pagos online</b> / Checkout Pro.
+              Hacé clic en tu app <b>Hefesto3D</b>.
             </li>
             <li>
-              En <b>Credenciales de producción</b> copiá el <b>Access Token</b>{" "}
-              (empieza con <code>APP_USR-</code>).
+              Si te pide un <b>código de verificación</b> a tu celular, es
+              normal: ponelo (es la seguridad de tu cuenta).
             </li>
             <li>
-              Pegalo acá y tocá <b>Conectar</b>. Los pagos van a tu cuenta.
+              En el menú de la izquierda entrá a{" "}
+              <b>Credenciales de producción</b>.
+            </li>
+            <li>
+              Copiá el <b>Access Token</b> (empieza con <code>APP_USR-</code>).
+            </li>
+            <li>
+              Volvé acá, pegalo en el campo y tocá <b>Conectar</b>.
             </li>
           </ol>
+          <a
+            href="https://www.mercadopago.com.ar/developers/panel/app"
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-primary"
+            style={{ textDecoration: "none" }}
+          >
+            Abrir MercadoPago → Integraciones
+          </a>
           <p className="text-faint">
             El token es secreto: no lo compartas. Podés cambiarlo o
             desconectarlo cuando quieras.
