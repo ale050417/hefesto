@@ -28,6 +28,7 @@ const TABS: Array<[Tab, string]> = [
 export function ConfigTabs({
   settings,
   payment,
+  mpConnected,
   shipping,
   banners,
   team,
@@ -37,6 +38,7 @@ export function ConfigTabs({
 }: {
   settings: BusinessSettings | null;
   payment: PaymentSettings | null;
+  mpConnected: boolean;
   shipping: ShippingSettings | null;
   banners: StoreBanner[];
   team: TeamMember[];
@@ -63,7 +65,9 @@ export function ConfigTabs({
 
       {tab === "negocio" ? <BusinessConfigForm settings={settings} /> : null}
 
-      {tab === "pagos" ? <PaymentSettingsForm settings={payment} /> : null}
+      {tab === "pagos" ? (
+        <PaymentSettingsForm settings={payment} mpConnected={mpConnected} />
+      ) : null}
 
       {tab === "store" ? (
         <StoreAppearance settings={settings} banners={banners} />

@@ -25,7 +25,7 @@ export default async function CheckoutPage() {
         Finalizar compra
       </h1>
       <CheckoutStepper
-        mpEnabled={isMercadoPagoConfigured()}
+        mpEnabled={await isMercadoPagoConfigured()}
         whatsapp={brand.whatsapp}
       />
     </div>

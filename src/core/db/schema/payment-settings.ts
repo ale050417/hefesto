@@ -19,6 +19,9 @@ export const paymentSettings = pgTable(
     transferCbu: text("transfer_cbu"),
     mpEnabled: boolean("mp_enabled").notNull().default(true),
     mpNote: text("mp_note"),
+    // Access Token de MercadoPago del vendedor. Se pega desde el panel y se usa
+    // en el checkout. SECRETO: server-only, NUNCA se manda al cliente.
+    mpAccessToken: text("mp_access_token"),
     cashEnabled: boolean("cash_enabled").notNull().default(true),
     cashNote: text("cash_note"),
     updatedAt: timestamp("updated_at", { withTimezone: true })

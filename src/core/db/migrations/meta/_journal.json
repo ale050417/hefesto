@@ -435,6 +435,13 @@
       "when": 1783306600000,
       "tag": "0061_gallery",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1783306700000,
+      "tag": "0062_mp_access_token",
+      "breakpoints": true
     }
   ]
 }

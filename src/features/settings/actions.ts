@@ -14,6 +14,7 @@ import {
   saveAppearance,
   saveBusinessInfo,
   savePaymentSettings,
+  saveMpAccessToken,
   saveShippingSettings,
   setBrandImage,
   inviteTeamMember,
@@ -518,6 +519,46 @@ export async function savePaymentSettingsAction(
       cashNote: n(p.data.cashNote),
     });
     revalidatePath("/admin/configuracion");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+// MercadoPago conectable: el vendedor pega/borra su Access Token (server-only,
+// nunca vuelve al cliente).
+const mpTokenSchema = z.object({
+  token: z.string().trim().min(10).max(500),
+});
+
+export async function saveMpTokenAction(input: unknown): Promise<ActionResult> {
+  if (!(await can("config", "editar"))) return UNAUTH;
+  const parsed = mpTokenSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "El token no parece válido (muy corto).",
+      },
+    };
+  }
+  try {
+    await saveMpAccessToken(parsed.data.token);
+    revalidatePath("/admin/configuracion");
+    revalidatePath("/checkout");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+export async function disconnectMpAction(): Promise<ActionResult> {
+  if (!(await can("config", "editar"))) return UNAUTH;
+  try {
+    await saveMpAccessToken(null);
+    revalidatePath("/admin/configuracion");
+    revalidatePath("/checkout");
     return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };

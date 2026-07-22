@@ -495,6 +495,16 @@ export default async function Home({
                 <div className="eyebrow">{brand.instagram ?? "Seguinos"}</div>
                 <h2 className="sec-title">Galería de Instagram</h2>
               </div>
+              {igUrl ? (
+                <a
+                  href={igUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={buttonVariants({ variant: "secondary" })}
+                >
+                  Seguinos en Instagram &rarr;
+                </a>
+              ) : null}
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {brand.gallery?.map((g, i) => (
@@ -517,18 +527,6 @@ export default async function Home({
                 </div>
               ))}
             </div>
-            {igUrl ? (
-              <div className="mt-6 flex justify-center">
-                <a
-                  href={igUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={buttonVariants({ variant: "secondary" })}
-                >
-                  Seguinos en Instagram
-                </a>
-              </div>
-            ) : null}
           </div>
         </section>
       ) : null}

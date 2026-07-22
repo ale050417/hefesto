@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
-import { savePaymentSettingsAction } from "../actions";
+import { Modal } from "@/components/ui/modal";
+import {
+  disconnectMpAction,
+  saveMpTokenAction,
+  savePaymentSettingsAction,
+} from "../actions";
 import type { PaymentSettings } from "../types";
 import { runAction } from "@/lib/run-action";
 
@@ -30,8 +35,10 @@ const I = {
 
 export function PaymentSettingsForm({
   settings,
+  mpConnected,
 }: {
   settings: PaymentSettings | null;
+  mpConnected: boolean;
 }) {
   const [form, setForm] = useState({
     transferEnabled: settings?.transferEnabled ?? true,
@@ -45,6 +52,37 @@ export function PaymentSettingsForm({
   const [busy, setBusy] = useState(false);
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
+
+  // Conexión de MercadoPago (token). El token NUNCA llega acá (solo el estado).
+  const [connected, setConnected] = useState(mpConnected);
+  const [mpToken, setMpToken] = useState("");
+  const [mpBusy, setMpBusy] = useState(false);
+  const [howOpen, setHowOpen] = useState(false);
+
+  async function saveMpToken() {
+    if (mpToken.trim().length < 10) {
+      toast("Pegá tu Access Token completo.", "danger");
+      return;
+    }
+    setMpBusy(true);
+    const res = await runAction(() => saveMpTokenAction({ token: mpToken }), {
+      silent: true,
+    });
+    setMpBusy(false);
+    if (!res.ok) return toast(res.error.message, "danger");
+    setConnected(true);
+    setMpToken("");
+    toast("MercadoPago conectado", "success");
+  }
+
+  async function disconnectMp() {
+    setMpBusy(true);
+    const res = await runAction(() => disconnectMpAction(), { silent: true });
+    setMpBusy(false);
+    if (!res.ok) return toast(res.error.message, "danger");
+    setConnected(false);
+    toast("MercadoPago desconectado", "success");
+  }
 
   async function submit() {
     setBusy(true);
@@ -130,21 +168,96 @@ export function PaymentSettingsForm({
             )}
           </div>
           <div>
-            <div className="text-[15px] font-semibold">MercadoPago</div>
+            <div className="flex items-center gap-2">
+              <div className="text-[15px] font-semibold">MercadoPago</div>
+              {connected ? (
+                <span className="badge badge-success">Conectado</span>
+              ) : (
+                <span className="text-faint text-[11.5px] font-semibold">
+                  Sin conectar
+                </span>
+              )}
+            </div>
             <div className="text-faint mt-1 text-[12.5px]">
-              Tarjetas, QR y cuotas. Las credenciales van por variables de
-              entorno.
+              Tarjetas, QR y cuotas. Conectá tu cuenta pegando tu Access Token.
             </div>
           </div>
           {form.mpEnabled ? (
-            <div className="field">
-              <label>Nota interna</label>
-              <input
-                className="input"
-                value={form.mpNote}
-                onChange={(e) => set("mpNote", e.target.value)}
-                placeholder="Conectado · comisión 4,9%"
-              />
+            <div className="flex flex-col gap-2">
+              {connected ? (
+                <>
+                  <div className="text-faint text-[12.5px]">
+                    Tu cuenta está conectada. Podés reemplazar el token pegando
+                    uno nuevo, o desconectarla.
+                  </div>
+                  <input
+                    className="input"
+                    type="password"
+                    value={mpToken}
+                    autoComplete="off"
+                    onChange={(e) => setMpToken(e.target.value)}
+                    placeholder="Pegar un token nuevo (opcional)"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={saveMpToken}
+                      loading={mpBusy}
+                    >
+                      Reemplazar token
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={disconnectMp}
+                      disabled={mpBusy}
+                    >
+                      Desconectar
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="field">
+                    <label>Access Token de MercadoPago</label>
+                    <input
+                      className="input"
+                      type="password"
+                      value={mpToken}
+                      autoComplete="off"
+                      onChange={(e) => setMpToken(e.target.value)}
+                      placeholder="APP_USR-..."
+                    />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      onClick={saveMpToken}
+                      loading={mpBusy}
+                    >
+                      Conectar
+                    </Button>
+                    <button
+                      type="button"
+                      className="text-[12.5px] font-semibold"
+                      style={{ color: "var(--gold-bright)" }}
+                      onClick={() => setHowOpen(true)}
+                    >
+                      ¿De dónde saco mi token?
+                    </button>
+                  </div>
+                </>
+              )}
+              <div className="field">
+                <label>Nota interna (opcional)</label>
+                <input
+                  className="input"
+                  value={form.mpNote}
+                  onChange={(e) => set("mpNote", e.target.value)}
+                  placeholder="Ej: comisión 4,9%"
+                />
+              </div>
             </div>
           ) : null}
         </div>
@@ -184,6 +297,47 @@ export function PaymentSettingsForm({
           {ic(I.check)} Guardar métodos de pago
         </Button>
       </div>
+
+      <Modal
+        open={howOpen}
+        onClose={() => setHowOpen(false)}
+        title="Conectar MercadoPago"
+      >
+        <div className="flex flex-col gap-3 text-[13.5px] leading-relaxed">
+          <p>
+            Necesitás tu <b>Access Token de producción</b>. Lo conseguís así:
+          </p>
+          <ol
+            className="flex flex-col gap-2"
+            style={{ listStyle: "decimal", paddingLeft: 18 }}
+          >
+            <li>
+              Entrá a <b>mercadopago.com.ar/developers</b> con tu cuenta y andá
+              a <b>Tus integraciones</b>.
+            </li>
+            <li>
+              Creá una aplicación (o usá una existente) del tipo{" "}
+              <b>Pagos online</b> / Checkout Pro.
+            </li>
+            <li>
+              En <b>Credenciales de producción</b> copiá el <b>Access Token</b>{" "}
+              (empieza con <code>APP_USR-</code>).
+            </li>
+            <li>
+              Pegalo acá y tocá <b>Conectar</b>. Los pagos van a tu cuenta.
+            </li>
+          </ol>
+          <p className="text-faint">
+            El token es secreto: no lo compartas. Podés cambiarlo o
+            desconectarlo cuando quieras.
+          </p>
+          <div className="flex justify-end">
+            <Button type="button" onClick={() => setHowOpen(false)}>
+              Entendido
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

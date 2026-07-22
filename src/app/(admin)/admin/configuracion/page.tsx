@@ -28,6 +28,10 @@ export default async function AdminSettingsPage() {
       listRoles(),
     ]),
   );
+  // SEGURIDAD: el Access Token de MercadoPago NUNCA se manda al cliente. Al form
+  // solo le pasamos si está conectado; el token queda server-side.
+  const mpConnected = Boolean(payment?.mpAccessToken?.trim());
+  const paymentSafe = payment ? { ...payment, mpAccessToken: null } : null;
 
   return (
     <div className="view grid gap-5">
@@ -42,7 +46,8 @@ export default async function AdminSettingsPage() {
       </div>
       <ConfigTabs
         settings={settings}
-        payment={payment}
+        payment={paymentSafe}
+        mpConnected={mpConnected}
         shipping={shipping}
         banners={banners}
         team={team}

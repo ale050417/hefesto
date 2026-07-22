@@ -1,13 +1,32 @@
 import crypto from "node:crypto";
+import { eq } from "drizzle-orm";
 import { MercadoPagoConfig, Payment, Preference } from "mercadopago";
+import { db } from "@/core/db";
+import { paymentSettings } from "@/core/db/schema/payment-settings";
 import { env } from "@/core/config/env";
+import { pickMpAccessToken } from "./mp-token";
 
 // Adapter: envolvemos el SDK de MercadoPago tras una interfaz propia, para que
 // el resto de la app no dependa directamente del tercero (Cap. 6).
 
-/** True si hay access token de MercadoPago configurado. */
-export function isMercadoPagoConfigured(): boolean {
-  return Boolean(env.MERCADOPAGO_ACCESS_TOKEN);
+/** Access Token activo: el del panel (DB) con fallback al de entorno. */
+export async function getActiveMpAccessToken(): Promise<string | null> {
+  let dbToken: string | null = null;
+  try {
+    const [row] = await db
+      .select({ token: paymentSettings.mpAccessToken })
+      .from(paymentSettings)
+      .where(eq(paymentSettings.id, 1));
+    dbToken = row?.token ?? null;
+  } catch {
+    // Si la DB no responde, caemos al token de entorno.
+  }
+  return pickMpAccessToken(dbToken, env.MERCADOPAGO_ACCESS_TOKEN);
+}
+
+/** True si MercadoPago está conectado (token en el panel o en el entorno). */
+export async function isMercadoPagoConfigured(): Promise<boolean> {
+  return Boolean(await getActiveMpAccessToken());
 }
 
 export type PreferenceItem = {
@@ -45,27 +64,23 @@ export function buildPreferenceBody(p: CreatePreferenceParams) {
   };
 }
 
-let preferenceClient: Preference | null = null;
-function getPreferenceClient(): Preference {
-  if (!preferenceClient) {
-    if (!env.MERCADOPAGO_ACCESS_TOKEN) {
-      throw new Error("Falta configurar MERCADOPAGO_ACCESS_TOKEN.");
-    }
-    const config = new MercadoPagoConfig({
-      // Anti-cuelgue: si MP no responde, cortamos nosotros (no Vercel a los 300 s).
-      options: { timeout: 15_000 },
-      accessToken: env.MERCADOPAGO_ACCESS_TOKEN,
-    });
-    preferenceClient = new Preference(config);
-  }
-  return preferenceClient;
+// El token puede cambiar (lo edita el vendedor en el panel), así que NO
+// cacheamos el cliente: lo resolvemos por llamada. Instanciar el SDK es barato.
+function mpConfig(accessToken: string): MercadoPagoConfig {
+  return new MercadoPagoConfig({
+    // Anti-cuelgue: si MP no responde, cortamos nosotros (no Vercel a los 300 s).
+    options: { timeout: 15_000 },
+    accessToken,
+  });
 }
 
 /** Crea la preferencia en MercadoPago y devuelve su id + init_point. */
 export async function createPreference(
   p: CreatePreferenceParams,
 ): Promise<CreatedPreference> {
-  const res = await getPreferenceClient().create({
+  const token = await getActiveMpAccessToken();
+  if (!token) throw new Error("MercadoPago no está conectado.");
+  const res = await new Preference(mpConfig(token)).create({
     body: buildPreferenceBody(p),
   });
   if (!res.id || !res.init_point) {
@@ -109,27 +124,13 @@ export function verifyWebhookSignature(params: {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-let paymentClient: Payment | null = null;
-function getPaymentClient(): Payment {
-  if (!paymentClient) {
-    if (!env.MERCADOPAGO_ACCESS_TOKEN) {
-      throw new Error("Falta configurar MERCADOPAGO_ACCESS_TOKEN.");
-    }
-    const config = new MercadoPagoConfig({
-      // Anti-cuelgue: si MP no responde, cortamos nosotros (no Vercel a los 300 s).
-      options: { timeout: 15_000 },
-      accessToken: env.MERCADOPAGO_ACCESS_TOKEN,
-    });
-    paymentClient = new Payment(config);
-  }
-  return paymentClient;
-}
-
 /** Consulta un pago en MercadoPago por id (estado + referencia al pedido). */
 export async function getPayment(
   id: string,
 ): Promise<{ status: string | null; externalReference: string | null }> {
-  const res = await getPaymentClient().get({ id });
+  const token = await getActiveMpAccessToken();
+  if (!token) throw new Error("MercadoPago no está conectado.");
+  const res = await new Payment(mpConfig(token)).get({ id });
   return {
     status: res.status ?? null,
     externalReference: res.external_reference ?? null,

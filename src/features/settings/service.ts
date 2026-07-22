@@ -144,6 +144,14 @@ export async function savePaymentSettings(patch: {
   await repo.upsertPaymentSettings(patch);
 }
 
+/**
+ * Guarda (o borra con null) el Access Token de MercadoPago del vendedor.
+ * SECRETO: server-only. No lo devolvemos nunca al cliente.
+ */
+export async function saveMpAccessToken(token: string | null): Promise<void> {
+  await repo.upsertPaymentSettings({ mpAccessToken: token });
+}
+
 /* ---------- Envíos ---------- */
 
 export async function getShippingSettings(): Promise<ShippingSettings | null> {
