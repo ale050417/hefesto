@@ -169,23 +169,35 @@ const testimonials: Array<[string, string]> = [
 const faqs: Array<[string, string]> = [
   [
     "¿Cuánto tarda mi pedido?",
-    "Todo se imprime a pedido. El tiempo figura en cada producto, en general 24 a 48 hs.",
+    "Todo se imprime a pedido, así que el tiempo depende de la pieza: el estimado figura en cada producto. Apenas confirmás el pedido, arrancamos.",
   ],
   [
     "¿Puedo elegir el color?",
-    "¡Sí! Muchos productos permiten elegir color. Lo ves en la página del producto.",
+    "¡Sí! Muchos productos te dejan elegir el color desde su página. Si no encontrás el que buscás, escribinos por WhatsApp y lo vemos.",
   ],
   [
     "¿Hacen diseños personalizados?",
-    "Claro. Contanos tu idea y te pasamos un presupuesto sin compromiso.",
+    "Claro. Contanos tu idea por WhatsApp y te pasamos un presupuesto sin compromiso. Para arrancar pedimos un adelanto (lo coordinamos según el proyecto) y el resto al entregar.",
   ],
   [
     "¿Cómo son los envíos?",
-    "Envíos a todo el país y retiro gratis en el taller.",
+    "Enviamos a todo el país. El costo del envío lo abona el cliente y lo coordinamos al confirmar tu pedido.",
+  ],
+  [
+    "¿Puedo retirar en persona?",
+    "Sí. Estamos en Iguazú y coordinamos el punto y el horario de entrega por WhatsApp.",
   ],
   [
     "¿Qué medios de pago aceptan?",
     "MercadoPago, transferencia bancaria y efectivo al retirar.",
+  ],
+  [
+    "¿Con qué materiales imprimen?",
+    "Trabajamos con PLA, PETG, TPU y resina, y elegimos el más adecuado según la pieza y el uso que le vayas a dar.",
+  ],
+  [
+    "¿Y si algo sale mal?",
+    "Si tu pieza llega con una falla de impresión, la rehacemos. Queremos que quede impecable.",
   ],
 ];
 
