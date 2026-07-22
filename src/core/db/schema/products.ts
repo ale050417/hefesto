@@ -34,6 +34,12 @@ export const products = pgTable(
     // amortization = costo de producir; profit = precio − amortización.
     amortization: numeric("amortization", { precision: 12, scale: 2 }),
     profit: numeric("profit", { precision: 12, scale: 2 }),
+    // Costo de los insumos del producto (vaso, argollas, etc.). SEPARADO del
+    // precio: el precio ya los incluye (se cobran), pero este monto se descuenta
+    // en la amortización del pedido para que el insumo no infle la ganancia.
+    extrasCost: numeric("extras_cost", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
     material: text("material"),
     printTimeMinutes: integer("print_time_minutes"),
     weightGrams: integer("weight_grams"),

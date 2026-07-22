@@ -134,6 +134,8 @@ export type DeliveredItem = {
   weightGrams: number;
   printMinutes: number;
   material: string | null;
+  /** Costo de insumos del producto (por unidad). */
+  extrasCost: number;
 };
 
 export async function getDeliveredItems(
@@ -146,6 +148,7 @@ export async function getDeliveredItems(
       weightGrams: products.weightGrams,
       printMinutes: products.printTimeMinutes,
       material: products.material,
+      extrasCost: products.extrasCost,
     })
     .from(orderItems)
     .innerJoin(orders, eq(orderItems.orderId, orders.id))
@@ -157,6 +160,7 @@ export async function getDeliveredItems(
     weightGrams: r.weightGrams != null ? Number(r.weightGrams) : 0,
     printMinutes: r.printMinutes != null ? Number(r.printMinutes) : 0,
     material: r.material,
+    extrasCost: r.extrasCost != null ? Number(r.extrasCost) : 0,
   }));
 }
 

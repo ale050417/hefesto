@@ -124,6 +124,7 @@ export async function getEarningsOverview(month?: string | null) {
       weightGrams: it.weightGrams,
       printMinutes: it.printMinutes,
       costPerKg,
+      extrasCost: it.extrasCost,
     });
     byOrder.set(it.orderId, arr);
   }

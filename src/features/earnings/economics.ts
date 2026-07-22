@@ -56,6 +56,9 @@ export type EconItem = {
   weightGrams: number;
   printMinutes: number;
   costPerKg: number;
+  /** Costo de insumos del producto por unidad (vaso, argollas...). Baja la
+   * ganancia: el precio ya los incluye, así que se descuentan como costo. */
+  extrasCost?: number;
 };
 
 export type OrderEconomics = {
@@ -77,7 +80,8 @@ export function computeOrderEconomics(
   let hours = 0;
   for (const it of items) {
     const a = productAmort(it.weightGrams, it.printMinutes, it.costPerKg, s);
-    amort += a.total * it.quantity;
+    // El insumo del producto es un costo: se suma a la amortización (por unidad).
+    amort += (a.total + (it.extrasCost ?? 0)) * it.quantity;
     grams += a.grams * it.quantity;
     hours += a.hours * it.quantity;
   }

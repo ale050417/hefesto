@@ -84,6 +84,10 @@ export const productInputSchema = z
       .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
       .optional(),
     profit: z.preprocess(emptyToNull, z.coerce.number().nullable()).optional(),
+    // Costo de insumos del producto (va aparte del precio; baja la ganancia).
+    extrasCost: z
+      .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
+      .optional(),
     // Estado elegible al CREAR (borrador/publicado). En edición se maneja aparte.
     status: z.enum(["draft", "published", "archived"]).optional(),
     isFeatured: z.boolean().default(false),

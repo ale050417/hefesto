@@ -287,6 +287,8 @@ export async function createProduct(input: ProductInput): Promise<Product> {
     ...toRow(input),
     slug,
     status: input.status ?? "draft",
+    // Costo de insumos (aparte del precio). Default 0 si no se cargó.
+    extrasCost: input.extrasCost != null ? input.extrasCost.toString() : "0",
   });
 }
 
@@ -295,7 +297,17 @@ export async function updateProduct(
   id: string,
   input: ProductInput,
 ): Promise<Product> {
-  const row = await updateProductRow(id, toRow(input));
+  // extras_cost solo se pisa si el form lo trae (undefined = preservar el valor
+  // guardado; así una edición que no toca insumos no los borra).
+  const row = await updateProductRow(id, {
+    ...toRow(input),
+    ...(input.extrasCost !== undefined
+      ? {
+          extrasCost:
+            input.extrasCost != null ? input.extrasCost.toString() : "0",
+        }
+      : {}),
+  });
   if (!row) throw new Error("Producto no encontrado");
   return row;
 }

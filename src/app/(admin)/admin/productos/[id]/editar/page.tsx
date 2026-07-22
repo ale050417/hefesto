@@ -51,6 +51,7 @@ export default async function EditarProductoPage({
     description: product.description ?? "",
     categoryId: product.categoryId ?? "",
     price: product.price,
+    extrasCost: product.extrasCost ?? "0",
     salePrice: product.salePrice ?? "",
     material: product.material ?? "",
     printTimeMinutes: product.printTimeMinutes?.toString() ?? "",

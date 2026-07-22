@@ -122,6 +122,7 @@ export async function getProductFormDataAction(id: string): Promise<
     description: product.description ?? "",
     categoryId: product.categoryId ?? "",
     price: product.price,
+    extrasCost: product.extrasCost ?? "0",
     salePrice: product.salePrice ?? "",
     material: product.material ?? "",
     printTimeMinutes: product.printTimeMinutes?.toString() ?? "",

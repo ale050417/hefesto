@@ -62,6 +62,30 @@ describe("computeOrderEconomics", () => {
     );
     expect(e.gananciaPura).toBe(0);
   });
+
+  it("el insumo del producto (extrasCost) baja la ganancia por unidad", () => {
+    const sin = computeOrderEconomics(
+      30000,
+      [{ quantity: 2, weightGrams: 500, printMinutes: 60, costPerKg: 20000 }],
+      settings,
+    );
+    const con = computeOrderEconomics(
+      30000,
+      [
+        {
+          quantity: 2,
+          weightGrams: 500,
+          printMinutes: 60,
+          costPerKg: 20000,
+          extrasCost: 500, // vaso: 500 por unidad
+        },
+      ],
+      settings,
+    );
+    // 500 × 2 unidades = 1000 más de costo → 1000 menos de ganancia.
+    expect(con.amort).toBeCloseTo(sin.amort + 1000, 5);
+    expect(con.gananciaPura).toBeCloseTo(sin.gananciaPura - 1000, 5);
+  });
 });
 
 describe("manualSaleEconomics", () => {

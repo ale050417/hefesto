@@ -273,6 +273,9 @@ export function ProductWizard({
       categoryId,
       // Precio final = calculadora + insumos.
       price: String(priceN),
+      // Insumos: se cobran en el precio, pero su COSTO se guarda aparte para
+      // descontarlo en la ganancia del pedido (no la infla).
+      extrasCost: String(extrasCost),
       salePrice: "",
       material: est.material,
       printTimeMinutes: est.printMinutes ? String(est.printMinutes) : "",

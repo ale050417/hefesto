@@ -22,6 +22,8 @@ export type ProductFormValues = {
   description: string;
   categoryId: string;
   price: string;
+  /** Costo de insumos del producto (vaso, argollas...). Baja la ganancia. */
+  extrasCost: string;
   salePrice: string;
   material: string;
   printTimeMinutes: string;
@@ -318,6 +320,23 @@ export function ProductForm({
         {errors.price ? (
           <p className="text-danger text-xs">{errors.price.message}</p>
         ) : null}
+      </div>
+
+      <div className="field">
+        <label htmlFor="extrasCost">Insumos (costo)</label>
+        <input
+          id="extrasCost"
+          type="number"
+          step="0.01"
+          min={0}
+          className="input"
+          placeholder="0"
+          {...register("extrasCost")}
+        />
+        <div className="text-faint mt-1 text-[11.5px]">
+          Costo de los insumos del producto (vaso, argollas, etc.). Se descuenta
+          de la ganancia; el precio al cliente no cambia.
+        </div>
       </div>
 
       {/* Ficha técnica de impresión 3D */}
