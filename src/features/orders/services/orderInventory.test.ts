@@ -140,8 +140,16 @@ describe("deductFilamentForOrder", () => {
         colors: ["Negro", "Rojo"],
         colorGrams: { Negro: 30, Rojo: 20 }, // gramos del producto (fallback)
         variants: [
-          { label: "15 cm", colorGrams: { Negro: 10, Rojo: 8 } },
-          { label: "25 cm", colorGrams: { Negro: 80, Rojo: 50 } }, // el vendido
+          {
+            label: "15 cm",
+            colorGrams: { Negro: 10, Rojo: 8 },
+            weightGrams: null,
+          },
+          {
+            label: "25 cm", // el vendido
+            colorGrams: { Negro: 80, Rojo: 50 },
+            weightGrams: null,
+          },
         ],
       }),
     });
@@ -178,7 +186,8 @@ describe("deductFilamentForOrder", () => {
         colorMode: "multi" as const,
         colors: ["Negro", "Rojo"],
         colorGrams: { Negro: 30, Rojo: 20 },
-        variants: [{ label: "15 cm", colorGrams: null }], // sin gramos propios
+        // sin gramos propios → cae a los del producto
+        variants: [{ label: "15 cm", colorGrams: null, weightGrams: null }],
       }),
     });
     const res = await deductFilamentForOrder("o1", deps);
@@ -186,6 +195,58 @@ describe("deductFilamentForOrder", () => {
     expect(res.deducted).toBe(2);
     const movements = applyDeltas.mock.calls[0]![0] as NewFilamentMovement[];
     expect(movements.map((m) => m.deltaGrams)).toEqual([-30, -20]);
+  });
+
+  it("color único: usa el PESO del tamaño vendido (label compuesto 'talle · color')", async () => {
+    const { deps, applyDeltas } = makeDeps({
+      getOrder: async () =>
+        makeOrder([{ variantLabel: "25 cm · Rojo", quantity: 2 }]),
+      getProductSpecs: async () => ({
+        material: "PLA",
+        weightGrams: 100, // peso del producto (fallback)
+        colorMode: "single" as const,
+        colors: ["Rojo"],
+        colorGrams: {},
+        variants: [
+          { label: "15 cm", colorGrams: null, weightGrams: 60 },
+          { label: "25 cm", colorGrams: null, weightGrams: 180 }, // el vendido
+        ],
+      }),
+    });
+    const res = await deductFilamentForOrder("o1", deps);
+
+    expect(res.deducted).toBe(1);
+    const movements = applyDeltas.mock.calls[0]![0] as NewFilamentMovement[];
+    expect(movements).toEqual([
+      {
+        filamentId: "f2", // Rojo (sacado del label compuesto)
+        material: "PLA",
+        color: "Rojo",
+        deltaGrams: -360, // 180 g del tamaño 25 cm × 2, no los 100 del producto
+        reason: "order",
+        refId: "o1",
+      },
+    ]);
+  });
+
+  it("color único: si el tamaño no tiene peso, cae al peso del producto", async () => {
+    const { deps, applyDeltas } = makeDeps({
+      getOrder: async () =>
+        makeOrder([{ variantLabel: "15 cm · Rojo", quantity: 1 }]),
+      getProductSpecs: async () => ({
+        material: "PLA",
+        weightGrams: 100,
+        colorMode: "single" as const,
+        colors: ["Rojo"],
+        colorGrams: {},
+        variants: [{ label: "15 cm", colorGrams: null, weightGrams: null }],
+      }),
+    });
+    const res = await deductFilamentForOrder("o1", deps);
+
+    expect(res.deducted).toBe(1);
+    const movements = applyDeltas.mock.calls[0]![0] as NewFilamentMovement[];
+    expect(movements[0]!.deltaGrams).toBe(-100); // peso del producto
   });
 
   it("es idempotente: si el ledger ya tiene movimientos del pedido, no repite", async () => {

@@ -237,6 +237,7 @@ export async function replaceProductVariants(
     label: string;
     priceOverride: string | null;
     colorGrams: Record<string, number> | null;
+    weightGrams: string | null;
   }[],
   database: Database = db,
 ): Promise<void> {
@@ -250,6 +251,7 @@ export async function replaceProductVariants(
         label: v.label,
         priceOverride: v.priceOverride,
         colorGrams: v.colorGrams,
+        weightGrams: v.weightGrams,
       })),
     );
   }
@@ -265,6 +267,7 @@ export async function listVariantsByProduct(
     label: string;
     priceOverride: string | null;
     colorGrams: Record<string, number> | null;
+    weightGrams: string | null;
   }[]
 > {
   return database
@@ -273,6 +276,7 @@ export async function listVariantsByProduct(
       label: productVariants.label,
       priceOverride: productVariants.priceOverride,
       colorGrams: productVariants.colorGrams,
+      weightGrams: productVariants.weightGrams,
     })
     .from(productVariants)
     .where(eq(productVariants.productId, productId));

@@ -33,10 +33,12 @@ export type OrderInventoryDeps = {
     colors: string[];
     /** Multicolor: gramos por color del producto (para descontar de cada color). */
     colorGrams: Record<string, number>;
-    /** Gramos por color POR tamaño: si el tamaño vendido tiene los suyos, mandan. */
+    /** Material POR tamaño: si el tamaño vendido tiene lo suyo, manda sobre el
+     * producto. colorGrams (multicolor) y weightGrams (color único, gramos). */
     variants: Array<{
       label: string;
       colorGrams: Record<string, number> | null;
+      weightGrams: number | null;
     }>;
   } | null>;
   listFilaments: () => Promise<Filament[]>;
@@ -127,12 +129,20 @@ export async function deductFilamentForOrder(
         continue;
       }
 
+      // Tamaño vendido: el label del pedido puede ser compuesto ("25 cm · Rojo"
+      // en color único) o solo el tamaño ("25 cm" en multicolor). Buscamos la
+      // variante cuyo label aparece como segmento → sirve para los dos modos.
+      const labelSegments = (item.variantLabel ?? "")
+        .split("·")
+        .map((s) => s.trim().toLowerCase())
+        .filter(Boolean);
+      const variant = specs.variants.find((v) =>
+        labelSegments.includes(v.label.trim().toLowerCase()),
+      );
+
       // MULTICOLOR: la pieza lleva varios colores; se descuenta de CADA color los
       // gramos cargados. Si el TAMAÑO vendido tiene sus propios gramos por color,
       // mandan esos (cada tamaño gasta distinto material); si no, los del producto.
-      const variant = item.variantLabel
-        ? specs.variants.find((v) => v.label === item.variantLabel)
-        : null;
       const variantGrams = variant?.colorGrams ?? {};
       const hasVariantGrams = Object.values(variantGrams).some((g) => g > 0);
       const effectiveColorGrams = hasVariantGrams
@@ -174,8 +184,13 @@ export async function deductFilamentForOrder(
         continue;
       }
 
-      // COLOR ÚNICO: peso total del producto sobre el color elegido.
-      if (!specs.weightGrams || specs.weightGrams <= 0) {
+      // COLOR ÚNICO: peso de la pieza sobre el color elegido. Si el TAMAÑO
+      // vendido tiene su propio peso, manda ese; si no, el peso del producto.
+      const singleWeight =
+        variant?.weightGrams && variant.weightGrams > 0
+          ? variant.weightGrams
+          : specs.weightGrams;
+      if (!singleWeight || singleWeight <= 0) {
         result.skipped.push({ item: label, reason: "producto sin peso (g)" });
         continue;
       }
@@ -194,7 +209,7 @@ export async function deductFilamentForOrder(
         filamentId: filament.id,
         material: filament.material,
         color: filament.color,
-        deltaGrams: -(specs.weightGrams * item.quantity),
+        deltaGrams: -(singleWeight * item.quantity),
         reason: "order",
         refId: orderId,
       });

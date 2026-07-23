@@ -25,6 +25,9 @@ export const productVariants = pgTable(
     // Gramos por color de ESTE tamaño (multicolor): descuenta stock según el
     // tamaño vendido. Null = usar los gramos del producto.
     colorGrams: jsonb("color_grams").$type<Record<string, number>>(),
+    // Peso de ESTE tamaño en color único (gramos): descuenta stock según el
+    // tamaño vendido sobre el color elegido. Null = usar el peso del producto.
+    weightGrams: numeric("weight_grams", { precision: 10, scale: 2 }),
   },
   (t) => [
     check(

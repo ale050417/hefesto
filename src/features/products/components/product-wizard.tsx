@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EstimatorModalButton } from "@/features/calculator/components/estimator-modal-button";
-import { VariantGramsButton } from "./variant-grams-button";
+import { GramsButton } from "./grams-button";
 import type { EstimatorValue } from "@/features/calculator/components/price-estimator";
 import type { EstimatorContext } from "@/features/calculator/service";
 import {
@@ -102,10 +102,16 @@ export function ProductWizard({
   const [extras, setExtras] = useState<
     Array<{ name: string; cost: string; qty: string }>
   >([]);
-  // Tamaños (variantes): nombre + precio + gramos por color (multicolor, para
-  // descontar stock según el tamaño). Vacío = producto sin tamaños.
+  // Tamaños (variantes): nombre + precio + material del tamaño (para descontar
+  // stock según el tamaño vendido). Multicolor: gramos por color; color único:
+  // peso de la pieza. Vacío = producto sin tamaños.
   const [variants, setVariants] = useState<
-    Array<{ label: string; price: string; colorGrams: Record<string, number> }>
+    Array<{
+      label: string;
+      price: string;
+      colorGrams: Record<string, number>;
+      weightGrams: string;
+    }>
   >([]);
   const [est, setEst] = useState<EstimatorValue>({
     filamentId: null,
@@ -153,8 +159,17 @@ export function ProductWizard({
     setVariants((vs) =>
       vs.map((x, j) => (j === i ? { ...x, colorGrams: grams } : x)),
     );
+  const setVariantWeight = (i: number, grams: number) =>
+    setVariants((vs) =>
+      vs.map((x, j) =>
+        j === i ? { ...x, weightGrams: grams > 0 ? String(grams) : "" } : x,
+      ),
+    );
   const addVariant = () =>
-    setVariants((vs) => [...vs, { label: "", price: "", colorGrams: {} }]);
+    setVariants((vs) => [
+      ...vs,
+      { label: "", price: "", colorGrams: {}, weightGrams: "" },
+    ]);
   const removeVariant = (i: number) =>
     setVariants((vs) => vs.filter((_, j) => j !== i));
   // El precio final del producto = el de la calculadora + los insumos.
@@ -324,13 +339,15 @@ export function ProductWizard({
       productionTime,
       isFeatured,
       isNew,
-      // Tamaños: nombre + precio + gramos por color (los sin nombre se descartan).
+      // Tamaños: nombre + precio + material del tamaño (gramos por color en
+      // multicolor / peso en color único). Los sin nombre se descartan.
       variants: variants
         .filter((v) => v.label.trim())
         .map((v) => ({
           label: v.label.trim(),
           price: v.price,
           colorGrams: v.colorGrams,
+          weightGrams: v.weightGrams,
         })),
       status,
     };
@@ -638,53 +655,6 @@ export function ProductWizard({
               </div>
             </div>
 
-            {/* MULTICOLOR: gramos de cada color, SOLO para descontar el stock de
-                filamento al vender (no cambia el precio). Va acá, junto a los
-                colores, porque describe la composición de la pieza. */}
-            {colorMode === "multi" && colors.length > 0 ? (
-              <div className="field">
-                <label className="mb-0">Gramos por color</label>
-                <div className="text-faint text-[11.5px] leading-relaxed">
-                  Cuántos gramos de cada color lleva la pieza. Sirve para
-                  descontar el stock de filamento al vender; no cambia el
-                  precio.
-                </div>
-                <div className="mt-2 flex flex-col gap-2">
-                  {colors.map((c) => (
-                    <div key={c} className="flex items-center gap-2">
-                      <span className="flex w-32 items-center gap-2 text-sm">
-                        <span
-                          style={{
-                            width: 13,
-                            height: 13,
-                            borderRadius: "50%",
-                            background: hexOf(c),
-                            border: "1px solid var(--border)",
-                            flexShrink: 0,
-                          }}
-                        />
-                        {c}
-                      </span>
-                      <input
-                        type="number"
-                        className="input"
-                        style={{ maxWidth: 120 }}
-                        placeholder="0"
-                        value={colorGrams[c] ?? ""}
-                        onChange={(e) =>
-                          setColorGrams((prev) => ({
-                            ...prev,
-                            [c]: Number(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                      <span className="text-faint text-[12px]">g</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
             <div className="field">
               <label htmlFor="w-time">
                 Tiempo de producción / entrega{" "}
@@ -818,72 +788,118 @@ export function ProductWizard({
               ) : null}
             </div>
 
-            {/* TAMAÑOS: variantes con su precio. El cliente elige un tamaño y
-                paga ese precio. Vacío = producto de precio único. */}
+            {/* MATERIAL del producto (multicolor SIN tamaños): gramos por color
+                para descontar stock. Con tamaños, el material va por tamaño
+                (abajo). En color único el peso sale de la calculadora. */}
+            {colorMode === "multi" &&
+            colors.length > 0 &&
+            variants.length === 0 ? (
+              <div className="field">
+                <label className="mb-0">Material (para el stock)</label>
+                <p className="text-faint text-[12px] leading-relaxed">
+                  Cargá los gramos de cada color que usa la pieza. Se descuentan
+                  del stock al vender; no cambian el precio.
+                </p>
+                <div className="mt-2">
+                  <GramsButton
+                    mode="multi"
+                    colors={colors}
+                    colorGrams={colorGrams}
+                    onColorGrams={setColorGrams}
+                    hexOf={hexOf}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {/* TAMAÑOS: cada uno con su precio Y su material. El cliente elige un
+                tamaño y paga ese precio; el stock descuenta según el tamaño.
+                Vacío = producto de precio único. */}
             <div className="field">
               <label className="mb-0">
                 Tamaños{" "}
                 <span className="text-faint font-normal">(opcional)</span>
               </label>
               <p className="text-faint text-[12px] leading-relaxed">
-                Si vendés el mismo producto en varios tamaños, cargalos acá con
-                su precio (calculalo con los gramos de cada tamaño). El cliente
-                elige el tamaño y paga ese precio — así no publicás el mismo
-                producto varias veces.
+                Si vendés el mismo producto en varios tamaños, cargalos acá:
+                cada uno con su precio (calculadora) y su material (botón
+                “Gramos”). El cliente elige el tamaño y paga ese precio — así no
+                publicás el mismo producto varias veces.
               </p>
-              {variants.map((v, i) => (
-                <div key={i} className="mt-2 flex flex-wrap items-center gap-2">
-                  <input
-                    className="input flex-1"
-                    style={{ minWidth: 140 }}
-                    placeholder="Ej: Chico 12 cm"
-                    value={v.label}
-                    onChange={(ev) => setVariant(i, "label", ev.target.value)}
-                  />
-                  <input
-                    className="input"
-                    style={{ width: 110 }}
-                    type="number"
-                    min={0}
-                    placeholder="Precio"
-                    value={v.price}
-                    onChange={(ev) => setVariant(i, "price", ev.target.value)}
-                  />
-                  <EstimatorModalButton
-                    estimator={estimator}
-                    label="Calcular"
-                    onUse={(val) => {
-                      if (val.price != null)
-                        setVariant(i, "price", String(val.price));
-                    }}
-                  />
-                  {colorMode === "multi" ? (
-                    <VariantGramsButton
-                      colors={colors}
-                      value={v.colorGrams}
-                      onChange={(g) => setVariantGrams(i, g)}
-                      hexOf={hexOf}
-                    />
-                  ) : null}
-                  <button
-                    type="button"
-                    className="btn-icon btn-ghost"
-                    onClick={() => removeVariant(i)}
-                    aria-label="Quitar tamaño"
+              <div className="mt-2 flex flex-col gap-2">
+                {variants.map((v, i) => (
+                  <div
+                    key={i}
+                    className="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-3"
                   >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              <div className="mt-2">
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-sm"
-                  onClick={addVariant}
-                >
-                  + Agregar tamaño
-                </button>
+                    <div className="flex items-center gap-2">
+                      <input
+                        className="input flex-1"
+                        style={{ minWidth: 120 }}
+                        placeholder="Nombre del tamaño (ej: Chico 12 cm)"
+                        value={v.label}
+                        onChange={(ev) =>
+                          setVariant(i, "label", ev.target.value)
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="btn-icon btn-ghost"
+                        onClick={() => removeVariant(i)}
+                        aria-label="Quitar tamaño"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <span className="text-faint text-[12px]">$</span>
+                        <input
+                          className="input"
+                          style={{ width: 110 }}
+                          type="number"
+                          min={0}
+                          placeholder="Precio"
+                          value={v.price}
+                          onChange={(ev) =>
+                            setVariant(i, "price", ev.target.value)
+                          }
+                        />
+                      </div>
+                      <EstimatorModalButton
+                        estimator={estimator}
+                        label="Calcular"
+                        onUse={(val) => {
+                          if (val.price != null)
+                            setVariant(i, "price", String(val.price));
+                        }}
+                      />
+                      {colorMode === "multi" ? (
+                        <GramsButton
+                          mode="multi"
+                          colors={colors}
+                          colorGrams={v.colorGrams}
+                          onColorGrams={(g) => setVariantGrams(i, g)}
+                          hexOf={hexOf}
+                        />
+                      ) : (
+                        <GramsButton
+                          mode="single"
+                          weight={Number(v.weightGrams) || 0}
+                          onWeight={(g) => setVariantWeight(i, g)}
+                        />
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
+              <button
+                type="button"
+                onClick={addVariant}
+                className="text-dim mt-2 w-full rounded-xl border border-dashed border-[var(--border-strong)] py-2.5 text-[13px] transition hover:border-[var(--gold)] hover:text-[var(--gold-bright)]"
+              >
+                + Agregar tamaño
+              </button>
             </div>
 
             {/* COLOR ÚNICO: precio por color (opcional). El cliente paga el precio

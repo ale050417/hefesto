@@ -6,7 +6,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EstimatorModalButton } from "@/features/calculator/components/estimator-modal-button";
-import { VariantGramsButton } from "./variant-grams-button";
+import { GramsButton } from "./grams-button";
 import type { EstimatorValue } from "@/features/calculator/components/price-estimator";
 import type { EstimatorContext } from "@/features/calculator/service";
 import {
@@ -39,11 +39,13 @@ export type ProductFormValues = {
   isFeatured: boolean;
   isNew: boolean;
   status: "draft" | "published";
-  /** Tamaños (variantes): nombre, precio y gramos por color (multicolor). */
+  /** Tamaños (variantes): nombre, precio y material del tamaño (gramos por color
+   * en multicolor / peso en color único) para descontar stock según el tamaño. */
   variants: {
     label: string;
     price: string;
     colorGrams: Record<string, number>;
+    weightGrams: string;
   }[];
 };
 
@@ -95,9 +97,14 @@ export function ProductForm({
   const [colorPricesSingle, setColorPricesSingle] = useState<
     Record<string, number>
   >(defaultValues.colorPrices ?? {});
-  // Tamaños (variantes): nombre + precio + gramos por color; se precargan al editar.
+  // Tamaños (variantes): nombre + precio + material del tamaño; se precargan al editar.
   const [variants, setVariants] = useState<
-    { label: string; price: string; colorGrams: Record<string, number> }[]
+    {
+      label: string;
+      price: string;
+      colorGrams: Record<string, number>;
+      weightGrams: string;
+    }[]
   >(defaultValues.variants ?? []);
   const setVariant = (i: number, k: "label" | "price", v: string) =>
     setVariants((vs) => vs.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
@@ -105,8 +112,17 @@ export function ProductForm({
     setVariants((vs) =>
       vs.map((x, j) => (j === i ? { ...x, colorGrams: grams } : x)),
     );
+  const setVariantWeight = (i: number, grams: number) =>
+    setVariants((vs) =>
+      vs.map((x, j) =>
+        j === i ? { ...x, weightGrams: grams > 0 ? String(grams) : "" } : x,
+      ),
+    );
   const addVariant = () =>
-    setVariants((vs) => [...vs, { label: "", price: "", colorGrams: {} }]);
+    setVariants((vs) => [
+      ...vs,
+      { label: "", price: "", colorGrams: {}, weightGrams: "" },
+    ]);
   const removeVariant = (i: number) =>
     setVariants((vs) => vs.filter((_, j) => j !== i));
   // Ficha técnica (material/peso/tiempo/altura) la maneja el PriceEstimator;
@@ -209,6 +225,7 @@ export function ProductForm({
           label: v.label.trim(),
           price: v.price,
           colorGrams: v.colorGrams,
+          weightGrams: v.weightGrams,
         })),
     };
     const result =
@@ -351,70 +368,110 @@ export function ProductForm({
         ) : null}
       </div>
 
-      {/* TAMAÑOS: variantes con su precio. El cliente elige uno y paga ese
-          precio. Vacío = producto de precio único. */}
+      {/* MATERIAL del producto (multicolor SIN tamaños): gramos por color para
+          descontar stock. Con tamaños, el material va por tamaño (abajo). En
+          color único el peso sale de la calculadora. */}
+      {colorMode === "multi" && colors.length > 0 && variants.length === 0 ? (
+        <div className="field">
+          <label className="mb-0">Material (para el stock)</label>
+          <p className="text-faint text-[12px] leading-relaxed">
+            Cargá los gramos de cada color que usa la pieza. Se descuentan del
+            stock al vender; no cambian el precio.
+          </p>
+          <div className="mt-2">
+            <GramsButton
+              mode="multi"
+              colors={colors}
+              colorGrams={colorGrams}
+              onColorGrams={setColorGrams}
+              hexOf={(c) => colorList.find((x) => x.n === c)?.c ?? "#888"}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      {/* TAMAÑOS: cada uno con su precio Y su material. El cliente elige un tamaño
+          y paga ese precio; el stock descuenta según el tamaño. Vacío = precio
+          único. */}
       <div className="field">
         <label className="mb-0">
           Tamaños <span className="text-faint font-normal">(opcional)</span>
         </label>
         <p className="text-faint text-[12px] leading-relaxed">
-          Si vendés el mismo producto en varios tamaños, cargalos acá con su
-          precio (calculalo con los gramos de cada tamaño). El cliente elige el
-          tamaño y paga ese precio.
+          Si vendés el mismo producto en varios tamaños, cargalos acá: cada uno
+          con su precio (calculadora) y su material (botón “Gramos”). El cliente
+          elige el tamaño y paga ese precio.
         </p>
-        {variants.map((v, i) => (
-          <div key={i} className="mt-2 flex flex-wrap items-center gap-2">
-            <input
-              className="input flex-1"
-              style={{ minWidth: 140 }}
-              placeholder="Ej: Chico 12 cm"
-              value={v.label}
-              onChange={(ev) => setVariant(i, "label", ev.target.value)}
-            />
-            <input
-              className="input"
-              style={{ width: 110 }}
-              type="number"
-              min={0}
-              placeholder="Precio"
-              value={v.price}
-              onChange={(ev) => setVariant(i, "price", ev.target.value)}
-            />
-            <EstimatorModalButton
-              estimator={estimator}
-              label="Calcular"
-              onUse={(val) => {
-                if (val.price != null)
-                  setVariant(i, "price", String(val.price));
-              }}
-            />
-            {colorMode === "multi" ? (
-              <VariantGramsButton
-                colors={colors}
-                value={v.colorGrams}
-                onChange={(g) => setVariantGrams(i, g)}
-                hexOf={(c) => colorList.find((x) => x.n === c)?.c ?? "#888"}
-              />
-            ) : null}
-            <button
-              type="button"
-              className="btn-icon btn-ghost"
-              onClick={() => removeVariant(i)}
-              aria-label="Quitar tamaño"
+        <div className="mt-2 flex flex-col gap-2">
+          {variants.map((v, i) => (
+            <div
+              key={i}
+              className="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-3"
             >
-              ✕
-            </button>
-          </div>
-        ))}
-        <div className="mt-2">
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            onClick={addVariant}
-          >
-            + Agregar tamaño
-          </button>
+              <div className="flex items-center gap-2">
+                <input
+                  className="input flex-1"
+                  style={{ minWidth: 120 }}
+                  placeholder="Nombre del tamaño (ej: Chico 12 cm)"
+                  value={v.label}
+                  onChange={(ev) => setVariant(i, "label", ev.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn-icon btn-ghost"
+                  onClick={() => removeVariant(i)}
+                  aria-label="Quitar tamaño"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-faint text-[12px]">$</span>
+                  <input
+                    className="input"
+                    style={{ width: 110 }}
+                    type="number"
+                    min={0}
+                    placeholder="Precio"
+                    value={v.price}
+                    onChange={(ev) => setVariant(i, "price", ev.target.value)}
+                  />
+                </div>
+                <EstimatorModalButton
+                  estimator={estimator}
+                  label="Calcular"
+                  onUse={(val) => {
+                    if (val.price != null)
+                      setVariant(i, "price", String(val.price));
+                  }}
+                />
+                {colorMode === "multi" ? (
+                  <GramsButton
+                    mode="multi"
+                    colors={colors}
+                    colorGrams={v.colorGrams}
+                    onColorGrams={(g) => setVariantGrams(i, g)}
+                    hexOf={(c) => colorList.find((x) => x.n === c)?.c ?? "#888"}
+                  />
+                ) : (
+                  <GramsButton
+                    mode="single"
+                    weight={Number(v.weightGrams) || 0}
+                    onWeight={(g) => setVariantWeight(i, g)}
+                  />
+                )}
+              </div>
+            </div>
+          ))}
         </div>
+        <button
+          type="button"
+          onClick={addVariant}
+          className="text-dim mt-2 w-full rounded-xl border border-dashed border-[var(--border-strong)] py-2.5 text-[13px] transition hover:border-[var(--gold)] hover:text-[var(--gold-bright)]"
+        >
+          + Agregar tamaño
+        </button>
       </div>
 
       <div className="field">
@@ -520,40 +577,6 @@ export function ProductForm({
             ))}
           </div>
         </div>
-
-        {/* Multicolor: gramos por color (descontar stock; no cambia el precio). */}
-        {colorMode === "multi" && colors.length > 0 ? (
-          <div className="field mb-3.5">
-            <label>
-              Gramos por color{" "}
-              <span className="text-faint font-normal">
-                (para descontar el stock de filamento; no cambia el precio)
-              </span>
-            </label>
-            <div className="flex flex-col gap-2">
-              {colors.map((c) => (
-                <div key={c} className="flex items-center gap-3">
-                  <span className="w-28 text-sm">{c}</span>
-                  <input
-                    type="number"
-                    step="1"
-                    className="input"
-                    style={{ maxWidth: 140 }}
-                    placeholder="0"
-                    value={colorGrams[c] ?? ""}
-                    onChange={(e) =>
-                      setColorGrams((prev) => ({
-                        ...prev,
-                        [c]: Number(e.target.value) || 0,
-                      }))
-                    }
-                  />
-                  <span className="text-faint text-[12px]">g</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
 
         {/* Color único: precio por color (opcional). El cliente paga el del color
             que elige; vacío = el precio base del producto. */}

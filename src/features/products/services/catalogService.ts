@@ -289,6 +289,7 @@ function toVariantRows(variants: ProductInput["variants"]): {
   label: string;
   priceOverride: string | null;
   colorGrams: Record<string, number> | null;
+  weightGrams: string | null;
 }[] {
   return (variants ?? [])
     .filter((v) => v.label.trim().length > 0)
@@ -301,6 +302,11 @@ function toVariantRows(variants: ProductInput["variants"]): {
         label: v.label.trim(),
         priceOverride: v.price != null ? v.price.toString() : null,
         colorGrams: Object.keys(grams).length > 0 ? grams : null,
+        // Peso del tamaño (color único). > 0 → se guarda; si no, null (usa producto).
+        weightGrams:
+          v.weightGrams != null && v.weightGrams > 0
+            ? v.weightGrams.toString()
+            : null,
       };
     });
 }
@@ -481,8 +487,13 @@ export async function getProductPrintSpecs(id: string): Promise<{
   colors: string[];
   /** Multicolor: gramos por color del PRODUCTO (columna color_prices reusada). */
   colorGrams: Record<string, number>;
-  /** Gramos por color POR tamaño: si el tamaño vendido tiene los suyos, mandan. */
-  variants: Array<{ label: string; colorGrams: Record<string, number> | null }>;
+  /** Material POR tamaño: si el tamaño vendido tiene lo suyo, manda sobre el producto.
+   * colorGrams (multicolor) y weightGrams (color único, en gramos). */
+  variants: Array<{
+    label: string;
+    colorGrams: Record<string, number> | null;
+    weightGrams: number | null;
+  }>;
 } | null> {
   const product = await findProductById(id);
   if (!product) return null;
@@ -496,6 +507,7 @@ export async function getProductPrintSpecs(id: string): Promise<{
     variants: variants.map((v) => ({
       label: v.label,
       colorGrams: v.colorGrams,
+      weightGrams: v.weightGrams !== null ? Number(v.weightGrams) : null,
     })),
   };
 }
@@ -508,6 +520,7 @@ export async function getProductAdmin(id: string): Promise<{
     label: string;
     priceOverride: string | null;
     colorGrams: Record<string, number> | null;
+    weightGrams: string | null;
   }[];
 } | null> {
   const product = await findProductById(id);
@@ -523,6 +536,7 @@ export async function getProductAdmin(id: string): Promise<{
       label: v.label,
       priceOverride: v.priceOverride,
       colorGrams: v.colorGrams,
+      weightGrams: v.weightGrams,
     })),
   };
 }

@@ -111,6 +111,11 @@ export const productInputSchema = z
           colorGrams: z
             .record(z.string().max(40), z.coerce.number().nonnegative())
             .default({}),
+          // Peso de este tamaño en color único (gramos). Vacío = usa el peso
+          // del producto. Descuenta stock según el tamaño sobre el color elegido.
+          weightGrams: z
+            .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
+            .optional(),
         }),
       )
       .max(20, "Demasiados tamaños")

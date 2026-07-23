@@ -456,6 +456,13 @@
       "when": 1783306900000,
       "tag": "0064_variant_color_grams",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1783307000000,
+      "tag": "0065_variant_weight_grams",
+      "breakpoints": true
     }
   ]
 }
