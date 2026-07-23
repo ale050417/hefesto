@@ -193,7 +193,15 @@ export default async function Home({
     ]);
   // En el home mostramos SOLO las categorías padre (las subcategorías se
   // navegan dentro del catálogo). Se ven como círculos en un carrusel.
-  const parentCategories = categories.filter((c) => !c.parentId);
+  // Ocultamos las que no llevan a NINGÚN producto (ni directo ni en sus
+  // subcategorías): una categoría en "0 productos" da sensación de tienda a
+  // medio armar. Un padre con productos solo en sus hijas SÍ se muestra.
+  const parentCategories = categories.filter(
+    (c) =>
+      !c.parentId &&
+      (c.productCount > 0 ||
+        categories.some((s) => s.parentId === c.id && s.productCount > 0)),
+  );
   // FAQ editable: si el dueño cargó preguntas desde Config, usamos esas; si no,
   // las de por defecto (compactas).
   const faqList = brand.faq?.length ? brand.faq : DEFAULT_FAQ;

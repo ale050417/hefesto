@@ -1,5 +1,6 @@
 import { NotFoundError } from "@/core/errors";
 import { getUserEmail, listAuthEmails } from "@/core/supabase/admin";
+import { safeLoad } from "@/lib/safe-load";
 import {
   getPointsSummary,
   type PointsSummary,
@@ -130,12 +131,26 @@ export async function deleteAddress(customerId: string, id: string) {
 export async function listAdminCustomers(): Promise<AdminCustomer[]> {
   const profilesList = await listCustomerProfiles();
   const ids = profilesList.map((p) => p.id);
-  const [agg, cities, emails, manual] = await Promise.all([
-    getCustomerOrderAggregates(ids),
-    getDefaultCities(ids),
-    listAuthEmails(),
-    listManualCustomers(),
+  // Enriquecimientos RESILIENTES: cada uno con su tope de espera y fallback.
+  // Si uno tarda (típico: `listAuthEmails` = API admin de Supabase Auth, HTTP),
+  // degrada a vacío en vez de tumbar TODA la lista a "datos incompletos" (antes
+  // el Promise.all colgaba hasta el deadline y mostraba 0 clientes). Los perfiles
+  // (query rápida) siempre se muestran; a lo sumo faltan email/ciudad/métricas.
+  const [aggR, citiesR, emailsR, manualR] = await Promise.all([
+    safeLoad(
+      "clientes:aggregates",
+      getCustomerOrderAggregates(ids),
+      new Map(),
+      7000,
+    ),
+    safeLoad("clientes:cities", getDefaultCities(ids), new Map(), 7000),
+    safeLoad("clientes:emails", listAuthEmails(), new Map(), 7000),
+    safeLoad("clientes:manual", listManualCustomers(), [], 7000),
   ]);
+  const agg = aggR.value;
+  const cities = citiesR.value;
+  const emails = emailsR.value;
+  const manual = manualR.value;
 
   const registered: AdminCustomer[] = profilesList.map((p) => {
     const a = agg.get(p.id) ?? { orders: 0, spent: 0 };
