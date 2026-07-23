@@ -38,6 +38,8 @@ export type ProductFormValues = {
   isFeatured: boolean;
   isNew: boolean;
   status: "draft" | "published";
+  /** Tamaños (variantes) con su precio. Vacío = producto de precio único. */
+  variants: { label: string; price: string }[];
 };
 
 function slugify(text: string): string {
@@ -88,6 +90,16 @@ export function ProductForm({
   const [colorPricesSingle, setColorPricesSingle] = useState<
     Record<string, number>
   >(defaultValues.colorPrices ?? {});
+  // Tamaños (variantes) con su precio; se precargan al editar.
+  const [variants, setVariants] = useState<{ label: string; price: string }[]>(
+    defaultValues.variants ?? [],
+  );
+  const setVariant = (i: number, k: "label" | "price", v: string) =>
+    setVariants((vs) => vs.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const addVariant = () =>
+    setVariants((vs) => [...vs, { label: "", price: "" }]);
+  const removeVariant = (i: number) =>
+    setVariants((vs) => vs.filter((_, j) => j !== i));
   // Ficha técnica (material/peso/tiempo/altura) la maneja el PriceEstimator;
   // acá guardamos su último valor para el payload.
   const [est, setEst] = useState<EstimatorValue>({
@@ -181,6 +193,10 @@ export function ProductForm({
                 .filter((c) => colorPricesSingle[c])
                 .map((c) => [c, colorPricesSingle[c]!]),
             ),
+      // Tamaños desde el estado local (no RHF); se descartan los sin nombre.
+      variants: variants
+        .filter((v) => v.label.trim())
+        .map((v) => ({ label: v.label.trim(), price: v.price })),
     };
     const result =
       mode === "create"
@@ -320,6 +336,64 @@ export function ProductForm({
         {errors.price ? (
           <p className="text-danger text-xs">{errors.price.message}</p>
         ) : null}
+      </div>
+
+      {/* TAMAÑOS: variantes con su precio. El cliente elige uno y paga ese
+          precio. Vacío = producto de precio único. */}
+      <div className="field">
+        <label className="mb-0">
+          Tamaños <span className="text-faint font-normal">(opcional)</span>
+        </label>
+        <p className="text-faint text-[12px] leading-relaxed">
+          Si vendés el mismo producto en varios tamaños, cargalos acá con su
+          precio (calculalo con los gramos de cada tamaño). El cliente elige el
+          tamaño y paga ese precio.
+        </p>
+        {variants.map((v, i) => (
+          <div key={i} className="mt-2 flex flex-wrap items-center gap-2">
+            <input
+              className="input flex-1"
+              style={{ minWidth: 140 }}
+              placeholder="Ej: Chico 12 cm"
+              value={v.label}
+              onChange={(ev) => setVariant(i, "label", ev.target.value)}
+            />
+            <input
+              className="input"
+              style={{ width: 110 }}
+              type="number"
+              min={0}
+              placeholder="Precio"
+              value={v.price}
+              onChange={(ev) => setVariant(i, "price", ev.target.value)}
+            />
+            <EstimatorModalButton
+              estimator={estimator}
+              label="Calcular"
+              onUse={(val) => {
+                if (val.price != null)
+                  setVariant(i, "price", String(val.price));
+              }}
+            />
+            <button
+              type="button"
+              className="btn-icon btn-ghost"
+              onClick={() => removeVariant(i)}
+              aria-label="Quitar tamaño"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        <div className="mt-2">
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={addVariant}
+          >
+            + Agregar tamaño
+          </button>
+        </div>
       </div>
 
       <div className="field">

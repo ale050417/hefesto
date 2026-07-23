@@ -22,6 +22,8 @@ import {
   insertProduct,
   listCategoriesWithCount,
   listImagesByProduct,
+  listVariantsByProduct,
+  replaceProductVariants,
   setPrimaryImage,
   setProductStatus,
   updateCategoryRow,
@@ -282,15 +284,30 @@ async function ensureUniqueSlug(base: string): Promise<string> {
   return slug;
 }
 
+/** Mapea las variantes del form (label + price) a filas de product_variants. */
+function toVariantRows(
+  variants: ProductInput["variants"],
+): { label: string; priceOverride: string | null }[] {
+  return (variants ?? [])
+    .filter((v) => v.label.trim().length > 0)
+    .map((v) => ({
+      label: v.label.trim(),
+      priceOverride: v.price != null ? v.price.toString() : null,
+    }));
+}
+
 export async function createProduct(input: ProductInput): Promise<Product> {
   const slug = await ensureUniqueSlug(input.slug);
-  return insertProduct({
+  const product = await insertProduct({
     ...toRow(input),
     slug,
     status: input.status ?? "draft",
     // Costo de insumos (aparte del precio). Default 0 si no se cargó.
     extrasCost: input.extrasCost != null ? input.extrasCost.toString() : "0",
   });
+  // Tamaños con su precio (opcional). El checkout cobra el precio del tamaño.
+  await replaceProductVariants(product.id, toVariantRows(input.variants));
+  return product;
 }
 
 /** Actualiza un producto existente. */
@@ -310,6 +327,8 @@ export async function updateProduct(
       : {}),
   });
   if (!row) throw new Error("Producto no encontrado");
+  // Reemplaza el set de tamaños (borra + reinserta; seguro por snapshot de label).
+  await replaceProductVariants(id, toVariantRows(input.variants));
   return row;
 }
 
@@ -465,14 +484,26 @@ export async function getProductPrintSpecs(id: string): Promise<{
   };
 }
 
-/** Trae un producto (cualquier estado) + sus imágenes, para el form de edición. */
-export async function getProductAdmin(
-  id: string,
-): Promise<{ product: Product; images: ProductImage[] } | null> {
+/** Trae un producto (cualquier estado) + imágenes + tamaños, para el form de edición. */
+export async function getProductAdmin(id: string): Promise<{
+  product: Product;
+  images: ProductImage[];
+  variants: { label: string; priceOverride: string | null }[];
+} | null> {
   const product = await findProductById(id);
   if (!product) return null;
-  const images = await listImagesByProduct(id);
-  return { product, images };
+  const [images, variants] = await Promise.all([
+    listImagesByProduct(id),
+    listVariantsByProduct(id),
+  ]);
+  return {
+    product,
+    images,
+    variants: variants.map((v) => ({
+      label: v.label,
+      priceOverride: v.priceOverride,
+    })),
+  };
 }
 
 // --- Listado admin ---

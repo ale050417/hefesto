@@ -92,6 +92,30 @@ export const productInputSchema = z
     status: z.enum(["draft", "published", "archived"]).optional(),
     isFeatured: z.boolean().default(false),
     isNew: z.boolean().default(false),
+    // Variantes por TAMAÑO, cada una con su precio (opcional; vacío = precio
+    // base). Se guardan en product_variants; el checkout cobra el precio del
+    // tamaño elegido. Los labels no se pueden repetir dentro del producto.
+    variants: z
+      .array(
+        z.object({
+          label: z.string().trim().min(1, "Poné el nombre del tamaño").max(60),
+          price: z.preprocess(
+            emptyToNull,
+            z.coerce
+              .number()
+              .positive("El precio del tamaño debe ser mayor a 0")
+              .nullable(),
+          ),
+        }),
+      )
+      .max(20, "Demasiados tamaños")
+      .default([])
+      .refine(
+        (arr) =>
+          new Set(arr.map((v) => v.label.trim().toLowerCase())).size ===
+          arr.length,
+        { message: "Hay dos tamaños con el mismo nombre" },
+      ),
   })
   .refine((d) => d.salePrice == null || d.salePrice < d.price, {
     message: "El precio de oferta debe ser menor al precio",

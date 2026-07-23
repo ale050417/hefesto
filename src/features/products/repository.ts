@@ -12,7 +12,12 @@ import {
   type SQL,
 } from "drizzle-orm";
 import { db } from "@/core/db";
-import { categories, productImages, products } from "@/core/db/schema";
+import {
+  categories,
+  productImages,
+  productVariants,
+  products,
+} from "@/core/db/schema";
 import type { ProductFilter } from "./schemas";
 import type {
   Category,
@@ -219,6 +224,45 @@ export async function insertProduct(
   const [row] = await database.insert(products).values(values).returning();
   if (!row) throw new Error("No se pudo crear el producto");
   return row;
+}
+
+/**
+ * Reemplaza TODAS las variantes (tamaños) de un producto por el set dado.
+ * Es seguro borrar y reinsertar: order_items guarda `variant_label` como texto
+ * (snapshot), no una FK a esta tabla → los pedidos viejos no se rompen.
+ */
+export async function replaceProductVariants(
+  productId: string,
+  variants: { label: string; priceOverride: string | null }[],
+  database: Database = db,
+): Promise<void> {
+  await database
+    .delete(productVariants)
+    .where(eq(productVariants.productId, productId));
+  if (variants.length > 0) {
+    await database.insert(productVariants).values(
+      variants.map((v) => ({
+        productId,
+        label: v.label,
+        priceOverride: v.priceOverride,
+      })),
+    );
+  }
+}
+
+/** Variantes (tamaños) de un producto, para precargar el form de edición. */
+export async function listVariantsByProduct(
+  productId: string,
+  database: Database = db,
+): Promise<{ id: string; label: string; priceOverride: string | null }[]> {
+  return database
+    .select({
+      id: productVariants.id,
+      label: productVariants.label,
+      priceOverride: productVariants.priceOverride,
+    })
+    .from(productVariants)
+    .where(eq(productVariants.productId, productId));
 }
 
 /** Actualiza un producto por id (o null si no existe). */

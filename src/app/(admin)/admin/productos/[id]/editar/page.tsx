@@ -43,7 +43,7 @@ export default async function EditarProductoPage({
   );
   const newsSectionActive = sectionOn(brand.homeSections, "nuevos");
   if (!data) notFound();
-  const { product, images } = data;
+  const { product, images, variants } = data;
 
   const defaults: ProductFormValues = {
     name: product.name,
@@ -66,6 +66,10 @@ export default async function EditarProductoPage({
     isFeatured: product.isFeatured,
     isNew: product.isNew,
     status: product.status === "published" ? "published" : "draft",
+    variants: variants.map((v) => ({
+      label: v.label,
+      price: v.priceOverride ?? "",
+    })),
   };
 
   return (

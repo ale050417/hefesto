@@ -116,7 +116,7 @@ export async function getProductFormDataAction(id: string): Promise<
       error: { code: "NOT_FOUND", message: "No encontrado" },
     };
   }
-  const { product, images } = data;
+  const { product, images, variants } = data;
   const defaults: ProductFormValues = {
     name: product.name,
     slug: product.slug,
@@ -138,6 +138,10 @@ export async function getProductFormDataAction(id: string): Promise<
     isFeatured: product.isFeatured,
     isNew: product.isNew,
     status: product.status === "published" ? "published" : "draft",
+    variants: variants.map((v) => ({
+      label: v.label,
+      price: v.priceOverride ?? "",
+    })),
   };
   return {
     ok: true,

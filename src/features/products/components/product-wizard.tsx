@@ -101,6 +101,11 @@ export function ProductWizard({
   const [extras, setExtras] = useState<
     Array<{ name: string; cost: string; qty: string }>
   >([]);
+  // Tamaños (variantes) con su precio. Vacío = producto sin tamaños (precio
+  // único). Si hay tamaños, el cliente elige uno y paga ESE precio.
+  const [variants, setVariants] = useState<
+    Array<{ label: string; price: string }>
+  >([]);
   const [est, setEst] = useState<EstimatorValue>({
     filamentId: null,
     material: "",
@@ -141,6 +146,12 @@ export function ProductWizard({
     setExtras((es) => [...es, { name: "", cost: "", qty: "1" }]);
   const removeExtra = (i: number) =>
     setExtras((es) => es.filter((_, j) => j !== i));
+  const setVariant = (i: number, k: "label" | "price", v: string) =>
+    setVariants((vs) => vs.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const addVariant = () =>
+    setVariants((vs) => [...vs, { label: "", price: "" }]);
+  const removeVariant = (i: number) =>
+    setVariants((vs) => vs.filter((_, j) => j !== i));
   // El precio final del producto = el de la calculadora + los insumos.
   const priceN = (Number(price) || 0) + extrasCost;
 
@@ -308,6 +319,10 @@ export function ProductWizard({
       productionTime,
       isFeatured,
       isNew,
+      // Tamaños con su precio (los sin nombre se descartan).
+      variants: variants
+        .filter((v) => v.label.trim())
+        .map((v) => ({ label: v.label.trim(), price: v.price })),
       status,
     };
     try {
@@ -792,6 +807,66 @@ export function ProductWizard({
                   </b>
                 </div>
               ) : null}
+            </div>
+
+            {/* TAMAÑOS: variantes con su precio. El cliente elige un tamaño y
+                paga ese precio. Vacío = producto de precio único. */}
+            <div className="field">
+              <label className="mb-0">
+                Tamaños{" "}
+                <span className="text-faint font-normal">(opcional)</span>
+              </label>
+              <p className="text-faint text-[12px] leading-relaxed">
+                Si vendés el mismo producto en varios tamaños, cargalos acá con
+                su precio (calculalo con los gramos de cada tamaño). El cliente
+                elige el tamaño y paga ese precio — así no publicás el mismo
+                producto varias veces.
+              </p>
+              {variants.map((v, i) => (
+                <div key={i} className="mt-2 flex flex-wrap items-center gap-2">
+                  <input
+                    className="input flex-1"
+                    style={{ minWidth: 140 }}
+                    placeholder="Ej: Chico 12 cm"
+                    value={v.label}
+                    onChange={(ev) => setVariant(i, "label", ev.target.value)}
+                  />
+                  <input
+                    className="input"
+                    style={{ width: 110 }}
+                    type="number"
+                    min={0}
+                    placeholder="Precio"
+                    value={v.price}
+                    onChange={(ev) => setVariant(i, "price", ev.target.value)}
+                  />
+                  <EstimatorModalButton
+                    estimator={estimator}
+                    label="Calcular"
+                    onUse={(val) => {
+                      if (val.price != null)
+                        setVariant(i, "price", String(val.price));
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn-icon btn-ghost"
+                    onClick={() => removeVariant(i)}
+                    aria-label="Quitar tamaño"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <div className="mt-2">
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  onClick={addVariant}
+                >
+                  + Agregar tamaño
+                </button>
+              </div>
             </div>
 
             {/* COLOR ÚNICO: precio por color (opcional). El cliente paga el precio
