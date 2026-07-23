@@ -46,6 +46,27 @@ export type CreatePreferenceParams = {
 
 export type CreatedPreference = { id: string; initPoint: string };
 
+/**
+ * True si la URL es local/no pública (localhost, IPs de loopback, *.local).
+ * MercadoPago RECHAZA la preferencia si mandamos `auto_return` con back_urls
+ * que apuntan a localhost (típico en dev). Función PURA → testeable.
+ */
+export function isLocalUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "0.0.0.0" ||
+      host === "::1" ||
+      host.endsWith(".local")
+    );
+  } catch {
+    // Si no parsea, no arriesgamos auto_return.
+    return true;
+  }
+}
+
 // Cuerpo de la preferencia. Función PURA → testeable sin tocar la red.
 export function buildPreferenceBody(p: CreatePreferenceParams) {
   return {
@@ -58,8 +79,16 @@ export function buildPreferenceBody(p: CreatePreferenceParams) {
     })),
     external_reference: p.externalReference,
     back_urls: p.backUrls,
-    auto_return: "approved" as const,
-    ...(p.notificationUrl ? { notification_url: p.notificationUrl } : {}),
+    // auto_return solo con URL pública: en localhost MP lo rechaza y rompe el
+    // checkout. En producción (dominio real) se incluye y vuelve solo al sitio.
+    ...(isLocalUrl(p.backUrls.success)
+      ? {}
+      : { auto_return: "approved" as const }),
+    // notification_url solo si es pública: un webhook a localhost es inútil
+    // (MP no puede alcanzarlo) y encima puede hacer que MP rechace la preferencia.
+    ...(p.notificationUrl && !isLocalUrl(p.notificationUrl)
+      ? { notification_url: p.notificationUrl }
+      : {}),
     ...(p.payerEmail ? { payer: { email: p.payerEmail } } : {}),
   };
 }

@@ -304,27 +304,31 @@ export function PaymentSettingsForm({
       >
         <div className="flex flex-col gap-3 text-[13.5px] leading-relaxed">
           <p>
-            Tu app <b>Hefesto3D</b> ya está creada en MercadoPago (no crees una
-            nueva). Solo falta traer su token:
+            Conectás tu propia cuenta de MercadoPago para cobrar. Es gratis y
+            toma un par de minutos:
           </p>
           <ol
             className="flex flex-col gap-2"
             style={{ listStyle: "decimal", paddingLeft: 18 }}
           >
             <li>
-              Abrí MercadoPago con el botón de abajo y entrá a{" "}
-              <b>Tus aplicaciones</b>.
+              Abrí MercadoPago (botón de abajo) e <b>iniciá sesión</b> con tu
+              cuenta. Si no tenés, creá una gratis.
             </li>
             <li>
-              Hacé clic en tu app <b>Hefesto3D</b>.
+              Entrá a <b>Integraciones → Tus aplicaciones</b> y tocá{" "}
+              <b>Crear aplicación</b>.
             </li>
             <li>
-              Si te pide un <b>código de verificación</b> a tu celular, es
-              normal: ponelo (es la seguridad de tu cuenta).
+              Poné un nombre (el de tu tienda), elegí <b>Pagos online</b> con{" "}
+              <b>Checkout Pro</b> y creala.
             </li>
             <li>
-              En el menú de la izquierda entrá a{" "}
-              <b>Credenciales de producción</b>.
+              Si te pide un <b>código</b> (SMS/WhatsApp) o escanear un <b>QR</b>
+              , seguilo: es la seguridad de tu cuenta.
+            </li>
+            <li>
+              Dentro de la app, entrá a <b>Credenciales de producción</b>.
             </li>
             <li>
               Copiá el <b>Access Token</b> (empieza con <code>APP_USR-</code>).
@@ -340,7 +344,7 @@ export function PaymentSettingsForm({
             className="btn btn-primary"
             style={{ textDecoration: "none" }}
           >
-            Abrir MercadoPago → Integraciones
+            Abrir MercadoPago
           </a>
           <p className="text-faint">
             El token es secreto: no lo compartas. Podés cambiarlo o

@@ -1,6 +1,10 @@
 import crypto from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { buildPreferenceBody, verifyWebhookSignature } from "./mercadopago";
+import {
+  buildPreferenceBody,
+  isLocalUrl,
+  verifyWebhookSignature,
+} from "./mercadopago";
 
 describe("buildPreferenceBody", () => {
   const base = {
@@ -33,13 +37,32 @@ describe("buildPreferenceBody", () => {
     expect(buildPreferenceBody(base).external_reference).toBe("order-1");
   });
 
-  it("incluye back_urls, auto_return y notification_url", () => {
+  it("incluye back_urls, auto_return y notification_url (URL pública)", () => {
     const body = buildPreferenceBody(base);
     expect(body.back_urls.success).toContain("/checkout/exito");
     expect(body.auto_return).toBe("approved");
     expect(body.notification_url).toBe(
       "https://hefesto.test/api/webhooks/mercadopago",
     );
+  });
+
+  it("OMITE auto_return y notification_url cuando la URL es localhost (dev)", () => {
+    // MP rechaza la preferencia si mandamos auto_return / notification_url con
+    // URLs no públicas (localhost). En dev las omitimos para no romper.
+    const body = buildPreferenceBody({
+      ...base,
+      backUrls: {
+        success: "http://localhost:3000/checkout/exito?pedido=HEF-1",
+        failure: "http://localhost:3000/checkout?pago=fallido",
+        pending: "http://localhost:3000/checkout/exito?pedido=HEF-1",
+      },
+      notificationUrl: "http://localhost:3000/api/webhooks/mercadopago",
+    });
+    expect(body).not.toHaveProperty("auto_return");
+    expect(body).not.toHaveProperty("notification_url");
+    // el resto del cuerpo sigue intacto
+    expect(body.back_urls.success).toContain("localhost");
+    expect(body.external_reference).toBe("order-1");
   });
 
   it("agrega el email del pagador cuando está", () => {
@@ -54,6 +77,25 @@ describe("buildPreferenceBody", () => {
     });
     expect(body).not.toHaveProperty("payer");
     expect(body).not.toHaveProperty("notification_url");
+  });
+});
+
+describe("isLocalUrl", () => {
+  it("detecta localhost y loopback como no públicas", () => {
+    expect(isLocalUrl("http://localhost:3000/x")).toBe(true);
+    expect(isLocalUrl("http://127.0.0.1:3000/x")).toBe(true);
+    expect(isLocalUrl("http://0.0.0.0/x")).toBe(true);
+    expect(isLocalUrl("http://mi-pc.local/x")).toBe(true);
+  });
+
+  it("trata un dominio real como público", () => {
+    expect(isLocalUrl("https://hefesto3d.com/checkout/exito")).toBe(false);
+    expect(isLocalUrl("https://www.hefesto.test/x")).toBe(false);
+  });
+
+  it("ante una URL inválida no arriesga (la trata como local)", () => {
+    expect(isLocalUrl("no-es-una-url")).toBe(true);
+    expect(isLocalUrl("")).toBe(true);
   });
 });
 
