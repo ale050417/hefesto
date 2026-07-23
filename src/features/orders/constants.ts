@@ -31,3 +31,13 @@ export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   mercadopago: "MercadoPago",
   cash: "Efectivo",
 };
+
+// Motivos estándar al cancelar/reembolsar un pedido o venta. El selector ofrece
+// estos + "Otro" (texto libre). El motivo es opcional (se puede confirmar sin uno).
+export const CANCEL_REASONS = [
+  "El cliente se arrepintió",
+  "Producto defectuoso / falla de impresión",
+  "Demora en la entrega",
+  "Error en el pedido / datos incorrectos",
+  "No se pudo coordinar el envío o retiro",
+] as const;

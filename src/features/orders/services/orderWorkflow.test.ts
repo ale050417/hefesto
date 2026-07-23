@@ -37,6 +37,11 @@ describe("canTransition", () => {
     expect(canTransition("refunded", "confirmed")).toBe(false);
     expect(canTransition("delivered", "shipped")).toBe(false);
   });
+
+  it("desde entregado se puede cancelar o reembolsar (devolución)", () => {
+    expect(canTransition("delivered", "cancelled")).toBe(true);
+    expect(canTransition("delivered", "refunded")).toBe(true);
+  });
 });
 
 describe("transitionOrderStatus", () => {

@@ -35,6 +35,17 @@ export function OrderSummary({
         </Badge>
       </header>
 
+      {(order.status === "cancelled" || order.status === "refunded") &&
+      order.cancelReason ? (
+        <div className="bg-surface-1 border-surface-2 rounded-lg border p-3 text-sm">
+          <span className="text-dim">
+            Motivo de{" "}
+            {order.status === "refunded" ? "reembolso" : "cancelación"}:{" "}
+          </span>
+          <span className="text-fg">{order.cancelReason}</span>
+        </div>
+      ) : null}
+
       <section className="bg-surface-1 border-surface-2 rounded-lg border">
         <ul className="divide-surface-2 divide-y">
           {order.items.map((it) => (

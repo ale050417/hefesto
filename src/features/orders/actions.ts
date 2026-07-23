@@ -495,6 +495,7 @@ export async function updateManualSaleAction(
 export async function updateManualSaleStatusAction(
   saleId: string,
   status: unknown,
+  reason?: unknown,
 ): Promise<
   { ok: true } | { ok: false; error: { code: string; message: string } }
 > {
@@ -507,9 +508,14 @@ export async function updateManualSaleStatusAction(
       error: { code: "VALIDATION", message: "Venta o estado inválido." },
     };
   }
+  // Motivo opcional (solo se usa al cancelar/reembolsar); acotado y saneado.
+  const reasonStr =
+    typeof reason === "string" && reason.trim()
+      ? reason.trim().slice(0, 300)
+      : null;
   const user = await getCurrentUser();
   try {
-    await updateManualSaleStatus(idOk.data, statusOk.data);
+    await updateManualSaleStatus(idOk.data, statusOk.data, reasonStr);
     revalidatePath("/admin/pedidos");
     revalidatePath("/admin/ganancias");
     revalidatePath("/admin/reportes");

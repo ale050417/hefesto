@@ -25,6 +25,8 @@ export const manualSales = pgTable(
     saleDate: timestamp("sale_date", { withTimezone: true }).notNull(),
     customerName: text("customer_name").notNull(),
     detail: text("detail"),
+    // Motivo al cancelar/reembolsar (opcional): estándar o texto libre.
+    cancelReason: text("cancel_reason"),
     // Categoria (snapshot del nombre) para agrupar en Reportes junto con la
     // tienda. Nullable: ventas viejas o sin categoria caen en "Sin categoria".
     category: text("category"),

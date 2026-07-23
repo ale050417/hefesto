@@ -9,7 +9,8 @@ export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   // "delivered" directo desde "ready": retiro en el taller (sin envío).
   ready: ["shipped", "delivered", "cancelled", "refunded"],
   shipped: ["delivered", "refunded"],
-  delivered: ["refunded"],
+  // Desde entregado se puede reembolsar o cancelar (devolución post-entrega).
+  delivered: ["cancelled", "refunded"],
   cancelled: [],
   refunded: [],
 };

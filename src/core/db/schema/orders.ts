@@ -36,6 +36,8 @@ export const orders = pgTable(
     shippingAddress: jsonb("shipping_address"),
     trackingCode: text("tracking_code"),
     internalNote: text("internal_note"),
+    // Motivo al cancelar/reembolsar (opcional): estándar o texto libre.
+    cancelReason: text("cancel_reason"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

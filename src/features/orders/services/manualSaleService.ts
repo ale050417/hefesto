@@ -314,6 +314,7 @@ export async function listManualSales(): Promise<ManualSale[]> {
 export async function updateManualSaleStatus(
   id: string,
   status: ManualSale["status"],
+  reason?: string | null,
 ): Promise<void> {
   const sale = await db.query.manualSales.findFirst({
     where: eq(manualSales.id, id),
@@ -325,7 +326,16 @@ export async function updateManualSaleStatus(
       `No se puede pasar de "${sale.status}" a "${status}".`,
     );
   }
-  await db.update(manualSales).set({ status }).where(eq(manualSales.id, id));
+  await db
+    .update(manualSales)
+    .set({
+      status,
+      // Motivo al cancelar/reembolsar (opcional); en otras transiciones no toca.
+      ...((status === "cancelled" || status === "refunded") && reason
+        ? { cancelReason: reason }
+        : {}),
+    })
+    .where(eq(manualSales.id, id));
 
   // Hooks de stock: entrar a "confirmado+" descuenta el filamento persistido en
   // la venta; pasar a cancelado/reembolsado repone. Idempotente vía ledger.

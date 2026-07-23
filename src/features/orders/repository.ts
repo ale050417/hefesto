@@ -168,6 +168,13 @@ export async function updateOrderStatus(
       .set({
         status: params.toStatus,
         ...(params.paidAt !== undefined ? { paidAt: params.paidAt } : {}),
+        // Al cancelar/reembolsar guardamos el motivo (viene como `note`) en el
+        // pedido, para mostrarlo en el detalle. En otras transiciones no se toca.
+        ...((params.toStatus === "cancelled" ||
+          params.toStatus === "refunded") &&
+        params.note
+          ? { cancelReason: params.note }
+          : {}),
       })
       .where(
         and(
