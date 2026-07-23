@@ -31,8 +31,13 @@ export type OrderInventoryDeps = {
     weightGrams: number | null;
     colorMode: "single" | "multi";
     colors: string[];
-    /** Multicolor: gramos por color (para descontar de cada color). */
+    /** Multicolor: gramos por color del producto (para descontar de cada color). */
     colorGrams: Record<string, number>;
+    /** Gramos por color POR tamaño: si el tamaño vendido tiene los suyos, mandan. */
+    variants: Array<{
+      label: string;
+      colorGrams: Record<string, number> | null;
+    }>;
   } | null>;
   listFilaments: () => Promise<Filament[]>;
   hasMovements: (reason: "order", refId: string) => Promise<boolean>;
@@ -123,8 +128,17 @@ export async function deductFilamentForOrder(
       }
 
       // MULTICOLOR: la pieza lleva varios colores; se descuenta de CADA color los
-      // gramos cargados en el producto (colorGrams), no un peso total sobre uno.
-      const gramsByColor = Object.entries(specs.colorGrams ?? {}).filter(
+      // gramos cargados. Si el TAMAÑO vendido tiene sus propios gramos por color,
+      // mandan esos (cada tamaño gasta distinto material); si no, los del producto.
+      const variant = item.variantLabel
+        ? specs.variants.find((v) => v.label === item.variantLabel)
+        : null;
+      const variantGrams = variant?.colorGrams ?? {};
+      const hasVariantGrams = Object.values(variantGrams).some((g) => g > 0);
+      const effectiveColorGrams = hasVariantGrams
+        ? variantGrams
+        : (specs.colorGrams ?? {});
+      const gramsByColor = Object.entries(effectiveColorGrams).filter(
         ([, g]) => g > 0,
       );
       if (specs.colorMode === "multi" && gramsByColor.length > 0) {

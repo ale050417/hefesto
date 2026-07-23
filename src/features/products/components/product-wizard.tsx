@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EstimatorModalButton } from "@/features/calculator/components/estimator-modal-button";
+import { VariantGramsButton } from "./variant-grams-button";
 import type { EstimatorValue } from "@/features/calculator/components/price-estimator";
 import type { EstimatorContext } from "@/features/calculator/service";
 import {
@@ -101,10 +102,10 @@ export function ProductWizard({
   const [extras, setExtras] = useState<
     Array<{ name: string; cost: string; qty: string }>
   >([]);
-  // Tamaños (variantes) con su precio. Vacío = producto sin tamaños (precio
-  // único). Si hay tamaños, el cliente elige uno y paga ESE precio.
+  // Tamaños (variantes): nombre + precio + gramos por color (multicolor, para
+  // descontar stock según el tamaño). Vacío = producto sin tamaños.
   const [variants, setVariants] = useState<
-    Array<{ label: string; price: string }>
+    Array<{ label: string; price: string; colorGrams: Record<string, number> }>
   >([]);
   const [est, setEst] = useState<EstimatorValue>({
     filamentId: null,
@@ -148,8 +149,12 @@ export function ProductWizard({
     setExtras((es) => es.filter((_, j) => j !== i));
   const setVariant = (i: number, k: "label" | "price", v: string) =>
     setVariants((vs) => vs.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const setVariantGrams = (i: number, grams: Record<string, number>) =>
+    setVariants((vs) =>
+      vs.map((x, j) => (j === i ? { ...x, colorGrams: grams } : x)),
+    );
   const addVariant = () =>
-    setVariants((vs) => [...vs, { label: "", price: "" }]);
+    setVariants((vs) => [...vs, { label: "", price: "", colorGrams: {} }]);
   const removeVariant = (i: number) =>
     setVariants((vs) => vs.filter((_, j) => j !== i));
   // El precio final del producto = el de la calculadora + los insumos.
@@ -319,10 +324,14 @@ export function ProductWizard({
       productionTime,
       isFeatured,
       isNew,
-      // Tamaños con su precio (los sin nombre se descartan).
+      // Tamaños: nombre + precio + gramos por color (los sin nombre se descartan).
       variants: variants
         .filter((v) => v.label.trim())
-        .map((v) => ({ label: v.label.trim(), price: v.price })),
+        .map((v) => ({
+          label: v.label.trim(),
+          price: v.price,
+          colorGrams: v.colorGrams,
+        })),
       status,
     };
     try {
@@ -848,6 +857,14 @@ export function ProductWizard({
                         setVariant(i, "price", String(val.price));
                     }}
                   />
+                  {colorMode === "multi" ? (
+                    <VariantGramsButton
+                      colors={colors}
+                      value={v.colorGrams}
+                      onChange={(g) => setVariantGrams(i, g)}
+                      hexOf={hexOf}
+                    />
+                  ) : null}
                   <button
                     type="button"
                     className="btn-icon btn-ghost"

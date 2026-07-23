@@ -69,6 +69,7 @@ export default async function EditarProductoPage({
     variants: variants.map((v) => ({
       label: v.label,
       price: v.priceOverride ?? "",
+      colorGrams: v.colorGrams ?? {},
     })),
   };
 

@@ -6,6 +6,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EstimatorModalButton } from "@/features/calculator/components/estimator-modal-button";
+import { VariantGramsButton } from "./variant-grams-button";
 import type { EstimatorValue } from "@/features/calculator/components/price-estimator";
 import type { EstimatorContext } from "@/features/calculator/service";
 import {
@@ -38,8 +39,12 @@ export type ProductFormValues = {
   isFeatured: boolean;
   isNew: boolean;
   status: "draft" | "published";
-  /** Tamaños (variantes) con su precio. Vacío = producto de precio único. */
-  variants: { label: string; price: string }[];
+  /** Tamaños (variantes): nombre, precio y gramos por color (multicolor). */
+  variants: {
+    label: string;
+    price: string;
+    colorGrams: Record<string, number>;
+  }[];
 };
 
 function slugify(text: string): string {
@@ -90,14 +95,18 @@ export function ProductForm({
   const [colorPricesSingle, setColorPricesSingle] = useState<
     Record<string, number>
   >(defaultValues.colorPrices ?? {});
-  // Tamaños (variantes) con su precio; se precargan al editar.
-  const [variants, setVariants] = useState<{ label: string; price: string }[]>(
-    defaultValues.variants ?? [],
-  );
+  // Tamaños (variantes): nombre + precio + gramos por color; se precargan al editar.
+  const [variants, setVariants] = useState<
+    { label: string; price: string; colorGrams: Record<string, number> }[]
+  >(defaultValues.variants ?? []);
   const setVariant = (i: number, k: "label" | "price", v: string) =>
     setVariants((vs) => vs.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const setVariantGrams = (i: number, grams: Record<string, number>) =>
+    setVariants((vs) =>
+      vs.map((x, j) => (j === i ? { ...x, colorGrams: grams } : x)),
+    );
   const addVariant = () =>
-    setVariants((vs) => [...vs, { label: "", price: "" }]);
+    setVariants((vs) => [...vs, { label: "", price: "", colorGrams: {} }]);
   const removeVariant = (i: number) =>
     setVariants((vs) => vs.filter((_, j) => j !== i));
   // Ficha técnica (material/peso/tiempo/altura) la maneja el PriceEstimator;
@@ -196,7 +205,11 @@ export function ProductForm({
       // Tamaños desde el estado local (no RHF); se descartan los sin nombre.
       variants: variants
         .filter((v) => v.label.trim())
-        .map((v) => ({ label: v.label.trim(), price: v.price })),
+        .map((v) => ({
+          label: v.label.trim(),
+          price: v.price,
+          colorGrams: v.colorGrams,
+        })),
     };
     const result =
       mode === "create"
@@ -375,6 +388,14 @@ export function ProductForm({
                   setVariant(i, "price", String(val.price));
               }}
             />
+            {colorMode === "multi" ? (
+              <VariantGramsButton
+                colors={colors}
+                value={v.colorGrams}
+                onChange={(g) => setVariantGrams(i, g)}
+                hexOf={(c) => colorList.find((x) => x.n === c)?.c ?? "#888"}
+              />
+            ) : null}
             <button
               type="button"
               className="btn-icon btn-ghost"

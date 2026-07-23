@@ -233,7 +233,11 @@ export async function insertProduct(
  */
 export async function replaceProductVariants(
   productId: string,
-  variants: { label: string; priceOverride: string | null }[],
+  variants: {
+    label: string;
+    priceOverride: string | null;
+    colorGrams: Record<string, number> | null;
+  }[],
   database: Database = db,
 ): Promise<void> {
   await database
@@ -245,6 +249,7 @@ export async function replaceProductVariants(
         productId,
         label: v.label,
         priceOverride: v.priceOverride,
+        colorGrams: v.colorGrams,
       })),
     );
   }
@@ -254,12 +259,20 @@ export async function replaceProductVariants(
 export async function listVariantsByProduct(
   productId: string,
   database: Database = db,
-): Promise<{ id: string; label: string; priceOverride: string | null }[]> {
+): Promise<
+  {
+    id: string;
+    label: string;
+    priceOverride: string | null;
+    colorGrams: Record<string, number> | null;
+  }[]
+> {
   return database
     .select({
       id: productVariants.id,
       label: productVariants.label,
       priceOverride: productVariants.priceOverride,
+      colorGrams: productVariants.colorGrams,
     })
     .from(productVariants)
     .where(eq(productVariants.productId, productId));

@@ -141,6 +141,7 @@ export async function getProductFormDataAction(id: string): Promise<
     variants: variants.map((v) => ({
       label: v.label,
       price: v.priceOverride ?? "",
+      colorGrams: v.colorGrams ?? {},
     })),
   };
   return {

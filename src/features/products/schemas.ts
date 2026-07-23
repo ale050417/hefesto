@@ -106,6 +106,11 @@ export const productInputSchema = z
               .positive("El precio del tamaño debe ser mayor a 0")
               .nullable(),
           ),
+          // Gramos por color de este tamaño (multicolor). Vacío = usa los del
+          // producto. Se usa para descontar stock según el tamaño vendido.
+          colorGrams: z
+            .record(z.string().max(40), z.coerce.number().nonnegative())
+            .default({}),
         }),
       )
       .max(20, "Demasiados tamaños")

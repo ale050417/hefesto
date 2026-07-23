@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   index,
+  jsonb,
   numeric,
   pgTable,
   text,
@@ -21,6 +22,9 @@ export const productVariants = pgTable(
       .references(() => products.id, { onDelete: "cascade" }),
     label: text("label").notNull(),
     priceOverride: numeric("price_override", { precision: 12, scale: 2 }),
+    // Gramos por color de ESTE tamaño (multicolor): descuenta stock según el
+    // tamaño vendido. Null = usar los gramos del producto.
+    colorGrams: jsonb("color_grams").$type<Record<string, number>>(),
   },
   (t) => [
     check(

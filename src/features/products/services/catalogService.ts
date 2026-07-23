@@ -284,16 +284,25 @@ async function ensureUniqueSlug(base: string): Promise<string> {
   return slug;
 }
 
-/** Mapea las variantes del form (label + price) a filas de product_variants. */
-function toVariantRows(
-  variants: ProductInput["variants"],
-): { label: string; priceOverride: string | null }[] {
+/** Mapea las variantes del form (label + price + gramos por color) a filas. */
+function toVariantRows(variants: ProductInput["variants"]): {
+  label: string;
+  priceOverride: string | null;
+  colorGrams: Record<string, number> | null;
+}[] {
   return (variants ?? [])
     .filter((v) => v.label.trim().length > 0)
-    .map((v) => ({
-      label: v.label.trim(),
-      priceOverride: v.price != null ? v.price.toString() : null,
-    }));
+    .map((v) => {
+      // Solo guardamos los colores con gramos > 0. Vacío → null (usa el producto).
+      const grams = Object.fromEntries(
+        Object.entries(v.colorGrams ?? {}).filter(([, g]) => g > 0),
+      );
+      return {
+        label: v.label.trim(),
+        priceOverride: v.price != null ? v.price.toString() : null,
+        colorGrams: Object.keys(grams).length > 0 ? grams : null,
+      };
+    });
 }
 
 export async function createProduct(input: ProductInput): Promise<Product> {
@@ -470,17 +479,24 @@ export async function getProductPrintSpecs(id: string): Promise<{
   weightGrams: number | null;
   colorMode: "single" | "multi";
   colors: string[];
-  /** Multicolor: gramos por color (columna color_prices reusada). */
+  /** Multicolor: gramos por color del PRODUCTO (columna color_prices reusada). */
   colorGrams: Record<string, number>;
+  /** Gramos por color POR tamaño: si el tamaño vendido tiene los suyos, mandan. */
+  variants: Array<{ label: string; colorGrams: Record<string, number> | null }>;
 } | null> {
   const product = await findProductById(id);
   if (!product) return null;
+  const variants = await listVariantsByProduct(id);
   return {
     material: product.material ?? null,
     weightGrams: product.weightGrams ?? null,
     colorMode: product.colorMode === "multi" ? "multi" : "single",
     colors: product.colors ?? [],
     colorGrams: product.colorPrices ?? {},
+    variants: variants.map((v) => ({
+      label: v.label,
+      colorGrams: v.colorGrams,
+    })),
   };
 }
 
@@ -488,7 +504,11 @@ export async function getProductPrintSpecs(id: string): Promise<{
 export async function getProductAdmin(id: string): Promise<{
   product: Product;
   images: ProductImage[];
-  variants: { label: string; priceOverride: string | null }[];
+  variants: {
+    label: string;
+    priceOverride: string | null;
+    colorGrams: Record<string, number> | null;
+  }[];
 } | null> {
   const product = await findProductById(id);
   if (!product) return null;
@@ -502,6 +522,7 @@ export async function getProductAdmin(id: string): Promise<{
     variants: variants.map((v) => ({
       label: v.label,
       priceOverride: v.priceOverride,
+      colorGrams: v.colorGrams,
     })),
   };
 }
