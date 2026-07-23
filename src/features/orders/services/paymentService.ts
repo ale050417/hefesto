@@ -1,7 +1,8 @@
 import { InvalidTransitionError } from "@/core/errors";
-import type {
-  CreatePreferenceParams,
-  CreatedPreference,
+import {
+  describeMpError,
+  type CreatePreferenceParams,
+  type CreatedPreference,
 } from "@/core/payments/mercadopago";
 import type { Order, OrderWithItems } from "../types";
 import { awardForOrder } from "@/features/rewards/service";
@@ -56,10 +57,11 @@ export async function startMercadoPagoPayment(
     });
     return { redirectUrl: pref.initPoint, preferenceId: pref.id };
   } catch (error) {
-    console.error("[checkout] MercadoPago falló:", error);
+    const reason = describeMpError(error);
+    console.error("[checkout] MercadoPago falló:", reason, error);
     throw new OrderError(
       "PAYMENT_ERROR",
-      "No pudimos iniciar el pago con MercadoPago. Probá de nuevo.",
+      `No pudimos iniciar el pago con MercadoPago (${reason}). Probá de nuevo.`,
     );
   }
 }

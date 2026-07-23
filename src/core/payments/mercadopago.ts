@@ -93,6 +93,52 @@ export function buildPreferenceBody(p: CreatePreferenceParams) {
   };
 }
 
+/**
+ * Traduce un error del SDK de MercadoPago a un motivo corto y legible
+ * (status + descripción de la API). Sirve para mostrar POR QUÉ falló la
+ * creación de la preferencia (token inválido, credenciales sin activar, etc.)
+ * en vez de un genérico opaco. Función PURA → testeable. No expone secretos.
+ */
+export function describeMpError(error: unknown): string {
+  if (error == null) return "error desconocido";
+  if (typeof error === "string") return error.slice(0, 200);
+  if (typeof error !== "object") return String(error).slice(0, 200);
+
+  const e = error as {
+    status?: unknown;
+    message?: unknown;
+    cause?: unknown;
+    error?: unknown;
+  };
+  const parts: string[] = [];
+
+  if (typeof e.status === "number" || typeof e.status === "string") {
+    parts.push(`status ${e.status}`);
+  }
+
+  // cause: puede ser [{ code, description }] (formato típico de la API) u objeto.
+  const cause = e.cause;
+  if (Array.isArray(cause) && cause.length > 0) {
+    const first = cause[0] as { description?: unknown; code?: unknown };
+    if (first?.description) parts.push(String(first.description));
+    else if (first?.code) parts.push(`code ${first.code}`);
+  } else if (cause && typeof cause === "object") {
+    const c = cause as { message?: unknown; description?: unknown };
+    if (c.description) parts.push(String(c.description));
+    else if (c.message) parts.push(String(c.message));
+  }
+
+  // Fallbacks: mensaje del error o el campo `error` de la API.
+  if (parts.length === 0 && typeof e.message === "string" && e.message) {
+    parts.push(e.message);
+  }
+  if (parts.length === 0 && typeof e.error === "string" && e.error) {
+    parts.push(e.error);
+  }
+
+  return (parts.join(" · ") || "error desconocido").slice(0, 200);
+}
+
 // El token puede cambiar (lo edita el vendedor en el panel), así que NO
 // cacheamos el cliente: lo resolvemos por llamada. Instanciar el SDK es barato.
 function mpConfig(accessToken: string): MercadoPagoConfig {

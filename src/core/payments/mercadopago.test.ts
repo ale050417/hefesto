@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   buildPreferenceBody,
+  describeMpError,
   isLocalUrl,
   verifyWebhookSignature,
 } from "./mercadopago";
@@ -96,6 +97,33 @@ describe("isLocalUrl", () => {
   it("ante una URL inválida no arriesga (la trata como local)", () => {
     expect(isLocalUrl("no-es-una-url")).toBe(true);
     expect(isLocalUrl("")).toBe(true);
+  });
+});
+
+describe("describeMpError", () => {
+  it("arma status + descripción del cause (formato API de MP)", () => {
+    const out = describeMpError({
+      status: 401,
+      message: "unauthorized",
+      cause: [{ code: 2034, description: "invalid access token" }],
+    });
+    expect(out).toContain("status 401");
+    expect(out).toContain("invalid access token");
+  });
+
+  it("cae al message cuando no hay cause", () => {
+    expect(describeMpError({ message: "boom" })).toBe("boom");
+  });
+
+  it("soporta string y desconocidos sin romper", () => {
+    expect(describeMpError("texto plano")).toBe("texto plano");
+    expect(describeMpError(null)).toBe("error desconocido");
+    expect(describeMpError({})).toBe("error desconocido");
+  });
+
+  it("recorta a 200 caracteres", () => {
+    const long = "x".repeat(500);
+    expect(describeMpError({ message: long }).length).toBeLessThanOrEqual(200);
   });
 });
 
