@@ -96,8 +96,9 @@ export default async function AdminDashboard() {
   const firstName =
     user?.profile?.fullName?.trim().split(/\s+/)[0] || "Hefesto";
 
-  // Las cards del panel son ACCESOS DIRECTOS a cada sección (las métricas viven
-  // en Reportes). Algunas muestran un contador accionable (no una métrica).
+  // Accesos directos del día a día. El resto de las secciones ya están en el
+  // menú lateral, así que acá dejamos solo las operativas — y las que tienen un
+  // contador accionable (pedidos pendientes, filamento bajo) lo muestran.
   const nav: Array<{
     href: string;
     label: string;
@@ -121,12 +122,7 @@ export default async function AdminDashboard() {
         ? { badge: { value: kpis.lowStockCount, label: "bajo stock" } }
         : {}),
     },
-    { href: "/admin/fallas", label: "Impresiones fallidas", icon: "alert" },
     { href: "/admin/reportes", label: "Reportes", icon: "chart" },
-    { href: "/admin/clientes", label: "Clientes", icon: "users" },
-    { href: "/admin/categorias", label: "Categorías", icon: "grid" },
-    { href: "/admin/descuentos", label: "Descuentos", icon: "tag" },
-    { href: "/admin/configuracion", label: "Configuración", icon: "gear" },
   ];
 
   return (
@@ -225,9 +221,13 @@ export default async function AdminDashboard() {
                   className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] p-3 text-sm transition hover:border-[var(--gold)]"
                 >
                   <span className="min-w-0">
-                    <b>{o.orderNumber}</b>
-                    <span className="text-faint ml-2 text-xs">
-                      {dateFmt.format(new Date(o.createdAt))}
+                    {/* Qué se pidió (no el código HEF-XXX). El número y la fecha
+                        van chicos debajo, para identificar el pedido si hace falta. */}
+                    <b className="text-fg block truncate">
+                      {o.itemsSummary || o.orderNumber}
+                    </b>
+                    <span className="text-faint text-xs">
+                      {o.orderNumber} · {dateFmt.format(new Date(o.createdAt))}
                     </span>
                   </span>
                   <Badge variant={ORDER_STATUS_VARIANT[o.status]}>

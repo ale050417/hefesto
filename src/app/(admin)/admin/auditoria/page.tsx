@@ -14,7 +14,34 @@ const dateFmt = new Intl.DateTimeFormat("es-AR", {
 const ACTION_LABEL: Record<string, string> = {
   "order.status_changed": "Cambió estado de pedido",
   "order.meta_updated": "Editó datos de pedido",
+  "product.created": "Creó un producto",
+  "product.updated": "Editó un producto",
+  "product.deleted": "Borró un producto",
+  "category.created": "Creó una categoría",
+  "category.updated": "Editó una categoría",
+  "category.deleted": "Borró una categoría",
+  "coupon.created": "Creó un cupón",
+  "coupon.updated": "Editó un cupón",
+  "coupon.deleted": "Borró un cupón",
+  "reward.created": "Creó una recompensa",
+  "reward.updated": "Editó una recompensa",
+  "reward.deleted": "Borró una recompensa",
+  "settings.updated": "Cambió la configuración",
 };
+
+/** Muestra el detalle en texto legible (el nombre afectado), no JSON crudo. */
+function formatDetail(meta: unknown): string {
+  if (!meta || typeof meta !== "object") return "—";
+  const m = meta as Record<string, unknown>;
+  if (typeof m.name === "string" && m.name.trim()) return m.name;
+  const parts = Object.entries(m)
+    .filter(([, v]) => v != null && v !== "")
+    .map(
+      ([k, v]) =>
+        `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`,
+    );
+  return parts.length ? parts.join(" · ") : "—";
+}
 
 export default async function AuditoriaPage() {
   await requirePermissionPage("auditoria", "ver");
@@ -65,7 +92,7 @@ export default async function AuditoriaPage() {
                       {ACTION_LABEL[e.action] ?? e.action}
                     </td>
                     <td className="text-faint text-xs">
-                      {e.metadata ? JSON.stringify(e.metadata) : "—"}
+                      {formatDetail(e.metadata)}
                     </td>
                   </tr>
                 ))}
