@@ -96,6 +96,7 @@ export async function createOrder(
     const hasVariants = product.variants.length > 0;
     let unitPrice = product.effectivePrice;
     let variantLabel: string | null = null;
+    let chosenVariant: (typeof product.variants)[number] | null = null;
 
     if (hasVariants) {
       if (!line.variantId) {
@@ -114,6 +115,7 @@ export async function createOrder(
       // El precio de la variante (si lo tiene) reemplaza al precio base.
       unitPrice = variant.price ?? product.effectivePrice;
       variantLabel = variant.label;
+      chosenVariant = variant;
     } else if (line.variantId) {
       throw new OrderError(
         "VARIANT_NOT_FOUND",
@@ -121,12 +123,13 @@ export async function createOrder(
       );
     }
 
-    // Precio por color (solo "color único"): el precio cargado por color es el
-    // EXACTO que paga el cliente al elegirlo — Dorado y Amarillo cuestan distinto
-    // porque el filamento cuesta distinto. Se resuelve acá, en el SERVIDOR (fuente
-    // de verdad del cobro): nunca se confía en el precio que mandó el navegador.
-    // Sin precio propio queda el precio base/tamaño. En "multicolor" no se elige
-    // color (la combinación es fija; `colorPrices` ahí guarda gramos, no precio).
+    // Precio por color (solo "color único"). Resuelto SIEMPRE en el servidor
+    // (fuente de verdad del cobro; nunca se confía en el precio del navegador).
+    // Con tamaño elegido manda la MATRIZ tamaño × color (el 10 cm morado cuesta
+    // más que el 10 cm azul); si el tamaño no tiene precio para ese color, queda
+    // el precio del tamaño. Sin tamaños, manda el precio por color del producto;
+    // sin precio propio, el base. En "multicolor" no se elige color (combinación
+    // fija; `colorPrices` del producto ahí guarda gramos, no precio).
     const lineColor = line.color ?? null;
     if (lineColor && product.colorMode === "single") {
       if (!product.colors.includes(lineColor)) {
@@ -135,9 +138,18 @@ export async function createOrder(
           `El color elegido para "${product.name}" ya no está disponible.`,
         );
       }
-      unitPrice = round2(
-        colorUnitPrice(unitPrice, "single", product.colorPrices, lineColor),
-      );
+      if (chosenVariant) {
+        const matrixPrice = chosenVariant.colorPrices?.[lineColor];
+        if (matrixPrice != null && matrixPrice > 0) {
+          unitPrice = round2(matrixPrice);
+        }
+        // Sin celda en la matriz: queda el precio del tamaño (no se aplica el
+        // precio por color del producto, que es para productos SIN tamaños).
+      } else {
+        unitPrice = round2(
+          colorUnitPrice(unitPrice, "single", product.colorPrices, lineColor),
+        );
+      }
     }
     const lineLabel =
       [variantLabel, lineColor].filter(Boolean).join(" · ") || null;

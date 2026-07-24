@@ -549,6 +549,9 @@ export function ProductsAdmin({
               categories={categories}
               defaultValues={modal.defaults}
               estimator={estimator}
+              // Sin el catálogo, la edición ofrecía solo Negro/Blanco (fallback)
+              // y no se podían armar combos/colores reales.
+              colorCatalog={colorCatalog}
               onSaved={() => {
                 toast("Producto guardado", "success");
               }}

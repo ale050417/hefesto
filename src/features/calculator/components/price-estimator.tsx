@@ -25,6 +25,9 @@ export type EstimatorValue = {
   presetId: string;
   /** Precio final calculado (admin: cliente; operador: servidor). Null si falta dato. */
   price: number | null;
+  /** Multicolor: gramos por color (para descontar stock). Vacío en color único.
+   * En multicolor el TOTAL (suma) es el que se usa para el precio. */
+  colorGrams?: Record<string, number>;
 };
 
 /** Etiqueta del selector: "PLA · Dorado — $35.000/kg". */
@@ -50,6 +53,7 @@ export function PriceEstimator({
   isAdmin,
   initial,
   onChange,
+  colors,
 }: {
   config: CalcConfig;
   filaments: FilamentOption[];
@@ -63,8 +67,12 @@ export function PriceEstimator({
     printMinutes: number;
     layerHeight: string;
     presetId: string;
+    colorGrams: Record<string, number>;
   }>;
   onChange?: (v: EstimatorValue) => void;
+  /** Multicolor: los colores de la pieza. Si viene, en vez del campo "Gramos"
+   * único se cargan los gramos POR color (la suma va al precio). */
+  colors?: string[];
 }) {
   const initMin = initial?.printMinutes ?? 0;
   // Default: el filamento inicial (edición), o el primero que coincida con el
@@ -80,6 +88,11 @@ export function PriceEstimator({
   const [grams, setGrams] = useState(
     initial?.grams ? String(initial.grams) : "",
   );
+  // Multicolor: gramos por color (la suma = gramos para el precio + van al stock).
+  const isMulti = (colors?.length ?? 0) > 0;
+  const [colorGramsState, setColorGramsState] = useState<
+    Record<string, number>
+  >(initial?.colorGrams ?? {});
   const [hours, setHours] = useState(
     initMin ? String(Math.floor(initMin / 60)) : "",
   );
@@ -94,7 +107,11 @@ export function PriceEstimator({
   const [opBusy, setOpBusy] = useState(false);
 
   const selected = filaments.find((f) => f.id === filamentId) ?? null;
-  const gramsN = Number(grams) || 0;
+  const colorGramsTotal = (colors ?? []).reduce(
+    (a, c) => a + (Number(colorGramsState[c]) || 0),
+    0,
+  );
+  const gramsN = isMulti ? colorGramsTotal : Number(grams) || 0;
   const totalMin = (Number(hours) || 0) * 60 + (Number(minutes) || 0);
   const totalHours = totalMin / 60;
   const costPerKg = selected?.costPerKg ?? 0;
@@ -171,6 +188,7 @@ export function PriceEstimator({
       layerHeight,
       presetId,
       price,
+      colorGrams: isMulti ? colorGramsState : {},
     });
   }, [
     filamentId,
@@ -181,6 +199,8 @@ export function PriceEstimator({
     layerHeight,
     presetId,
     price,
+    isMulti,
+    colorGramsState,
   ]);
 
   return (
@@ -229,18 +249,53 @@ export function PriceEstimator({
         </div>
       </div>
 
-      <div className="field">
-        <label htmlFor="pe-grams">Gramos</label>
-        <input
-          id="pe-grams"
-          className="input"
-          type="number"
-          min={0}
-          placeholder="0"
-          value={grams}
-          onChange={(e) => setGrams(e.target.value)}
-        />
-      </div>
+      {isMulti ? (
+        <div className="field">
+          <label>Gramos por color</label>
+          <p className="text-faint text-[11.5px] leading-relaxed">
+            Los gramos de cada color de la pieza: suman el total para el precio
+            y se descuentan del stock al vender.
+          </p>
+          <div className="mt-1 flex flex-col gap-2">
+            {(colors ?? []).map((c) => (
+              <div key={c} className="flex items-center gap-2">
+                <span className="w-32 text-sm">{c}</span>
+                <input
+                  className="input"
+                  style={{ maxWidth: 120 }}
+                  type="number"
+                  min={0}
+                  placeholder="0"
+                  value={colorGramsState[c] || ""}
+                  onChange={(e) =>
+                    setColorGramsState((prev) => ({
+                      ...prev,
+                      [c]: Number(e.target.value) || 0,
+                    }))
+                  }
+                />
+                <span className="text-faint text-[12px]">g</span>
+              </div>
+            ))}
+            <div className="text-faint text-[12px]">
+              Total: <b className="text-dim">{colorGramsTotal} g</b>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="field">
+          <label htmlFor="pe-grams">Gramos</label>
+          <input
+            id="pe-grams"
+            className="input"
+            type="number"
+            min={0}
+            placeholder="0"
+            value={grams}
+            onChange={(e) => setGrams(e.target.value)}
+          />
+        </div>
+      )}
 
       <div className="grid-2">
         <div className="field">

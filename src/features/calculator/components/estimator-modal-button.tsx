@@ -17,6 +17,7 @@ export function EstimatorModalButton({
   onUse,
   initial,
   label = "Calcular precio",
+  colors,
 }: {
   estimator: EstimatorContext;
   onUse: (v: EstimatorValue) => void;
@@ -25,8 +26,11 @@ export function EstimatorModalButton({
     grams: number;
     printMinutes: number;
     layerHeight: string;
+    colorGrams: Record<string, number>;
   }>;
   label?: string;
+  /** Multicolor: colores de la pieza → la calculadora pide gramos por color. */
+  colors?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const [val, setVal] = useState<EstimatorValue | null>(null);
@@ -59,7 +63,12 @@ export function EstimatorModalButton({
         size="md"
       >
         <div className="flex flex-col gap-4">
-          <PriceEstimator {...estimator} initial={initial} onChange={setVal} />
+          <PriceEstimator
+            {...estimator}
+            initial={initial}
+            onChange={setVal}
+            colors={colors}
+          />
           <div className="flex justify-end gap-2 border-t border-[var(--border)] pt-4">
             <Button
               type="button"

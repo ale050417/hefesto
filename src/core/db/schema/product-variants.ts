@@ -28,6 +28,10 @@ export const productVariants = pgTable(
     // Peso de ESTE tamaño en color único (gramos): descuenta stock según el
     // tamaño vendido sobre el color elegido. Null = usar el peso del producto.
     weightGrams: numeric("weight_grams", { precision: 10, scale: 2 }),
+    // Matriz tamaño × color: precio POR color de ESTE tamaño (el filamento
+    // morado cuesta más que el azul en el mismo tamaño). Null = precio del
+    // tamaño (price_override) para todos los colores.
+    colorPrices: jsonb("color_prices").$type<Record<string, number>>(),
   },
   (t) => [
     check(

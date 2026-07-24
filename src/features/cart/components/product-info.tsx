@@ -10,7 +10,13 @@ import { colorUnitPrice } from "@/features/products/pricing";
 import { useCartStore } from "@/stores/cartStore";
 import { useUiStore } from "@/stores/uiStore";
 
-type Variant = { id: string; label: string; price: number | null };
+type Variant = {
+  id: string;
+  label: string;
+  price: number | null;
+  /** Matriz tamaño × color: precio del color DENTRO de este tamaño. */
+  colorPrices: Record<string, number>;
+};
 
 const FILAMENT_HEX: Record<string, string> = {
   Negro: "#1a1a1f",
@@ -50,7 +56,17 @@ export type ProductInfoData = {
  * carrito". Reemplaza al viejo PriceTag + AddToCart para que el precio grande
  * refleje siempre lo elegido.
  */
-export function ProductInfo({ product }: { product: ProductInfoData }) {
+export function ProductInfo({
+  product,
+  onColorChange,
+  onVariantChange,
+}: {
+  product: ProductInfoData;
+  /** Avisa el color elegido (para que la galería salte a su foto). */
+  onColorChange?: (color: string | null) => void;
+  /** Avisa la variante elegida (combinación multicolor → su foto). */
+  onVariantChange?: (label: string | null) => void;
+}) {
   const router = useRouter();
   const hasVariants = product.variants.length > 0;
   const hasColors = product.colors.length > 0;
@@ -59,9 +75,13 @@ export function ProductInfo({ product }: { product: ProductInfoData }) {
   const [variantId, setVariantId] = useState<string | null>(
     product.variants[0]?.id ?? null,
   );
-  const [color, setColor] = useState<string | null>(
+  const [color, setColorState] = useState<string | null>(
     !isMulti ? (product.colors[0] ?? null) : null,
   );
+  const setColor = (c: string | null) => {
+    setColorState(c);
+    onColorChange?.(c);
+  };
   const [qty, setQty] = useState(1);
 
   const addItem = useCartStore((s) => s.addItem);
@@ -74,15 +94,23 @@ export function ProductInfo({ product }: { product: ProductInfoData }) {
       : product.price;
   // Precio base según variante/tamaño o precio (oferta) del producto.
   const beforeColor = Math.max(0, selected?.price ?? basePrice);
-  // Precio por color (solo "color único"): si el color elegido tiene precio
-  // propio, ese es el precio EXACTO (Dorado y Amarillo cuestan distinto). Misma
-  // función pura que usa el servidor para cobrar → nunca divergen.
-  const unitPrice = colorUnitPrice(
-    beforeColor,
-    product.colorMode,
-    product.colorPrices,
-    color,
-  );
+  // Precio por color (solo "color único"), ESPEJO exacto del servidor:
+  // - Con tamaño elegido manda la MATRIZ tamaño × color (el 10 cm morado puede
+  //   costar más que el 10 cm azul); sin celda queda el precio del tamaño.
+  // - Sin tamaños, el precio por color del producto (colorUnitPrice, la misma
+  //   función pura que usa el cobro) → nunca divergen.
+  const matrixPrice =
+    !isMulti && selected && color ? selected.colorPrices[color] : undefined;
+  const unitPrice = selected
+    ? matrixPrice != null && matrixPrice > 0
+      ? matrixPrice
+      : beforeColor
+    : colorUnitPrice(
+        beforeColor,
+        product.colorMode,
+        product.colorPrices,
+        color,
+      );
   const hasColorPrice = !isMulti && color != null && unitPrice !== beforeColor;
   // ¿Mostrar el precio original tachado? Solo si es oferta y el precio no lo
   // reemplaza ni el tamaño ni el color.
@@ -91,10 +119,15 @@ export function ProductInfo({ product }: { product: ProductInfoData }) {
     product.salePrice != null &&
     !selected?.price &&
     !hasColorPrice;
+  // Multicolor con COMBINACIONES: el label de la variante ya lleva los colores
+  // ("Negro + Rojo") → color null para no duplicar. Multicolor fijo: todos los
+  // colores. Color único: el elegido.
   const lineColor = isMulti
-    ? hasColors
-      ? product.colors.join(" + ")
-      : null
+    ? selected
+      ? null
+      : hasColors
+        ? product.colors.join(" + ")
+        : null
     : color;
 
   function buildItem() {
@@ -153,24 +186,38 @@ export function ProductInfo({ product }: { product: ProductInfoData }) {
       <div className="mt-6 space-y-4">
         {hasVariants ? (
           <div>
-            <p className="text-fg mb-2 text-sm font-medium">Tamaño</p>
+            <p className="text-fg mb-2 text-sm font-medium">
+              {isMulti ? "Combinación" : "Tamaño"}
+            </p>
             <div className="flex flex-wrap gap-2">
-              {product.variants.map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => setVariantId(v.id)}
-                  className={cn(
-                    "rounded-md border px-3 py-2 text-sm transition-colors",
-                    v.id === variantId
-                      ? "border-primary text-primary"
-                      : "border-surface-3 text-fg hover:border-primary",
-                  )}
-                >
-                  {v.label}
-                  {v.price != null ? ` · ${formatPrice(v.price)}` : ""}
-                </button>
-              ))}
+              {product.variants.map((v) => {
+                // Precio del botón: con matriz (precio por color), la CELDA de
+                // este tamaño para el color elegido — no un precio fijo que
+                // después cambia con el color. Sin celda, el precio del tamaño.
+                const cell =
+                  !isMulti && color ? v.colorPrices[color] : undefined;
+                const shown = cell != null && cell > 0 ? cell : v.price;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    onClick={() => {
+                      setVariantId(v.id);
+                      // Combinación multicolor: la galería salta a su foto.
+                      onVariantChange?.(v.label);
+                    }}
+                    className={cn(
+                      "rounded-md border px-3 py-2 text-sm transition-colors",
+                      v.id === variantId
+                        ? "border-primary text-primary"
+                        : "border-surface-3 text-fg hover:border-primary",
+                    )}
+                  >
+                    {v.label}
+                    {shown != null ? ` · ${formatPrice(shown)}` : ""}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : null}
@@ -181,7 +228,12 @@ export function ProductInfo({ product }: { product: ProductInfoData }) {
               {isMulti ? "Colores de la pieza" : "Color"}
             </p>
             <div className="flex flex-wrap gap-2">
-              {product.colors.map((c) => {
+              {/* Multicolor con combinaciones: se muestran los colores del combo
+                  ELEGIDO (el label es "Negro + Rojo"); si no, los del producto. */}
+              {(isMulti && selected
+                ? selected.label.split(" + ").map((s) => s.trim())
+                : product.colors
+              ).map((c) => {
                 const active = !isMulti && color === c;
                 return (
                   <button
@@ -209,9 +261,14 @@ export function ProductInfo({ product }: { product: ProductInfoData }) {
                       }}
                     />
                     {c}
-                    {!isMulti && (product.colorPrices[c] ?? 0) > 0
-                      ? ` · ${formatPrice(product.colorPrices[c]!)}`
-                      : ""}
+                    {(() => {
+                      // Precio del chip: con tamaño elegido, la celda de SU
+                      // matriz; sin tamaños, el precio por color del producto.
+                      const p = selected
+                        ? (selected.colorPrices[c] ?? 0)
+                        : (product.colorPrices[c] ?? 0);
+                      return !isMulti && p > 0 ? ` · ${formatPrice(p)}` : "";
+                    })()}
                   </button>
                 );
               })}

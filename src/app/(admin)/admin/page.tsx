@@ -96,9 +96,8 @@ export default async function AdminDashboard() {
   const firstName =
     user?.profile?.fullName?.trim().split(/\s+/)[0] || "Hefesto";
 
-  // Accesos directos del día a día. El resto de las secciones ya están en el
-  // menú lateral, así que acá dejamos solo las operativas — y las que tienen un
-  // contador accionable (pedidos pendientes, filamento bajo) lo muestran.
+  // Accesos directos a las secciones (el menú lateral tiene el resto). Las que
+  // tienen un contador accionable (pedidos pendientes, filamento bajo) lo muestran.
   const nav: Array<{
     href: string;
     label: string;
@@ -122,7 +121,12 @@ export default async function AdminDashboard() {
         ? { badge: { value: kpis.lowStockCount, label: "bajo stock" } }
         : {}),
     },
+    { href: "/admin/fallas", label: "Impresiones fallidas", icon: "alert" },
+    { href: "/admin/clientes", label: "Clientes", icon: "users" },
+    { href: "/admin/categorias", label: "Categorías", icon: "grid" },
+    { href: "/admin/descuentos", label: "Descuentos", icon: "tag" },
     { href: "/admin/reportes", label: "Reportes", icon: "chart" },
+    { href: "/admin/configuracion", label: "Configuración", icon: "gear" },
   ];
 
   return (

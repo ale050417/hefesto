@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EstimatorModalButton } from "@/features/calculator/components/estimator-modal-button";
-import { GramsButton } from "./grams-button";
 import type { EstimatorValue } from "@/features/calculator/components/price-estimator";
 import type { EstimatorContext } from "@/features/calculator/service";
 import {
@@ -15,6 +14,7 @@ import {
 } from "../actions";
 import type { Category } from "../types";
 import { runAction } from "@/lib/run-action";
+import { useActionOverlayStore } from "@/stores/actionOverlayStore";
 import { compressImageToWebp } from "@/lib/image-compress";
 import { useDragReframe } from "@/hooks/use-drag-reframe";
 import { useFormErrors } from "@/hooks/use-form-errors";
@@ -30,7 +30,9 @@ function slugify(text: string): string {
 
 const money = (n: number) => "$" + Math.round(n).toLocaleString("es-AR");
 
-const STEPS = ["Básicos", "Imágenes", "Detalle", "Precio", "Publicación"];
+// Imágenes va DESPUÉS de Precio: las combinaciones/colores se definen antes y
+// recién ahí se asigna la imagen de cada uno (fila por color → "Elegir imagen").
+const STEPS = ["Básicos", "Detalle", "Precio", "Imágenes", "Publicación"];
 
 type Props = {
   categories: Category[];
@@ -73,6 +75,20 @@ export function ProductWizard({
     [extraUrls],
   );
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  // Foto POR color/combinación: una imagen elegida para cada color (single) o
+  // combo (multi). La tienda salta a ella al elegirlo. Clave = color o combo.
+  const [colorImages, setColorImages] = useState<Record<string, File>>({});
+  const colorImageUrls = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const [k, f] of Object.entries(colorImages))
+      out[k] = URL.createObjectURL(f);
+    return out;
+  }, [colorImages]);
+  useEffect(
+    () => () =>
+      Object.values(colorImageUrls).forEach((u) => URL.revokeObjectURL(u)),
+    [colorImageUrls],
+  );
   const [posX, setPosX] = useState(50);
   const [posY, setPosY] = useState(50);
   // Reencuadre por arrastre sobre la vista previa (mouse y touch).
@@ -82,7 +98,7 @@ export function ProductWizard({
   });
 
   // Paso 2
-  const [colorMode, setColorMode] = useState<"single" | "multi">("single");
+  const [colorMode, setColorModeState] = useState<"single" | "multi">("single");
   const [colors, setColors] = useState<string[]>([]);
   // Multicolor: gramos de cada color que lleva la pieza (para descontar stock).
   const [colorGrams, setColorGrams] = useState<Record<string, number>>({});
@@ -102,15 +118,53 @@ export function ProductWizard({
   const [extras, setExtras] = useState<
     Array<{ name: string; cost: string; qty: string }>
   >([]);
-  // Tamaños (variantes): nombre + precio + material del tamaño (para descontar
-  // stock según el tamaño vendido). Multicolor: gramos por color; color único:
-  // peso de la pieza. Vacío = producto sin tamaños.
+  // El precio varía por DOS ejes INDEPENDIENTES y combinables (pedido de Ale:
+  // "el tamaño cambia los gramos Y el color cambia el costo del filamento"):
+  // - hasSizes: ¿se vende en varios tamaños?
+  // - byColor: ¿cada color cuesta distinto? (solo color único)
+  // Ambos activos = MATRIZ tamaño × color (cada celda su precio).
+  const [hasSizes, setHasSizes] = useState(false);
+  const [byColor, setByColor] = useState(false);
+  const distinctColorPrice = colorMode === "single" && byColor;
+  // MULTICOLOR: ¿una combinación fija o VARIAS? (mariposas: 4 combos de 2
+  // colores, cada uno con su foto). Los combos viajan como variantes (label
+  // autogenerado "Negro + Rojo" + gramos por color del combo) → el stock y el
+  // cobro reusan TODO el circuito de variantes. Excluyente con tamaños en multi.
+  const [multiCombos, setMultiCombosState] = useState(false);
+  // Cambiar de modo REINICIA lo que depende del modo: colores, precios por
+  // color, combos y variantes. Sin esto, volver atrás y cambiar de modo dejaba
+  // estados sucios (p. ej. un producto "single" con TODOS los colores tocados).
+  const setColorMode = (m: "single" | "multi") => {
+    if (m === colorMode) return;
+    setColorModeState(m);
+    setColors([]);
+    setColorGrams({});
+    setColorPricesSingle({});
+    setByColor(false);
+    setMultiCombosState(false);
+    setVariants([]);
+    setColorImages({});
+  };
+  const setMultiCombos = (on: boolean) => {
+    if (on === multiCombos) return;
+    setMultiCombosState(on);
+    // Los combos definen sus colores; el modo fijo los elige en Detalle.
+    setColors([]);
+    setColorGrams({});
+    setVariants([]);
+    setColorImages({});
+  };
+  // Tamaños o combinaciones (variantes): nombre + precio + material (gramos por
+  // color multi / peso single) + matriz por color (byColor). comboColors = los
+  // colores elegidos del combo (solo UI; el label y colorGrams derivan de ahí).
   const [variants, setVariants] = useState<
     Array<{
       label: string;
       price: string;
       colorGrams: Record<string, number>;
       weightGrams: string;
+      colorPrices: Record<string, number>;
+      comboColors: string[];
     }>
   >([]);
   const [est, setEst] = useState<EstimatorValue>({
@@ -140,6 +194,16 @@ export function ProductWizard({
     [colorCatalog],
   );
   const hexOf = (n: string) => colorList.find((c) => c.n === n)?.c ?? "#888";
+  // Etiquetas de color disponibles para las FOTOS: en color único, los colores;
+  // en multicolor con varias combinaciones, los combos ("Negro + Rojo").
+  const photoColorOptions =
+    colorMode === "single"
+      ? colors
+      : multiCombos
+        ? variants
+            .filter((v) => v.comboColors.length >= 2)
+            .map((v) => v.comboColors.join(" + "))
+        : [];
   const catName =
     categories.find((c) => c.id === categoryId)?.name ?? "Sin categoría";
   // Insumos: costo total (costo × cantidad de cada uno).
@@ -165,15 +229,78 @@ export function ProductWizard({
         j === i ? { ...x, weightGrams: grams > 0 ? String(grams) : "" } : x,
       ),
     );
+  // Matriz: setea el precio de UN color dentro de UN tamaño; el precio del
+  // tamaño (price) queda como el más barato de sus colores (para el "desde").
+  const setVariantColorPrice = (i: number, color: string, p: number) =>
+    setVariants((vs) =>
+      vs.map((x, j) => {
+        if (j !== i) return x;
+        const colorPrices = { ...x.colorPrices, [color]: p };
+        const mins = Object.values(colorPrices).filter((n) => n > 0);
+        return {
+          ...x,
+          colorPrices,
+          price: mins.length ? String(Math.min(...mins)) : x.price,
+        };
+      }),
+    );
   const addVariant = () =>
     setVariants((vs) => [
       ...vs,
-      { label: "", price: "", colorGrams: {}, weightGrams: "" },
+      {
+        label: "",
+        price: "",
+        colorGrams: {},
+        weightGrams: "",
+        colorPrices: {},
+        comboColors: [],
+      },
     ]);
+  // Combos: alterna un color dentro de una combinación; el label se autogenera
+  // ("Negro + Rojo") y los gramos de colores sacados se limpian.
+  const toggleComboColor = (i: number, c: string) =>
+    setVariants((vs) =>
+      vs.map((x, j) => {
+        if (j !== i) return x;
+        const comboColors = x.comboColors.includes(c)
+          ? x.comboColors.filter((n) => n !== c)
+          : [...x.comboColors, c];
+        const colorGrams = Object.fromEntries(
+          Object.entries(x.colorGrams).filter(([k]) => comboColors.includes(k)),
+        );
+        return {
+          ...x,
+          comboColors,
+          colorGrams,
+          label: comboColors.join(" + "),
+        };
+      }),
+    );
   const removeVariant = (i: number) =>
     setVariants((vs) => vs.filter((_, j) => j !== i));
   // El precio final del producto = el de la calculadora + los insumos.
   const priceN = (Number(price) || 0) + extrasCost;
+  // Precio a mostrar en la vista previa: con tamaños o precio distinto por color,
+  // el más barato ("desde $"); si no, calculadora + insumos.
+  const sizeMin = variants
+    .filter((v) => v.label.trim() && Number(v.price) > 0)
+    .reduce((m, v) => Math.min(m, Number(v.price)), Infinity);
+  const colorMin = colors
+    .map((c) => Number(colorPricesSingle[c]) || 0)
+    .filter((n) => n > 0)
+    .reduce((m, n) => Math.min(m, n), Infinity);
+  const isDistinctPreview = colorMode === "single" && distinctColorPrice;
+  const isCombosPreview = colorMode === "multi" && multiCombos;
+  const displayPrice =
+    hasSizes || isCombosPreview
+      ? Number.isFinite(sizeMin)
+        ? sizeMin
+        : 0
+      : isDistinctPreview
+        ? Number.isFinite(colorMin)
+          ? colorMin
+          : 0
+        : priceN;
 
   function pickImage(file: File | null) {
     if (imageUrl) URL.revokeObjectURL(imageUrl);
@@ -264,16 +391,47 @@ export function ProductWizard({
 
   function canAdvance(): string | null {
     if (step === 1) {
-      if (!imageFile) return "Subí la imagen principal del producto.";
-    }
-    if (step === 2) {
-      if (colors.length === 0)
+      // Con varias combinaciones, los colores se eligen POR combo (paso Precio).
+      if (!(colorMode === "multi" && multiCombos) && colors.length === 0)
         return "Elegí al menos un color (es obligatorio).";
       if (!productionTime.trim())
         return "Ingresá el tiempo de producción / entrega.";
     }
     if (step === 3) {
-      if (!(priceN > 0)) return "Calculá el precio con la calculadora.";
+      // Alcanza con UNA imagen: la principal O al menos una foto por color /
+      // combinación (la primera subida queda como portada automáticamente).
+      if (!imageFile && Object.keys(colorImages).length === 0)
+        return "Subí al menos una imagen (principal o de un color).";
+    }
+    if (step === 2) {
+      if (colorMode === "multi" && multiCombos) {
+        const combos = variants.filter((v) => v.comboColors.length >= 2);
+        if (combos.length === 0)
+          return "Agregá al menos una combinación (2 o más colores).";
+        const noPrice = combos.find((v) => !(Number(v.price) > 0));
+        if (noPrice)
+          return `Calculá el precio de "${noPrice.comboColors.join(" + ")}".`;
+        return null;
+      }
+      if (hasSizes && distinctColorPrice) {
+        // Matriz: cada tamaño con nombre necesita al menos un color calculado.
+        const named = variants.filter((v) => v.label.trim());
+        if (named.length === 0)
+          return "Agregá al menos un tamaño y calculá sus colores.";
+        const incomplete = named.find(
+          (v) => !Object.values(v.colorPrices).some((p) => p > 0),
+        );
+        if (incomplete)
+          return `Calculá al menos un color para "${incomplete.label.trim()}".`;
+      } else if (hasSizes) {
+        const ok = variants.some((v) => v.label.trim() && Number(v.price) > 0);
+        if (!ok) return "Agregá al menos un tamaño y calculá su precio.";
+      } else if (distinctColorPrice) {
+        const ok = colors.some((c) => (colorPricesSingle[c] || 0) > 0);
+        if (!ok) return "Calculá el precio de al menos un color.";
+      } else if (!(priceN > 0)) {
+        return "Calculá el precio con la calculadora.";
+      }
     }
     return null;
   }
@@ -299,18 +457,69 @@ export function ProductWizard({
 
   async function submit() {
     setErr(null);
-    if (colors.length === 0) return setErr("Elegí al menos un color.");
-    if (!(priceN > 0)) return setErr("Calculá el precio con la calculadora.");
+    // COMBOS (multicolor con varias combinaciones): las variantes son los
+    // combos; los colores del producto = la unión de los de todos los combos.
+    const isCombos = colorMode === "multi" && multiCombos;
+    const combos = isCombos
+      ? variants.filter((v) => v.comboColors.length >= 2)
+      : [];
+    const effectiveColors = isCombos
+      ? [...new Set(combos.flatMap((v) => v.comboColors))]
+      : colors;
+    if (effectiveColors.length === 0)
+      return setErr(
+        isCombos
+          ? "Agregá al menos una combinación (2 o más colores)."
+          : "Elegí al menos un color.",
+      );
+    // El precio del tamaño ya incorpora la matriz (price = min de sus colores,
+    // lo mantiene setVariantColorPrice), así que sizePrices sirve para ambos.
+    const sizePrices = variants
+      .filter((v) => (isCombos ? v.comboColors.length >= 2 : v.label.trim()))
+      .map((v) => Number(v.price))
+      .filter((n) => n > 0);
+    const isDistinct = distinctColorPrice;
+    const colorPriceList = colors
+      .map((c) => Number(colorPricesSingle[c]) || 0)
+      .filter((n) => n > 0);
+    if (isCombos) {
+      if (sizePrices.length === 0)
+        return setErr("Calculá el precio de al menos una combinación.");
+    } else if (hasSizes) {
+      if (sizePrices.length === 0)
+        return setErr(
+          isDistinct
+            ? "Agregá al menos un tamaño y calculá sus colores."
+            : "Agregá al menos un tamaño y calculá su precio.",
+        );
+    } else if (isDistinct) {
+      if (colorPriceList.length === 0)
+        return setErr("Calculá el precio de al menos un color.");
+    } else if (!(priceN > 0)) {
+      return setErr("Calculá el precio con la calculadora.");
+    }
+    // Precio base ("desde $"): con tamaños/combos = el más barato (el del tamaño
+    // ya es el mínimo de su matriz); por color = el color más barato; si no =
+    // calculadora + insumos.
+    const basePrice =
+      isCombos || hasSizes
+        ? Math.min(...sizePrices)
+        : isDistinct
+          ? Math.min(...colorPriceList)
+          : priceN;
     setBusy(true);
+    // UN solo overlay para toda la publicación (crear + N imágenes): sin esto,
+    // cada runAction prendía y apagaba el overlay global → "parpadeo".
+    const overlay = useActionOverlayStore.getState();
+    overlay.begin("Publicando producto…");
     const payload = {
       name: name.trim(),
       slug: slugify(name),
       description,
       categoryId,
-      // Precio final = calculadora + insumos.
-      price: String(priceN),
-      // Insumos: se cobran en el precio, pero su COSTO se guarda aparte para
-      // descontarlo en la ganancia del pedido (no la infla).
+      price: String(basePrice),
+      // Insumos (bajan la ganancia): se guardan siempre. En "precio único"
+      // además ya están sumados al precio base (priceN).
       extrasCost: String(extrasCost),
       salePrice: "",
       material: est.material,
@@ -318,44 +527,59 @@ export function ProductWizard({
       weightGrams: est.grams ? String(est.grams) : "",
       dimensions,
       colorMode,
-      colors,
-      // La columna color_prices se reusa según el modo: en MULTICOLOR guarda los
-      // GRAMOS por color (para descontar stock); en COLOR ÚNICO guarda el PRECIO
-      // exacto por color (opcional). Un producto es de un solo modo → no chocan.
+      colors: effectiveColors,
+      // color_prices reusada SOLO sin tamaños/combos: MULTICOLOR = gramos por
+      // color (stock); COLOR ÚNICO con "precio distinto" = precio por color.
+      // Con tamaños/combos, material y precio van por variante → acá vacío.
       colorPrices:
-        colorMode === "multi"
+        !hasSizes && !isCombos && colorMode === "multi"
           ? Object.fromEntries(
               colors
                 .filter((c) => colorGrams[c])
                 .map((c) => [c, colorGrams[c]!]),
             )
-          : Object.fromEntries(
-              colors
-                .filter((c) => colorPricesSingle[c])
-                .map((c) => [c, colorPricesSingle[c]!]),
-            ),
+          : !hasSizes && colorMode === "single" && distinctColorPrice
+            ? Object.fromEntries(
+                colors
+                  .filter((c) => colorPricesSingle[c])
+                  .map((c) => [c, colorPricesSingle[c]!]),
+              )
+            : {},
       layerHeight: est.layerHeight,
       infillPercent: "",
       productionTime,
       isFeatured,
       isNew,
-      // Tamaños: nombre + precio + material del tamaño (gramos por color en
-      // multicolor / peso en color único). Los sin nombre se descartan.
-      variants: variants
-        .filter((v) => v.label.trim())
-        .map((v) => ({
-          label: v.label.trim(),
-          price: v.price,
-          colorGrams: v.colorGrams,
-          weightGrams: v.weightGrams,
-        })),
+      // Variantes = tamaños O combinaciones: nombre (combo autogenerado) +
+      // precio + material (gramos por color / peso) + matriz (byColor).
+      variants: isCombos
+        ? combos.map((v) => ({
+            label: v.comboColors.join(" + "),
+            price: v.price,
+            colorGrams: v.colorGrams,
+            weightGrams: "",
+            colorPrices: {},
+          }))
+        : hasSizes
+          ? variants
+              .filter((v) => v.label.trim())
+              .map((v) => ({
+                label: v.label.trim(),
+                price: v.price,
+                colorGrams: v.colorGrams,
+                weightGrams: v.weightGrams,
+                colorPrices: isDistinct ? v.colorPrices : {},
+              }))
+          : [],
       status,
     };
     try {
       const res = await runAction(() => createProductAction(payload), {
         silent: true,
+        overlay: false,
       });
       if (!res.ok) {
+        overlay.end();
         setBusy(false);
         return setErr(res.error.message);
       }
@@ -366,19 +590,40 @@ export function ProductWizard({
         fd.set("productId", id);
         fd.set("file", compact);
         fd.set("position", `${posX}% ${posY}%`);
-        await runAction(() => uploadProductImageAction(fd), { silent: true });
+        await runAction(() => uploadProductImageAction(fd), {
+          silent: true,
+          overlay: false,
+        });
+      }
+      // Foto POR color/combinación: se sube etiquetada → la galería de la
+      // tienda salta a ella al elegir ese color/combo.
+      for (const [label, file] of Object.entries(colorImages)) {
+        const compact = await compressImageToWebp(file, 1600);
+        const cfd = new FormData();
+        cfd.set("productId", id);
+        cfd.set("file", compact);
+        cfd.set("position", "50% 50%");
+        cfd.set("color", label);
+        await runAction(() => uploadProductImageAction(cfd), {
+          silent: true,
+          overlay: false,
+        });
       }
       // Fotos adicionales (van después de la principal; sortOrder/isPrimary los
       // resuelve addProductImage por orden de subida). Se comprimen igual que la
       // principal para que una foto de celular no falle por tamaño.
-      for (const extra of extraFiles) {
-        const compact = await compressImageToWebp(extra, 1600);
+      for (let i = 0; i < extraFiles.length; i++) {
+        const compact = await compressImageToWebp(extraFiles[i]!, 1600);
         const efd = new FormData();
         efd.set("productId", id);
         efd.set("file", compact);
         efd.set("position", "50% 50%");
-        await runAction(() => uploadProductImageAction(efd), { silent: true });
+        await runAction(() => uploadProductImageAction(efd), {
+          silent: true,
+          overlay: false,
+        });
       }
+      overlay.end();
       setBusy(false);
       if (onCreated) {
         onCreated(id);
@@ -386,6 +631,7 @@ export function ProductWizard({
         router.push(`/admin/productos/${id}/editar`);
       }
     } catch {
+      overlay.end();
       setBusy(false);
       setErr("No se pudo crear el producto. Intentá de nuevo.");
     }
@@ -508,8 +754,9 @@ export function ProductWizard({
           </div>
         ) : null}
 
-        {/* PASO 2 — Imágenes */}
-        {step === 1 ? (
+        {/* PASO 4 — Imágenes (después de Precio: los colores/combinaciones ya
+            están definidos → una fila por cada uno con su "Elegir imagen") */}
+        {step === 3 ? (
           <div className="flex flex-col gap-4">
             <div className="field">
               <label>
@@ -547,9 +794,94 @@ export function ProductWizard({
                 </div>
               )}
             </div>
+            {/* FOTO POR COLOR / COMBINACIÓN: una fila por cada uno con su
+                "Elegir imagen" (la tienda salta a esa foto al elegirlo). */}
+            {photoColorOptions.length > 0 ? (
+              <div className="field">
+                <label>
+                  {colorMode === "multi"
+                    ? "Foto de cada combinación"
+                    : "Foto de cada color"}{" "}
+                  <span className="text-faint font-normal">(opcional)</span>
+                </label>
+                <p className="text-faint text-[12px] leading-relaxed">
+                  Al elegir{" "}
+                  {colorMode === "multi" ? "la combinación" : "el color"} en la
+                  tienda, la galería muestra su foto. Sin foto propia, se ve la
+                  principal.
+                </p>
+                <div className="mt-2 flex flex-col gap-2">
+                  {photoColorOptions.map((opt) => (
+                    <div
+                      key={opt}
+                      className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] p-2.5"
+                    >
+                      <span className="flex flex-1 items-center gap-2 text-sm">
+                        {colorMode === "single" ? (
+                          <span
+                            style={{
+                              width: 13,
+                              height: 13,
+                              borderRadius: "50%",
+                              background: hexOf(opt),
+                              border: "1px solid var(--border)",
+                              flexShrink: 0,
+                            }}
+                          />
+                        ) : null}
+                        {opt}
+                      </span>
+                      {colorImageUrls[opt] ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={colorImageUrls[opt]}
+                            alt={opt}
+                            className="h-12 w-12 rounded-md object-cover"
+                          />
+                          <button
+                            type="button"
+                            className="btn-icon btn-ghost"
+                            aria-label={`Quitar foto de ${opt}`}
+                            onClick={() =>
+                              setColorImages((prev) => {
+                                const next = { ...prev };
+                                delete next[opt];
+                                return next;
+                              })
+                            }
+                          >
+                            ✕
+                          </button>
+                        </>
+                      ) : (
+                        <label className="btn btn-secondary btn-sm cursor-pointer">
+                          Elegir imagen
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f)
+                                setColorImages((prev) => ({
+                                  ...prev,
+                                  [opt]: f,
+                                }));
+                              e.currentTarget.value = "";
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
             <div className="field">
               <label>
-                Más fotos{" "}
+                Más fotos generales{" "}
                 <span className="text-faint font-normal">
                   (opcional, hasta 4)
                 </span>
@@ -592,15 +924,14 @@ export function ProductWizard({
                 </div>
               ) : null}
               <div className="text-faint mt-1 text-[11.5px]">
-                La foto principal es la de arriba (hasta 5 en total).
-                Recomendado: cuadrada, 1000×1000 px o más.
+                Fotos de ambiente o detalle, sin color asignado.
               </div>
             </div>
           </div>
         ) : null}
 
-        {/* PASO 3 — Detalle: colores y ficha */}
-        {step === 2 ? (
+        {/* PASO 2 — Detalle: colores y ficha (antes que Imágenes) */}
+        {step === 1 ? (
           <div className="flex flex-col gap-4">
             <div className="field">
               <label>Modo de color</label>
@@ -617,43 +948,82 @@ export function ProductWizard({
                   className={cn("chip", colorMode === "multi" && "active")}
                   onClick={() => setColorMode("multi")}
                 >
-                  Multicolor (combinación fija)
+                  Multicolor (combinación de colores)
                 </button>
               </div>
             </div>
-            <div className="field">
-              <label>
-                {colorMode === "multi"
-                  ? "Colores que lleva la pieza"
-                  : "Colores disponibles"}{" "}
-                <span className="text-danger">*</span>
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {colorList.map((fc) => (
+
+            {/* Multicolor: ¿UNA combinación fija o VARIAS a elección? (mariposas:
+                4 combos de 2 colores; el cliente elige cuál y ve su foto). */}
+            {colorMode === "multi" ? (
+              <div className="field">
+                <label>¿Cuántas combinaciones?</label>
+                <div className="flex gap-2">
                   <button
-                    key={fc.n}
                     type="button"
-                    className={cn("chip", colors.includes(fc.n) && "active")}
-                    onClick={() => toggleColor(fc.n)}
+                    className={cn(
+                      "chip flex-1 justify-center",
+                      !multiCombos && "active",
+                    )}
+                    onClick={() => setMultiCombos(false)}
                   >
-                    <span
-                      style={{
-                        width: 13,
-                        height: 13,
-                        borderRadius: "50%",
-                        background: fc.c,
-                        border: "1px solid rgba(255,255,255,.25)",
-                        display: "inline-block",
-                      }}
-                    />
-                    {fc.n}
+                    Una fija
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    className={cn(
+                      "chip flex-1 justify-center",
+                      multiCombos && "active",
+                    )}
+                    onClick={() => setMultiCombos(true)}
+                  >
+                    Varias (el cliente elige)
+                  </button>
+                </div>
+                {multiCombos ? (
+                  <div className="text-faint mt-1 text-[11.5px]">
+                    Las combinaciones (y sus colores) se cargan en el paso
+                    Precio; cada una puede tener su foto.
+                  </div>
+                ) : null}
               </div>
-              <div className="text-faint text-[11.5px]">
-                Obligatorio: elegí al menos un color.
+            ) : null}
+
+            {colorMode === "multi" && multiCombos ? null : (
+              <div className="field">
+                <label>
+                  {colorMode === "multi"
+                    ? "Colores que lleva la pieza"
+                    : "Colores disponibles"}{" "}
+                  <span className="text-danger">*</span>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {colorList.map((fc) => (
+                    <button
+                      key={fc.n}
+                      type="button"
+                      className={cn("chip", colors.includes(fc.n) && "active")}
+                      onClick={() => toggleColor(fc.n)}
+                    >
+                      <span
+                        style={{
+                          width: 13,
+                          height: 13,
+                          borderRadius: "50%",
+                          background: fc.c,
+                          border: "1px solid rgba(255,255,255,.25)",
+                          display: "inline-block",
+                        }}
+                      />
+                      {fc.n}
+                    </button>
+                  ))}
+                </div>
+                <div className="text-faint text-[11.5px]">
+                  Obligatorio: elegí al menos un color.
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="field">
               <label htmlFor="w-time">
@@ -684,40 +1054,454 @@ export function ProductWizard({
           </div>
         ) : null}
 
-        {/* PASO 4 — Precio */}
-        {step === 3 ? (
+        {/* PASO 3 — Precio */}
+        {step === 2 ? (
           <div className="flex flex-col gap-4">
-            <div className="field">
-              <label htmlFor="w-price">Precio</label>
-              <input
-                id="w-price"
-                type="number"
-                className="input"
-                readOnly
-                placeholder="Calculalo con la calculadora"
-                value={price}
-              />
-              <div className="mt-1.5">
-                <EstimatorModalButton
-                  estimator={estimator}
-                  onUse={handleEstUse}
-                />
+            {/* DOS ejes independientes y COMBINABLES: tamaños (los grandes usan
+                más gramos) y color (un filamento cuesta más que otro). Ambos
+                activos = matriz tamaño × color. Con VARIAS combinaciones
+                (multi), los ejes no aplican: cada combo es la variante. */}
+            {colorMode === "multi" && multiCombos ? null : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="field">
+                  <label>¿Varios tamaños?</label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className={cn(
+                        "chip flex-1 justify-center",
+                        !hasSizes && "active",
+                      )}
+                      onClick={() => setHasSizes(false)}
+                    >
+                      No
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        "chip flex-1 justify-center",
+                        hasSizes && "active",
+                      )}
+                      onClick={() => setHasSizes(true)}
+                    >
+                      Sí
+                    </button>
+                  </div>
+                </div>
+                {colorMode === "single" && colors.length > 0 ? (
+                  <div className="field">
+                    <label>¿Precio distinto por color?</label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className={cn(
+                          "chip flex-1 justify-center",
+                          !byColor && "active",
+                        )}
+                        onClick={() => setByColor(false)}
+                      >
+                        No
+                      </button>
+                      <button
+                        type="button"
+                        className={cn(
+                          "chip flex-1 justify-center",
+                          byColor && "active",
+                        )}
+                        onClick={() => setByColor(true)}
+                      >
+                        Sí
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
-              <div className="text-faint mt-1 text-[11.5px]">
-                El precio se calcula con la calculadora. Los insumos de abajo se
-                suman. Las ofertas van por Descuentos.
+            )}
+            {colorMode === "multi" && multiCombos ? null : (
+              <div className="text-faint -mt-2 text-[11.5px]">
+                {hasSizes && distinctColorPrice
+                  ? "Matriz: cada tamaño con su precio POR color (el 10 cm morado puede costar más que el 10 cm azul)."
+                  : hasSizes
+                    ? "Cada tamaño con su precio (el más grande usa más material)."
+                    : distinctColorPrice
+                      ? "Cada color con su precio; el cliente paga el que elija."
+                      : "Un solo precio, el mismo para todos los colores."}
               </div>
-            </div>
+            )}
 
-            {/* Insumos adicionales (como en pedidos): se suman al precio final. */}
+            {colorMode === "multi" && multiCombos ? (
+              /* ─── COMBINACIONES (multicolor): cada combo elige SUS colores
+                 (label autogenerado "Negro + Rojo"), con su Calcular (precio +
+                 gramos por color del combo). El cliente elige la combinación y
+                 cada una puede tener su foto (paso Imágenes). ─── */
+              <div className="field">
+                <label className="mb-0">Combinaciones</label>
+                <p className="text-faint text-[12px] leading-relaxed">
+                  Agregá cada combinación (2 o más colores) con su “Calcular”.
+                  Si todas valen lo mismo, calculá el mismo precio en cada una.
+                </p>
+                <div className="mt-2 flex flex-col gap-2">
+                  {variants.map((v, i) => (
+                    <div
+                      key={i}
+                      className="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex flex-wrap gap-1.5">
+                          {colorList.map((fc) => (
+                            <button
+                              key={fc.n}
+                              type="button"
+                              className={cn(
+                                "chip",
+                                v.comboColors.includes(fc.n) && "active",
+                              )}
+                              onClick={() => toggleComboColor(i, fc.n)}
+                            >
+                              <span
+                                style={{
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: "50%",
+                                  background: fc.c,
+                                  border: "1px solid rgba(255,255,255,.25)",
+                                  display: "inline-block",
+                                }}
+                              />
+                              {fc.n}
+                            </button>
+                          ))}
+                        </div>
+                        <button
+                          type="button"
+                          className="btn-icon btn-ghost shrink-0"
+                          onClick={() => removeVariant(i)}
+                          aria-label="Quitar combinación"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <b className="text-[13px]">
+                          {v.comboColors.length >= 2
+                            ? v.comboColors.join(" + ")
+                            : "Elegí 2 o más colores…"}
+                        </b>
+                        <div className="ml-auto flex items-center gap-1">
+                          <span className="text-faint text-[12px]">$</span>
+                          <input
+                            className="input"
+                            style={{ width: 100 }}
+                            type="number"
+                            readOnly
+                            placeholder="Calcular →"
+                            value={v.price}
+                          />
+                        </div>
+                        <EstimatorModalButton
+                          estimator={estimator}
+                          label="Calcular"
+                          colors={
+                            v.comboColors.length >= 2
+                              ? v.comboColors
+                              : undefined
+                          }
+                          initial={{ colorGrams: v.colorGrams }}
+                          onUse={(val) => {
+                            // Insumos: se SUMAN al precio (la ganancia ya los
+                            // descuenta como costo; sin esto se pierde plata).
+                            if (val.price != null)
+                              setVariant(
+                                i,
+                                "price",
+                                String(val.price + extrasCost),
+                              );
+                            setEst(val);
+                            setVariantGrams(i, val.colorGrams ?? {});
+                          }}
+                        />
+                        {/* Mariposas: mismo precio en todas → copia el precio de
+                            la 1ª combinación calculada (y sus gramos, mapeados
+                            por posición si tienen la misma cantidad de colores). */}
+                        {i > 0 && Number(variants[0]?.price) > 0 ? (
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              const first = variants[0]!;
+                              setVariant(i, "price", first.price);
+                              const from = first.comboColors;
+                              const to = v.comboColors;
+                              if (from.length === to.length) {
+                                const grams: Record<string, number> = {};
+                                to.forEach((c, k) => {
+                                  const g = first.colorGrams[from[k]!] ?? 0;
+                                  if (g > 0) grams[c] = g;
+                                });
+                                setVariantGrams(i, grams);
+                              }
+                            }}
+                          >
+                            Igual a la 1ª
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={addVariant}
+                  className="text-dim mt-2 w-full rounded-xl border border-dashed border-[var(--border-strong)] py-2.5 text-[13px] transition hover:border-[var(--gold)] hover:text-[var(--gold-bright)]"
+                >
+                  + Agregar combinación
+                </button>
+              </div>
+            ) : hasSizes ? (
+              /* ─── POR TAMAÑO: cada uno con su Calcular (precio + gramos). Si
+                 además el precio varía por color, cada tamaño abre su MATRIZ:
+                 una fila por color con su Calcular. ─── */
+              <div className="field">
+                <label className="mb-0">Tamaños</label>
+                <p className="text-faint text-[12px] leading-relaxed">
+                  {distinctColorPrice
+                    ? "Agregá los tamaños; dentro de cada uno, calculá el precio de cada color (el filamento cambia el costo)."
+                    : "Agregá los tamaños de a uno; cada uno con su “Calcular” (precio y gramos). El cliente elige el tamaño y paga ese precio."}
+                </p>
+                <div className="mt-2 flex flex-col gap-2">
+                  {variants.map((v, i) => (
+                    <div
+                      key={i}
+                      className="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-3"
+                    >
+                      <div className="flex items-center gap-2">
+                        <input
+                          className="input flex-1"
+                          style={{ minWidth: 120 }}
+                          placeholder="Nombre del tamaño (ej: Chico 12 cm)"
+                          value={v.label}
+                          onChange={(ev) =>
+                            setVariant(i, "label", ev.target.value)
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="btn-icon btn-ghost"
+                          onClick={() => removeVariant(i)}
+                          aria-label="Quitar tamaño"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      {distinctColorPrice ? (
+                        /* MATRIZ: fila por color dentro del tamaño. El peso del
+                           tamaño (stock) lo trae el primer Calcular. */
+                        <div className="flex flex-col gap-1.5">
+                          {colors.map((c) => (
+                            <div
+                              key={c}
+                              className="flex flex-wrap items-center gap-2"
+                            >
+                              <span className="flex w-28 items-center gap-1.5 text-[13px]">
+                                <span
+                                  style={{
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: "50%",
+                                    background: hexOf(c),
+                                    border: "1px solid var(--border)",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                {c}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className="text-faint text-[12px]">
+                                  $
+                                </span>
+                                <input
+                                  className="input"
+                                  style={{ width: 100 }}
+                                  type="number"
+                                  readOnly
+                                  placeholder="Calcular →"
+                                  value={v.colorPrices[c] || ""}
+                                />
+                              </div>
+                              <EstimatorModalButton
+                                estimator={estimator}
+                                label="Calcular"
+                                initial={{
+                                  grams: Number(v.weightGrams) || undefined,
+                                }}
+                                onUse={(val) => {
+                                  if (val.price != null)
+                                    setVariantColorPrice(
+                                      i,
+                                      c,
+                                      val.price + extrasCost,
+                                    );
+                                  setEst(val);
+                                  // El peso del tamaño (stock): mismo para todos
+                                  // los colores, lo trae cualquier Calcular.
+                                  setVariantWeight(i, val.grams);
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-faint text-[12px]">$</span>
+                            <input
+                              className="input"
+                              style={{ width: 110 }}
+                              type="number"
+                              readOnly
+                              placeholder="Calcular →"
+                              value={v.price}
+                            />
+                          </div>
+                          <EstimatorModalButton
+                            estimator={estimator}
+                            label="Calcular precio y gramos"
+                            colors={colorMode === "multi" ? colors : undefined}
+                            initial={{
+                              colorGrams: v.colorGrams,
+                              grams: Number(v.weightGrams) || undefined,
+                            }}
+                            onUse={(val) => {
+                              if (val.price != null)
+                                setVariant(
+                                  i,
+                                  "price",
+                                  String(val.price + extrasCost),
+                                );
+                              setEst(val);
+                              if (colorMode === "multi")
+                                setVariantGrams(i, val.colorGrams ?? {});
+                              else setVariantWeight(i, val.grams);
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={addVariant}
+                  className="text-dim mt-2 w-full rounded-xl border border-dashed border-[var(--border-strong)] py-2.5 text-[13px] transition hover:border-[var(--gold)] hover:text-[var(--gold-bright)]"
+                >
+                  + Agregar tamaño
+                </button>
+              </div>
+            ) : distinctColorPrice ? (
+              /* ─── POR COLOR (color único): cada color con su Calcular (precio +
+                 peso). El "desde $" usa el más barato. ─── */
+              <div className="field">
+                <label className="mb-0">Precio por color</label>
+                <p className="text-faint text-[12px] leading-relaxed">
+                  Calculá cada color (precio y gramos). El cliente paga el del
+                  color que elija.
+                </p>
+                <div className="mt-2 flex flex-col gap-2">
+                  {colors.map((c) => (
+                    <div
+                      key={c}
+                      className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] p-2.5"
+                    >
+                      <span className="flex flex-1 items-center gap-2 text-sm">
+                        <span
+                          style={{
+                            width: 13,
+                            height: 13,
+                            borderRadius: "50%",
+                            background: hexOf(c),
+                            border: "1px solid var(--border)",
+                            flexShrink: 0,
+                          }}
+                        />
+                        {c}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-faint text-[12px]">$</span>
+                        <input
+                          type="number"
+                          className="input"
+                          style={{ width: 110 }}
+                          readOnly
+                          placeholder="Calcular →"
+                          value={colorPricesSingle[c] || ""}
+                        />
+                      </div>
+                      <EstimatorModalButton
+                        estimator={estimator}
+                        label="Calcular"
+                        onUse={(val) => {
+                          const p = val.price;
+                          if (p != null)
+                            setColorPricesSingle((prev) => ({
+                              ...prev,
+                              [c]: p + extrasCost,
+                            }));
+                          setEst(val); // el peso va al stock
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* ─── PRECIO ÚNICO: una calculadora (en multicolor pide los gramos
+                 por color → van al stock). ─── */
+              <div className="field">
+                <label htmlFor="w-price">Precio</label>
+                <input
+                  id="w-price"
+                  type="number"
+                  className="input"
+                  readOnly
+                  placeholder="Calculalo con la calculadora"
+                  value={price}
+                />
+                <div className="mt-1.5">
+                  <EstimatorModalButton
+                    estimator={estimator}
+                    label={
+                      colorMode === "multi"
+                        ? "Calcular precio y gramos"
+                        : "Calcular precio"
+                    }
+                    colors={colorMode === "multi" ? colors : undefined}
+                    initial={{ colorGrams, grams: est.grams || undefined }}
+                    onUse={(val) => {
+                      handleEstUse(val);
+                      if (colorMode === "multi")
+                        setColorGrams(val.colorGrams ?? {});
+                    }}
+                  />
+                </div>
+                <div className="text-faint mt-1 text-[11.5px]">
+                  {colorMode === "multi"
+                    ? "La calculadora pide los gramos por color; se descuentan del stock. Los insumos de abajo se suman."
+                    : "El precio se calcula con la calculadora. Los insumos de abajo se suman. Las ofertas van por Descuentos."}
+                </div>
+              </div>
+            )}
+
+            {/* Insumos adicionales (siempre): su costo se descuenta de la
+                ganancia; en "precio único" además se suma al precio. */}
             <div className="field">
               <label>
                 Insumos adicionales{" "}
                 <span className="text-faint font-normal">(opcional)</span>
               </label>
               <p className="text-faint text-[12px] leading-relaxed">
-                Argollas, vaso, polímero, etc. Su costo se suma al precio final
-                del producto.
+                Argollas, vaso, polímero, etc. Se SUMAN a cada precio que
+                calcules y se descuentan de la ganancia. Cargalos ANTES de
+                calcular; si los cambiás, recalculá.
               </p>
               {extras.map((e, i) => (
                 <div key={i} className="mt-2 flex items-center gap-2">
@@ -770,183 +1554,7 @@ export function ProductWizard({
                   </span>
                 ) : null}
               </div>
-              {extrasCost > 0 ? (
-                <div
-                  className="ui-card mt-2 flex items-center justify-between"
-                  style={{ padding: "10px 13px" }}
-                >
-                  <span className="text-[12.5px] font-semibold">
-                    Precio final (calculadora + insumos)
-                  </span>
-                  <b
-                    className="price text-[15px]"
-                    style={{ color: "var(--gold-bright)" }}
-                  >
-                    {money(priceN)}
-                  </b>
-                </div>
-              ) : null}
             </div>
-
-            {/* MATERIAL del producto (multicolor SIN tamaños): gramos por color
-                para descontar stock. Con tamaños, el material va por tamaño
-                (abajo). En color único el peso sale de la calculadora. */}
-            {colorMode === "multi" &&
-            colors.length > 0 &&
-            variants.length === 0 ? (
-              <div className="field">
-                <label className="mb-0">Material (para el stock)</label>
-                <p className="text-faint text-[12px] leading-relaxed">
-                  Cargá los gramos de cada color que usa la pieza. Se descuentan
-                  del stock al vender; no cambian el precio.
-                </p>
-                <div className="mt-2">
-                  <GramsButton
-                    mode="multi"
-                    colors={colors}
-                    colorGrams={colorGrams}
-                    onColorGrams={setColorGrams}
-                    hexOf={hexOf}
-                  />
-                </div>
-              </div>
-            ) : null}
-
-            {/* TAMAÑOS: cada uno con su precio Y su material. El cliente elige un
-                tamaño y paga ese precio; el stock descuenta según el tamaño.
-                Vacío = producto de precio único. */}
-            <div className="field">
-              <label className="mb-0">
-                Tamaños{" "}
-                <span className="text-faint font-normal">(opcional)</span>
-              </label>
-              <p className="text-faint text-[12px] leading-relaxed">
-                Si vendés el mismo producto en varios tamaños, cargalos acá:
-                cada uno con su precio (calculadora) y su material (botón
-                “Gramos”). El cliente elige el tamaño y paga ese precio — así no
-                publicás el mismo producto varias veces.
-              </p>
-              <div className="mt-2 flex flex-col gap-2">
-                {variants.map((v, i) => (
-                  <div
-                    key={i}
-                    className="flex flex-col gap-2 rounded-xl border border-[var(--border)] p-3"
-                  >
-                    <div className="flex items-center gap-2">
-                      <input
-                        className="input flex-1"
-                        style={{ minWidth: 120 }}
-                        placeholder="Nombre del tamaño (ej: Chico 12 cm)"
-                        value={v.label}
-                        onChange={(ev) =>
-                          setVariant(i, "label", ev.target.value)
-                        }
-                      />
-                      <button
-                        type="button"
-                        className="btn-icon btn-ghost"
-                        onClick={() => removeVariant(i)}
-                        aria-label="Quitar tamaño"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="flex items-center gap-1">
-                        <span className="text-faint text-[12px]">$</span>
-                        <input
-                          className="input"
-                          style={{ width: 110 }}
-                          type="number"
-                          min={0}
-                          placeholder="Precio"
-                          value={v.price}
-                          onChange={(ev) =>
-                            setVariant(i, "price", ev.target.value)
-                          }
-                        />
-                      </div>
-                      <EstimatorModalButton
-                        estimator={estimator}
-                        label="Calcular"
-                        onUse={(val) => {
-                          if (val.price != null)
-                            setVariant(i, "price", String(val.price));
-                        }}
-                      />
-                      {colorMode === "multi" ? (
-                        <GramsButton
-                          mode="multi"
-                          colors={colors}
-                          colorGrams={v.colorGrams}
-                          onColorGrams={(g) => setVariantGrams(i, g)}
-                          hexOf={hexOf}
-                        />
-                      ) : (
-                        <GramsButton
-                          mode="single"
-                          weight={Number(v.weightGrams) || 0}
-                          onWeight={(g) => setVariantWeight(i, g)}
-                        />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={addVariant}
-                className="text-dim mt-2 w-full rounded-xl border border-dashed border-[var(--border-strong)] py-2.5 text-[13px] transition hover:border-[var(--gold)] hover:text-[var(--gold-bright)]"
-              >
-                + Agregar tamaño
-              </button>
-            </div>
-
-            {/* COLOR ÚNICO: precio por color (opcional). El cliente paga el precio
-                del color que elige; vacío = precio de la calculadora. */}
-            {colorMode === "single" && colors.length > 0 ? (
-              <div className="field">
-                <label className="mb-0">Precio por color (opcional)</label>
-                <div className="text-faint text-[11.5px] leading-relaxed">
-                  Si un color cuesta distinto (ej. Dorado vs Amarillo), poné su
-                  precio acá y el cliente paga ese al elegirlo. Vacío = el
-                  precio de la calculadora ({money(priceN)}).
-                </div>
-                <div className="mt-2 flex flex-col gap-2">
-                  {colors.map((c) => (
-                    <div key={c} className="flex items-center gap-2">
-                      <span className="flex w-32 items-center gap-2 text-sm">
-                        <span
-                          style={{
-                            width: 13,
-                            height: 13,
-                            borderRadius: "50%",
-                            background: hexOf(c),
-                            border: "1px solid var(--border)",
-                            flexShrink: 0,
-                          }}
-                        />
-                        {c}
-                      </span>
-                      <span className="text-faint text-[12px]">$</span>
-                      <input
-                        type="number"
-                        className="input"
-                        style={{ maxWidth: 140 }}
-                        placeholder={String(priceN || 0)}
-                        value={colorPricesSingle[c] ?? ""}
-                        onChange={(e) =>
-                          setColorPricesSingle((prev) => ({
-                            ...prev,
-                            [c]: Number(e.target.value) || 0,
-                          }))
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
           </div>
         ) : null}
 
@@ -1167,7 +1775,9 @@ export function ProductWizard({
               {name || "Nombre del producto"}
             </div>
             <div style={{ color: "var(--gold-bright)" }} className="font-bold">
-              {priceN > 0 ? money(priceN) : "— calculá el precio"}
+              {displayPrice > 0
+                ? `${hasSizes || isDistinctPreview || isCombosPreview ? "desde " : ""}${money(displayPrice)}`
+                : "— calculá el precio"}
             </div>
             {colors.length > 0 ? (
               <div className="mt-1 flex gap-1">

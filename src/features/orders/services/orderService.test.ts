@@ -124,7 +124,9 @@ describe("createOrder", () => {
     const product = makeProduct({
       hasVariants: true,
       effectivePrice: 1000,
-      variants: [{ id: "v-grande", label: "Grande", price: 1500 }],
+      variants: [
+        { id: "v-grande", label: "Grande", price: 1500, colorPrices: {} },
+      ],
     });
     const { deps, persist } = makeDeps({ dragon: product });
 
@@ -151,7 +153,9 @@ describe("createOrder", () => {
     const product = makeProduct({
       hasVariants: true,
       effectivePrice: 1000,
-      variants: [{ id: "v-chica", label: "Chica", price: null }],
+      variants: [
+        { id: "v-chica", label: "Chica", price: null, colorPrices: {} },
+      ],
     });
     const { deps, persist } = makeDeps({ dragon: product });
 
@@ -170,6 +174,82 @@ describe("createOrder", () => {
     );
 
     expect(persist.mock.calls[0]![0].items[0]!.unitPrice).toBe("1000.00");
+  });
+
+  it("MATRIZ tamaño × color: cobra el precio del color DENTRO del tamaño", async () => {
+    const product = makeProduct({
+      hasVariants: true,
+      effectivePrice: 1000,
+      colorMode: "single",
+      colors: ["Azul", "Morado"],
+      // Precio por color del PRODUCTO (no debe usarse cuando hay tamaño):
+      colorPrices: { Morado: 9999 },
+      variants: [
+        {
+          id: "v-10",
+          label: "10 cm",
+          price: 10000,
+          // El morado sale más caro que el azul EN ESTE tamaño.
+          colorPrices: { Morado: 12500 },
+        },
+      ],
+    });
+    const { deps, persist } = makeDeps({ dragon: product });
+
+    await createOrder(
+      params({
+        items: [
+          {
+            productId: "p1",
+            slug: "dragon",
+            variantId: "v-10",
+            quantity: 1,
+            color: "Morado",
+          },
+        ],
+      }),
+      deps,
+    );
+
+    const item = persist.mock.calls[0]![0].items[0]!;
+    expect(item.unitPrice).toBe("12500.00"); // matriz, no 10000 ni 9999
+    expect(item.variantLabel).toBe("10 cm · Morado");
+  });
+
+  it("matriz sin celda para el color: queda el precio del TAMAÑO (no el del producto)", async () => {
+    const product = makeProduct({
+      hasVariants: true,
+      effectivePrice: 1000,
+      colorMode: "single",
+      colors: ["Azul", "Morado"],
+      colorPrices: { Azul: 7777 }, // del producto: NO aplica con tamaño elegido
+      variants: [
+        {
+          id: "v-10",
+          label: "10 cm",
+          price: 10000,
+          colorPrices: { Morado: 12500 }, // Azul no tiene celda
+        },
+      ],
+    });
+    const { deps, persist } = makeDeps({ dragon: product });
+
+    await createOrder(
+      params({
+        items: [
+          {
+            productId: "p1",
+            slug: "dragon",
+            variantId: "v-10",
+            quantity: 1,
+            color: "Azul",
+          },
+        ],
+      }),
+      deps,
+    );
+
+    expect(persist.mock.calls[0]![0].items[0]!.unitPrice).toBe("10000.00");
   });
 
   it("cobra el precio EXACTO del color elegido (color único)", async () => {
@@ -318,7 +398,9 @@ describe("createOrder", () => {
       dragon: makeProduct({
         hasVariants: true,
         effectivePrice: 1000,
-        variants: [{ id: "v-grande", label: "Grande", price: 1500 }],
+        variants: [
+          { id: "v-grande", label: "Grande", price: 1500, colorPrices: {} },
+        ],
         colorMode: "single",
         colors: ["Negro"],
         colorPrices: {},
@@ -411,7 +493,7 @@ describe("createOrder", () => {
   it("exige elegir tamaño si el producto tiene variantes", async () => {
     const product = makeProduct({
       hasVariants: true,
-      variants: [{ id: "v1", label: "Grande", price: 1500 }],
+      variants: [{ id: "v1", label: "Grande", price: 1500, colorPrices: {} }],
     });
     const { deps } = makeDeps({ dragon: product });
     await expect(
@@ -429,7 +511,7 @@ describe("createOrder", () => {
   it("rechaza una variante que no pertenece al producto", async () => {
     const product = makeProduct({
       hasVariants: true,
-      variants: [{ id: "v1", label: "Grande", price: 1500 }],
+      variants: [{ id: "v1", label: "Grande", price: 1500, colorPrices: {} }],
     });
     const { deps } = makeDeps({ dragon: product });
     await expect(

@@ -56,8 +56,21 @@ export type ProductDetailView = ProductView & {
   layerHeight: string | null;
   infillPercent: number | null;
   productionTime: string | null;
-  images: { url: string; alt: string; position: string; scale: number }[];
-  variants: { id: string; label: string; price: number | null }[];
+  images: {
+    url: string;
+    alt: string;
+    position: string;
+    scale: number;
+    /** Imagen por color: al elegir ese color, la galería salta a esta foto. */
+    color: string | null;
+  }[];
+  variants: {
+    id: string;
+    label: string;
+    price: number | null;
+    /** Matriz tamaño × color: precio del color DENTRO de este tamaño. */
+    colorPrices: Record<string, number>;
+  }[];
 };
 
 export type CatalogPage = {

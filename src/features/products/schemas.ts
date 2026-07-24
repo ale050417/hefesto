@@ -116,6 +116,11 @@ export const productInputSchema = z
           weightGrams: z
             .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
             .optional(),
+          // Matriz tamaño × color: precio POR color de este tamaño (el filamento
+          // morado cuesta más que el azul). Vacío = precio del tamaño.
+          colorPrices: z
+            .record(z.string().max(40), z.coerce.number().positive())
+            .default({}),
         }),
       )
       .max(20, "Demasiados tamaños")

@@ -143,6 +143,7 @@ export async function getProductFormDataAction(id: string): Promise<
       price: v.priceOverride ?? "",
       colorGrams: v.colorGrams ?? {},
       weightGrams: v.weightGrams ?? "",
+      colorPrices: v.colorPrices ?? {},
     })),
   };
   return {
@@ -402,7 +403,19 @@ export async function uploadProductImageAction(
       typeof scaleRaw === "string" && /^\d(\.\d{1,2})?$/.test(scaleRaw)
         ? scaleRaw
         : "1";
-    const image = await addProductImage(productId, bytes, position, scale);
+    // Imagen por color (opcional): la foto del producto en ESE color.
+    const colorRaw = formData.get("color");
+    const color =
+      typeof colorRaw === "string" && colorRaw.trim().length > 0
+        ? colorRaw.trim().slice(0, 40)
+        : null;
+    const image = await addProductImage(
+      productId,
+      bytes,
+      position,
+      scale,
+      color,
+    );
     revalidatePath(`/admin/productos/${productId}/editar`);
     return { ok: true, data: { id: image.id, url: image.url } };
   } catch {

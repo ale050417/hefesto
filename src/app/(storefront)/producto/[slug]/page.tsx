@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ProductInfo } from "@/features/cart/components/product-info";
-import { ProductGallery } from "@/features/products/components/product-gallery";
+import { ProductShowcase } from "@/features/products/components/product-showcase";
 import { ProductGrid } from "@/features/products/components/product-grid";
 import {
   getProductBySlug,
@@ -92,30 +91,29 @@ export default async function ProductPage({ params }: Params) {
         / <span className="text-fg">{product.name}</span>
       </nav>
 
-      <div className="mt-6 grid gap-10 lg:grid-cols-2">
-        <ProductGallery images={product.images} />
-
-        <ProductInfo
-          product={{
-            id: product.id,
-            slug: product.slug,
-            name: product.name,
-            categoryName: product.category?.name ?? null,
-            description: product.description,
-            price: product.price,
-            salePrice: product.salePrice,
-            isOnSale: product.isOnSale,
-            discountPercent: product.discountPercent,
-            isNew: product.isNew,
-            image: product.primaryImage?.url ?? null,
-            variants: product.variants,
-            colorMode: product.colorMode,
-            colors: product.colors,
-            colorPrices: product.colorPrices,
-            specs,
-          }}
-        />
-      </div>
+      {/* Vitrina: galería + info conectadas (al elegir un color, la galería
+          salta a la foto de ese color). */}
+      <ProductShowcase
+        images={product.images}
+        product={{
+          id: product.id,
+          slug: product.slug,
+          name: product.name,
+          categoryName: product.category?.name ?? null,
+          description: product.description,
+          price: product.price,
+          salePrice: product.salePrice,
+          isOnSale: product.isOnSale,
+          discountPercent: product.discountPercent,
+          isNew: product.isNew,
+          image: product.primaryImage?.url ?? null,
+          variants: product.variants,
+          colorMode: product.colorMode,
+          colors: product.colors,
+          colorPrices: product.colorPrices,
+          specs,
+        }}
+      />
 
       {related.length > 0 ? (
         <section className="mt-16">

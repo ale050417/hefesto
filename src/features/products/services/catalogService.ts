@@ -167,11 +167,15 @@ export async function getProductBySlug(
       alt: i.alt ?? p.name,
       position: i.position,
       scale: Number(i.scale),
+      // Imagen por color: la galería salta a esta foto al elegir el color.
+      color: i.color ?? null,
     })),
     variants: p.variants.map((v) => ({
       id: v.id,
       label: v.label,
       price: v.priceOverride !== null ? Number(v.priceOverride) : null,
+      // Matriz tamaño × color: precio del color DENTRO de este tamaño.
+      colorPrices: v.colorPrices ?? {},
     })),
   };
 }
@@ -290,6 +294,7 @@ function toVariantRows(variants: ProductInput["variants"]): {
   priceOverride: string | null;
   colorGrams: Record<string, number> | null;
   weightGrams: string | null;
+  colorPrices: Record<string, number> | null;
 }[] {
   return (variants ?? [])
     .filter((v) => v.label.trim().length > 0)
@@ -297,6 +302,10 @@ function toVariantRows(variants: ProductInput["variants"]): {
       // Solo guardamos los colores con gramos > 0. Vacío → null (usa el producto).
       const grams = Object.fromEntries(
         Object.entries(v.colorGrams ?? {}).filter(([, g]) => g > 0),
+      );
+      // Matriz: precios por color de este tamaño (> 0). Vacío → null.
+      const prices = Object.fromEntries(
+        Object.entries(v.colorPrices ?? {}).filter(([, p]) => p > 0),
       );
       return {
         label: v.label.trim(),
@@ -307,6 +316,7 @@ function toVariantRows(variants: ProductInput["variants"]): {
           v.weightGrams != null && v.weightGrams > 0
             ? v.weightGrams.toString()
             : null,
+        colorPrices: Object.keys(prices).length > 0 ? prices : null,
       };
     });
 }
@@ -398,6 +408,7 @@ export async function addProductImage(
   bytes: Buffer,
   position = "50% 50%",
   scale = "1",
+  color: string | null = null,
 ): Promise<ProductImage> {
   const webp = await optimizeImage(bytes);
   const path = `${productId}/${randomUUID()}.webp`;
@@ -411,6 +422,8 @@ export async function addProductImage(
     isPrimary: count === 0,
     position,
     scale,
+    // Imagen por color: al elegir ese color en la tienda, la galería salta acá.
+    color,
   });
 }
 
@@ -521,6 +534,7 @@ export async function getProductAdmin(id: string): Promise<{
     priceOverride: string | null;
     colorGrams: Record<string, number> | null;
     weightGrams: string | null;
+    colorPrices: Record<string, number> | null;
   }[];
 } | null> {
   const product = await findProductById(id);
@@ -537,6 +551,7 @@ export async function getProductAdmin(id: string): Promise<{
       priceOverride: v.priceOverride,
       colorGrams: v.colorGrams,
       weightGrams: v.weightGrams,
+      colorPrices: v.colorPrices,
     })),
   };
 }

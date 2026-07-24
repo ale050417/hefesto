@@ -33,11 +33,13 @@ describe("productInputSchema · variants (tamaños, dinero)", () => {
         label: "Chico 12 cm",
         price: 500,
         colorGrams: {},
+        colorPrices: {},
       });
       expect(r.data.variants[1]).toEqual({
         label: "Grande 20 cm",
         price: null,
         colorGrams: {},
+        colorPrices: {},
       });
     }
   });
