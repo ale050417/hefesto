@@ -15,6 +15,7 @@ import {
   findProductById,
   findPublished,
   findProductsForSale,
+  findVariantsForSale,
   findPublishedSlugs,
   findRelated,
   insertCategory,
@@ -681,6 +682,19 @@ export async function listProductsByIds(ids: string[]): Promise<ProductView[]> {
   return rows.map(toProductView);
 }
 
+/** Variante (tamaño o combinación) elegible al cargar una venta manual. */
+export type SaleVariant = {
+  label: string;
+  /** price_override del tamaño/combo (null = usar la base del producto). */
+  price: number | null;
+  /** Multicolor: gramos por color de ESTE tamaño/combo (para el stock). */
+  colorGrams: Record<string, number>;
+  /** Color único: peso de ESTE tamaño (para el stock). */
+  weightGrams: number | null;
+  /** Matriz tamaño × color: precio POR color de este tamaño. */
+  colorPrices: Record<string, number>;
+};
+
 export type ProductForSale = {
   id: string;
   name: string;
@@ -689,13 +703,37 @@ export type ProductForSale = {
   weightGrams: number | null;
   printMinutes: number | null;
   colors: string[];
+  colorMode: "single" | "multi";
+  /** Columna reusada: en color único = PRECIO exacto por color; en multicolor
+   * = GRAMOS por color (misma convención que el resto de la app). */
+  colorPrices: Record<string, number>;
+  variants: SaleVariant[];
   categoryName: string | null;
 };
 
 /** Productos publicados para el selector "cargar desde la tienda" de una venta
- * manual: autocompletan detalle, material, gramos, minutos y precio. */
+ * manual: autocompletan detalle, material, gramos, minutos y precio. Trae las
+ * VARIANTES para elegir cuál se vendió (task #188: el chihuahua tiene 2
+ * tamaños y antes se tomaba uno solo). */
 export async function listProductsForSale(): Promise<ProductForSale[]> {
-  const rows = await findProductsForSale();
+  const [rows, variantRows] = await Promise.all([
+    findProductsForSale(),
+    findVariantsForSale(),
+  ]);
+  const byProduct = new Map<string, SaleVariant[]>();
+  for (const v of variantRows) {
+    const list = byProduct.get(v.productId) ?? [];
+    const price = v.priceOverride != null ? Number(v.priceOverride) : null;
+    const weight = v.weightGrams != null ? Number(v.weightGrams) : null;
+    list.push({
+      label: v.label,
+      price: price != null && price > 0 ? price : null,
+      colorGrams: v.colorGrams ?? {},
+      weightGrams: weight != null && weight > 0 ? weight : null,
+      colorPrices: v.colorPrices ?? {},
+    });
+    byProduct.set(v.productId, list);
+  }
   return rows.map((p) => ({
     id: p.id,
     name: p.name,
@@ -704,6 +742,9 @@ export async function listProductsForSale(): Promise<ProductForSale[]> {
     weightGrams: p.weightGrams,
     printMinutes: p.printTimeMinutes,
     colors: p.colors ?? [],
+    colorMode: p.colorMode === "multi" ? "multi" : "single",
+    colorPrices: p.colorPrices ?? {},
+    variants: byProduct.get(p.id) ?? [],
     categoryName: p.categoryName,
   }));
 }

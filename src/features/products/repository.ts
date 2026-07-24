@@ -565,10 +565,27 @@ export async function findProductsForSale() {
       weightGrams: products.weightGrams,
       printTimeMinutes: products.printTimeMinutes,
       colors: products.colors,
+      colorMode: products.colorMode,
+      colorPrices: products.colorPrices,
       categoryName: categories.name,
     })
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .where(ne(products.status, "archived"))
     .orderBy(asc(products.name));
+}
+
+/** Variantes (tamaños/combinaciones) de TODOS los productos, en UNA query,
+ * para que la venta manual deje elegir CUÁL se vendió (2026-07-24). */
+export async function findVariantsForSale() {
+  return db
+    .select({
+      productId: productVariants.productId,
+      label: productVariants.label,
+      priceOverride: productVariants.priceOverride,
+      colorGrams: productVariants.colorGrams,
+      weightGrams: productVariants.weightGrams,
+      colorPrices: productVariants.colorPrices,
+    })
+    .from(productVariants);
 }

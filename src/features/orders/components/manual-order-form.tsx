@@ -7,6 +7,8 @@ import { EstimatorModalButton } from "@/features/calculator/components/estimator
 import type { EstimatorValue } from "@/features/calculator/components/price-estimator";
 import type { EstimatorContext } from "@/features/calculator/service";
 import type { ProductForSale } from "@/features/products/services/catalogService";
+import { saleUnitPrice } from "@/features/products/pricing";
+import { cn } from "@/lib/utils";
 import { createManualSaleAction } from "../actions";
 import { ORDER_STATUS_LABEL } from "../constants";
 import type { OrderStatus } from "../types";
@@ -158,34 +160,92 @@ export function ManualSaleForm({
     );
   }
 
-  function pickProduct(id: string) {
-    const p = products.find((x) => x.id === id);
-    if (!p) return;
-    const colors = p.colors ?? [];
-    const weight = p.weightGrams ?? 0;
-    // Reparte el peso en partes iguales entre los colores del producto (editable).
-    const n = colors.length;
-    const base = n > 0 ? Math.floor(weight / n) : 0;
-    const rem = n > 0 ? weight - base * n : 0;
-    const lines = colors.map((c, idx) => ({
-      filamentId: matchFilamentId(p.material ?? "", c) ?? "",
-      grams: n > 0 ? String(base + (idx === n - 1 ? rem : 0)) : "",
-    }));
-    setColorLines(
-      lines.length > 0 ? lines : [{ filamentId: "", grams: String(weight) }],
-    );
+  // Producto elegido de la tienda + variante (tamaño/combinación) + color:
+  // task #188 — el chihuahua tiene 2 tamaños y antes se tomaba uno solo.
+  const [picked, setPicked] = useState<ProductForSale | null>(null);
+  const [saleVariant, setSaleVariant] = useState<string | null>(null);
+  const [saleColor, setSaleColor] = useState<string | null>(null);
+
+  /** Aplica el producto + variante + color: precio ESPEJO del cobro online
+   * (saleUnitPrice, testeado), gramos del tamaño/combo elegido para el stock
+   * y detalle con lo vendido. Todo sigue editable a mano después. */
+  function applySelection(
+    p: ProductForSale,
+    variantLabel: string | null,
+    color: string | null,
+  ) {
+    const variant = p.variants.find((v) => v.label === variantLabel) ?? null;
+    const isMulti = p.colorMode === "multi";
+    const unit = saleUnitPrice({
+      basePrice: p.price,
+      colorMode: p.colorMode,
+      productColorPrices: p.colorPrices,
+      variant,
+      color,
+    });
+    let lines: Array<{ filamentId: string; grams: string }> = [];
+    let weight = 0;
+    if (isMulti) {
+      // Gramos por color: los del tamaño/combo elegido; si no tiene, los del
+      // producto (en multi la columna colorPrices guarda GRAMOS por color).
+      const vg = variant?.colorGrams ?? {};
+      const source = Object.values(vg).some((g) => g > 0) ? vg : p.colorPrices;
+      const entries = Object.entries(source).filter(([, g]) => g > 0);
+      lines = entries.map(([c, g]) => ({
+        filamentId: matchFilamentId(p.material ?? "", c) ?? "",
+        grams: String(g),
+      }));
+      weight = entries.reduce((a, [, g]) => a + g, 0);
+      if (lines.length === 0 && (p.weightGrams ?? 0) > 0) {
+        weight = p.weightGrams ?? 0;
+        lines = [{ filamentId: "", grams: String(weight) }];
+      }
+    } else {
+      // Color único: el peso del tamaño elegido (o del producto) va TODO al
+      // color vendido (antes se repartía entre todos los colores: mal).
+      weight =
+        variant?.weightGrams && variant.weightGrams > 0
+          ? variant.weightGrams
+          : (p.weightGrams ?? 0);
+      lines = [
+        {
+          filamentId: color
+            ? (matchFilamentId(p.material ?? "", color) ?? "")
+            : "",
+          grams: weight > 0 ? String(weight) : "",
+        },
+      ];
+    }
+    setColorLines(lines.length > 0 ? lines : [{ filamentId: "", grams: "" }]);
     setEstData({
       filamentId: lines.find((l) => l.filamentId)?.filamentId || null,
       material: p.material ?? "",
       grams: weight,
       printMinutes: p.printMinutes ?? 0,
     });
-    setUnitPrice(p.price);
+    setUnitPrice(unit);
     setForm((f) => ({
       ...f,
-      detail: p.name,
+      detail: [
+        p.name,
+        variantLabel,
+        !isMulti && color && p.colors.length > 1 ? color : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
       category: p.categoryName ?? f.category,
     }));
+  }
+
+  function pickProduct(id: string) {
+    const p = products.find((x) => x.id === id);
+    if (!p) return;
+    const firstVariant = p.variants[0]?.label ?? null;
+    const firstColor = p.colorMode === "single" ? (p.colors[0] ?? null) : null;
+    setPicked(p);
+    setSaleVariant(firstVariant);
+    setSaleColor(firstColor);
+    applySelection(p, firstVariant, firstColor);
   }
   // El reparto de la ganancia lo resuelve Ganancias (socios actuales); esta venta
   // ya no lleva un reparto propio (se sacó "Personalizar").
@@ -365,6 +425,85 @@ export function ManualSaleForm({
                   )}
                 </div>
               )}
+              {/* Producto elegido: variante (tamaño/combinación) + color. El
+                  precio y los gramos siguen lo elegido, igual que la tienda. */}
+              {picked ? (
+                <div className="mt-2 flex flex-col gap-2.5 rounded-xl border border-[var(--border)] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <b className="text-[13px]">{picked.name}</b>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => {
+                        setPicked(null);
+                        setSaleVariant(null);
+                        setSaleColor(null);
+                      }}
+                    >
+                      Quitar
+                    </button>
+                  </div>
+                  {picked.variants.length > 0 ? (
+                    <div>
+                      <div className="text-dim mb-1.5 text-[12px] font-medium">
+                        {picked.variants.some((v) => v.label.includes(" + "))
+                          ? "¿Qué combinación se vendió?"
+                          : "¿Qué tamaño se vendió?"}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {picked.variants.map((v) => (
+                          <button
+                            key={v.label}
+                            type="button"
+                            className={cn(
+                              "chip",
+                              saleVariant === v.label && "active",
+                            )}
+                            onClick={() => {
+                              setSaleVariant(v.label);
+                              applySelection(picked, v.label, saleColor);
+                            }}
+                          >
+                            {v.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  {picked.colorMode === "single" && picked.colors.length > 0 ? (
+                    <div>
+                      <div className="text-dim mb-1.5 text-[12px] font-medium">
+                        ¿De qué color?
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {picked.colors.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            className={cn("chip", saleColor === c && "active")}
+                            onClick={() => {
+                              setSaleColor(c);
+                              applySelection(picked, saleVariant, c);
+                            }}
+                          >
+                            {c}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  {unitPrice != null ? (
+                    <div className="text-faint text-[11.5px]">
+                      Precio unitario:{" "}
+                      <b className="text-fg">
+                        ${unitPrice.toLocaleString("es-AR")}
+                      </b>{" "}
+                      (el mismo que cobra la tienda para esa elección) · gramos
+                      cargados abajo en “Colores usados”.
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="text-faint text-[11.5px]">
                 Autocompleta detalle, material, gramos y precio. Ajustá lo que
                 haga falta.
