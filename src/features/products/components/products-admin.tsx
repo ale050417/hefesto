@@ -20,6 +20,7 @@ import type {
 } from "../types";
 import type { EstimatorContext } from "@/features/calculator/service";
 import { ProductForm, type ProductFormValues } from "./product-form";
+import { EditSection } from "./edit-section";
 import { ProductWizard } from "./product-wizard";
 import { ImageUpload } from "./image-upload";
 import { ProductStatusActions } from "./product-status-actions";
@@ -556,14 +557,18 @@ export function ProductsAdmin({
                 toast("Producto guardado", "success");
               }}
             />
-            <div>
-              <h2 className="font-display text-fg mb-3 text-lg">Imágenes</h2>
+            {/* Mismo patrón colapsable que el form: el modal abre corto y se
+                despliega solo lo que se quiere editar. */}
+            <EditSection
+              title="Imágenes"
+              hint={`${modal.images.length} foto${modal.images.length === 1 ? "" : "s"} · la primera es la portada`}
+            >
               <ImageUpload
                 productId={modal.productId}
                 images={modal.images}
                 onChanged={reloadEdit}
               />
-            </div>
+            </EditSection>
           </div>
         ) : null}
       </Modal>

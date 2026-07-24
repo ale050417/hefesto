@@ -459,13 +459,23 @@ export function ManualSaleForm({
                 placeholder="Se completa con la calculadora"
                 value={total > 0 ? total : ""}
                 readOnly
-                title="Precio (calculadora/producto) × cantidad + insumos"
+                title="Precio unitario (calculadora/producto) × cantidad"
               />
               <div className="mt-1">
                 <EstimatorModalButton
                   estimator={estimator}
                   onUse={handleEstUse}
                 />
+              </div>
+              {/* Contrato de la cantidad (pedido de Ale): TODO va de la mano.
+                  Se cotiza UNA pieza; precio, stock y costo escalan solos. */}
+              <div className="text-faint text-[11.5px]">
+                Cotizá <b className="text-fg">una unidad</b>: el total, los
+                gramos y el costo se multiplican solos por la cantidad
+                {qtyN > 1 ? ` (×${qtyN})` : ""}. ¿Ya sabés cuánto cobrás (ej:
+                $2.500 el parche)? Ponelo en la calculadora en{" "}
+                <b className="text-fg">“¿Ya sabés cuánto cobrás?”</b> y se usa
+                ese precio; la ganancia sale exacta.
               </div>
             </div>
             <div className="field">
@@ -489,9 +499,10 @@ export function ManualSaleForm({
             <div className="field">
               <label>Colores usados (descuenta stock)</label>
               <p className="text-faint text-[12px] leading-relaxed">
-                Obligatorio: elegí el/los color(es) y cuántos gramos de cada
-                carrete. Se descuenta de cada uno; si falta stock, la venta se
-                registra igual y te avisa por notificación para reponer.
+                Obligatorio: elegí el/los color(es) y los gramos de{" "}
+                <b className="text-fg">una unidad</b> (el stock descuenta gramos
+                × cantidad, igual que el precio). Si falta stock, la venta se
+                registra igual y te avisa por notificación.
               </p>
               {colorLines.map((ln, i) => (
                 <div key={i} className="mt-2 flex items-center gap-2">

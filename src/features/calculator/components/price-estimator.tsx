@@ -105,6 +105,12 @@ export function PriceEstimator({
   const [presetId, setPresetId] = useState(initial?.presetId || "");
   const [opPrice, setOpPrice] = useState<number | null>(null);
   const [opBusy, setOpBusy] = useState(false);
+  // "Ya sé cuánto cobro" (2026-07-24): si el precio ya está decidido (ej:
+  // $2.500 el parche), se pone acá y la cuenta va AL REVÉS: costo real desde
+  // gramos/tiempo y ganancia EXACTA de ese precio (nada de adivinar el margen
+  // hasta que dé el número). Vacío = modo normal (costo + margen del tipo).
+  const [charged, setCharged] = useState("");
+  const chargedN = Number(charged) || 0;
 
   const selected = filaments.find((f) => f.id === filamentId) ?? null;
   const colorGramsTotal = (colors ?? []).reduce(
@@ -164,11 +170,20 @@ export function PriceEstimator({
     };
   }, [isAdmin, presetId, filamentId, gramsN, totalHours, hasData]);
 
-  const price = isAdmin
+  const autoPrice = isAdmin
     ? hasData && presetId && selected
       ? q.precioFinal
       : null
     : opPrice;
+  // Con precio propio cargado, ESE es el precio (no hace falta elegir tipo).
+  const price = chargedN > 0 ? chargedN : autoPrice;
+  // Desglose con precio propio: ganancia = cobrado − costo (puede dar negativa
+  // → aviso). El margen implícito es informativo (el % que estabas adivinando).
+  const gained = chargedN > 0 ? chargedN - q.costoTotal : q.ganancia;
+  const impliedPct =
+    chargedN > 0 && q.costoTotal > 0
+      ? Math.round(((chargedN - q.costoTotal) / q.costoTotal) * 100)
+      : null;
 
   // Reporta el resultado al formulario contenedor. onChange queda fuera de deps
   // a propósito (puede cambiar de identidad por render); emitimos por valores.
@@ -353,6 +368,30 @@ export function PriceEstimator({
         )}
       </div>
 
+      {/* Precio propio: cobrás lo que decidiste y la calculadora te muestra
+          costo y ganancia de ESE precio (caso "10 parches a $2.500 c/u"). */}
+      <div className="field">
+        <label htmlFor="pe-cobro">¿Ya sabés cuánto cobrás? (opcional)</label>
+        <div className="flex items-center gap-2">
+          <span className="text-faint text-[12px]">$</span>
+          <input
+            id="pe-cobro"
+            className="input"
+            style={{ maxWidth: 140 }}
+            type="number"
+            min={0}
+            placeholder="Ej: 2500"
+            value={charged}
+            onChange={(e) => setCharged(e.target.value)}
+          />
+        </div>
+        <div className="text-faint text-[11.5px]">
+          Ponelo y la cuenta va al revés: con los gramos y el tiempo te muestra
+          el costo real y la ganancia EXACTA de ese precio (sin adivinar el
+          margen). Vacío = precio por tipo de producto.
+        </div>
+      </div>
+
       {/* Resultado */}
       {isAdmin ? (
         <div
@@ -364,16 +403,38 @@ export function PriceEstimator({
             <b className="price">{formatPrice(q.costoTotal)}</b>
           </div>
           <div className="flex items-center justify-between text-[12.5px]">
-            <span className="text-dim">Ganancia · margen {adminMargin}%</span>
-            <b className="price" style={{ color: "var(--success)" }}>
-              {formatPrice(q.ganancia)}
+            <span className="text-dim">
+              {chargedN > 0
+                ? `Ganancia real${impliedPct != null ? ` · margen ${impliedPct}%` : ""}`
+                : `Ganancia · margen ${adminMargin}%`}
+            </span>
+            <b
+              className="price"
+              style={{
+                color: gained < 0 ? "var(--danger)" : "var(--success)",
+              }}
+            >
+              {formatPrice(gained)}
             </b>
           </div>
+          {chargedN > 0 && gained < 0 ? (
+            <div className="text-[11.5px]" style={{ color: "var(--danger)" }}>
+              ⚠ Estás cobrando MENOS que el costo: perdés plata con este precio.
+            </div>
+          ) : null}
+          {chargedN > 0 && !hasData ? (
+            <div className="text-[11.5px]" style={{ color: "var(--warning)" }}>
+              Cargá los gramos y el tiempo: sin eso el costo da $0 y la ganancia
+              no es real.
+            </div>
+          ) : null}
           <div
             className="mt-1 flex items-center justify-between border-t pt-2"
             style={{ borderColor: "var(--border)" }}
           >
-            <span className="text-[12.5px] font-semibold">Precio sugerido</span>
+            <span className="text-[12.5px] font-semibold">
+              {chargedN > 0 ? "Precio (lo que cobrás)" : "Precio sugerido"}
+            </span>
             <b
               className="price text-[16px]"
               style={{ color: "var(--gold-bright)" }}

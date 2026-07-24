@@ -88,6 +88,10 @@ export function ProductInfo({
   const flashCart = useUiStore((s) => s.flashCart);
 
   const selected = product.variants.find((v) => v.id === variantId) ?? null;
+  // ¿Las variantes son combinaciones de colores o tamaños? Define el título
+  // del selector (un multicolor puede tener TAMAÑOS: "15 cm", no combos).
+  const variantsAreCombos =
+    isMulti && product.variants.some((v) => v.label.includes(" + "));
   const basePrice =
     product.isOnSale && product.salePrice != null
       ? product.salePrice
@@ -119,11 +123,14 @@ export function ProductInfo({
     product.salePrice != null &&
     !selected?.price &&
     !hasColorPrice;
-  // Multicolor con COMBINACIONES: el label de la variante ya lleva los colores
-  // ("Negro + Rojo") → color null para no duplicar. Multicolor fijo: todos los
-  // colores. Color único: el elegido.
+  // ¿La variante elegida es una COMBINACIÓN de colores ("Negro + Rojo") o un
+  // TAMAÑO ("15 cm")? En multicolor conviven los dos casos y se tratan distinto.
+  const isCombo = isMulti && selected != null && selected.label.includes(" + ");
+  // Multicolor con COMBINACIONES: el label ya lleva los colores → color null
+  // para no duplicar. Multicolor con tamaños o fijo: todos los colores de la
+  // pieza. Color único: el elegido.
   const lineColor = isMulti
-    ? selected
+    ? isCombo
       ? null
       : hasColors
         ? product.colors.join(" + ")
@@ -187,37 +194,30 @@ export function ProductInfo({
         {hasVariants ? (
           <div>
             <p className="text-fg mb-2 text-sm font-medium">
-              {isMulti ? "Combinación" : "Tamaño"}
+              {variantsAreCombos ? "Combinación" : "Tamaño"}
             </p>
             <div className="flex flex-wrap gap-2">
-              {product.variants.map((v) => {
-                // Precio del botón: con matriz (precio por color), la CELDA de
-                // este tamaño para el color elegido — no un precio fijo que
-                // después cambia con el color. Sin celda, el precio del tamaño.
-                const cell =
-                  !isMulti && color ? v.colorPrices[color] : undefined;
-                const shown = cell != null && cell > 0 ? cell : v.price;
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={() => {
-                      setVariantId(v.id);
-                      // Combinación multicolor: la galería salta a su foto.
-                      onVariantChange?.(v.label);
-                    }}
-                    className={cn(
-                      "rounded-md border px-3 py-2 text-sm transition-colors",
-                      v.id === variantId
-                        ? "border-primary text-primary"
-                        : "border-surface-3 text-fg hover:border-primary",
-                    )}
-                  >
-                    {v.label}
-                    {shown != null ? ` · ${formatPrice(shown)}` : ""}
-                  </button>
-                );
-              })}
+              {/* Solo el label: el precio grande de arriba ya refleja lo
+                  elegido (pedido de Ale: sin "$" en los botones de tamaño). */}
+              {product.variants.map((v) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => {
+                    setVariantId(v.id);
+                    // Combinación multicolor: la galería salta a su foto.
+                    onVariantChange?.(v.label);
+                  }}
+                  className={cn(
+                    "rounded-md border px-3 py-2 text-sm transition-colors",
+                    v.id === variantId
+                      ? "border-primary text-primary"
+                      : "border-surface-3 text-fg hover:border-primary",
+                  )}
+                >
+                  {v.label}
+                </button>
+              ))}
             </div>
           </div>
         ) : null}
@@ -228,9 +228,11 @@ export function ProductInfo({
               {isMulti ? "Colores de la pieza" : "Color"}
             </p>
             <div className="flex flex-wrap gap-2">
-              {/* Multicolor con combinaciones: se muestran los colores del combo
-                  ELEGIDO (el label es "Negro + Rojo"); si no, los del producto. */}
-              {(isMulti && selected
+              {/* Multicolor con COMBINACIONES: se muestran los colores del combo
+                  ELEGIDO (label "Negro + Rojo"). Si la variante es un TAMAÑO
+                  ("15 cm", sin " + "), NO es un combo: van los colores del
+                  producto (bug chihuahua: mostraba "15 cm" como color gris). */}
+              {(isCombo && selected
                 ? selected.label.split(" + ").map((s) => s.trim())
                 : product.colors
               ).map((c) => {
