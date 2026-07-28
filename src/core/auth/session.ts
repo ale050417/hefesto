@@ -87,7 +87,14 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
  * hasta que venciera el cache (bug 2026-07-24). Llamar desde server actions.
  */
 export function invalidateProfileCache(userId: string): void {
-  revalidateTag(`auth-profile-${userId}`);
+  try {
+    // Next 16 pide el perfil de cache como 2º argumento ("max" = purga total).
+    revalidateTag(`auth-profile-${userId}`, "max");
+  } catch (error) {
+    // Fuera de un contexto que permita revalidar: no es fatal — el guard
+    // igual confirma contra la DB antes de rebotar (ver requireStaff).
+    console.error("[auth] no se pudo invalidar el perfil cacheado:", error);
+  }
 }
 
 /**
@@ -116,8 +123,14 @@ export async function requireStaff(): Promise<CurrentUser> {
   if (user.profileUnavailable) throwAuthUnavailable();
   const role = user.profile?.role;
   if (role !== "admin" && role !== "operator") redirect("/");
-  // Invitado con contraseña temporal: debe cambiarla antes de entrar al panel.
-  if (user.profile?.mustChangePassword) redirect("/cuenta/cambiar-clave");
+  // Invitado que todavía no creó SU contraseña: primero la crea. El perfil
+  // está cacheado 60 s, así que ANTES de rebotar confirmamos contra la base
+  // (si no, quien acaba de crearla quedaba en loop). Es una lectura extra
+  // solo en este caso raro, no en cada request del panel.
+  if (user.profile?.mustChangePassword) {
+    const fresh = await getProfileById(user.id).catch(() => null);
+    if (fresh?.mustChangePassword !== false) redirect("/cuenta/cambiar-clave");
+  }
   return user;
 }
 

@@ -6,6 +6,7 @@ import { db } from "@/core/db";
 import { roles } from "@/core/db/schema";
 import { withDeadline } from "@/lib/safe-load";
 import { getCurrentUser, type CurrentUser } from "./session";
+import { getProfileById } from "./profile";
 import {
   PERM_MODULE_KEYS,
   resolveAllowed,
@@ -162,7 +163,12 @@ export async function requirePermissionPage(
       "No pudimos verificar tu sesión: la base de datos no respondió. Recargá en unos segundos.",
     );
   }
-  if (user.profile?.mustChangePassword) redirect("/cuenta/cambiar-clave");
+  // Mismo criterio que requireStaff: el perfil está cacheado 60 s, así que
+  // confirmamos contra la base antes de rebotar a "Creá tu contraseña".
+  if (user.profile?.mustChangePassword) {
+    const fresh = await getProfileById(user.id).catch(() => null);
+    if (fresh?.mustChangePassword !== false) redirect("/cuenta/cambiar-clave");
+  }
   const input = await loadResolveInput(user);
   if (!resolveAllowed(input, module, action)) redirect("/admin");
   return user;
