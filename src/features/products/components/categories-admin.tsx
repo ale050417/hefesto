@@ -484,6 +484,47 @@ export function CategoriesAdmin({
                         <tr key={c.id}>
                           <td data-label="Categoría">
                             <span className="flex items-center gap-2.5">
+                              {/* La fila del padre también se despliega (como
+                                  la grilla): la flecha muestra/oculta hijas. */}
+                              <button
+                                type="button"
+                                onClick={() => toggleExpand(c.id)}
+                                aria-expanded={expanded.has(c.id)}
+                                disabled={children.length === 0}
+                                className="text-faint hover:text-fg shrink-0 p-0.5"
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor:
+                                    children.length > 0 ? "pointer" : "default",
+                                  opacity: children.length > 0 ? 1 : 0.25,
+                                }}
+                                title={
+                                  children.length > 0
+                                    ? "Ver subcategorías"
+                                    : "Sin subcategorías"
+                                }
+                              >
+                                <svg
+                                  width="14"
+                                  height="14"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2.5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  aria-hidden
+                                  style={{
+                                    transform: expanded.has(c.id)
+                                      ? "rotate(90deg)"
+                                      : "none",
+                                    transition: "transform 0.15s",
+                                  }}
+                                >
+                                  <path d="M9 18l6-6-6-6" />
+                                </svg>
+                              </button>
                               <span
                                 className="kpi-ic relative shrink-0 overflow-hidden"
                                 style={{
@@ -537,7 +578,8 @@ export function CategoriesAdmin({
                             </span>
                           </td>
                         </tr>,
-                        ...children.map((child) => {
+                        // Hijas solo si el padre está desplegado.
+                        ...(expanded.has(c.id) ? children : []).map((child) => {
                           const childColor = child.color ?? color;
                           return (
                             <tr key={child.id}>

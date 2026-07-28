@@ -5,6 +5,7 @@ import {
   ORDER_STATUS_LABEL,
   ORDER_STATUS_VARIANT,
 } from "@/features/orders/constants";
+import { FilamentUsageCard } from "@/features/reports/components/filament-usage-card";
 import { getDashboardData } from "@/features/reports/service";
 import { getStaffUser } from "@/core/auth/session";
 
@@ -24,17 +25,12 @@ function greeting(): string {
   return h < 13 ? "Buen día" : h < 20 ? "Buenas tardes" : "Buenas noches";
 }
 
-const fmtG = (g: number) =>
-  g >= 1000 ? `${(g / 1000).toFixed(2)} kg` : `${Math.round(g)} g`;
-
 export default async function AdminDashboard() {
   const [{ recentOrders, lowStock, filamentUsage, degraded }, user] =
     await Promise.all([getDashboardData(30), getStaffUser()]);
   const firstName =
     user?.profile?.fullName?.trim().split(/\s+/)[0] || "Hefesto";
   const monthName = monthFmt.format(new Date());
-  const maxUsage = Math.max(1, ...filamentUsage.map((u) => u.grams));
-  const totalUsage = filamentUsage.reduce((a, u) => a + u.grams, 0);
 
   return (
     <div>
@@ -49,89 +45,8 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      {/* Filamentos más usados del MES (2026-07-24, pedido de Ale): el consumo
-          real del ledger (pedidos online + ventas manuales), TODOS los
-          filamentos —también los sin uso, para comparar— con su color real y
-          una barra de calor proporcional al más usado. Reemplaza a la sección
-          "Consumo de filamento" que estaba en Reportes. */}
-      <div className="ui-card section-card" style={{ marginBottom: 18 }}>
-        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-          <div className="section-title">
-            Filamentos más usados · {monthName}
-          </div>
-          <span className="text-faint text-[12px]">
-            Total del mes: <b className="text-fg">{fmtG(totalUsage)}</b>
-          </span>
-        </div>
-        <div className="text-faint mb-4 text-[12.5px]">
-          Consumo real descontado del inventario por ventas (tienda y manuales).
-          La barra compara contra el más usado del mes.
-        </div>
-        {filamentUsage.length === 0 ? (
-          <p className="text-dim py-4 text-center text-sm">
-            Todavía no hay filamentos cargados.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-2.5">
-            {filamentUsage.map((u, i) => {
-              const pct =
-                u.grams > 0
-                  ? Math.max(4, Math.round((u.grams / maxUsage) * 100))
-                  : 0;
-              const tone = u.hex ?? "var(--gold)";
-              return (
-                <div
-                  key={`${u.material}-${u.color}-${i}`}
-                  className="flex items-center gap-3"
-                >
-                  <span
-                    className="shrink-0"
-                    style={{
-                      width: 14,
-                      height: 14,
-                      borderRadius: "50%",
-                      background: tone,
-                      border: "1px solid var(--border-strong)",
-                    }}
-                  />
-                  <span
-                    className="text-fg w-40 shrink-0 truncate text-[13px]"
-                    title={`${u.material} · ${u.color}`}
-                  >
-                    {u.material} · {u.color}
-                  </span>
-                  <div
-                    className="h-4 flex-1 overflow-hidden rounded-full"
-                    style={{ background: "var(--surface-2)" }}
-                  >
-                    {pct > 0 ? (
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${pct}%`,
-                          background: tone,
-                          // Intensidad tipo "mapa de calor": el más usado a
-                          // pleno; el resto se atenúa proporcionalmente.
-                          opacity: 0.45 + 0.55 * (u.grams / maxUsage),
-                        }}
-                      />
-                    ) : null}
-                  </div>
-                  <b
-                    className="w-20 shrink-0 text-right text-[13px]"
-                    style={{
-                      color: u.grams > 0 ? "var(--fg)" : "var(--text-faint)",
-                    }}
-                  >
-                    {u.grams > 0 ? fmtG(u.grams) : "Sin uso"}
-                  </b>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
+      {/* Últimos pedidos PRIMERO (2026-07-24); el consumo del mes es una
+          tarjeta chica más, del tamaño de las alertas. */}
       <div className="dash-grid">
         <div className="ui-card section-card">
           <div className="mb-3.5 flex items-center justify-between">
@@ -253,6 +168,10 @@ export default async function AdminDashboard() {
             </div>
           )}
         </div>
+
+        {/* Filamentos del mes: tarjeta chica con filtro más/menos usados;
+            los filamentos sin uso NO aparecen. */}
+        <FilamentUsageCard rows={filamentUsage} monthName={monthName} />
       </div>
     </div>
   );
