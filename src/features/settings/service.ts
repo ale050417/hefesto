@@ -1,11 +1,14 @@
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import {
-  createUserWithPassword,
+  createInviteToken,
+  createLoginToken,
   getUserEmail,
+  listAuthEmails,
   listAuthUsers,
   setUserPassword,
 } from "@/core/supabase/admin";
+import { buildTeamInviteEmail, buildTeamPromotedEmail } from "./emails";
 import { env } from "@/core/config/env";
 import { sendEmail } from "@/core/email";
 import { DEFAULT_OPERATOR } from "@/core/auth/perm-defs";
@@ -301,58 +304,120 @@ function generateTempPassword(): string {
   return p;
 }
 
-/** Aviso por email (sin contraseña: la comparte el admin por canal seguro). */
-async function notifyAccessGranted(email: string, roleLabel: string) {
-  try {
-    await sendEmail({
-      to: email,
-      subject: "Tenés acceso al panel de Hefesto 3D",
-      html: `<p>Hola,</p><p>Te dieron acceso al panel de gestión de <b>Hefesto 3D</b> como <b>${roleLabel}</b>.</p><p>Ingresá en <a href="${env.NEXT_PUBLIC_SITE_URL}/ingresar">${env.NEXT_PUBLIC_SITE_URL}/ingresar</a> con tu email. La persona que te invitó te pasará una contraseña temporal que deberás cambiar en tu primer ingreso.</p>`,
-    });
-  } catch (error) {
-    console.error("[email] no se pudo avisar el acceso:", error);
-  }
-}
-
 /** El enum de acceso se deriva del rol: admin si es el rol full, si no operador. */
 function enumForRole(role: Role): StaffRole {
   return role.isAdmin ? "admin" : "operator";
 }
 
 /**
- * Crea el acceso de un miembro con una CONTRASEÑA TEMPORAL (Supabase createUser,
- * email ya confirmado) y le asigna el rol elegido. Devuelve la contraseña para
- * mostrarla en el panel; el miembro deberá cambiarla en su primer ingreso.
+ * Invita a un miembro por LINK SEGURO (2026-07-24, reemplaza a la contraseña
+ * temporal): Supabase crea la cuenta SIN contraseña y genera un token de un
+ * solo uso con expiración; el correo (Resend, plantilla propia + mensaje del
+ * admin) lleva a /equipo/aceptar, que verifica el token y lo manda a CREAR su
+ * contraseña — que solo esa persona conoce; el admin nunca la ve.
+ *
+ * Si el email ya era CLIENTE de la tienda, se lo PROMUEVE al equipo con su
+ * misma cuenta y contraseña (decisión de Ale) y se le avisa por correo.
  * La autorización (admin) va en la action.
  */
 export async function inviteTeamMember(input: {
   email: string;
   roleId: string;
   fullName?: string | null;
-}): Promise<{ password: string; email: string }> {
+  message?: string | null;
+}): Promise<{ email: string; promoted: boolean }> {
   const role = await repo.getRoleById(input.roleId);
   if (!role) throw new ValidationError("Elegí un rol válido.");
-  const password = generateTempPassword();
-  const { id, error } = await createUserWithPassword(input.email, password);
-  if (error || !id) {
-    const dup =
-      error?.toLowerCase().includes("already") ||
-      error?.toLowerCase().includes("registered");
-    throw new ValidationError(
-      dup
-        ? "Ese email ya tiene una cuenta."
-        : (error ?? "No se pudo crear el acceso."),
-    );
+  const email = input.email.trim().toLowerCase();
+
+  // ¿Ya existe la cuenta? → promover (cliente) o rechazar (ya es del equipo).
+  const emails = await listAuthEmails();
+  let existingId: string | null = null;
+  for (const [id, e] of emails) {
+    if (e.toLowerCase() === email) {
+      existingId = id;
+      break;
+    }
+  }
+  if (existingId) {
+    const current = await repo.getProfileRole(existingId);
+    if (current === "admin" || current === "operator") {
+      throw new ValidationError("Ese email ya es parte del equipo.");
+    }
+    await repo.upsertProfile({
+      id: existingId,
+      fullName: input.fullName ?? null,
+      role: enumForRole(role),
+      roleId: role.id,
+      // Conserva SU contraseña: no hay nada que crear.
+      mustChangePassword: false,
+    });
+    try {
+      const mail = buildTeamPromotedEmail({
+        roleName: role.name,
+        message: input.message ?? null,
+        panelUrl: `${env.NEXT_PUBLIC_SITE_URL}/admin`,
+      });
+      await sendEmail({ to: email, ...mail });
+    } catch (error) {
+      // El acceso ya quedó dado; el aviso es best-effort.
+      console.error("[email] no se pudo avisar la promoción:", error);
+    }
+    return { email, promoted: true };
+  }
+
+  const { userId, tokenHash, error } = await createInviteToken(email);
+  if (error || !userId || !tokenHash) {
+    throw new ValidationError(error ?? "No se pudo crear la invitación.");
   }
   await repo.upsertProfile({
-    id,
+    id: userId,
     fullName: input.fullName ?? null,
     role: enumForRole(role),
     roleId: role.id,
+    // Al aceptar, los guards lo llevan derecho a "Creá tu contraseña".
     mustChangePassword: true,
   });
-  await notifyAccessGranted(input.email, role.name);
-  return { password, email: input.email };
+  const acceptUrl = `${env.NEXT_PUBLIC_SITE_URL}/equipo/aceptar?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
+  try {
+    const mail = buildTeamInviteEmail({
+      roleName: role.name,
+      message: input.message ?? null,
+      acceptUrl,
+    });
+    await sendEmail({ to: email, ...mail });
+  } catch {
+    // Sin correo la invitación no sirve: avisar claro (el acceso quedó creado
+    // y "Reenviar invitación" genera un link nuevo).
+    throw new ValidationError(
+      "La invitación quedó creada pero falló el envío del correo. Probá con 'Reenviar invitación'.",
+    );
+  }
+  return { email, promoted: false };
+}
+
+/**
+ * Reenvía la invitación (link NUEVO de un solo uso; el anterior deja de
+ * servir). Vuelve a exigir crear contraseña al entrar.
+ */
+export async function resendTeamInvite(
+  userId: string,
+): Promise<{ email: string }> {
+  const email = await getUserEmail(userId);
+  if (!email) throw new ValidationError("Usuario no encontrado.");
+  const { tokenHash, error } = await createLoginToken(email);
+  if (error || !tokenHash) {
+    throw new ValidationError(error ?? "No se pudo generar el link.");
+  }
+  await repo.setMustChangePassword(userId, true);
+  const acceptUrl = `${env.NEXT_PUBLIC_SITE_URL}/equipo/aceptar?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink`;
+  const mail = buildTeamInviteEmail({
+    roleName: null,
+    message: null,
+    acceptUrl,
+  });
+  await sendEmail({ to: email, ...mail });
+  return { email };
 }
 
 /**

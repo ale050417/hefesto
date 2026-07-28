@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/core/auth/session";
 import { can } from "@/core/auth/permissions";
 import { PERM_MODULE_KEYS } from "@/core/auth/perm-defs";
 import { type ActionResult, toActionError } from "@/core/errors";
+import { recordAudit } from "@/core/audit";
 import { optimizeImage, uploadObject } from "@/core/storage";
 import {
   createBanner,
@@ -20,7 +21,7 @@ import {
   inviteTeamMember,
   assignMemberRole,
   removeTeamMember,
-  resetTeamPassword,
+  resendTeamInvite,
   createRole,
   updateRole,
   deleteRole,
@@ -655,13 +656,13 @@ const inviteSchema = z.object({
   fullName: z.string().trim().max(120).optional().or(z.literal("")),
   email: z.string().trim().email(),
   roleId: z.string().uuid(),
+  /** Mensaje personal del admin: viaja en el correo de invitación. */
+  message: z.string().trim().max(600).optional().or(z.literal("")),
 });
-
-type Credentials = { password: string; email: string };
 
 export async function inviteTeamMemberAction(
   input: unknown,
-): Promise<ActionResult<Credentials>> {
+): Promise<ActionResult<{ email: string; promoted: boolean }>> {
   const actor = await requireAdminActor();
   if (!actor) {
     return {
@@ -680,14 +681,23 @@ export async function inviteTeamMemberAction(
     };
   }
   try {
-    const creds = await inviteTeamMember({
+    const result = await inviteTeamMember({
       email: p.data.email,
       roleId: p.data.roleId,
       fullName:
         p.data.fullName && p.data.fullName.length > 0 ? p.data.fullName : null,
+      message:
+        p.data.message && p.data.message.length > 0 ? p.data.message : null,
+    });
+    await recordAudit({
+      actorId: actor.id,
+      action: result.promoted ? "team.member_promoted" : "team.member_invited",
+      entityType: "team",
+      entityId: result.email,
+      metadata: { roleId: p.data.roleId },
     });
     revalidatePath("/admin/configuracion");
-    return { ok: true, data: creds };
+    return { ok: true, data: result };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
   }
@@ -697,7 +707,7 @@ const resendSchema = z.object({ userId: z.string().uuid() });
 
 export async function resendInviteAction(
   input: unknown,
-): Promise<ActionResult<Credentials>> {
+): Promise<ActionResult<{ email: string }>> {
   const actor = await requireAdminActor();
   if (!actor) {
     return {
@@ -716,9 +726,16 @@ export async function resendInviteAction(
     };
   }
   try {
-    const creds = await resetTeamPassword(p.data.userId);
+    const result = await resendTeamInvite(p.data.userId);
+    await recordAudit({
+      actorId: actor.id,
+      action: "team.invite_resent",
+      entityType: "team",
+      entityId: result.email,
+      metadata: {},
+    });
     revalidatePath("/admin/configuracion");
-    return { ok: true, data: creds };
+    return { ok: true, data: result };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
   }

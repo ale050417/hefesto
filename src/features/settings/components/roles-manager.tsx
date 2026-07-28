@@ -49,8 +49,6 @@ const I = {
   edit: '<path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
 };
 
-type Credentials = { email: string; password: string };
-
 function roleAllows(role: Role, moduleId: string, action: string): boolean {
   if (role.isAdmin) return true;
   return (role.permissions[moduleId] ?? []).includes(action);
@@ -72,7 +70,6 @@ export function RolesManager({
   const [roleModal, setRoleModal] = useState<Role | "new" | null>(null);
   const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
   const [deleteRole, setDeleteRole] = useState<Role | null>(null);
-  const [creds, setCreds] = useState<Credentials | null>(null);
 
   const activos = team.filter((t) => t.status === "activo").length;
   const pendientes = team.filter((t) => t.status === "invitado").length;
@@ -97,7 +94,7 @@ export function RolesManager({
     });
     setPendingId(null);
     if (res.ok) {
-      setCreds(res.data);
+      toast(`Invitación reenviada a ${res.data.email}`, "success");
     } else toast(res.error.message, "danger");
   }
 
@@ -258,9 +255,9 @@ export function RolesManager({
                               className="btn btn-secondary btn-sm"
                               disabled={pendingId === t.id}
                               onClick={() => resend(t.id)}
-                              title="Generar nueva contraseña temporal"
+                              title="Enviar un link nuevo de un solo uso (el anterior deja de servir)"
                             >
-                              {ic(I.key)}Nueva clave
+                              {ic(I.send)}Reenviar invitación
                             </button>
                           ) : null}
                           {canManage && !isSelf && !isLastAdmin ? (
@@ -396,18 +393,7 @@ export function RolesManager({
       ))}
 
       {inviteOpen ? (
-        <InviteModal
-          roles={roles}
-          onClose={() => setInviteOpen(false)}
-          onCreated={(c) => {
-            setInviteOpen(false);
-            setCreds(c);
-          }}
-        />
-      ) : null}
-
-      {creds ? (
-        <CredentialsModal creds={creds} onClose={() => setCreds(null)} />
+        <InviteModal roles={roles} onClose={() => setInviteOpen(false)} />
       ) : null}
 
       {roleModal ? (
@@ -519,24 +505,41 @@ export function RolesManager({
   );
 }
 
-/* ---------- Modal invitar (contraseña temporal) ---------- */
+/* ---------- Modal invitar (link seguro por correo, 2026-07-24) ---------- */
+/** Plantilla del mensaje según el rol elegido (editable antes de enviar). */
+function inviteTemplate(roleName: string): string {
+  return `¡Hola! Te sumo al equipo de Hefesto 3D como ${roleName}. Tocá el botón de abajo para crear tu contraseña y entrar al panel. ¡Bienvenido/a!`;
+}
+
 function InviteModal({
   roles,
   onClose,
-  onCreated,
 }: {
   roles: Role[];
   onClose: () => void;
-  onCreated: (creds: Credentials) => void;
 }) {
+  const firstRole = roles.find((r) => !r.isAdmin)?.id ?? roles[0]?.id ?? "";
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [roleId, setRoleId] = useState(
-    roles.find((r) => !r.isAdmin)?.id ?? roles[0]?.id ?? "",
-  );
+  const [roleId, setRoleId] = useState(firstRole);
+  // El mensaje arranca con la plantilla del rol y se actualiza al cambiar de
+  // rol SOLO si el admin todavía no lo tocó a mano.
+  const [message, setMessage] = useState(() => {
+    const r = roles.find((x) => x.id === firstRole);
+    return r ? inviteTemplate(r.name) : "";
+  });
+  const [messageTouched, setMessageTouched] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fe = useFormErrors();
+
+  function pickRole(id: string) {
+    setRoleId(id);
+    if (!messageTouched) {
+      const r = roles.find((x) => x.id === id);
+      if (r) setMessage(inviteTemplate(r.name));
+    }
+  }
 
   async function submit() {
     setErr(null);
@@ -551,12 +554,18 @@ function InviteModal({
     if (!ok) return;
     setBusy(true);
     const res = await runAction(
-      () => inviteTeamMemberAction({ fullName, email, roleId }),
+      () => inviteTeamMemberAction({ fullName, email, roleId, message }),
       { silent: true },
     );
     setBusy(false);
     if (!res.ok) return fe.fromAction(res.error);
-    onCreated(res.data);
+    toast(
+      res.data.promoted
+        ? `${res.data.email} ya tenía cuenta: quedó promovido al equipo (le avisamos por correo).`
+        : `Invitación enviada a ${res.data.email}`,
+      "success",
+    );
+    onClose();
   }
 
   return (
@@ -570,16 +579,17 @@ function InviteModal({
             Cancelar
           </Button>
           <Button type="button" onClick={submit} loading={busy}>
-            Crear acceso
+            {ic(I.send)}Enviar invitación
           </Button>
         </>
       }
     >
       <div className="grid gap-4">
         <div className="text-faint" style={{ fontSize: 13, lineHeight: 1.5 }}>
-          Se crea el acceso con una <b>contraseña temporal</b> que vas a ver al
-          confirmar. Pasásela a la persona por un canal seguro; deberá cambiarla
-          en su primer ingreso.
+          Le enviamos un correo con un <b>link seguro de un solo uso</b>: al
+          tocarlo crea su propia contraseña (nadie más la conoce) y entra al
+          panel con el rol elegido. Si el email ya es cliente de la tienda, se
+          lo promueve al equipo con su cuenta de siempre.
         </div>
         <div className="grid-2">
           <div className="field">
@@ -597,7 +607,7 @@ function InviteModal({
               className="select"
               aria-invalid={!!fe.errors.roleId}
               value={roleId}
-              onChange={(e) => setRoleId(e.target.value)}
+              onChange={(e) => pickRole(e.target.value)}
             >
               {roles.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -624,99 +634,28 @@ function InviteModal({
             <p className="field-error">{fe.errors.email}</p>
           ) : null}
         </div>
+        <div className="field">
+          <label>Mensaje de la invitación</label>
+          <textarea
+            className="textarea"
+            rows={4}
+            maxLength={600}
+            value={message}
+            onChange={(e) => {
+              setMessage(e.target.value);
+              setMessageTouched(true);
+            }}
+          />
+          <div className="text-faint text-[11.5px]">
+            Se precarga según el rol; escribilo como quieras — va tal cual en el
+            correo.
+          </div>
+        </div>
         {err ? (
           <p className="bg-danger/10 text-danger rounded-md px-3 py-2 text-sm">
             {err}
           </p>
         ) : null}
-      </div>
-    </Modal>
-  );
-}
-
-/* ---------- Modal credenciales ---------- */
-function CredentialsModal({
-  creds,
-  onClose,
-}: {
-  creds: Credentials;
-  onClose: () => void;
-}) {
-  const [copied, setCopied] = useState(false);
-  async function copy() {
-    const txt = `Hefesto 3D — acceso al panel\nUsuario: ${creds.email}\nContraseña temporal: ${creds.password}`;
-    try {
-      await navigator.clipboard.writeText(txt);
-      setCopied(true);
-      toast("Credenciales copiadas", "success");
-    } catch {
-      toast("No se pudo copiar", "danger");
-    }
-  }
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title="Credenciales de acceso"
-      footer={
-        <Button type="button" onClick={onClose}>
-          {ic(I.check)}Listo
-        </Button>
-      }
-    >
-      <div className="grid gap-4">
-        <div
-          className="ui-card"
-          style={{
-            padding: 16,
-            background:
-              "linear-gradient(150deg,rgba(var(--gold-rgb),.07),transparent)",
-          }}
-        >
-          <div
-            className="flex items-center gap-2"
-            style={{ color: "var(--gold-bright)", marginBottom: 12 }}
-          >
-            {ic(I.key)}
-            <b style={{ fontSize: 13 }}>Datos de ingreso</b>
-          </div>
-          <div className="field" style={{ marginBottom: 10 }}>
-            <label>Usuario</label>
-            <input
-              className="input"
-              readOnly
-              value={creds.email}
-              style={{ fontFamily: "var(--font-display)", fontSize: 12.5 }}
-            />
-          </div>
-          <div className="field">
-            <label>Contraseña temporal</label>
-            <input
-              className="input"
-              readOnly
-              value={creds.password}
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: 13,
-                letterSpacing: ".03em",
-              }}
-            />
-          </div>
-          <button
-            type="button"
-            className="btn btn-secondary btn-sm"
-            style={{ marginTop: 12 }}
-            onClick={copy}
-          >
-            {ic(I.copy)}
-            {copied ? "Copiado" : "Copiar credenciales"}
-          </button>
-        </div>
-        <div className="text-faint" style={{ fontSize: 12, lineHeight: 1.5 }}>
-          Guardala ahora: por seguridad no se vuelve a mostrar. La persona
-          deberá cambiarla en su primer ingreso. Le avisamos por email que tiene
-          acceso (sin la contraseña).
-        </div>
       </div>
     </Modal>
   );

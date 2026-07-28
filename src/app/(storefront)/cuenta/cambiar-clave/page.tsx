@@ -19,8 +19,8 @@ export default async function CambiarClavePage() {
         </h1>
         {forced ? (
           <p className="text-faint mt-1 text-[13px]">
-            Te dieron acceso con una contraseña temporal. Definí una nueva para
-            continuar al panel.
+            ¡Bienvenido/a al equipo! Definí tu contraseña personal — solo vos la
+            vas a conocer — para continuar al panel.
           </p>
         ) : null}
       </div>

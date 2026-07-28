@@ -99,6 +99,44 @@ export async function createUserWithPassword(
   return { id: data.user?.id ?? null, error: null };
 }
 
+/**
+ * Invitación SEGURA por link (2026-07-24): crea el usuario SIN contraseña y
+ * devuelve el token de UN SOLO USO (con expiración de Supabase) para armar
+ * nuestra URL propia (/equipo/aceptar). La contraseña la define el invitado
+ * al aceptar — nunca viaja por correo ni la conoce el admin.
+ */
+export async function createInviteToken(
+  email: string,
+): Promise<{
+  userId: string | null;
+  tokenHash: string | null;
+  error: string | null;
+}> {
+  const { data, error } = await getSupabaseAdmin().auth.admin.generateLink({
+    type: "invite",
+    email,
+  });
+  if (error) return { userId: null, tokenHash: null, error: error.message };
+  return {
+    userId: data.user?.id ?? null,
+    tokenHash: data.properties?.hashed_token ?? null,
+    error: null,
+  };
+}
+
+/** Token de ingreso (magic link) para REENVIAR el acceso a un usuario que ya
+ * existe (invitación vencida/perdida). Un solo uso, expira solo. */
+export async function createLoginToken(
+  email: string,
+): Promise<{ tokenHash: string | null; error: string | null }> {
+  const { data, error } = await getSupabaseAdmin().auth.admin.generateLink({
+    type: "magiclink",
+    email,
+  });
+  if (error) return { tokenHash: null, error: error.message };
+  return { tokenHash: data.properties?.hashed_token ?? null, error: null };
+}
+
 /** Setea una nueva contraseña a un usuario (reset de credenciales por admin). */
 export async function setUserPassword(
   userId: string,
