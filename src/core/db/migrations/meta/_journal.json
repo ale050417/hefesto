@@ -470,6 +470,13 @@
       "when": 1783307100000,
       "tag": "0066_variant_color_prices",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1783307200000,
+      "tag": "0067_round_prices",
+      "breakpoints": true
     }
   ]
 }

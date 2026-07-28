@@ -3,6 +3,7 @@ import {
   computePrintPrice,
   computeQuote,
   resolveCostPerKg,
+  roundPrice,
   selectActiveMargin,
 } from "./calculator";
 import { marginPresetSchema } from "./schemas";
@@ -172,5 +173,32 @@ describe("marginPresetSchema", () => {
     expect(
       marginPresetSchema.safeParse({ name: "X", marginPct: -1 }).success,
     ).toBe(false);
+  });
+});
+
+// Redondeo comercial (2026-07-24): precios redondos dan confianza. HACIA
+// ARRIBA al múltiplo de $100: nunca se cobra menos que lo calculado.
+describe("roundPrice (múltiplo de $100 hacia arriba)", () => {
+  it("un número feo sube al próximo múltiplo de 100", () => {
+    expect(roundPrice(1231234)).toBe(1231300);
+    expect(roundPrice(20001)).toBe(20100);
+    expect(roundPrice(2814)).toBe(2900);
+  });
+
+  it("un precio ya redondo no cambia (idempotente)", () => {
+    expect(roundPrice(20000)).toBe(20000);
+    expect(roundPrice(20100)).toBe(20100);
+  });
+
+  it("nunca redondea hacia abajo", () => {
+    expect(roundPrice(19901)).toBe(20000);
+    expect(roundPrice(99.5)).toBe(100);
+  });
+
+  it("cero, negativos o basura → 0", () => {
+    expect(roundPrice(0)).toBe(0);
+    expect(roundPrice(-500)).toBe(0);
+    expect(roundPrice(Number.NaN)).toBe(0);
+    expect(roundPrice(Number.POSITIVE_INFINITY)).toBe(0);
   });
 });

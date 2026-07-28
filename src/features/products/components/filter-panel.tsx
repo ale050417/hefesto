@@ -8,13 +8,14 @@ import type { Category } from "../types";
 const PRICE_MIN = 3000;
 const PRICE_MAX = 50000;
 
-export function FilterPanel({
-  categories,
-  materials,
-}: {
-  categories: Category[];
-  materials: string[];
-}) {
+/**
+ * Filtros del catálogo (rediseño 2026-07-24, pedido de Ale):
+ * - Destacados / Ofertas ARRIBA de todo (lo más usado).
+ * - Sin filtro de Material (alargaba el panel y no aportaba).
+ * - Categorías como ÁRBOL desplegable: las subcategorías aparecen recién al
+ *   tocar la flecha del padre (elegir el padre ya filtra sus hijas igual).
+ */
+export function FilterPanel({ categories }: { categories: Category[] }) {
   const router = useRouter();
   const sp = useSearchParams();
   const get = (k: string) => sp.get(k);
@@ -26,6 +27,35 @@ export function FilterPanel({
   // scrollear); en desktop (md+) siempre visibles.
   const [open, setOpen] = useState(false);
 
+  const activeCategory = get("category");
+
+  // Jerarquía padre → subcategorías (estándar e-commerce). Elegir un padre ya
+  // trae los productos de sus hijas (lo resuelve el repository).
+  const ids = new Set(categories.map((c) => c.id));
+  const roots = categories.filter((c) => !c.parentId || !ids.has(c.parentId));
+  const childrenOf = (id: string) =>
+    categories.filter((c) => c.parentId === id);
+
+  // Árbol desplegable: si la categoría activa es una hija, su padre arranca
+  // abierto (al recargar no se pierde el contexto).
+  const [expanded, setExpanded] = useState<Set<string>>(() => {
+    const s = new Set<string>();
+    const act = sp.get("category");
+    if (act) {
+      const cat = categories.find((c) => c.slug === act);
+      if (cat?.parentId) s.add(cat.parentId);
+      else if (cat) s.add(cat.id);
+    }
+    return s;
+  });
+  const toggleExpand = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
   function setParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(sp.toString());
     for (const [k, v] of Object.entries(updates)) {
@@ -35,15 +65,6 @@ export function FilterPanel({
     params.delete("page"); // cualquier cambio vuelve a la página 1
     router.push(`/catalogo?${params.toString()}`);
   }
-
-  const activeCategory = get("category");
-
-  // Jerarquía padre → subcategorías (estándar e-commerce). Elegir un padre ya
-  // trae los productos de sus hijas (lo resuelve el repository).
-  const ids = new Set(categories.map((c) => c.id));
-  const roots = categories.filter((c) => !c.parentId || !ids.has(c.parentId));
-  const childrenOf = (id: string) =>
-    categories.filter((c) => c.parentId === id);
 
   return (
     <div className="ui-card filter-panel p-5">
@@ -78,6 +99,33 @@ export function FilterPanel({
         </button>
       </div>
       <div className={`${open ? "block" : "hidden"} mt-1 md:block`}>
+        {/* Lo más usado, arriba de todo. */}
+        <div className="filter-group">
+          <h5>Destacados</h5>
+          <label className="f-switch">
+            Solo novedades
+            <input
+              type="checkbox"
+              className="accent-[var(--gold)]"
+              checked={get("isNew") === "true"}
+              onChange={(e) =>
+                setParams({ isNew: e.target.checked ? "true" : null })
+              }
+            />
+          </label>
+          <label className="f-switch">
+            Solo ofertas
+            <input
+              type="checkbox"
+              className="accent-[var(--gold)]"
+              checked={get("onSale") === "true"}
+              onChange={(e) =>
+                setParams({ onSale: e.target.checked ? "true" : null })
+              }
+            />
+          </label>
+        </div>
+
         <div className="filter-group">
           <h5>Categoría</h5>
           <label className="f-radio">
@@ -91,38 +139,73 @@ export function FilterPanel({
             <span className="rdot" />
             Todas
           </label>
-          {roots.map((root) => (
-            <div key={root.id}>
-              <label className="f-radio">
-                <input
-                  type="radio"
-                  name="cat"
-                  className="sr-only"
-                  checked={activeCategory === root.slug}
-                  onChange={() => setParams({ category: root.slug })}
-                />
-                <span className="rdot" />
-                {root.name}
-              </label>
-              {childrenOf(root.id).map((sub) => (
-                <label
-                  key={sub.id}
-                  className="f-radio"
-                  style={{ paddingLeft: 22 }}
-                >
-                  <input
-                    type="radio"
-                    name="cat"
-                    className="sr-only"
-                    checked={activeCategory === sub.slug}
-                    onChange={() => setParams({ category: sub.slug })}
-                  />
-                  <span className="rdot" />
-                  {sub.name}
-                </label>
-              ))}
-            </div>
-          ))}
+          {roots.map((root) => {
+            const subs = childrenOf(root.id);
+            const isOpen = expanded.has(root.id);
+            return (
+              <div key={root.id}>
+                <div className="flex items-center gap-1">
+                  <label className="f-radio min-w-0 flex-1">
+                    <input
+                      type="radio"
+                      name="cat"
+                      className="sr-only"
+                      checked={activeCategory === root.slug}
+                      onChange={() => {
+                        // Filtrar el padre también despliega sus hijas.
+                        setParams({ category: root.slug });
+                        if (subs.length > 0)
+                          setExpanded((prev) => new Set(prev).add(root.id));
+                      }}
+                    />
+                    <span className="rdot" />
+                    <span className="truncate">{root.name}</span>
+                  </label>
+                  {subs.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(root.id)}
+                      aria-expanded={isOpen}
+                      aria-label={`${isOpen ? "Ocultar" : "Ver"} subcategorías de ${root.name}`}
+                      className="text-faint hover:text-fg shrink-0 p-1"
+                    >
+                      <svg
+                        className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                      >
+                        <path d="M9 18l6-6-6-6" />
+                      </svg>
+                    </button>
+                  ) : null}
+                </div>
+                {isOpen
+                  ? subs.map((sub) => (
+                      <label
+                        key={sub.id}
+                        className="f-radio"
+                        style={{ paddingLeft: 22 }}
+                      >
+                        <input
+                          type="radio"
+                          name="cat"
+                          className="sr-only"
+                          checked={activeCategory === sub.slug}
+                          onChange={() => setParams({ category: sub.slug })}
+                        />
+                        <span className="rdot" />
+                        {sub.name}
+                      </label>
+                    ))
+                  : null}
+              </div>
+            );
+          })}
         </div>
 
         <div className="filter-group">
@@ -152,48 +235,6 @@ export function FilterPanel({
               {formatPrice(maxPrice)}
             </b>
           </div>
-        </div>
-
-        <div className="filter-group">
-          <h5>Material</h5>
-          <select
-            className="select w-full"
-            value={get("material") ?? ""}
-            onChange={(e) => setParams({ material: e.target.value || null })}
-          >
-            <option value="">Todos</option>
-            {materials.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="filter-group">
-          <h5>Destacados</h5>
-          <label className="f-switch">
-            Solo novedades
-            <input
-              type="checkbox"
-              className="accent-[var(--gold)]"
-              checked={get("isNew") === "true"}
-              onChange={(e) =>
-                setParams({ isNew: e.target.checked ? "true" : null })
-              }
-            />
-          </label>
-          <label className="f-switch">
-            Solo ofertas
-            <input
-              type="checkbox"
-              className="accent-[var(--gold)]"
-              checked={get("onSale") === "true"}
-              onChange={(e) =>
-                setParams({ onSale: e.target.checked ? "true" : null })
-              }
-            />
-          </label>
         </div>
       </div>
     </div>

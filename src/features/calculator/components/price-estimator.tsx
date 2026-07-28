@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatPrice } from "@/lib/format";
-import { computeQuote } from "../calculator";
+import { computeQuote, roundPrice } from "../calculator";
 import { quotePriceAction } from "../actions";
 import type {
   CalcConfig,
@@ -176,10 +176,18 @@ export function PriceEstimator({
       : null
     : opPrice;
   // Con precio propio cargado, ESE es el precio (no hace falta elegir tipo).
-  const price = chargedN > 0 ? chargedN : autoPrice;
-  // Desglose con precio propio: ganancia = cobrado − costo (puede dar negativa
-  // → aviso). El margen implícito es informativo (el % que estabas adivinando).
-  const gained = chargedN > 0 ? chargedN - q.costoTotal : q.ganancia;
+  // El calculado se REDONDEA a $100 hacia arriba (números redondos, 2026-07).
+  const price =
+    chargedN > 0 ? chargedN : autoPrice != null ? roundPrice(autoPrice) : null;
+  // Desglose: ganancia = precio final (redondeado o cobrado) − costo real.
+  // Puede dar negativa con precio propio → aviso. El margen implícito es
+  // informativo (el % que estabas adivinando).
+  const gained =
+    chargedN > 0
+      ? chargedN - q.costoTotal
+      : price != null
+        ? price - q.costoTotal
+        : q.ganancia;
   const impliedPct =
     chargedN > 0 && q.costoTotal > 0
       ? Math.round(((chargedN - q.costoTotal) / q.costoTotal) * 100)

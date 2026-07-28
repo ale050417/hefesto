@@ -76,6 +76,16 @@ export function CategoriesAdmin({
   const [view, setView] = useState<"grilla" | "lista">("grilla");
   const [newParentId, setNewParentId] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<CategoryWithCount | null>(null);
+  // Árbol desplegable (2026-07-24, pedido de Ale): las subcategorías se ven
+  // recién al tocar — arranca todo plegado y la vista queda compacta.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpand = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   function openNew() {
     setEditing(null);
@@ -289,19 +299,41 @@ export function CategoriesAdmin({
                     </div>
                   </div>
 
-                  {/* Subcategorías SIEMPRE visibles (preview total del árbol) */}
+                  {/* Subcategorías como ÁRBOL: se despliegan al tocar (2026-07-24). */}
                   <div style={{ padding: "12px 18px 16px" }}>
                     <div className="flex items-center justify-between">
-                      <span
-                        className="text-faint text-[11px] font-semibold"
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(c.id)}
+                        aria-expanded={expanded.has(c.id)}
+                        className="text-faint hover:text-dim flex items-center gap-1.5 text-[11px] font-semibold"
                         style={{
                           textTransform: "uppercase",
                           letterSpacing: ".08em",
                         }}
                       >
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden
+                          style={{
+                            transform: expanded.has(c.id)
+                              ? "rotate(90deg)"
+                              : "none",
+                            transition: "transform 0.15s",
+                          }}
+                        >
+                          <path d="M9 18l6-6-6-6" />
+                        </svg>
                         Subcategorías
                         {children.length > 0 ? ` (${children.length})` : ""}
-                      </span>
+                      </button>
                       <button
                         type="button"
                         className="text-dim hover:text-fg flex items-center gap-1 text-[12px] font-medium"
@@ -324,7 +356,7 @@ export function CategoriesAdmin({
                       </button>
                     </div>
 
-                    {children.length === 0 ? (
+                    {!expanded.has(c.id) ? null : children.length === 0 ? (
                       <button
                         type="button"
                         onClick={() => openNewChild(c.id)}

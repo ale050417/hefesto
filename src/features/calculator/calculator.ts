@@ -116,6 +116,18 @@ export function resolveCostPerKg(
   return null;
 }
 
+/**
+ * Redondeo COMERCIAL de un precio: al múltiplo de $100 HACIA ARRIBA (nunca
+ * cobrar menos que lo calculado). Números redondos (20000, 20100) dan
+ * confianza; 1231234 no (pedido de Ale, 2026-07-24). PURA y testeada: la usa
+ * la calculadora al emitir el precio final; el catálogo viejo se redondeó
+ * con la migración 0067.
+ */
+export function roundPrice(n: number): number {
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.ceil(n / 100) * 100;
+}
+
 export function computeQuote(input: QuoteInput): QuoteResult {
   const hours = clamp0(input.hours);
   const material = (clamp0(input.grams) / 1000) * clamp0(input.costPerKg);

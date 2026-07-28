@@ -6,7 +6,6 @@ import { ProductGrid } from "@/features/products/components/product-grid";
 import { productFilterSchema } from "@/features/products/schemas";
 import {
   listCategories,
-  listMaterials,
   listProducts,
 } from "@/features/products/services/catalogService";
 
@@ -36,10 +35,10 @@ export default async function CatalogoPage({
   const parsed = productFilterSchema.safeParse(raw);
   const filter = parsed.success ? parsed.data : productFilterSchema.parse({});
 
-  const [page, categories, materials] = await Promise.all([
+  // El filtro de Material se sacó del panel (2026-07-24): una query menos.
+  const [page, categories] = await Promise.all([
     listProducts(filter),
     listCategories(),
-    listMaterials(),
   ]);
 
   const baseParams = { ...raw };
@@ -67,7 +66,7 @@ export default async function CatalogoPage({
       </div>
 
       <div className="catalog-grid mt-2">
-        <FilterPanel categories={categories} materials={materials} />
+        <FilterPanel categories={categories} />
         <div>
           <ProductGrid products={page.items} />
           <Pagination
