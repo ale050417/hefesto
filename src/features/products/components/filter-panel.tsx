@@ -151,12 +151,9 @@ export function FilterPanel({ categories }: { categories: Category[] }) {
                       name="cat"
                       className="sr-only"
                       checked={activeCategory === root.slug}
-                      onChange={() => {
-                        // Filtrar el padre también despliega sus hijas.
-                        setParams({ category: root.slug });
-                        if (subs.length > 0)
-                          setExpanded((prev) => new Set(prev).add(root.id));
-                      }}
+                      // Tocar el NOMBRE filtra la categoría completa (padre +
+                      // hijas); desplegar es SOLO con la flecha (pedido de Ale).
+                      onChange={() => setParams({ category: root.slug })}
                     />
                     <span className="rdot" />
                     <span className="truncate">{root.name}</span>
@@ -167,10 +164,10 @@ export function FilterPanel({ categories }: { categories: Category[] }) {
                       onClick={() => toggleExpand(root.id)}
                       aria-expanded={isOpen}
                       aria-label={`${isOpen ? "Ocultar" : "Ver"} subcategorías de ${root.name}`}
-                      className="text-faint hover:text-fg shrink-0 p-1"
+                      className="text-faint hover:text-fg shrink-0 p-1.5"
                     >
                       <svg
-                        className={`h-3.5 w-3.5 transition-transform ${isOpen ? "rotate-90" : ""}`}
+                        className={`h-4 w-4 transition-transform ${isOpen ? "rotate-90" : ""}`}
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="currentColor"

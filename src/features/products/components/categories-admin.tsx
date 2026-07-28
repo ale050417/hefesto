@@ -228,22 +228,54 @@ export function CategoriesAdmin({
             {roots.map((c) => {
               const color = c.color ?? "#888";
               const children = byParent.get(c.id) ?? [];
+              const isOpen = expanded.has(c.id);
               return (
                 <div
                   key={c.id}
                   className="ui-card card-hover"
                   style={{ padding: 0, overflow: "hidden" }}
                 >
-                  {/* Cabecera tintada con el color de la categoría */}
+                  {/* Cabecera tintada = TOGGLE (patrón SectionCard de Config →
+                      Tienda, pedido de Ale): tocás y se despliega el cuerpo. */}
                   <div
                     style={{
                       padding: "16px 18px 14px",
                       background: `linear-gradient(135deg, ${color}2e, ${color}0a 55%, transparent)`,
-                      borderBottom: "1px solid var(--border)",
+                      borderBottom: isOpen ? "1px solid var(--border)" : "none",
                     }}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => toggleExpand(c.id)}
+                        aria-expanded={isOpen}
+                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          cursor: "pointer",
+                        }}
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          width={16}
+                          height={16}
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2.5}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden
+                          style={{
+                            flexShrink: 0,
+                            opacity: 0.6,
+                            transform: isOpen ? "rotate(90deg)" : "none",
+                            transition: "transform 0.15s",
+                          }}
+                        >
+                          <path d="M9 18l6-6-6-6" />
+                        </svg>
                         <div
                           className="kpi-ic relative shrink-0 overflow-hidden"
                           style={{
@@ -273,9 +305,12 @@ export function CategoriesAdmin({
                           <div className="text-faint text-[12px]">
                             {c.productCount}{" "}
                             {c.productCount === 1 ? "producto" : "productos"}
+                            {" · "}
+                            {children.length} subcategoría
+                            {children.length === 1 ? "" : "s"}
                           </div>
                         </div>
-                      </div>
+                      </button>
                       <div className="flex shrink-0 items-center gap-1">
                         <button
                           className="btn-icon btn-ghost"
@@ -299,142 +334,123 @@ export function CategoriesAdmin({
                     </div>
                   </div>
 
-                  {/* Subcategorías como ÁRBOL: se despliegan al tocar (2026-07-24). */}
-                  <div style={{ padding: "12px 18px 16px" }}>
-                    <div className="flex items-center justify-between">
-                      <button
-                        type="button"
-                        onClick={() => toggleExpand(c.id)}
-                        aria-expanded={expanded.has(c.id)}
-                        className="text-faint hover:text-dim flex items-center gap-1.5 text-[11px] font-semibold"
-                        style={{
-                          textTransform: "uppercase",
-                          letterSpacing: ".08em",
-                        }}
-                      >
-                        <svg
-                          width="11"
-                          height="11"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden
+                  {/* Cuerpo: solo cuando la tarjeta está desplegada (la
+                      cabecera es el toggle, como en Config → Tienda). */}
+                  {!isOpen ? null : (
+                    <div style={{ padding: "12px 18px 16px" }}>
+                      <div className="flex items-center justify-between">
+                        <span
+                          className="text-faint text-[11px] font-semibold"
                           style={{
-                            transform: expanded.has(c.id)
-                              ? "rotate(90deg)"
-                              : "none",
-                            transition: "transform 0.15s",
+                            textTransform: "uppercase",
+                            letterSpacing: ".08em",
                           }}
                         >
-                          <path d="M9 18l6-6-6-6" />
-                        </svg>
-                        Subcategorías
-                        {children.length > 0 ? ` (${children.length})` : ""}
-                      </button>
-                      <button
-                        type="button"
-                        className="text-dim hover:text-fg flex items-center gap-1 text-[12px] font-medium"
-                        title={`Nueva subcategoría de ${c.name}`}
-                        onClick={() => openNewChild(c.id)}
-                      >
-                        <svg
-                          width="12"
-                          height="12"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          aria-hidden
+                          Subcategorías
+                          {children.length > 0 ? ` (${children.length})` : ""}
+                        </span>
+                        <button
+                          type="button"
+                          className="text-dim hover:text-fg flex items-center gap-1 text-[12px] font-medium"
+                          title={`Nueva subcategoría de ${c.name}`}
+                          onClick={() => openNewChild(c.id)}
                         >
-                          <path d="M12 5v14M5 12h14" />
-                        </svg>
-                        Sub
-                      </button>
-                    </div>
+                          <svg
+                            width="12"
+                            height="12"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            aria-hidden
+                          >
+                            <path d="M12 5v14M5 12h14" />
+                          </svg>
+                          Sub
+                        </button>
+                      </div>
 
-                    {!expanded.has(c.id) ? null : children.length === 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => openNewChild(c.id)}
-                        className="text-faint hover:text-dim mt-2 w-full rounded-lg py-2.5 text-[12px]"
-                        style={{ border: "1px dashed var(--border)" }}
-                      >
-                        + Agregar la primera subcategoría
-                      </button>
-                    ) : (
-                      <ul className="mt-2 flex flex-col gap-1.5">
-                        {children.map((child) => {
-                          const childColor = child.color ?? color;
-                          return (
-                            <li
-                              key={child.id}
-                              className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2"
-                              style={{
-                                background: "var(--surface-2)",
-                                border: "1px solid var(--border)",
-                              }}
-                            >
-                              <div className="flex min-w-0 items-center gap-2.5">
-                                <span
-                                  className="kpi-ic relative shrink-0 overflow-hidden"
-                                  style={{
-                                    width: 28,
-                                    height: 28,
-                                    background: `${childColor}22`,
-                                    color: childColor,
-                                  }}
-                                >
-                                  {child.imageUrl ? (
-                                    <Image
-                                      src={child.imageUrl}
-                                      alt=""
-                                      fill
-                                      sizes="28px"
-                                      className="object-cover"
-                                    />
-                                  ) : (
-                                    <IconSvg name={child.icon} size={14} />
-                                  )}
-                                </span>
-                                <span className="truncate text-[13px] font-semibold">
-                                  {child.name}
-                                </span>
-                                <span
-                                  className="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
-                                  style={{
-                                    background: `${childColor}1e`,
-                                    color: childColor,
-                                  }}
-                                >
-                                  {child.productCount}
-                                </span>
-                              </div>
-                              <div className="flex shrink-0 items-center">
-                                <button
-                                  className="btn-icon btn-ghost"
-                                  title="Editar"
-                                  onClick={() => openEdit(child)}
-                                >
-                                  {EditIcon}
-                                </button>
-                                <button
-                                  className="btn-icon btn-ghost"
-                                  title="Eliminar"
-                                  onClick={() => setToDelete(child)}
-                                >
-                                  {TrashIcon}
-                                </button>
-                              </div>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
+                      {children.length === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => openNewChild(c.id)}
+                          className="text-faint hover:text-dim mt-2 w-full rounded-lg py-2.5 text-[12px]"
+                          style={{ border: "1px dashed var(--border)" }}
+                        >
+                          + Agregar la primera subcategoría
+                        </button>
+                      ) : (
+                        <ul className="mt-2 flex flex-col gap-1.5">
+                          {children.map((child) => {
+                            const childColor = child.color ?? color;
+                            return (
+                              <li
+                                key={child.id}
+                                className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2"
+                                style={{
+                                  background: "var(--surface-2)",
+                                  border: "1px solid var(--border)",
+                                }}
+                              >
+                                <div className="flex min-w-0 items-center gap-2.5">
+                                  <span
+                                    className="kpi-ic relative shrink-0 overflow-hidden"
+                                    style={{
+                                      width: 28,
+                                      height: 28,
+                                      background: `${childColor}22`,
+                                      color: childColor,
+                                    }}
+                                  >
+                                    {child.imageUrl ? (
+                                      <Image
+                                        src={child.imageUrl}
+                                        alt=""
+                                        fill
+                                        sizes="28px"
+                                        className="object-cover"
+                                      />
+                                    ) : (
+                                      <IconSvg name={child.icon} size={14} />
+                                    )}
+                                  </span>
+                                  <span className="truncate text-[13px] font-semibold">
+                                    {child.name}
+                                  </span>
+                                  <span
+                                    className="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
+                                    style={{
+                                      background: `${childColor}1e`,
+                                      color: childColor,
+                                    }}
+                                  >
+                                    {child.productCount}
+                                  </span>
+                                </div>
+                                <div className="flex shrink-0 items-center">
+                                  <button
+                                    className="btn-icon btn-ghost"
+                                    title="Editar"
+                                    onClick={() => openEdit(child)}
+                                  >
+                                    {EditIcon}
+                                  </button>
+                                  <button
+                                    className="btn-icon btn-ghost"
+                                    title="Eliminar"
+                                    onClick={() => setToDelete(child)}
+                                  >
+                                    {TrashIcon}
+                                  </button>
+                                </div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
