@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { Sidebar } from "./sidebar";
@@ -27,9 +28,12 @@ function readNavCollapsed(): boolean {
 
 export function AdminShell({
   perms,
+  logoUrl,
   children,
 }: {
   perms?: Record<string, boolean>;
+  /** Logo del negocio (Config → Negocio): el MISMO que la tienda. */
+  logoUrl?: string | null;
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -99,7 +103,18 @@ export function AdminShell({
           </svg>
         </button>
         <Link href="/admin" className="brand" aria-label="HEFESTO Admin">
-          <BrandMark size={26} />
+          {/* El mismo logo de la tienda, redondeado (2026-07-24). */}
+          {logoUrl ? (
+            <Image
+              src={logoUrl}
+              alt=""
+              width={26}
+              height={26}
+              className="h-[26px] w-[26px] rounded-md object-cover"
+            />
+          ) : (
+            <BrandMark size={26} />
+          )}
           <span className="brand-name text-[14px]">
             HEFESTO<b> Admin</b>
           </span>
@@ -137,6 +152,7 @@ export function AdminShell({
           perms={perms}
           open={menuOpen}
           onNavigate={() => setMenuOpen(false)}
+          logoUrl={logoUrl}
         />
 
         {menuOpen ? (

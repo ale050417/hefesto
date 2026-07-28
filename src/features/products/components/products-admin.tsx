@@ -142,14 +142,32 @@ export function ProductsAdmin({
   const [archiving, setArchiving] = useState<AdminProductRow | null>(null);
   const [deleting, setDeleting] = useState<AdminProductRow | null>(null);
 
+  // Filtro por categoría PRINCIPAL (2026-07-24, pedido de Ale): mostrar todas
+  // las categorías llenaba la barra de chips. Solo raíces; elegir una filtra
+  // también los productos de sus subcategorías.
+  const rootCats = useMemo(
+    () => categories.filter((c) => !c.parentId),
+    [categories],
+  );
   const list = useMemo(() => {
     const q = search.trim().toLowerCase();
+    // Ids que cubre el filtro: la raíz elegida + todas sus hijas.
+    const covered =
+      catFilter === "all"
+        ? null
+        : new Set([
+            catFilter,
+            ...categories
+              .filter((c) => c.parentId === catFilter)
+              .map((c) => c.id),
+          ]);
     return products.filter((p) => {
-      if (catFilter !== "all" && p.categoryId !== catFilter) return false;
+      if (covered && (!p.categoryId || !covered.has(p.categoryId)))
+        return false;
       if (q && !p.name.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [products, search, catFilter]);
+  }, [products, search, catFilter, categories]);
 
   const published = products.filter((p) => p.status === "published").length;
 
@@ -253,7 +271,8 @@ export function ProductsAdmin({
         >
           Todas
         </button>
-        {categories.map((c) => (
+        {/* Solo categorías PRINCIPALES (una raíz filtra también sus hijas). */}
+        {rootCats.map((c) => (
           <button
             key={c.id}
             className={`chip ${catFilter === c.id ? "active" : ""}`}

@@ -39,7 +39,9 @@ export async function Header() {
               alt="Hefesto 3D"
               width={40}
               height={40}
-              className="h-9 w-9 object-contain"
+              // Redondeado (2026-07-24): el logo es cuadrado y con las puntas
+              // vivas quedaba feo. Mismo tratamiento en el panel admin.
+              className="h-9 w-9 rounded-lg object-cover"
               priority
             />
           ) : (

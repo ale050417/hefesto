@@ -71,6 +71,11 @@ export function CategoriesAdmin({
   const parentOptions = roots.map(({ id, name }) => ({ id, name }));
   const subCount = categories.length - roots.length;
   const totalProducts = categories.reduce((acc, c) => acc + c.productCount, 0);
+  // El conteo de una RAÍZ suma los productos de sus subcategorías (fix
+  // 2026-07-24: decía "0 productos" cuando los productos estaban en las hijas).
+  const countWithChildren = (c: CategoryWithCount) =>
+    c.productCount +
+    (byParent.get(c.id) ?? []).reduce((acc, x) => acc + x.productCount, 0);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryFormData | null>(null);
   const [view, setView] = useState<"grilla" | "lista">("grilla");
@@ -211,194 +216,342 @@ export function CategoriesAdmin({
             </div>
           </div>
 
-          <div
-            className={
-              view === "grilla" ? "grid gap-3.5" : "flex flex-col gap-3"
-            }
-            style={{
-              alignItems: "start",
-              ...(view === "grilla"
-                ? {
-                    gridTemplateColumns:
-                      "repeat(auto-fill, minmax(300px, 1fr))",
-                  }
-                : {}),
-            }}
-          >
-            {roots.map((c) => {
-              const color = c.color ?? "#888";
-              const children = byParent.get(c.id) ?? [];
-              const isOpen = expanded.has(c.id);
-              return (
-                <div
-                  key={c.id}
-                  className="ui-card card-hover"
-                  style={{ padding: 0, overflow: "hidden" }}
-                >
-                  {/* Cabecera tintada = TOGGLE (patrón SectionCard de Config →
-                      Tienda, pedido de Ale): tocás y se despliega el cuerpo. */}
+          {view === "grilla" ? (
+            <div
+              className="grid gap-3.5"
+              style={{
+                alignItems: "start",
+                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+              }}
+            >
+              {roots.map((c) => {
+                const color = c.color ?? "#888";
+                const children = byParent.get(c.id) ?? [];
+                const isOpen = expanded.has(c.id);
+                return (
                   <div
-                    style={{
-                      padding: "16px 18px 14px",
-                      background: `linear-gradient(135deg, ${color}2e, ${color}0a 55%, transparent)`,
-                      borderBottom: isOpen ? "1px solid var(--border)" : "none",
-                    }}
+                    key={c.id}
+                    className="ui-card card-hover"
+                    style={{ padding: 0, overflow: "hidden" }}
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <button
-                        type="button"
-                        onClick={() => toggleExpand(c.id)}
-                        aria-expanded={isOpen}
-                        className="flex min-w-0 flex-1 items-center gap-3 text-left"
-                        style={{
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          cursor: "pointer",
-                        }}
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          width={16}
-                          height={16}
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2.5}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden
-                          style={{
-                            flexShrink: 0,
-                            opacity: 0.6,
-                            transform: isOpen ? "rotate(90deg)" : "none",
-                            transition: "transform 0.15s",
-                          }}
-                        >
-                          <path d="M9 18l6-6-6-6" />
-                        </svg>
-                        <div
-                          className="kpi-ic relative shrink-0 overflow-hidden"
-                          style={{
-                            width: 48,
-                            height: 48,
-                            background: `${color}26`,
-                            color,
-                            boxShadow: `0 0 0 1px ${color}33`,
-                          }}
-                        >
-                          {c.imageUrl ? (
-                            <Image
-                              src={c.imageUrl}
-                              alt=""
-                              fill
-                              sizes="48px"
-                              className="object-cover"
-                            />
-                          ) : (
-                            <IconSvg name={c.icon} size={22} />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="truncate text-[16.5px] font-bold">
-                            {c.name}
-                          </div>
-                          <div className="text-faint text-[12px]">
-                            {c.productCount}{" "}
-                            {c.productCount === 1 ? "producto" : "productos"}
-                            {" · "}
-                            {children.length} subcategoría
-                            {children.length === 1 ? "" : "s"}
-                          </div>
-                        </div>
-                      </button>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <button
-                          className="btn-icon btn-ghost"
-                          title="Editar"
-                          onClick={() => openEdit(c)}
-                        >
-                          {EditIcon}
-                        </button>
-                        <button
-                          className="btn-icon btn-ghost"
-                          title={
-                            children.length > 0
-                              ? "Tiene subcategorías: borralas primero"
-                              : "Eliminar"
-                          }
-                          onClick={() => setToDelete(c)}
-                        >
-                          {TrashIcon}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Cuerpo: solo cuando la tarjeta está desplegada (la
-                      cabecera es el toggle, como en Config → Tienda). */}
-                  {!isOpen ? null : (
-                    <div style={{ padding: "12px 18px 16px" }}>
-                      <div className="flex items-center justify-between">
-                        <span
-                          className="text-faint text-[11px] font-semibold"
-                          style={{
-                            textTransform: "uppercase",
-                            letterSpacing: ".08em",
-                          }}
-                        >
-                          Subcategorías
-                          {children.length > 0 ? ` (${children.length})` : ""}
-                        </span>
+                    {/* Cabecera tintada = TOGGLE (patrón SectionCard de Config →
+                      Tienda, pedido de Ale): tocás y se despliega el cuerpo. */}
+                    <div
+                      style={{
+                        padding: "16px 18px 14px",
+                        background: `linear-gradient(135deg, ${color}2e, ${color}0a 55%, transparent)`,
+                        borderBottom: isOpen
+                          ? "1px solid var(--border)"
+                          : "none",
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
                         <button
                           type="button"
-                          className="text-dim hover:text-fg flex items-center gap-1 text-[12px] font-medium"
-                          title={`Nueva subcategoría de ${c.name}`}
-                          onClick={() => openNewChild(c.id)}
+                          onClick={() => toggleExpand(c.id)}
+                          aria-expanded={isOpen}
+                          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            cursor: "pointer",
+                          }}
                         >
                           <svg
-                            width="12"
-                            height="12"
                             viewBox="0 0 24 24"
+                            width={16}
+                            height={16}
                             fill="none"
                             stroke="currentColor"
-                            strokeWidth="2.5"
+                            strokeWidth={2.5}
                             strokeLinecap="round"
+                            strokeLinejoin="round"
                             aria-hidden
+                            style={{
+                              flexShrink: 0,
+                              opacity: 0.6,
+                              transform: isOpen ? "rotate(90deg)" : "none",
+                              transition: "transform 0.15s",
+                            }}
                           >
-                            <path d="M12 5v14M5 12h14" />
+                            <path d="M9 18l6-6-6-6" />
                           </svg>
-                          Sub
+                          <div
+                            className="kpi-ic relative shrink-0 overflow-hidden"
+                            style={{
+                              width: 48,
+                              height: 48,
+                              background: `${color}26`,
+                              color,
+                              boxShadow: `0 0 0 1px ${color}33`,
+                            }}
+                          >
+                            {c.imageUrl ? (
+                              <Image
+                                src={c.imageUrl}
+                                alt=""
+                                fill
+                                sizes="48px"
+                                className="object-cover"
+                              />
+                            ) : (
+                              <IconSvg name={c.icon} size={22} />
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="truncate text-[16.5px] font-bold">
+                              {c.name}
+                            </div>
+                            <div className="text-faint text-[12px]">
+                              {countWithChildren(c)}{" "}
+                              {countWithChildren(c) === 1
+                                ? "producto"
+                                : "productos"}
+                              {" · "}
+                              {children.length} subcategoría
+                              {children.length === 1 ? "" : "s"}
+                            </div>
+                          </div>
                         </button>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            className="btn-icon btn-ghost"
+                            title="Editar"
+                            onClick={() => openEdit(c)}
+                          >
+                            {EditIcon}
+                          </button>
+                          <button
+                            className="btn-icon btn-ghost"
+                            title={
+                              children.length > 0
+                                ? "Tiene subcategorías: borralas primero"
+                                : "Eliminar"
+                            }
+                            onClick={() => setToDelete(c)}
+                          >
+                            {TrashIcon}
+                          </button>
+                        </div>
                       </div>
+                    </div>
 
-                      {children.length === 0 ? (
-                        <button
-                          type="button"
-                          onClick={() => openNewChild(c.id)}
-                          className="text-faint hover:text-dim mt-2 w-full rounded-lg py-2.5 text-[12px]"
-                          style={{ border: "1px dashed var(--border)" }}
-                        >
-                          + Agregar la primera subcategoría
-                        </button>
-                      ) : (
-                        <ul className="mt-2 flex flex-col gap-1.5">
-                          {children.map((child) => {
-                            const childColor = child.color ?? color;
-                            return (
-                              <li
-                                key={child.id}
-                                className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2"
+                    {/* Cuerpo: solo cuando la tarjeta está desplegada (la
+                      cabecera es el toggle, como en Config → Tienda). */}
+                    {!isOpen ? null : (
+                      <div style={{ padding: "12px 18px 16px" }}>
+                        <div className="flex items-center justify-between">
+                          <span
+                            className="text-faint text-[11px] font-semibold"
+                            style={{
+                              textTransform: "uppercase",
+                              letterSpacing: ".08em",
+                            }}
+                          >
+                            Subcategorías
+                            {children.length > 0 ? ` (${children.length})` : ""}
+                          </span>
+                          <button
+                            type="button"
+                            className="text-dim hover:text-fg flex items-center gap-1 text-[12px] font-medium"
+                            title={`Nueva subcategoría de ${c.name}`}
+                            onClick={() => openNewChild(c.id)}
+                          >
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              aria-hidden
+                            >
+                              <path d="M12 5v14M5 12h14" />
+                            </svg>
+                            Sub
+                          </button>
+                        </div>
+
+                        {children.length === 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => openNewChild(c.id)}
+                            className="text-faint hover:text-dim mt-2 w-full rounded-lg py-2.5 text-[12px]"
+                            style={{ border: "1px dashed var(--border)" }}
+                          >
+                            + Agregar la primera subcategoría
+                          </button>
+                        ) : (
+                          <ul className="mt-2 flex flex-col gap-1.5">
+                            {children.map((child) => {
+                              const childColor = child.color ?? color;
+                              return (
+                                <li
+                                  key={child.id}
+                                  className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2"
+                                  style={{
+                                    background: "var(--surface-2)",
+                                    border: "1px solid var(--border)",
+                                  }}
+                                >
+                                  <div className="flex min-w-0 items-center gap-2.5">
+                                    <span
+                                      className="kpi-ic relative shrink-0 overflow-hidden"
+                                      style={{
+                                        width: 28,
+                                        height: 28,
+                                        background: `${childColor}22`,
+                                        color: childColor,
+                                      }}
+                                    >
+                                      {child.imageUrl ? (
+                                        <Image
+                                          src={child.imageUrl}
+                                          alt=""
+                                          fill
+                                          sizes="28px"
+                                          className="object-cover"
+                                        />
+                                      ) : (
+                                        <IconSvg name={child.icon} size={14} />
+                                      )}
+                                    </span>
+                                    <span className="truncate text-[13px] font-semibold">
+                                      {child.name}
+                                    </span>
+                                    <span
+                                      className="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
+                                      style={{
+                                        background: `${childColor}1e`,
+                                        color: childColor,
+                                      }}
+                                    >
+                                      {child.productCount}
+                                    </span>
+                                  </div>
+                                  <div className="flex shrink-0 items-center">
+                                    <button
+                                      className="btn-icon btn-ghost"
+                                      title="Editar"
+                                      onClick={() => openEdit(child)}
+                                    >
+                                      {EditIcon}
+                                    </button>
+                                    <button
+                                      className="btn-icon btn-ghost"
+                                      title="Eliminar"
+                                      onClick={() => setToDelete(child)}
+                                    >
+                                      {TrashIcon}
+                                    </button>
+                                  </div>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Vista LISTA estilo Clientes (2026-07-24): tabla en desktop, se
+               apila como tarjetas en móvil (.tbl-cards). Las subcategorías van
+               indentadas debajo de su padre. */
+            <div
+              className="ui-card section-card"
+              style={{ padding: 0, overflow: "hidden" }}
+            >
+              <div className="table-wrap" style={{ border: "none" }}>
+                <table className="tbl tbl-cards">
+                  <thead>
+                    <tr>
+                      <th>Categoría</th>
+                      <th>Productos</th>
+                      <th>Subcategorías</th>
+                      <th style={{ textAlign: "right" }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {roots.flatMap((c) => {
+                      const color = c.color ?? "#888";
+                      const children = byParent.get(c.id) ?? [];
+                      return [
+                        <tr key={c.id}>
+                          <td data-label="Categoría">
+                            <span className="flex items-center gap-2.5">
+                              <span
+                                className="kpi-ic relative shrink-0 overflow-hidden"
                                 style={{
-                                  background: "var(--surface-2)",
-                                  border: "1px solid var(--border)",
+                                  width: 30,
+                                  height: 30,
+                                  background: `${color}22`,
+                                  color,
                                 }}
                               >
-                                <div className="flex min-w-0 items-center gap-2.5">
+                                {c.imageUrl ? (
+                                  <Image
+                                    src={c.imageUrl}
+                                    alt=""
+                                    fill
+                                    sizes="30px"
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  <IconSvg name={c.icon} size={15} />
+                                )}
+                              </span>
+                              <b className="text-[13.5px]">{c.name}</b>
+                            </span>
+                          </td>
+                          <td data-label="Productos">{countWithChildren(c)}</td>
+                          <td data-label="Subcategorías">{children.length}</td>
+                          <td data-label="Acciones">
+                            <span className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                title={`Nueva subcategoría de ${c.name}`}
+                                onClick={() => openNewChild(c.id)}
+                              >
+                                + Sub
+                              </button>
+                              <button
+                                className="btn-icon btn-ghost"
+                                title="Editar"
+                                onClick={() => openEdit(c)}
+                              >
+                                {EditIcon}
+                              </button>
+                              <button
+                                className="btn-icon btn-ghost"
+                                title="Eliminar"
+                                onClick={() => setToDelete(c)}
+                              >
+                                {TrashIcon}
+                              </button>
+                            </span>
+                          </td>
+                        </tr>,
+                        ...children.map((child) => {
+                          const childColor = child.color ?? color;
+                          return (
+                            <tr key={child.id}>
+                              <td data-label="Categoría">
+                                <span
+                                  className="flex items-center gap-2.5"
+                                  style={{ paddingLeft: 22 }}
+                                >
+                                  <span className="text-faint">└</span>
                                   <span
                                     className="kpi-ic relative shrink-0 overflow-hidden"
                                     style={{
-                                      width: 28,
-                                      height: 28,
+                                      width: 24,
+                                      height: 24,
                                       background: `${childColor}22`,
                                       color: childColor,
                                     }}
@@ -408,27 +561,24 @@ export function CategoriesAdmin({
                                         src={child.imageUrl}
                                         alt=""
                                         fill
-                                        sizes="28px"
+                                        sizes="24px"
                                         className="object-cover"
                                       />
                                     ) : (
-                                      <IconSvg name={child.icon} size={14} />
+                                      <IconSvg name={child.icon} size={12} />
                                     )}
                                   </span>
-                                  <span className="truncate text-[13px] font-semibold">
+                                  <span className="text-[13px]">
                                     {child.name}
                                   </span>
-                                  <span
-                                    className="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold"
-                                    style={{
-                                      background: `${childColor}1e`,
-                                      color: childColor,
-                                    }}
-                                  >
-                                    {child.productCount}
-                                  </span>
-                                </div>
-                                <div className="flex shrink-0 items-center">
+                                </span>
+                              </td>
+                              <td data-label="Productos">
+                                {child.productCount}
+                              </td>
+                              <td data-label="Subcategorías">—</td>
+                              <td data-label="Acciones">
+                                <span className="flex items-center justify-end gap-1">
                                   <button
                                     className="btn-icon btn-ghost"
                                     title="Editar"
@@ -443,18 +593,18 @@ export function CategoriesAdmin({
                                   >
                                     {TrashIcon}
                                   </button>
-                                </div>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        }),
+                      ];
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
 

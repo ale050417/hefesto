@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { DegradedNotice } from "@/components/shared/degraded-notice";
 import { Badge } from "@/components/ui/badge";
@@ -18,116 +17,24 @@ const longDateFmt = new Intl.DateTimeFormat("es-AR", {
   day: "numeric",
   month: "long",
 });
-
-const P: Record<string, ReactNode> = {
-  cart: (
-    <>
-      <circle cx="9" cy="21" r="1" />
-      <circle cx="20" cy="21" r="1" />
-      <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
-    </>
-  ),
-  box: <path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4" />,
-  layers: <path d="m12 2 9 5-9 5-9-5 9-5zM3 12l9 5 9-5M3 17l9 5 9-5" />,
-  alert: (
-    <>
-      <path d="M10.3 3.8 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0z" />
-      <path d="M12 9v4M12 17h.01" />
-    </>
-  ),
-  chart: <path d="M3 3v18h18M7 14l4-4 3 3 5-6" />,
-  users: (
-    <>
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-    </>
-  ),
-  grid: (
-    <>
-      <rect x="3" y="3" width="7" height="7" />
-      <rect x="14" y="3" width="7" height="7" />
-      <rect x="14" y="14" width="7" height="7" />
-      <rect x="3" y="14" width="7" height="7" />
-    </>
-  ),
-  tag: (
-    <>
-      <path d="M20.6 13.4 12 22l-9-9V3h10z" />
-      <circle cx="7.5" cy="7.5" r="1.5" />
-    </>
-  ),
-  gear: (
-    <>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </>
-  ),
-};
-
-function Icon({ name, size = 20 }: { name: string; size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      {P[name]}
-    </svg>
-  );
-}
+const monthFmt = new Intl.DateTimeFormat("es-AR", { month: "long" });
 
 function greeting(): string {
   const h = new Date().getHours();
   return h < 13 ? "Buen día" : h < 20 ? "Buenas tardes" : "Buenas noches";
 }
 
+const fmtG = (g: number) =>
+  g >= 1000 ? `${(g / 1000).toFixed(2)} kg` : `${Math.round(g)} g`;
+
 export default async function AdminDashboard() {
-  const [{ kpis, recentOrders, lowStock, degraded }, user] = await Promise.all([
-    getDashboardData(30),
-    getStaffUser(),
-  ]);
+  const [{ recentOrders, lowStock, filamentUsage, degraded }, user] =
+    await Promise.all([getDashboardData(30), getStaffUser()]);
   const firstName =
     user?.profile?.fullName?.trim().split(/\s+/)[0] || "Hefesto";
-
-  // Accesos directos a las secciones (el menú lateral tiene el resto). Las que
-  // tienen un contador accionable (pedidos pendientes, filamento bajo) lo muestran.
-  const nav: Array<{
-    href: string;
-    label: string;
-    icon: string;
-    badge?: { value: number; label: string };
-  }> = [
-    {
-      href: "/admin/pedidos",
-      label: "Pedidos",
-      icon: "cart",
-      ...(kpis.pendingCount > 0
-        ? { badge: { value: kpis.pendingCount, label: "pendientes" } }
-        : {}),
-    },
-    { href: "/admin/productos", label: "Productos", icon: "box" },
-    {
-      href: "/admin/filamentos",
-      label: "Filamentos",
-      icon: "layers",
-      ...(kpis.lowStockCount > 0
-        ? { badge: { value: kpis.lowStockCount, label: "bajo stock" } }
-        : {}),
-    },
-    { href: "/admin/fallas", label: "Impresiones fallidas", icon: "alert" },
-    { href: "/admin/clientes", label: "Clientes", icon: "users" },
-    { href: "/admin/categorias", label: "Categorías", icon: "grid" },
-    { href: "/admin/descuentos", label: "Descuentos", icon: "tag" },
-    { href: "/admin/reportes", label: "Reportes", icon: "chart" },
-    { href: "/admin/configuracion", label: "Configuración", icon: "gear" },
-  ];
+  const monthName = monthFmt.format(new Date());
+  const maxUsage = Math.max(1, ...filamentUsage.map((u) => u.grams));
+  const totalUsage = filamentUsage.reduce((a, u) => a + u.grams, 0);
 
   return (
     <div>
@@ -142,63 +49,87 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      {/* Accesos directos a las secciones */}
-      <div
-        className="grid gap-3"
-        style={{
-          gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-          marginBottom: 18,
-        }}
-      >
-        {nav.map((n) => (
-          <Link
-            key={n.href}
-            href={n.href}
-            prefetch={false}
-            className="ui-card flex items-center gap-3 p-4 transition hover:border-[var(--gold)]"
-          >
-            <span
-              className="kpi-ic"
-              style={{
-                background: "rgba(var(--gold-rgb),.14)",
-                color: "var(--gold)",
-                width: 40,
-                height: 40,
-                flexShrink: 0,
-              }}
-            >
-              <Icon name={n.icon} size={18} />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="text-fg block text-[14px] font-semibold">
-                {n.label}
-              </span>
-              {n.badge ? (
-                <span className="text-[12px] text-[var(--gold-bright)]">
-                  {n.badge.value} {n.badge.label}
-                </span>
-              ) : (
-                <span className="text-faint text-[12px]">Ir a la sección</span>
-              )}
-            </span>
-            {/* Flecha a la derecha, centrada: antes iba en el texto ("→") y en
-                celular caía sola abajo. */}
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="text-faint flex-shrink-0"
-              aria-hidden
-            >
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </Link>
-        ))}
+      {/* Filamentos más usados del MES (2026-07-24, pedido de Ale): el consumo
+          real del ledger (pedidos online + ventas manuales), TODOS los
+          filamentos —también los sin uso, para comparar— con su color real y
+          una barra de calor proporcional al más usado. Reemplaza a la sección
+          "Consumo de filamento" que estaba en Reportes. */}
+      <div className="ui-card section-card" style={{ marginBottom: 18 }}>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+          <div className="section-title">
+            Filamentos más usados · {monthName}
+          </div>
+          <span className="text-faint text-[12px]">
+            Total del mes: <b className="text-fg">{fmtG(totalUsage)}</b>
+          </span>
+        </div>
+        <div className="text-faint mb-4 text-[12.5px]">
+          Consumo real descontado del inventario por ventas (tienda y manuales).
+          La barra compara contra el más usado del mes.
+        </div>
+        {filamentUsage.length === 0 ? (
+          <p className="text-dim py-4 text-center text-sm">
+            Todavía no hay filamentos cargados.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2.5">
+            {filamentUsage.map((u, i) => {
+              const pct =
+                u.grams > 0
+                  ? Math.max(4, Math.round((u.grams / maxUsage) * 100))
+                  : 0;
+              const tone = u.hex ?? "var(--gold)";
+              return (
+                <div
+                  key={`${u.material}-${u.color}-${i}`}
+                  className="flex items-center gap-3"
+                >
+                  <span
+                    className="shrink-0"
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: "50%",
+                      background: tone,
+                      border: "1px solid var(--border-strong)",
+                    }}
+                  />
+                  <span
+                    className="text-fg w-40 shrink-0 truncate text-[13px]"
+                    title={`${u.material} · ${u.color}`}
+                  >
+                    {u.material} · {u.color}
+                  </span>
+                  <div
+                    className="h-4 flex-1 overflow-hidden rounded-full"
+                    style={{ background: "var(--surface-2)" }}
+                  >
+                    {pct > 0 ? (
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${pct}%`,
+                          background: tone,
+                          // Intensidad tipo "mapa de calor": el más usado a
+                          // pleno; el resto se atenúa proporcionalmente.
+                          opacity: 0.45 + 0.55 * (u.grams / maxUsage),
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                  <b
+                    className="w-20 shrink-0 text-right text-[13px]"
+                    style={{
+                      color: u.grams > 0 ? "var(--fg)" : "var(--text-faint)",
+                    }}
+                  >
+                    {u.grams > 0 ? fmtG(u.grams) : "Sin uso"}
+                  </b>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="dash-grid">
@@ -243,6 +174,8 @@ export default async function AdminDashboard() {
           )}
         </div>
 
+        {/* Alertas de stock GRÁFICAS (2026-07-24): barra de lo que queda del
+            carrete con el color real del filamento; en rojo si quedó negativo. */}
         <div className="ui-card section-card">
           <div className="mb-3.5 flex items-center justify-between">
             <div className="section-title">Alertas de stock</div>
@@ -257,24 +190,66 @@ export default async function AdminDashboard() {
           {lowStock.length === 0 ? (
             <p className="text-dim text-sm">Todo el stock está en orden. ✓</p>
           ) : (
-            <div className="flex flex-col gap-2">
-              {lowStock.map((f) => (
-                <div
-                  key={f.id}
-                  className="flex items-center justify-between text-sm"
-                >
-                  <span className="text-dim">
-                    {f.material} · {f.color}
-                  </span>
-                  {f.stockGrams < 0 ? (
-                    <Badge variant="warning">
-                      Debés {Math.abs(f.stockGrams)} g
-                    </Badge>
-                  ) : (
-                    <Badge variant="warning">{f.stockGrams} g</Badge>
-                  )}
-                </div>
-              ))}
+            <div className="flex flex-col gap-3">
+              {lowStock.map((f) => {
+                const spool = f.spoolGrams > 0 ? f.spoolGrams : 1000;
+                const owed = f.stockGrams < 0;
+                const pct = owed
+                  ? 100
+                  : Math.min(
+                      100,
+                      Math.max(3, Math.round((f.stockGrams / spool) * 100)),
+                    );
+                const tone = f.hex ?? "var(--gold)";
+                return (
+                  <div key={f.id}>
+                    <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                      <span className="text-fg flex min-w-0 items-center gap-2">
+                        <span
+                          className="shrink-0"
+                          style={{
+                            width: 12,
+                            height: 12,
+                            borderRadius: "50%",
+                            background: tone,
+                            border: "1px solid var(--border-strong)",
+                          }}
+                        />
+                        <span className="truncate">
+                          {f.material} · {f.color}
+                        </span>
+                      </span>
+                      <b
+                        className="shrink-0 text-[13px]"
+                        style={{
+                          color: owed ? "var(--danger)" : "var(--warning)",
+                        }}
+                      >
+                        {owed
+                          ? `Debés ${Math.abs(f.stockGrams)} g`
+                          : `${f.stockGrams} g`}
+                      </b>
+                    </div>
+                    <div
+                      className="h-2.5 overflow-hidden rounded-full"
+                      style={{ background: "var(--surface-2)" }}
+                    >
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${pct}%`,
+                          background: owed ? "var(--danger)" : tone,
+                        }}
+                      />
+                    </div>
+                    <div className="text-faint mt-0.5 text-[11px]">
+                      {owed
+                        ? "Se vendió más de lo que había: reponé para cubrirlo."
+                        : `Aviso desde ${f.alertThresholdGrams} g · carrete de ${spool} g`}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

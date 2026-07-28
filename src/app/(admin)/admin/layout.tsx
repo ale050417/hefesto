@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { requireStaff } from "@/core/auth/session";
 import { getAllPerms } from "@/core/auth/permissions";
+import { getBrandSettings } from "@/features/settings/service";
 import { PermsProvider } from "@/components/auth/perms-provider";
 import { AdminShell } from "@/components/layout/admin-shell";
 
@@ -18,13 +19,19 @@ export default async function AdminLayout({
   await requireStaff();
   // Permisos completos (ver/crear/editar/eliminar por módulo), en UNA pasada.
   // Para el sidebar (filtra por "ver") y para el contexto de la UI.
-  const allPerms = await getAllPerms();
+  // El logo del negocio (Config → Negocio) es el MISMO que muestra la tienda.
+  const [allPerms, brand] = await Promise.all([
+    getAllPerms(),
+    getBrandSettings().catch(() => null),
+  ]);
   const verMap = Object.fromEntries(
     Object.entries(allPerms).map(([k, v]) => [k, v.ver]),
   );
   return (
     <PermsProvider value={allPerms}>
-      <AdminShell perms={verMap}>{children}</AdminShell>
+      <AdminShell perms={verMap} logoUrl={brand?.logoUrl ?? null}>
+        {children}
+      </AdminShell>
     </PermsProvider>
   );
 }

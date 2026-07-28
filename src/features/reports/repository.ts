@@ -446,6 +446,33 @@ export async function getLedgerSalesConsumption(
     .orderBy(sql`3 desc`);
 }
 
+/** Consumo del ledger por filamento (material · color) en un RANGO de fechas:
+ * el widget del panel lo usa con el MES actual ("filamentos más usados").
+ * Mismo criterio que el consumo anual: ventas netas de reposiciones. */
+export async function getLedgerSalesConsumptionRange(
+  from: Date,
+  to: Date,
+  database: Database = db,
+): Promise<Array<{ material: string; color: string; grams: number }>> {
+  return database
+    .select({
+      material: filamentMovements.material,
+      color: filamentMovements.color,
+      grams: sql<number>`coalesce(-sum(${filamentMovements.deltaGrams}), 0)::float8`,
+    })
+    .from(filamentMovements)
+    .where(
+      and(
+        inArray(filamentMovements.reason, ["order", "manual_sale", "restore"]),
+        gte(filamentMovements.createdAt, from),
+        lt(filamentMovements.createdAt, to),
+      ),
+    )
+    .groupBy(sql`1, 2`)
+    .having(sql`sum(${filamentMovements.deltaGrams}) < 0`)
+    .orderBy(sql`3 desc`);
+}
+
 /** Costo promedio por kg de cada material (según filamentos cargados). */
 export async function getAvgCostPerMaterial(
   database: Database = db,

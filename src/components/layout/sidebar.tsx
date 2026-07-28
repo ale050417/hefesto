@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -267,12 +268,15 @@ export function Sidebar({
   perms,
   open,
   onNavigate,
+  logoUrl,
 }: {
   perms?: Record<string, boolean>;
   /** Drawer abierto (móvil). En desktop se ignora (CSS lo fija). */
   open?: boolean;
   /** Se llama al tocar un link (para cerrar el drawer en móvil). */
   onNavigate?: () => void;
+  /** Logo del negocio (el mismo de la tienda), redondeado. */
+  logoUrl?: string | null;
 }) {
   const pathname = usePathname();
   const isActive = (href: string, exact?: boolean) =>
@@ -288,7 +292,17 @@ export function Sidebar({
           (2026-07-11) y ahorrar esta fila ayuda a que el menú entre sin scroll. */}
       <div className="mb-1 flex items-center gap-1 md:hidden">
         <Link href="/admin" className="brand px-2 py-1" onClick={onNavigate}>
-          <BrandMark size={30} />
+          {logoUrl ? (
+            <Image
+              src={logoUrl}
+              alt=""
+              width={30}
+              height={30}
+              className="h-[30px] w-[30px] rounded-md object-cover"
+            />
+          ) : (
+            <BrandMark size={30} />
+          )}
           <span className="brand-name text-[15px]">
             HEFESTO<b> Admin</b>
           </span>

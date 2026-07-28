@@ -1,5 +1,8 @@
 import { unstable_cache } from "next/cache";
-import { listFilamentsView } from "@/features/inventory/queries";
+import {
+  listColorCatalog,
+  listFilamentsView,
+} from "@/features/inventory/queries";
 import { listOrdersAdmin } from "@/features/orders/services/orderAdminService";
 import { safeLoad } from "@/lib/safe-load";
 import * as repo from "./repository";
@@ -123,24 +126,45 @@ async function getDashboardDataUncached(days: number) {
   // y queda registrada en `degraded` para que la UI muestre un aviso de datos
   // parciales (DegradedNotice) en vez de ceros silenciosos que parecen "no
   // vendiste nada" (incidente 2026-07-11). safeLoad acota cada fuente a 6 s.
-  const [kpisR, manualKpisR, revenueR, manualRevR, recentR, filamentsR] =
-    await Promise.all([
-      safeLoad("kpis", repo.getKpiRows(), {
-        revenue: 0,
-        salesCount: 0,
-        pendingCount: 0,
-        lowStockCount: 0,
-      }),
-      safeLoad("manualKpis", repo.getManualKpis(), { revenue: 0, count: 0 }),
-      safeLoad("revenueByDay", repo.getRevenueByDay(since), []),
-      safeLoad("manualRevenueByDay", repo.getManualRevenueByDay(since), []),
-      safeLoad(
-        "recentOrders",
-        listOrdersAdmin({ page: 1, pageSize: 6 }).then((r) => r.items),
-        [] as Awaited<ReturnType<typeof listOrdersAdmin>>["items"],
-      ),
-      safeLoad("filaments", listFilamentsView(), []),
-    ]);
+  // Consumo del MES actual para "Filamentos más usados" (widget del panel).
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+  const nextMonth = new Date(monthStart);
+  nextMonth.setMonth(nextMonth.getMonth() + 1);
+
+  const [
+    kpisR,
+    manualKpisR,
+    revenueR,
+    manualRevR,
+    recentR,
+    filamentsR,
+    monthUsageR,
+    colorsR,
+  ] = await Promise.all([
+    safeLoad("kpis", repo.getKpiRows(), {
+      revenue: 0,
+      salesCount: 0,
+      pendingCount: 0,
+      lowStockCount: 0,
+    }),
+    safeLoad("manualKpis", repo.getManualKpis(), { revenue: 0, count: 0 }),
+    safeLoad("revenueByDay", repo.getRevenueByDay(since), []),
+    safeLoad("manualRevenueByDay", repo.getManualRevenueByDay(since), []),
+    safeLoad(
+      "recentOrders",
+      listOrdersAdmin({ page: 1, pageSize: 6 }).then((r) => r.items),
+      [] as Awaited<ReturnType<typeof listOrdersAdmin>>["items"],
+    ),
+    safeLoad("filaments", listFilamentsView(), []),
+    safeLoad(
+      "monthUsage",
+      repo.getLedgerSalesConsumptionRange(monthStart, nextMonth),
+      [],
+    ),
+    safeLoad("colorCatalog", listColorCatalog(), []),
+  ]);
   const kpis = kpisR.value;
   const manualKpis = manualKpisR.value;
   const revenueRows = revenueR.value;
@@ -153,8 +177,53 @@ async function getDashboardDataUncached(days: number) {
   if (!revenueR.ok || !manualRevR.ok) degraded.push("los ingresos por día");
   if (!recentR.ok) degraded.push("los últimos pedidos");
   if (!filamentsR.ok) degraded.push("el stock de filamentos");
+  if (!monthUsageR.ok) degraded.push("el consumo del mes");
+
+  // "Filamentos más usados" del mes: TODOS los filamentos cargados (Ale quiere
+  // ver también los que no se usaron) + los gramos consumidos del ledger + el
+  // tono real del color (catálogo). Ordenado del más usado al menos.
+  const hexByColor = new Map(
+    colorsR.value
+      .filter((c) => c.hex)
+      .map((c) => [c.name.trim().toLowerCase(), c.hex as string]),
+  );
+  const usageMap = new Map(
+    monthUsageR.value.map((u) => [
+      `${u.material.trim().toLowerCase()}·${u.color.trim().toLowerCase()}`,
+      Number(u.grams) || 0,
+    ]),
+  );
+  const filamentUsage = filaments
+    .map((f) => {
+      const key = `${f.material.trim().toLowerCase()}·${f.color.trim().toLowerCase()}`;
+      const grams = usageMap.get(key) ?? 0;
+      usageMap.delete(key);
+      return {
+        material: f.material,
+        color: f.color,
+        hex: hexByColor.get(f.color.trim().toLowerCase()) ?? null,
+        grams,
+      };
+    })
+    // Consumo de filamentos que ya no existen en inventario: también se ve.
+    .concat(
+      monthUsageR.value
+        .filter((u) =>
+          usageMap.has(
+            `${u.material.trim().toLowerCase()}·${u.color.trim().toLowerCase()}`,
+          ),
+        )
+        .map((u) => ({
+          material: u.material,
+          color: u.color,
+          hex: hexByColor.get(u.color.trim().toLowerCase()) ?? null,
+          grams: Number(u.grams) || 0,
+        })),
+    )
+    .sort((a, b) => b.grams - a.grams);
 
   return {
+    filamentUsage,
     // Las ventas manuales cuentan igual que las de tienda (Fase 5).
     kpis: {
       ...kpis,
@@ -166,7 +235,13 @@ async function getDashboardDataUncached(days: number) {
       days,
     ),
     recentOrders: recentItems,
-    lowStock: filaments.filter((f) => f.lowStock),
+    // Con el tono real del color para la barra de la alerta (widget gráfico).
+    lowStock: filaments
+      .filter((f) => f.lowStock)
+      .map((f) => ({
+        ...f,
+        hex: hexByColor.get(f.color.trim().toLowerCase()) ?? null,
+      })),
     degraded,
   };
 }

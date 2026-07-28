@@ -4,7 +4,6 @@ import { ExportCsvButton } from "@/features/reports/components/export-csv-button
 import { KpiCard } from "@/features/reports/components/kpi-card";
 import { MonthlyBars } from "@/features/reports/components/monthly-bars";
 import { CategoryDonut } from "@/features/reports/components/category-donut";
-import { FilamentConsumption } from "@/features/reports/components/filament-consumption";
 import { getReportsOverview } from "@/features/reports/service";
 import { compactPrice, formatPrice } from "@/lib/format";
 import { loadOrThrow } from "@/lib/safe-load";
@@ -40,6 +39,8 @@ export default async function ReportesPage({
   const raw = Number(Array.isArray(sp.year) ? sp.year[0] : sp.year);
   const year = years.includes(raw) ? raw : thisYear;
 
+  // El consumo de filamento se mudó al PANEL principal como widget gráfico
+  // por mes ("Filamentos más usados", 2026-07-24).
   const {
     kpis,
     monthsCurrent,
@@ -47,7 +48,6 @@ export default async function ReportesPage({
     categoryBreakdown,
     topProducts,
     bySource,
-    consumption,
   } = await loadOrThrow("reportes", getReportsOverview(year));
 
   const avgTicket =
@@ -193,8 +193,6 @@ export default async function ReportesPage({
           </div>
         )}
       </div>
-
-      <FilamentConsumption rows={consumption} />
     </div>
   );
 }
