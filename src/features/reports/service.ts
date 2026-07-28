@@ -255,6 +255,39 @@ export const getDashboardData = unstable_cache(
   { revalidate: 30 },
 );
 
+/** Consumo por filamento de UN mes (selector del panel, 2026-07-24). Devuelve
+ * solo lo consumido (los sin uso no se muestran) con el hex del color. Al
+ * cambiar de mes, el mes nuevo arranca limpio solo (el rango lo define la
+ * clave "YYYY-MM"). */
+const getMonthFilamentUsageRaw = async (monthKey: string) => {
+  const [y, m] = monthKey.split("-").map(Number);
+  const year = y && y > 2000 ? y : new Date().getFullYear();
+  const month = m && m >= 1 && m <= 12 ? m : new Date().getMonth() + 1;
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 1);
+  const [usage, colors] = await Promise.all([
+    repo.getLedgerSalesConsumptionRange(start, end).catch(() => []),
+    listColorCatalog().catch(() => []),
+  ]);
+  const hexByColor = new Map(
+    colors
+      .filter((c) => c.hex)
+      .map((c) => [c.name.trim().toLowerCase(), c.hex as string]),
+  );
+  return usage.map((u) => ({
+    material: u.material,
+    color: u.color,
+    hex: hexByColor.get(u.color.trim().toLowerCase()) ?? null,
+    grams: Number(u.grams) || 0,
+  }));
+};
+
+export const getMonthFilamentUsage = unstable_cache(
+  getMonthFilamentUsageRaw,
+  ["month-filament-usage"],
+  { revalidate: 60 },
+);
+
 export async function getReportsData(days = 30) {
   const since = new Date();
   since.setDate(since.getDate() - (days - 1));

@@ -6,7 +6,10 @@ import {
   ORDER_STATUS_VARIANT,
 } from "@/features/orders/constants";
 import { FilamentUsageCard } from "@/features/reports/components/filament-usage-card";
-import { getDashboardData } from "@/features/reports/service";
+import {
+  getDashboardData,
+  getMonthFilamentUsage,
+} from "@/features/reports/service";
 import { getStaffUser } from "@/core/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -18,19 +21,34 @@ const longDateFmt = new Intl.DateTimeFormat("es-AR", {
   day: "numeric",
   month: "long",
 });
-const monthFmt = new Intl.DateTimeFormat("es-AR", { month: "long" });
-
 function greeting(): string {
   const h = new Date().getHours();
   return h < 13 ? "Buen día" : h < 20 ? "Buenas tardes" : "Buenas noches";
 }
 
-export default async function AdminDashboard() {
-  const [{ recentOrders, lowStock, filamentUsage, degraded }, user] =
-    await Promise.all([getDashboardData(30), getStaffUser()]);
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // Mes del widget de filamentos: ?mes=YYYY-MM (sin param = mes actual, así
+  // al cambiar el calendario el widget arranca limpio solo).
+  const sp = await searchParams;
+  const rawMes = Array.isArray(sp.mes) ? sp.mes[0] : sp.mes;
+  const now = new Date();
+  const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const monthKey = /^\d{4}-(0[1-9]|1[0-2])$/.test(rawMes ?? "")
+    ? (rawMes as string)
+    : currentKey;
+
+  const [{ recentOrders, lowStock, degraded }, monthUsage, user] =
+    await Promise.all([
+      getDashboardData(30),
+      getMonthFilamentUsage(monthKey).catch(() => []),
+      getStaffUser(),
+    ]);
   const firstName =
     user?.profile?.fullName?.trim().split(/\s+/)[0] || "Hefesto";
-  const monthName = monthFmt.format(new Date());
 
   return (
     <div>
@@ -168,10 +186,12 @@ export default async function AdminDashboard() {
             </div>
           )}
         </div>
+      </div>
 
-        {/* Filamentos del mes: tarjeta chica con filtro más/menos usados;
-            los filamentos sin uso NO aparecen. */}
-        <FilamentUsageCard rows={filamentUsage} monthName={monthName} />
+      {/* Filamentos más usados: ANCHO COMPLETO debajo (3ª versión), solo los
+          usados, orden fijo del más usado, selector de mes. */}
+      <div style={{ marginTop: 18 }}>
+        <FilamentUsageCard rows={monthUsage} selectedMonth={monthKey} />
       </div>
     </div>
   );

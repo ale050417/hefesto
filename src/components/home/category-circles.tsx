@@ -63,8 +63,16 @@ export function CategoryCircles({
   categories: CategoryWithCount[];
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const pausedRef = useRef(false);
+  // Fix 2026-07-24 (Ale: "a veces se para" / "en celular se traba"):
+  //  - NO hay pausa por hover (el mouseenter emulado del touch la dejaba
+  //    pausada para SIEMPRE porque nunca llega el mouseleave).
+  //  - El drag a mano es SOLO para mouse; en touch manda el scroll NATIVO
+  //    (antes ambos peleaban por scrollLeft y se trababa).
+  //  - Tras soltar el dedo, el auto espera un toque (holdUntil) para no
+  //    pisarle la inercia al usuario, y después SIGUE solo.
   const arrowScrolling = useRef(false);
+  const touchActive = useRef(false);
+  const holdUntil = useRef(0);
   const drag = useRef({ down: false, moved: false, startX: 0, startScroll: 0 });
   const [overflowing, setOverflowing] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
@@ -82,6 +90,16 @@ export function CategoryCircles({
     update();
     mq.addEventListener("change", update);
     return () => mq.removeEventListener("change", update);
+  }, []);
+
+  // Si el mouse se suelta FUERA del carrusel, el drag quedaba "agarrado" y el
+  // auto-scroll no volvía más ("a veces se para"). Red de seguridad global.
+  useEffect(() => {
+    const up = () => {
+      drag.current.down = false;
+    };
+    window.addEventListener("pointerup", up);
+    return () => window.removeEventListener("pointerup", up);
   }, []);
 
   // ¿El contenido desborda? (para mostrar flechas solo si hace falta).
@@ -112,7 +130,12 @@ export function CategoryCircles({
     const step = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000); // clamp si hubo un lag
       last = now;
-      if (!pausedRef.current && !drag.current.down && !arrowScrolling.current) {
+      const userBusy =
+        drag.current.down ||
+        touchActive.current ||
+        arrowScrolling.current ||
+        now < holdUntil.current;
+      if (!userBusy) {
         const half = track.scrollWidth / 2;
         pos += SPEED * dt;
         if (half > 0 && pos >= half) pos -= half;
@@ -129,6 +152,12 @@ export function CategoryCircles({
   function onPointerDown(e: RPointerEvent<HTMLDivElement>) {
     const track = trackRef.current;
     if (!track) return;
+    if (e.pointerType !== "mouse") {
+      // Touch: el scroll lo hace el NAVEGADOR (nativo, fluido). Solo
+      // pausamos el auto-scroll mientras el dedo está apoyado.
+      touchActive.current = true;
+      return;
+    }
     drag.current = {
       down: true,
       moved: false,
@@ -137,13 +166,20 @@ export function CategoryCircles({
     };
   }
   function onPointerMove(e: RPointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== "mouse") return; // touch = scroll nativo
     const track = trackRef.current;
     if (!track || !drag.current.down) return;
     const dx = e.clientX - drag.current.startX;
     if (Math.abs(dx) > 5) drag.current.moved = true;
     track.scrollLeft = drag.current.startScroll - dx;
   }
-  function endDrag() {
+  function endDrag(e?: RPointerEvent<HTMLDivElement>) {
+    if (e && e.pointerType !== "mouse") {
+      touchActive.current = false;
+      // Respiro para que la inercia del swipe termine sin que el auto la pise.
+      holdUntil.current = performance.now() + 2200;
+      return;
+    }
     drag.current.down = false;
   }
   // Si el click viene de un arrastre, no navegamos.
@@ -214,11 +250,14 @@ export function CategoryCircles({
           cursor: loop ? "grab" : "default",
           justifyContent: loop ? "flex-start" : "center",
           flexWrap: loop ? "nowrap" : "wrap",
+          // Deja el pan horizontal NATIVO en touch (sin esto, el navegador
+          // duda entre scrollear la página o el carrusel y se traba).
+          touchAction: "pan-x",
         }}
-        onMouseEnter={() => (pausedRef.current = true)}
+        // Sin pausa por hover (Ale: "no debe pararse"); el mouseleave solo
+        // suelta un drag de mouse que quedó a medias.
         onMouseLeave={() => {
-          pausedRef.current = false;
-          endDrag();
+          drag.current.down = false;
         }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
