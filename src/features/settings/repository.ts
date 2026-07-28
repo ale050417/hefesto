@@ -176,6 +176,7 @@ export async function listUserProfiles(
       role: profiles.role,
       roleId: profiles.roleId,
       createdAt: profiles.createdAt,
+      mustChangePassword: profiles.mustChangePassword,
     })
     .from(profiles)
     .orderBy(asc(profiles.role), asc(profiles.createdAt));
@@ -320,6 +321,7 @@ export async function listProfilesByRoles(
       role: profiles.role,
       roleId: profiles.roleId,
       createdAt: profiles.createdAt,
+      mustChangePassword: profiles.mustChangePassword,
     })
     .from(profiles)
     .where(inArray(profiles.role, roles))

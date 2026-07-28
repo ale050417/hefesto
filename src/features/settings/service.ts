@@ -4,14 +4,14 @@ import {
   createInviteToken,
   createLoginToken,
   getUserEmail,
-  listAuthEmails,
   listAuthUsers,
   setUserPassword,
 } from "@/core/supabase/admin";
 import { buildTeamInviteEmail, buildTeamPromotedEmail } from "./emails";
 import { env } from "@/core/config/env";
-import { sendEmail } from "@/core/email";
+import { isEmailConfigured, sendEmail } from "@/core/email";
 import { DEFAULT_OPERATOR } from "@/core/auth/perm-defs";
+import { invalidateProfileCache } from "@/core/auth/session";
 import { ValidationError } from "@/core/errors";
 import * as repo from "./repository";
 import {
@@ -281,7 +281,12 @@ export async function listTeam(): Promise<TeamMember[]> {
   const roleName = new Map(allRoles.map((r) => [r.id, r.name]));
   return profiles.map((p) => {
     const a = auth.get(p.id);
-    const pending = !!a?.invitedAt && !a?.lastSignInAt;
+    // Pendiente = todavía NO creó su propia contraseña (aunque haya abierto el
+    // link). Así "Reenviar invitación" queda disponible hasta completar el
+    // alta de verdad (fix 2026-07-24: antes con solo tocar el link pasaba a
+    // "activo" sin contraseña y sin forma de volver a entrar).
+    const pending =
+      p.mustChangePassword || (!!a?.invitedAt && !a?.lastSignInAt);
     return {
       id: p.id,
       fullName: p.fullName,
@@ -326,23 +331,65 @@ export async function inviteTeamMember(input: {
   fullName?: string | null;
   message?: string | null;
 }): Promise<{ email: string; promoted: boolean }> {
+  // Sin Resend configurado, sendEmail se OMITE en silencio → parecía enviado
+  // pero no llegaba nada (bug 2026-07-24). Mejor frenar con un error claro.
+  if (!isEmailConfigured()) {
+    throw new ValidationError(
+      "Falta configurar el envío de correos (RESEND_API_KEY): la invitación no se puede mandar.",
+    );
+  }
   const role = await repo.getRoleById(input.roleId);
   if (!role) throw new ValidationError("Elegí un rol válido.");
   const email = input.email.trim().toLowerCase();
 
-  // ¿Ya existe la cuenta? → promover (cliente) o rechazar (ya es del equipo).
-  const emails = await listAuthEmails();
+  // ¿Ya existe la cuenta? Tres casos: nunca entró (re-invitar con link nuevo),
+  // cliente con cuenta activa (promover) o ya es staff (rechazar).
+  const authUsers = await listAuthUsers();
   let existingId: string | null = null;
-  for (const [id, e] of emails) {
-    if (e.toLowerCase() === email) {
+  let existingInfo: { lastSignInAt: string | null } | null = null;
+  for (const [id, info] of authUsers) {
+    if (info.email?.toLowerCase() === email) {
       existingId = id;
+      existingInfo = info;
       break;
     }
+  }
+  if (existingId && existingInfo?.lastSignInAt == null) {
+    // Cuenta creada por una invitación previa que nunca se aceptó (p. ej. el
+    // primer intento sin Resend): rol al día + link NUEVO de un solo uso.
+    await repo.upsertProfile({
+      id: existingId,
+      fullName: input.fullName ?? null,
+      role: enumForRole(role),
+      roleId: role.id,
+      mustChangePassword: true,
+    });
+    invalidateProfileCache(existingId);
+    const { tokenHash, error } = await createLoginToken(email);
+    if (error || !tokenHash) {
+      throw new ValidationError(error ?? "No se pudo generar el link.");
+    }
+    const acceptUrl = `${env.NEXT_PUBLIC_SITE_URL}/equipo/aceptar?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink`;
+    const mail = buildTeamInviteEmail({
+      roleName: role.name,
+      message: input.message ?? null,
+      acceptUrl,
+    });
+    try {
+      await sendEmail({ to: email, ...mail });
+    } catch (mailError) {
+      const detail =
+        mailError instanceof Error ? mailError.message : String(mailError);
+      throw new ValidationError(`Falló el envío del correo: ${detail}`);
+    }
+    return { email, promoted: false };
   }
   if (existingId) {
     const current = await repo.getProfileRole(existingId);
     if (current === "admin" || current === "operator") {
-      throw new ValidationError("Ese email ya es parte del equipo.");
+      throw new ValidationError(
+        "Ese email ya es parte del equipo. Si tiene la invitación pendiente, usá 'Reenviar invitación' en la lista.",
+      );
     }
     await repo.upsertProfile({
       id: existingId,
@@ -352,6 +399,7 @@ export async function inviteTeamMember(input: {
       // Conserva SU contraseña: no hay nada que crear.
       mustChangePassword: false,
     });
+    invalidateProfileCache(existingId);
     try {
       const mail = buildTeamPromotedEmail({
         roleName: role.name,
@@ -378,6 +426,7 @@ export async function inviteTeamMember(input: {
     // Al aceptar, los guards lo llevan derecho a "Creá tu contraseña".
     mustChangePassword: true,
   });
+  invalidateProfileCache(userId);
   const acceptUrl = `${env.NEXT_PUBLIC_SITE_URL}/equipo/aceptar?token_hash=${encodeURIComponent(tokenHash)}&type=invite`;
   try {
     const mail = buildTeamInviteEmail({
@@ -386,11 +435,14 @@ export async function inviteTeamMember(input: {
       acceptUrl,
     });
     await sendEmail({ to: email, ...mail });
-  } catch {
-    // Sin correo la invitación no sirve: avisar claro (el acceso quedó creado
-    // y "Reenviar invitación" genera un link nuevo).
+  } catch (mailError) {
+    // Sin correo la invitación no sirve: avisar claro CON el motivo real de
+    // Resend (es una pantalla solo-admin; el detalle ayuda a arreglar la
+    // config: dominio sin verificar, modo prueba, etc.).
+    const detail =
+      mailError instanceof Error ? mailError.message : String(mailError);
     throw new ValidationError(
-      "La invitación quedó creada pero falló el envío del correo. Probá con 'Reenviar invitación'.",
+      `La invitación quedó creada pero falló el envío del correo: ${detail}`,
     );
   }
   return { email, promoted: false };
@@ -403,6 +455,11 @@ export async function inviteTeamMember(input: {
 export async function resendTeamInvite(
   userId: string,
 ): Promise<{ email: string }> {
+  if (!isEmailConfigured()) {
+    throw new ValidationError(
+      "Falta configurar el envío de correos (RESEND_API_KEY): la invitación no se puede mandar.",
+    );
+  }
   const email = await getUserEmail(userId);
   if (!email) throw new ValidationError("Usuario no encontrado.");
   const { tokenHash, error } = await createLoginToken(email);
@@ -410,13 +467,20 @@ export async function resendTeamInvite(
     throw new ValidationError(error ?? "No se pudo generar el link.");
   }
   await repo.setMustChangePassword(userId, true);
+  invalidateProfileCache(userId);
   const acceptUrl = `${env.NEXT_PUBLIC_SITE_URL}/equipo/aceptar?token_hash=${encodeURIComponent(tokenHash)}&type=magiclink`;
   const mail = buildTeamInviteEmail({
     roleName: null,
     message: null,
     acceptUrl,
   });
-  await sendEmail({ to: email, ...mail });
+  try {
+    await sendEmail({ to: email, ...mail });
+  } catch (mailError) {
+    const detail =
+      mailError instanceof Error ? mailError.message : String(mailError);
+    throw new ValidationError(`Falló el envío del correo: ${detail}`);
+  }
   return { email };
 }
 
@@ -444,6 +508,7 @@ export async function assignMemberRole(
     }
   }
   await repo.setProfileRole(userId, newEnum, role.id);
+  invalidateProfileCache(userId);
 }
 
 /**
@@ -482,6 +547,7 @@ export async function removeTeamMember(
     }
   }
   await repo.setProfileRole(targetId, "customer", null);
+  invalidateProfileCache(targetId);
 }
 
 export type AppearancePatch = {

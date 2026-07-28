@@ -25,11 +25,13 @@ export default async function CambiarClavePage() {
         ) : null}
       </div>
 
-      <ChangePasswordForm />
+      {/* Al guardar bien redirige SOLO al destino (sin pasos manuales,
+          2026-07-24). Si está mal, el form no deja avanzar. */}
+      <ChangePasswordForm redirectTo={isStaff ? "/admin" : "/cuenta"} />
 
-      {isStaff ? (
+      {isStaff && !forced ? (
         <Link href="/admin" className="text-dim text-sm hover:underline">
-          {forced ? "Ya la cambié → Ir al panel" : "← Volver al panel"}
+          ← Volver al panel
         </Link>
       ) : null}
     </div>

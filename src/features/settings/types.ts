@@ -23,6 +23,8 @@ export type UserRow = {
   role: UserRole;
   roleId: string | null;
   createdAt: Date;
+  /** true = todavía no creó SU contraseña (invitación sin completar). */
+  mustChangePassword: boolean;
 };
 
 export type TeamStatus = "activo" | "invitado";

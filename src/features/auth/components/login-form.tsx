@@ -30,7 +30,13 @@ export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
       setFormError(res.error.message);
       return;
     }
-    router.push(redirectTo);
+    // Miembro del equipo → directo al PANEL (salvo que venga con un destino
+    // explícito, p. ej. ?redirect=/admin/pedidos). Cliente → destino normal.
+    const dest =
+      res.data.isStaff && (redirectTo === "/" || redirectTo === "")
+        ? "/admin"
+        : redirectTo;
+    router.push(dest);
     router.refresh();
   });
 

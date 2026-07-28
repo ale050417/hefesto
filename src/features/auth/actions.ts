@@ -1,14 +1,14 @@
 "use server";
 
 import { z } from "zod";
-import { getCurrentUser } from "@/core/auth/session";
+import { getCurrentUser, invalidateProfileCache } from "@/core/auth/session";
 
 import { redirect } from "next/navigation";
 import { rateLimit } from "@/core/security/rate-limit";
 import { getClientIp } from "@/core/security/request";
 import { createClient } from "@/core/supabase/server";
 import { siteUrl } from "@/lib/site";
-import { clearMustChangePassword } from "./repository";
+import { clearMustChangePassword, getProfileRoleById } from "./repository";
 import { loginSchema, registerSchema, resetRequestSchema } from "./schemas";
 import {
   isAcceptablePassword,
@@ -27,7 +27,9 @@ const TOO_MANY: Result = {
   },
 };
 
-export async function loginAction(input: unknown): Promise<Result> {
+export async function loginAction(
+  input: unknown,
+): Promise<ActionResult<{ isStaff: boolean }>> {
   const ip = await getClientIp();
   if (!(await rateLimit(`login:${ip}`, { limit: 5, windowMs: 60_000 })).ok) {
     return TOO_MANY;
@@ -39,7 +41,7 @@ export async function loginAction(input: unknown): Promise<Result> {
       error: { code: "VALIDATION", message: "Datos inválidos" },
     };
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
+  const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
   if (error)
     return {
       ok: false,
@@ -48,7 +50,16 @@ export async function loginAction(input: unknown): Promise<Result> {
         message: "Email o contraseña incorrectos",
       },
     };
-  return { ok: true };
+  // Staff → el destino natural es el PANEL (2026-07-24, pedido de Ale: al
+  // loguearse un miembro del equipo va directo a /admin, no a la tienda).
+  let isStaff = false;
+  try {
+    const role = data.user?.id ? await getProfileRoleById(data.user.id) : null;
+    isStaff = role === "admin" || role === "operator";
+  } catch {
+    // Sin rol legible: queda el destino normal de la tienda.
+  }
+  return { ok: true, data: { isStaff } };
 }
 
 export async function registerAction(input: unknown): Promise<Result> {
@@ -158,8 +169,52 @@ export async function changePasswordAction(input: unknown): Promise<Result> {
   // Limpia la marca de cambio obligatorio (invitados con contraseña temporal).
   try {
     await clearMustChangePassword(user.id);
+    // El perfil está cacheado 60 s: sin esto, el guard seguía viendo la marca
+    // vieja y devolvía al recién invitado a "Creá tu contraseña" en loop.
+    invalidateProfileCache(user.id);
   } catch (e) {
     console.error("[auth] no se pudo limpiar must_change_password:", e);
+  }
+  return { ok: true };
+}
+
+const acceptInviteSchema = z.object({
+  tokenHash: z.string().min(10).max(500),
+  type: z.enum(["invite", "magiclink"]),
+});
+
+/**
+ * Acepta una invitación al equipo (2026-07-24): verifica el token de UN SOLO
+ * USO y abre sesión. Se dispara desde el BOTÓN de /equipo/aceptar — no desde
+ * el GET del link — porque los escáneres de seguridad de Gmail/Outlook visitan
+ * los links de los correos y quemaban el token antes de que la persona lo
+ * tocara. El token recién se consume con un click humano.
+ */
+export async function acceptTeamInviteAction(input: unknown): Promise<Result> {
+  const parsed = acceptInviteSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "El link de invitación no es válido.",
+      },
+    };
+  }
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({
+    type: parsed.data.type,
+    token_hash: parsed.data.tokenHash,
+  });
+  if (error) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message:
+          "El link venció o ya se usó. Pedile al administrador que reenvíe la invitación.",
+      },
+    };
   }
   return { ok: true };
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { changePasswordAction } from "../actions";
@@ -38,7 +39,14 @@ function Rule({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   );
 }
 
-export function ChangePasswordForm() {
+export function ChangePasswordForm({
+  redirectTo,
+}: {
+  /** A dónde ir cuando la contraseña se guardó bien (2026-07-24: nada de
+   * links manuales "ya la cambié" — si aceptó, redirige solo). */
+  redirectTo?: string;
+}) {
+  const router = useRouter();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [pending, setPending] = useState(false);
@@ -67,12 +75,19 @@ export function ChangePasswordForm() {
         }),
       { silent: true },
     );
-    setPending(false);
     if (res.ok) {
       toast("Contraseña actualizada", "success");
+      if (redirectTo) {
+        // Directo al destino (sin pasos manuales). pending queda prendido
+        // para que el botón no rebote mientras navega.
+        router.push(redirectTo);
+        return;
+      }
+      setPending(false);
       setPassword("");
       setConfirm("");
     } else {
+      setPending(false);
       toast(res.error.message, "danger");
     }
   }

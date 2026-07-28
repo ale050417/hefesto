@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { unstable_cache } from "next/cache";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { createClient } from "@/core/supabase/server";
 import { withDeadline } from "@/lib/safe-load";
 import { getProfileById, type Profile } from "./profile";
@@ -62,7 +62,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     const cachedProfile = unstable_cache(
       () => getProfileById(id),
       ["auth-profile", id],
-      { revalidate: 60 },
+      { revalidate: 60, tags: [`auth-profile-${id}`] },
     );
     // Deadline: si el pool no da conexión, no colgamos el render entero.
     profile = await withDeadline(cachedProfile(), 12_000, "auth:profile");
@@ -78,6 +78,17 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   }
   return { id, email, profile, profileUnavailable };
 });
+
+/**
+ * Invalida el perfil CACHEADO de un usuario. El cache de 60 s es clave para
+ * la estabilidad, pero cuando cambia algo que los guards miran en caliente
+ * (rol, must_change_password) tiene que verse YA — si no, el recién invitado
+ * creaba su contraseña y el guard lo devolvía a "Creá tu contraseña" en loop
+ * hasta que venciera el cache (bug 2026-07-24). Llamar desde server actions.
+ */
+export function invalidateProfileCache(userId: string): void {
+  revalidateTag(`auth-profile-${userId}`);
+}
 
 /**
  * La lectura del rol falló (DB caída/lenta): error VISIBLE para el error
