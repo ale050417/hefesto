@@ -19,7 +19,13 @@ import type { ActionResult } from "@/core/errors";
 // Contrato canónico de la app (core/errors): { ok } | { ok:false, error:{code,message} }.
 type Result = ActionResult;
 
-const TOO_MANY: Result = {
+// Tipado como el "brazo" ok:false puro (sin fijarlo a Result completo): ese
+// brazo es igual para cualquier ActionResult<T>, así se puede devolver tal
+// cual desde loginAction (ActionResult<{isStaff}>) y del resto (Result) sin
+// que TS se queje de que falta `data` (bug de build 2026-07-28: anotar esto
+// como `Result` fijaba el tipo a la unión completa, incluido el brazo
+// `{ok:true}` sin data, que no encaja en ActionResult<{isStaff:boolean}>).
+const TOO_MANY: { ok: false; error: { code: string; message: string } } = {
   ok: false,
   error: {
     code: "RATE_LIMITED",
