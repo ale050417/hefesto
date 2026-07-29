@@ -84,7 +84,7 @@ export async function Footer() {
                 </>
               )}
             </Link>
-            <p className="text-faint max-w-[280px] text-sm leading-relaxed">
+            <p className="text-faint max-w-[420px] text-sm leading-relaxed md:max-w-[280px]">
               {desc}
             </p>
             <div className="mt-4 flex gap-2">
@@ -168,11 +168,11 @@ export async function Footer() {
           </div>
         </div>
 
-        <div className="text-faint flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] pt-6 text-xs">
+        <div className="text-faint flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-6 text-xs">
           <span>
             &copy; {year} {name} · {slogan}
           </span>
-          <span className="flex items-center gap-4">
+          <span className="flex flex-wrap items-center gap-4">
             <Link href="/#faq" className="hover:text-fg">
               Políticas
             </Link>

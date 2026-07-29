@@ -331,6 +331,17 @@ body > * {
       grid-template-columns: repeat(4, 1fr);
     }
   }
+  /* .grid-2 SIEMPRE fue 2 columnas fijas, sin importar el ancho: adentro de un
+     modal ya se apilaba a los 480px (arriba, regla ".modal .grid-2"), pero
+     fuera de un modal (p. ej. Reportes: "Ventas por origen", gráficos de
+     "Ventas por mes"/"por categoría") quedaba con dos columnas angostísimas
+     en celular. Se apila en general al mismo ancho que el resto del panel
+     (2026-07-28). */
+  @media (max-width: 640px) {
+    .grid-2 {
+      grid-template-columns: 1fr;
+    }
+  }
 
   /* Botones */
   .btn {
@@ -1601,6 +1612,15 @@ body > * {
     }
     .calc-stats {
       grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  /* Pares de campos (nombre+cliente, horas+minutos) apilados en celular: a
+     ~1100px .calc-grid ya pasó a 1 columna pero .calc-input-row seguía fija
+     en 2, angostando cada input a ~170px (2026-07-28, mismo criterio que
+     ".modal .grid-2"). */
+  @media (max-width: 480px) {
+    .calc-input-row {
+      grid-template-columns: 1fr;
     }
   }
   .f-switch {

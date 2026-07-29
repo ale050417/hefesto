@@ -11,19 +11,6 @@ import { useUiStore } from "@/stores/uiStore";
 
 type Variant = { id: string; label: string; price: number | null };
 
-const FILAMENT_HEX: Record<string, string> = {
-  Negro: "#1a1a1f",
-  Blanco: "#f4f4f0",
-  Dorado: "#C9A84C",
-  Gris: "#8b8b95",
-  Rojo: "#d14b3c",
-  Azul: "#3a72c4",
-  Verde: "#3fa46a",
-  Galaxia: "#4b3a78",
-  Translúcido: "#cfe6ee",
-  Arcoíris: "#d98a5a",
-};
-
 export type AddToCartProduct = {
   id: string;
   slug: string;
@@ -36,6 +23,8 @@ export type AddToCartProduct = {
   colorMode: "single" | "multi";
   colors: string[];
   colorPrices: Record<string, number>;
+  /** Nombre del color → su hex REAL del catálogo (Filamentos), no un genérico. */
+  colorHex: Record<string, string>;
 };
 
 export function AddToCart({ product }: { product: AddToCartProduct }) {
@@ -149,7 +138,7 @@ export function AddToCart({ product }: { product: AddToCartProduct }) {
                       width: 13,
                       height: 13,
                       borderRadius: "50%",
-                      background: FILAMENT_HEX[c] ?? "#888",
+                      background: product.colorHex[c] ?? "#888",
                       border: "1px solid rgba(255,255,255,.25)",
                       display: "inline-block",
                     }}

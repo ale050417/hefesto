@@ -7,6 +7,7 @@ import {
   getProductBySlug,
   getRelatedProducts,
 } from "@/features/products/services/catalogService";
+import { listColorCatalog } from "@/features/inventory/queries";
 import { siteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,16 @@ export default async function ProductPage({ params }: Params) {
 
   // Reseñas ocultas (2026-07): no se traen ni se muestran. Reactivar: volver a
   // pedir getProductReviewsFor y renderizar <ProductReviews/> más abajo.
-  const related = await getRelatedProducts(slug);
+  // colorCatalog en paralelo: no depende de `product` (bug 2026-07-28: el
+  // selector de color mostraba un gris genérico porque usaba un mapa
+  // hardcodeado de 10 nombres fijos en vez del catálogo real de colores que
+  // Ale carga en Filamentos → cada color que exista ahí se ve con SU hex).
+  const [related, colorCatalog] = await Promise.all([
+    getRelatedProducts(slug),
+    listColorCatalog(),
+  ]);
+  const colorHex: Record<string, string> = {};
+  for (const c of colorCatalog) colorHex[c.name] = c.hex ?? "#888";
 
   // Solo lo que le interesa al cliente. Nada técnico (gramos, tiempo de
   // impresión, material, altura de capa): eso es interno del taller.
@@ -111,6 +121,7 @@ export default async function ProductPage({ params }: Params) {
           colorMode: product.colorMode,
           colors: product.colors,
           colorPrices: product.colorPrices,
+          colorHex,
           specs,
         }}
       />

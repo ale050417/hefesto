@@ -132,7 +132,7 @@ export function RolesManager({
       {/* ===== EQUIPO ===== */}
       <div className="ui-card section-card">
         <div
-          className="flex items-center justify-between"
+          className="flex flex-wrap items-center justify-between gap-3"
           style={{ marginBottom: 16 }}
         >
           <div>
@@ -283,7 +283,7 @@ export function RolesManager({
       </div>
 
       {/* ===== ROLES Y PERMISOS ===== */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="section-title">Roles y permisos</div>
           <div
@@ -307,7 +307,7 @@ export function RolesManager({
       {roles.map((r) => (
         <div key={r.id} className="ui-card section-card">
           <div
-            className="flex items-center justify-between"
+            className="flex flex-wrap items-center justify-between gap-3"
             style={{ marginBottom: 16 }}
           >
             <div className="flex items-center gap-3">

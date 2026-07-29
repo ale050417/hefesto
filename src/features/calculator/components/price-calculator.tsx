@@ -532,7 +532,7 @@ export function PriceCalculator({
                 <b className="price text-[18px]">{formatPrice(q.costoTotal)}</b>
               </div>
               <div className="calc-final">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <div
                       className="mb-1.5 flex items-center gap-2 text-[12.5px] uppercase"
@@ -553,7 +553,7 @@ export function PriceCalculator({
             </>
           ) : (
             <div className="calc-final">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <div
                     className="mb-1.5 flex items-center gap-2 text-[12.5px] uppercase"
