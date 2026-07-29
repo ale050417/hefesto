@@ -26,6 +26,13 @@ function greeting(): string {
   return h < 13 ? "Buen día" : h < 20 ? "Buenas tardes" : "Buenas noches";
 }
 
+// Aviso de "datos incompletos" (DegradedNotice) apagado a pedido de Ale
+// (2026-07-29): el timeout de safeLoad se disparaba seguido en cargas frías
+// del panel (8 queries vs. pool de 2 conexiones) y molestaba más de lo que
+// ayudaba. La resiliencia de fondo (safeLoad) sigue intacta — esto solo
+// apaga el cartel visual. Reactivar: pasar esto a `true` cuando Ale lo pida.
+const SHOW_DEGRADED_NOTICE = false;
+
 export default async function AdminDashboard({
   searchParams,
 }: {
@@ -52,7 +59,7 @@ export default async function AdminDashboard({
 
   return (
     <div>
-      <DegradedNotice sources={degraded} />
+      {SHOW_DEGRADED_NOTICE && <DegradedNotice sources={degraded} />}
       <div className="page-head">
         <div>
           <div className="eyebrow">Panel de gestión</div>
