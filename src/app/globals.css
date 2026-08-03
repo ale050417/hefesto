@@ -633,6 +633,9 @@ body > * {
     line-height: 1.04;
     letter-spacing: -0.02em;
   }
+  /* Palabra destacada en dorado dentro de un título de sección (la usa el
+     hero y la portada de "Pedí tu pieza personalizada"). */
+  .sec-title .gold,
   .hero-title .gold {
     background: linear-gradient(120deg, var(--gold-bright), var(--gold-deep));
     -webkit-background-clip: text;
@@ -3670,33 +3673,6 @@ body > * {
     .trust-grid,
     .stats-grid {
       grid-template-columns: 1fr 1fr;
-    }
-  }
-  /* Banda de confianza en celular: Ale la quiere de IZQUIERDA A DERECHA, igual
-     que en la compu (2026-07-29) — apilada perdía el aire de "tira de
-     beneficios". Como 4 ítems no entran en 390px, se convierte en una tira
-     deslizable: cada ítem con ancho legible y scroll horizontal suave, sin
-     barra a la vista. */
-  @media (max-width: 640px) {
-    .trust-grid {
-      display: flex;
-      grid-template-columns: none;
-      gap: 12px;
-      overflow-x: auto;
-      scroll-snap-type: x mandatory;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-      /* Sangría al ras del borde para que se note que hay más a la derecha. */
-      margin-inline: -16px;
-      padding-inline: 16px;
-    }
-    .trust-grid::-webkit-scrollbar {
-      display: none;
-    }
-    .trust-item {
-      flex: 0 0 auto;
-      width: 205px;
-      scroll-snap-align: start;
     }
   }
   /* Los números sí se apilan: son pocos y con la tipografía grande no entran

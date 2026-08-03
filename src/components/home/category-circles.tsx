@@ -48,14 +48,16 @@ function Chevron({ dir }: { dir: "left" | "right" }) {
 }
 
 /**
- * Carrusel de categorías padre en círculos (estilo "historias"), uno al lado
- * del otro.
- * - Auto-scroll LENTO y continuo con loop sin costura (duplicamos la lista).
- * - Se pausa al pasar el mouse / mientras se arrastra.
- * - Desktop: flechas ‹ › cuando hay muchas y desbordan.
- * - Tablet/celular: swipe con el dedo (scroll nativo); sin flechas.
- * - Respeta `prefers-reduced-motion` (sin animación).
- * La estructura va en estilos inline (no depende de recargar el CSS).
+ * Categorías padre en círculos (estilo "historias"), una al lado de la otra.
+ *
+ * SIN loop infinito ni auto-scroll (2026-08-03). Antes, con 5 o más categorías,
+ * la lista se DUPLICABA para que el desplazamiento automático no tuviera
+ * costura: en pantalla ancha se veía la misma categoría dos veces a la vez y
+ * parecía un error. Ale: "tiene que aparecer una vez nomás y ya". Ahora cada
+ * categoría aparece EXACTAMENTE UNA VEZ:
+ *  - si entran todas, quedan centradas;
+ *  - si no entran, se desplazan con el dedo (swipe) o con las flechas ‹ › en
+ *    compu, que es lo que la gente ya espera de una fila así.
  */
 export function CategoryCircles({
   categories,
@@ -63,27 +65,13 @@ export function CategoryCircles({
   categories: CategoryWithCount[];
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
-  // Fix 2026-07-24 (Ale: "a veces se para" / "en celular se traba"):
-  //  - NO hay pausa por hover (el mouseenter emulado del touch la dejaba
-  //    pausada para SIEMPRE porque nunca llega el mouseleave).
-  //  - El drag a mano es SOLO para mouse; en touch manda el scroll NATIVO
-  //    (antes ambos peleaban por scrollLeft y se trababa).
-  //  - Tras soltar el dedo, el auto espera un toque (holdUntil) para no
-  //    pisarle la inercia al usuario, y después SIGUE solo.
-  const arrowScrolling = useRef(false);
-  const touchActive = useRef(false);
-  const holdUntil = useRef(0);
+  // Arrastrar con el mouse (en touch manda el scroll NATIVO del navegador: si
+  // los dos pelean por scrollLeft, se traba — incidente 2026-07-24).
   const drag = useRef({ down: false, moved: false, startX: 0, startScroll: 0 });
   const [overflowing, setOverflowing] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
 
-  const loop = categories.length >= 5;
-  // Duplicamos para que el loop no tenga costura (la 2da mitad continúa la 1ra).
-  const items = loop ? [...categories, ...categories] : categories;
-
   // ¿Es una compu con mouse? (para mostrar flechas). En touch, no.
-  // Patrón de suscripción (evita setState suelto en el effect) y de paso
-  // reacciona si cambia el tipo de puntero.
   useEffect(() => {
     const mq = window.matchMedia("(hover: hover) and (pointer: fine)");
     const update = () => setIsDesktop(mq.matches);
@@ -92,8 +80,7 @@ export function CategoryCircles({
     return () => mq.removeEventListener("change", update);
   }, []);
 
-  // Si el mouse se suelta FUERA del carrusel, el drag quedaba "agarrado" y el
-  // auto-scroll no volvía más ("a veces se para"). Red de seguridad global.
+  // Si el mouse se suelta FUERA del carrusel, el drag quedaba "agarrado".
   useEffect(() => {
     const up = () => {
       drag.current.down = false;
@@ -102,7 +89,7 @@ export function CategoryCircles({
     return () => window.removeEventListener("pointerup", up);
   }, []);
 
-  // ¿El contenido desborda? (para mostrar flechas solo si hace falta).
+  // ¿El contenido desborda? Define si hay flechas y si se centra o no.
   useEffect(() => {
     const track = trackRef.current;
     if (!track) return;
@@ -111,53 +98,13 @@ export function CategoryCircles({
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [items.length]);
-
-  // Auto-scroll lento y continuo. Usamos un acumulador en JS (`pos`) porque el
-  // navegador redondea `scrollLeft` a enteros: si hiciéramos `scrollLeft += 0.3`
-  // leyendo el valor ya redondeado, nunca avanzaría (por eso "no se movía").
-  // Con el float aparte, cada ~3 frames avanza 1px real → movimiento suave.
-  useEffect(() => {
-    if (!loop) return;
-    const track = trackRef.current;
-    if (!track) return;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-
-    let raf = 0;
-    let pos = track.scrollLeft;
-    let last = performance.now();
-    const SPEED = 22; // px por segundo: despacito, e igual en cualquier monitor
-    const step = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000); // clamp si hubo un lag
-      last = now;
-      const userBusy =
-        drag.current.down ||
-        touchActive.current ||
-        arrowScrolling.current ||
-        now < holdUntil.current;
-      if (!userBusy) {
-        const half = track.scrollWidth / 2;
-        pos += SPEED * dt;
-        if (half > 0 && pos >= half) pos -= half;
-        track.scrollLeft = pos;
-      } else {
-        pos = track.scrollLeft; // el usuario movió a mano: resincronizamos
-      }
-      raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [loop]);
+  }, [categories.length]);
 
   function onPointerDown(e: RPointerEvent<HTMLDivElement>) {
     const track = trackRef.current;
     if (!track) return;
-    if (e.pointerType !== "mouse") {
-      // Touch: el scroll lo hace el NAVEGADOR (nativo, fluido). Solo
-      // pausamos el auto-scroll mientras el dedo está apoyado.
-      touchActive.current = true;
-      return;
-    }
+    // Touch: el scroll lo hace el NAVEGADOR (nativo, fluido).
+    if (e.pointerType !== "mouse") return;
     drag.current = {
       down: true,
       moved: false,
@@ -173,13 +120,7 @@ export function CategoryCircles({
     if (Math.abs(dx) > 5) drag.current.moved = true;
     track.scrollLeft = drag.current.startScroll - dx;
   }
-  function endDrag(e?: RPointerEvent<HTMLDivElement>) {
-    if (e && e.pointerType !== "mouse") {
-      touchActive.current = false;
-      // Respiro para que la inercia del swipe termine sin que el auto la pise.
-      holdUntil.current = performance.now() + 2200;
-      return;
-    }
+  function endDrag() {
     drag.current.down = false;
   }
   // Si el click viene de un arrastre, no navegamos.
@@ -190,19 +131,10 @@ export function CategoryCircles({
     }
   }
 
-  // Flechas: desplazan ~2 círculos, con wrap para que se sienta infinito.
+  /** Flechas: desplazan ~3 círculos. Al llegar al borde, se frena (no da la
+   *  vuelta): la lista tiene principio y fin, como lo que ve el cliente. */
   function nudge(dir: 1 | -1) {
-    const track = trackRef.current;
-    if (!track) return;
-    // Pausamos el auto-scroll mientras corre la animación suave (si no, el
-    // rAF le pisa el scrollLeft y la flecha no mueve).
-    arrowScrolling.current = true;
-    const half = track.scrollWidth / 2;
-    if (dir < 0 && loop && track.scrollLeft < 300) track.scrollLeft += half;
-    track.scrollBy({ left: dir * 300, behavior: "smooth" });
-    window.setTimeout(() => {
-      arrowScrolling.current = false;
-    }, 650);
+    trackRef.current?.scrollBy({ left: dir * 340, behavior: "smooth" });
   }
 
   const showArrows = isDesktop && overflowing;
@@ -239,7 +171,7 @@ export function CategoryCircles({
 
       <div
         ref={trackRef}
-        className={`cat-carousel ${loop ? "" : "cat-carousel--static"}`}
+        className={`cat-carousel ${overflowing ? "" : "cat-carousel--static"}`}
         style={{
           display: "flex",
           gap: 20,
@@ -247,28 +179,27 @@ export function CategoryCircles({
           padding: "8px 2px 12px",
           scrollSnapType: "none",
           scrollbarWidth: "none",
-          cursor: loop ? "grab" : "default",
-          justifyContent: loop ? "flex-start" : "center",
-          flexWrap: loop ? "nowrap" : "wrap",
+          // Si entran todas, centradas; si no, se arrastran de a una pasada.
+          cursor: overflowing ? "grab" : "default",
+          justifyContent: overflowing ? "flex-start" : "center",
+          flexWrap: "nowrap",
           // Deja el pan horizontal NATIVO en touch (sin esto, el navegador
           // duda entre scrollear la página o el carrusel y se traba).
           touchAction: "pan-x",
         }}
         // Sin pausa por hover (Ale: "no debe pararse"); el mouseleave solo
         // suelta un drag de mouse que quedó a medias.
-        onMouseLeave={() => {
-          drag.current.down = false;
-        }}
+        onMouseLeave={endDrag}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
       >
-        {items.map((category, i) => {
+        {categories.map((category) => {
           const cc = category.color ?? "#C9A84C";
           return (
             <Link
-              key={`${category.id}-${i}`}
+              key={category.id}
               href={`/catalogo?category=${category.slug}`}
               className="cat-circle"
               style={{
