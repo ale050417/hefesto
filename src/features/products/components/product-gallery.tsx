@@ -79,7 +79,34 @@ export function ProductGallery({
             className="object-contain"
             priority
           />
-        ) : null}
+        ) : (
+          /* Producto sin foto cargada: antes quedaba un rectángulo NEGRO
+             enorme y parecía que la página estaba rota (2026-08-03). */
+          <div className="text-faint absolute inset-0 grid place-items-center gap-2 text-center">
+            <div>
+              <svg
+                viewBox="0 0 24 24"
+                width="46"
+                height="46"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="mx-auto opacity-60"
+                aria-hidden
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <path d="m21 15-5-5L5 21" />
+              </svg>
+              <p className="mt-2 text-[13px]">Foto en camino</p>
+              <p className="mt-0.5 text-[11.5px] opacity-80">
+                Escribinos por WhatsApp y te la mandamos
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

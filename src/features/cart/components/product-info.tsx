@@ -118,6 +118,25 @@ export function ProductInfo({
   // Multicolor con COMBINACIONES: el label ya lleva los colores → color null
   // para no duplicar. Multicolor con tamaños o fijo: todos los colores de la
   // pieza. Color único: el elegido.
+  // Colores que se ofrecen: en un combo multicolor, los del combo elegido; si
+  // no, los del producto.
+  const colorChoices =
+    isCombo && selected
+      ? selected.label.split(" + ").map((x) => x.trim())
+      : product.colors;
+  // Con MUCHOS colores, los chips con nombre + precio tapaban media pantalla
+  // (el "Cuadro de Messi" tiene 18 y ocupaban 5 filas). A partir de 10 se
+  // muestran solo los círculos y el nombre del elegido va arriba (2026-08-03).
+  const compactColors = !isMulti && colorChoices.length > 10;
+  // ¿Algún color cuesta distinto? (para explicar el punto dorado).
+  const hasSpecialPrice =
+    !isMulti &&
+    colorChoices.some((c) => {
+      const own = selected
+        ? (selected.colorPrices[c] ?? 0)
+        : (product.colorPrices[c] ?? 0);
+      return own > 0 && own !== beforeColor;
+    });
   const lineColor = isMulti
     ? isCombo
       ? null
@@ -215,17 +234,77 @@ export function ProductInfo({
           <div>
             <p className="text-fg mb-2 text-sm font-medium">
               {isMulti ? "Colores de la pieza" : "Color"}
+              {/* El nombre del elegido va ACÁ, no repetido en cada chip: con 18
+                  colores, escribir el nombre y el precio en cada uno tapaba
+                  media pantalla (pedido de Ale, 2026-08-03). */}
+              {!isMulti && color ? (
+                <span className="text-primary ml-1.5 font-semibold">
+                  {color}
+                </span>
+              ) : null}
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div
+              className={cn(
+                "flex flex-wrap",
+                compactColors ? "gap-2.5" : "gap-2",
+              )}
+            >
               {/* Multicolor con COMBINACIONES: se muestran los colores del combo
                   ELEGIDO (label "Negro + Rojo"). Si la variante es un TAMAÑO
                   ("15 cm", sin " + "), NO es un combo: van los colores del
                   producto (bug chihuahua: mostraba "15 cm" como color gris). */}
-              {(isCombo && selected
-                ? selected.label.split(" + ").map((s) => s.trim())
-                : product.colors
-              ).map((c) => {
+              {colorChoices.map((c) => {
                 const active = !isMulti && color === c;
+                const hex = product.colorHex[c] ?? "#888";
+                // Precio del color: con tamaño elegido, la celda de SU matriz;
+                // sin tamaños, el precio por color del producto. Solo se
+                // ANUNCIA si es DISTINTO del precio del resto: repetir el mismo
+                // número en cada chip era ruido puro.
+                const own = selected
+                  ? (selected.colorPrices[c] ?? 0)
+                  : (product.colorPrices[c] ?? 0);
+                const showPrice = !isMulti && own > 0 && own !== beforeColor;
+
+                // MODO COMPACTO (más de 10 colores): solo el círculo. El nombre
+                // se lee arriba y en el tooltip. 18 colores entran en 2 filas
+                // en vez de 5.
+                if (compactColors) {
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      title={showPrice ? `${c} · ${formatPrice(own)}` : c}
+                      aria-label={c}
+                      aria-pressed={active}
+                      onClick={() => setColor(c)}
+                      className={cn(
+                        "relative grid h-9 w-9 place-items-center rounded-full border-2 transition-colors",
+                        active
+                          ? "border-primary"
+                          : "border-surface-3 hover:border-primary",
+                      )}
+                    >
+                      <span
+                        style={{
+                          width: 22,
+                          height: 22,
+                          borderRadius: "50%",
+                          background: hex,
+                          border: "1px solid rgba(255,255,255,.25)",
+                          display: "inline-block",
+                        }}
+                      />
+                      {/* Punto dorado: este color cuesta distinto. */}
+                      {showPrice ? (
+                        <span
+                          aria-hidden
+                          className="bg-primary absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full"
+                        />
+                      ) : null}
+                    </button>
+                  );
+                }
+
                 return (
                   <button
                     key={c}
@@ -246,20 +325,13 @@ export function ProductInfo({
                         width: 13,
                         height: 13,
                         borderRadius: "50%",
-                        background: product.colorHex[c] ?? "#888",
+                        background: hex,
                         border: "1px solid rgba(255,255,255,.25)",
                         display: "inline-block",
                       }}
                     />
                     {c}
-                    {(() => {
-                      // Precio del chip: con tamaño elegido, la celda de SU
-                      // matriz; sin tamaños, el precio por color del producto.
-                      const p = selected
-                        ? (selected.colorPrices[c] ?? 0)
-                        : (product.colorPrices[c] ?? 0);
-                      return !isMulti && p > 0 ? ` · ${formatPrice(p)}` : "";
-                    })()}
+                    {showPrice ? ` · ${formatPrice(own)}` : ""}
                   </button>
                 );
               })}
@@ -267,6 +339,10 @@ export function ProductInfo({
             {isMulti ? (
               <p className="text-faint mt-1 text-xs">
                 Esta pieza se imprime con todos estos colores.
+              </p>
+            ) : hasSpecialPrice ? (
+              <p className="text-faint mt-1.5 text-xs">
+                Los colores con punto dorado tienen otro precio.
               </p>
             ) : null}
           </div>

@@ -23,7 +23,27 @@ export function ProductCard({ product }: { product: ProductView }) {
               transform: `scale(${Math.max(1, product.primaryImage.scale)})`,
             }}
           />
-        ) : null}
+        ) : (
+          /* Sin foto: un ícono tenue en vez de un rectángulo vacío. */
+          <span className="text-faint absolute inset-0 grid place-items-center">
+            <svg
+              viewBox="0 0 24 24"
+              width="34"
+              height="34"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="opacity-50"
+              aria-hidden
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="m21 15-5-5L5 21" />
+            </svg>
+          </span>
+        )}
         <div className="prod-badges">
           {/* El % solo si la oferta de verdad es lo que se paga (con tamaños
               con precio propio el sale_price no se aplica). */}
