@@ -196,12 +196,21 @@ export default async function Home({
   // Ocultamos las que no llevan a NINGÚN producto (ni directo ni en sus
   // subcategorías): una categoría en "0 productos" da sensación de tienda a
   // medio armar. Un padre con productos solo en sus hijas SÍ se muestra.
-  const parentCategories = categories.filter(
-    (c) =>
-      !c.parentId &&
-      (c.productCount > 0 ||
-        categories.some((s) => s.parentId === c.id && s.productCount > 0)),
-  );
+  // El conteo del círculo suma las HIJAS: un padre cuyos productos están todos
+  // en subcategorías mostraba "0 productos" aunque al entrar hubiera 12
+  // (2026-07-29). Solo van categorías PRINCIPALES: las subcategorías se ven
+  // dentro del catálogo, no en la home.
+  const parentCategories = categories
+    .filter((c) => !c.parentId)
+    .map((c) => ({
+      ...c,
+      productCount:
+        c.productCount +
+        categories
+          .filter((s) => s.parentId === c.id)
+          .reduce((sum, s) => sum + s.productCount, 0),
+    }))
+    .filter((c) => c.productCount > 0);
   // FAQ editable: si el dueño cargó preguntas desde Config, usamos esas; si no,
   // las de por defecto (compactas).
   const faqList = brand.faq?.length ? brand.faq : DEFAULT_FAQ;
@@ -314,7 +323,7 @@ export default async function Home({
             <div className="sec-head">
               <div>
                 <div className="eyebrow">Explorá</div>
-                <h2 className="sec-title">Categorías destacadas</h2>
+                <h2 className="sec-title">Categorías</h2>
               </div>
               <Link
                 href="/catalogo"

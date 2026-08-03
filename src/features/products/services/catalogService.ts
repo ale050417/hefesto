@@ -36,6 +36,7 @@ import { unstable_cache } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { deleteObject, optimizeImage, uploadObject } from "@/core/storage";
 import { priceRange } from "../pricing";
+import { isNewProduct } from "../new-product";
 import {
   productFilterSchema,
   type CategoryInput,
@@ -109,7 +110,8 @@ export function toProductView(p: ProductWithRelations): ProductView {
     priceFrom: range.from,
     saleApplies,
     needsChoice,
-    isNew: p.isNew,
+    // Calculado por fecha: ya no hay casilla que tildar (2026-07-29).
+    isNew: isNewProduct(p.createdAt),
     isFeatured: p.isFeatured,
     material: p.material,
     categoryId: p.categoryId,
@@ -245,9 +247,15 @@ const getHomeDataUncached = async (): Promise<HomeData> => {
 
   const [featured, latest, onSale, categories] = await Promise.all([
     findFeatured(8),
-    findPublished(section({ isNew: "true" })),
+    // "Nuevos lanzamientos" = los 8 publicados MÁS RECIENTES (el orden por
+    // defecto es `newest`). Antes filtraba por la casilla `is_new`, así que si
+    // el dueño no la tildaba la sección quedaba vacía: publicar un producto ya
+    // ES el lanzamiento, no hace falta declararlo (decisión Ale 2026-07-29).
+    findPublished(section({})),
     findPublished(section({ onSale: "true" })),
-    listCategoriesWithCount(),
+    // La tienda cuenta SOLO publicados: una categoría con puros borradores no
+    // debe figurar como si tuviera productos.
+    listCategoriesWithCount(undefined, { publishedOnly: true }),
   ]);
 
   return {
@@ -302,7 +310,6 @@ function toRow(input: ProductInput) {
       input.amortization != null ? input.amortization.toString() : null,
     profit: input.profit != null ? input.profit.toString() : null,
     isFeatured: input.isFeatured,
-    isNew: input.isNew,
   };
 }
 
@@ -598,7 +605,8 @@ function toAdminRow(p: ProductWithRelations): AdminProductRow {
     price: Number(p.price),
     salePrice: p.salePrice != null ? Number(p.salePrice) : null,
     material: p.material ?? null,
-    isNew: p.isNew,
+    // Calculado por fecha: ya no hay casilla que tildar (2026-07-29).
+    isNew: isNewProduct(p.createdAt),
     categoryId: p.categoryId ?? null,
     categoryName: p.category?.name ?? null,
     primaryImage: primary?.url ?? null,

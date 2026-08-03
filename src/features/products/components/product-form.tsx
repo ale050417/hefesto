@@ -37,7 +37,6 @@ export type ProductFormValues = {
   infillPercent: string;
   productionTime: string;
   isFeatured: boolean;
-  isNew: boolean;
   status: "draft" | "published";
   /** Tamaños (variantes): nombre, precio, material del tamaño (gramos por color
    * en multicolor / peso en color único) y matriz de precios por color. */
@@ -66,7 +65,6 @@ export function ProductForm({
   defaultValues,
   estimator,
   colorCatalog = [],
-  newsSectionActive = true,
   onSaved,
 }: {
   mode: "create" | "edit";
@@ -77,8 +75,6 @@ export function ProductForm({
   estimator: EstimatorContext;
   /** Colores del catálogo (Bloque 1) para elegir los del producto. */
   colorCatalog?: Array<{ name: string; hex: string | null }>;
-  /** ¿Está activa la sección "Nuevos" del home? (para habilitar el check). */
-  newsSectionActive?: boolean;
   /** Si se pasa, en vez de navegar avisa al contenedor (uso en modal). */
   onSaved?: (id: string) => void;
 }) {
@@ -1136,25 +1132,8 @@ export function ProductForm({
             />{" "}
             Destacado
           </label>
-          <label
-            className={cn(
-              "text-fg flex items-center gap-2 text-sm",
-              !newsSectionActive && "opacity-50",
-            )}
-            title={
-              newsSectionActive
-                ? undefined
-                : "Activá la sección “Nuevos lanzamientos” en Configuración › Apariencia"
-            }
-          >
-            <input
-              type="checkbox"
-              className="accent-[var(--gold)]"
-              disabled={!newsSectionActive}
-              {...register("isNew")}
-            />{" "}
-            Nuevo
-          </label>
+          {/* "Nuevo" ya no se tilda: se calcula por fecha (los primeros 30
+              días desde que se creó el producto) — decisión Ale 2026-07-29. */}
         </div>
       </EditSection>
 

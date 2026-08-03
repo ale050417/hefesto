@@ -343,6 +343,11 @@ body > * {
     }
   }
 
+  /* Anclas (#faq del pie): que el encabezado fijo no tape el título al saltar. */
+  :target {
+    scroll-margin-top: 90px;
+  }
+
   /* Botones */
   .btn {
     display: inline-flex;
@@ -3656,11 +3661,36 @@ body > * {
       grid-template-columns: 1fr 1fr;
     }
   }
-  /* Celular angosto: con 2 columnas cada celda queda en ~115px de contenido y
-     "Reimpresión garantizada" / "Valoración promedio" se parten en 4 renglones.
-     Una sola columna, y el número grande un poco más chico (2026-07-29). */
+  /* Banda de confianza en celular: Ale la quiere de IZQUIERDA A DERECHA, igual
+     que en la compu (2026-07-29) — apilada perdía el aire de "tira de
+     beneficios". Como 4 ítems no entran en 390px, se convierte en una tira
+     deslizable: cada ítem con ancho legible y scroll horizontal suave, sin
+     barra a la vista. */
+  @media (max-width: 640px) {
+    .trust-grid {
+      display: flex;
+      grid-template-columns: none;
+      gap: 12px;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      /* Sangría al ras del borde para que se note que hay más a la derecha. */
+      margin-inline: -16px;
+      padding-inline: 16px;
+    }
+    .trust-grid::-webkit-scrollbar {
+      display: none;
+    }
+    .trust-item {
+      flex: 0 0 auto;
+      width: 205px;
+      scroll-snap-align: start;
+    }
+  }
+  /* Los números sí se apilan: son pocos y con la tipografía grande no entran
+     de a dos sin partirse en cuatro renglones. */
   @media (max-width: 520px) {
-    .trust-grid,
     .stats-grid {
       grid-template-columns: 1fr;
     }

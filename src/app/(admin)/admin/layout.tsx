@@ -1,9 +1,11 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { requireStaff } from "@/core/auth/session";
 import { getAllPerms } from "@/core/auth/permissions";
 import { getBrandSettings } from "@/features/settings/service";
 import { PermsProvider } from "@/components/auth/perms-provider";
 import { AdminShell } from "@/components/layout/admin-shell";
+import { ScrollToTopOnNavigate } from "@/components/layout/scroll-to-top-on-navigate";
+import { AdminLiveRefresh } from "@/components/layout/admin-live-refresh";
 
 // Tope de ejecución del render del panel. Sin esto, un request que se
 // cuelga esperando conexión a la DB podía retenerla hasta 300 s (default de
@@ -29,6 +31,12 @@ export default async function AdminLayout({
   );
   return (
     <PermsProvider value={allPerms}>
+      {/* Cambiar de sección empieza arriba, no a mitad de página. */}
+      <Suspense fallback={null}>
+        <ScrollToTopOnNavigate />
+      </Suspense>
+      {/* Lo que carga un empleado aparece solo, sin recargar la página. */}
+      <AdminLiveRefresh />
       <AdminShell perms={verMap} logoUrl={brand?.logoUrl ?? null}>
         {children}
       </AdminShell>

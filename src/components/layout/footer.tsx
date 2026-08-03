@@ -59,7 +59,9 @@ export async function Footer() {
   const email = s?.contactEmail?.trim() || "hola@hefesto3d.com";
   const address =
     s?.addressText?.trim() || "Av. Victoria Aguirre 320, Puerto Iguazú";
-  const topCats = categories.slice(0, 3);
+  // Solo categorías PRINCIPALES: en el pie mezclar padres con subcategorías
+  // hacía parecer que había categorías sueltas que no existen (2026-07-29).
+  const topCats = categories.filter((c) => !c.parentId).slice(0, 3);
 
   return (
     <footer className="footer">

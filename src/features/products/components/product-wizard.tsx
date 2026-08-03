@@ -181,7 +181,6 @@ export function ProductWizard({
   // quiere que se publique solo; si no, lo pasa a Borrador a mano).
   const [status, setStatus] = useState<"draft" | "published">("published");
   const [isFeatured, setIsFeatured] = useState(false);
-  const [isNew, setIsNew] = useState(false);
 
   const colorList = useMemo(
     () =>
@@ -204,6 +203,15 @@ export function ProductWizard({
             .filter((v) => v.comboColors.length >= 2)
             .map((v) => v.comboColors.join(" + "))
         : [];
+  const hasColorPhotos = Object.keys(colorImages).length > 0;
+  // Producto SIMPLE = un solo precio, sin tamaños ni precio por color.
+  const simpleProduct =
+    colorMode === "single" && !hasSizes && !byColor && !multiCombos;
+  // En un producto CON variaciones lo que importa son las fotos de cada color
+  // (el cliente elige por color), no una "principal" genérica: ahí la principal
+  // pasa a ser opcional y la portada es la primera foto de color. En uno simple
+  // se sigue pidiendo (pedido de Ale, 2026-07-29).
+  const mainImageOptional = !simpleProduct && photoColorOptions.length > 0;
   const catName =
     categories.find((c) => c.id === categoryId)?.name ?? "Sin categoría";
   // Insumos: costo total (costo × cantidad de cada uno).
@@ -400,8 +408,10 @@ export function ProductWizard({
     if (step === 3) {
       // Alcanza con UNA imagen: la principal O al menos una foto por color /
       // combinación (la primera subida queda como portada automáticamente).
-      if (!imageFile && Object.keys(colorImages).length === 0)
-        return "Subí al menos una imagen (principal o de un color).";
+      if (!imageFile && !hasColorPhotos)
+        return photoColorOptions.length > 0
+          ? "Subí al menos una foto: la de algún color o la principal."
+          : "Subí la imagen principal.";
     }
     if (step === 2) {
       if (colorMode === "multi" && multiCombos) {
@@ -549,7 +559,6 @@ export function ProductWizard({
       infillPercent: "",
       productionTime,
       isFeatured,
-      isNew,
       // Variantes = tamaños O combinaciones: nombre (combo autogenerado) +
       // precio + material (gramos por color / peso) + matriz (byColor).
       variants: isCombos
@@ -758,42 +767,6 @@ export function ProductWizard({
             están definidos → una fila por cada uno con su "Elegir imagen") */}
         {step === 3 ? (
           <div className="flex flex-col gap-4">
-            <div className="field">
-              <label>
-                Imagen principal <span className="text-danger">*</span>
-              </label>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="input"
-                onChange={(e) => pickImage(e.target.files?.[0] ?? null)}
-              />
-              {imageUrl ? (
-                <div className="mt-2 flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={autoFrame}
-                    >
-                      ✨ Auto-encuadre
-                    </Button>
-                    <span className="text-faint text-[11.5px]">
-                      Centra el objeto para que quede prolijo en la publicación.
-                    </span>
-                  </div>
-                  <div className="text-faint text-[11.5px]">
-                    Arrastrá la imagen en la vista previa para acomodar el
-                    encuadre.
-                  </div>
-                </div>
-              ) : (
-                <div className="text-faint text-[11.5px]">
-                  Obligatoria. Abajo podés sumar más (hasta 5 en total).
-                </div>
-              )}
-            </div>
             {/* FOTO POR COLOR / COMBINACIÓN: una fila por cada uno con su
                 "Elegir imagen" (la tienda salta a esa foto al elegirlo). */}
             {photoColorOptions.length > 0 ? (
@@ -878,6 +851,52 @@ export function ProductWizard({
                 </div>
               </div>
             ) : null}
+
+            <div className="field">
+              <label>
+                Imagen principal{" "}
+                {mainImageOptional ? (
+                  <span className="text-faint font-normal">
+                    (opcional, es la portada)
+                  </span>
+                ) : (
+                  <span className="text-danger">*</span>
+                )}
+              </label>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="input"
+                onChange={(e) => pickImage(e.target.files?.[0] ?? null)}
+              />
+              {imageUrl ? (
+                <div className="mt-2 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={autoFrame}
+                    >
+                      ✨ Auto-encuadre
+                    </Button>
+                    <span className="text-faint text-[11.5px]">
+                      Centra el objeto para que quede prolijo en la publicación.
+                    </span>
+                  </div>
+                  <div className="text-faint text-[11.5px]">
+                    Arrastrá la imagen en la vista previa para acomodar el
+                    encuadre.
+                  </div>
+                </div>
+              ) : (
+                <div className="text-faint text-[11.5px]">
+                  {mainImageOptional
+                    ? "No hace falta: si no subís una, la portada es la primera foto de color."
+                    : "Obligatoria. Abajo podés sumar más (hasta 5 en total)."}
+                </div>
+              )}
+            </div>
 
             <div className="field">
               <label>
@@ -1659,38 +1678,13 @@ export function ProductWizard({
                     onChange={(e) => setIsFeatured(e.target.checked)}
                   />
                 </label>
-                <label
-                  className={cn(
-                    "flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] p-3",
-                    sections.nuevos ? "cursor-pointer" : "opacity-50",
-                  )}
-                  title={
-                    sections.nuevos
-                      ? undefined
-                      : "Activá “Nuevos lanzamientos” en Configuración › Apariencia"
-                  }
-                >
-                  <span>
-                    <span className="text-fg block text-[13.5px] font-semibold">
-                      Nuevo lanzamiento
-                    </span>
-                    <span className="text-faint block text-[11.5px] leading-snug">
-                      Aparece en Nuevos lanzamientos del inicio.
-                    </span>
-                  </span>
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 shrink-0 accent-[var(--gold)]"
-                    disabled={!sections.nuevos}
-                    checked={isNew}
-                    onChange={(e) => setIsNew(e.target.checked)}
-                  />
-                </label>
               </div>
               <div className="text-faint mt-2 rounded-lg bg-[var(--surface-2)] p-2.5 text-[11.5px] leading-relaxed">
+                <b className="text-dim">Nuevos lanzamientos</b>,{" "}
                 <b className="text-dim">Ofertas de la semana</b> y{" "}
-                <b className="text-dim">Más vendidos</b> son automáticas (por
-                descuentos y por ventas). No se asignan a mano.
+                <b className="text-dim">Más vendidos</b> son automáticas. Al
+                publicarlo ya entra en Nuevos lanzamientos y sale solo a los 30
+                días; las otras dos salen de los descuentos y las ventas.
               </div>
             </div>
           </div>
@@ -1757,11 +1751,11 @@ export function ProductWizard({
               className="absolute top-2 left-2 flex gap-1"
               style={{ pointerEvents: "none" }}
             >
-              {isNew ? (
-                <span className="rounded bg-[var(--gold)] px-2 py-0.5 text-[10px] font-semibold text-black">
-                  Nuevo
-                </span>
-              ) : null}
+              {/* Recién creado ⇒ siempre lleva el cartel "Nuevo" (sale solo
+                  a los 30 días). */}
+              <span className="rounded bg-[var(--gold)] px-2 py-0.5 text-[10px] font-semibold text-black">
+                Nuevo
+              </span>
               {isFeatured ? (
                 <span className="rounded bg-black/70 px-2 py-0.5 text-[10px] font-semibold text-white">
                   Destacado

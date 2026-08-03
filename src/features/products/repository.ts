@@ -3,6 +3,7 @@ import {
   asc,
   desc,
   eq,
+  gte,
   ilike,
   inArray,
   isNotNull,
@@ -18,6 +19,7 @@ import {
   productVariants,
   products,
 } from "@/core/db/schema";
+import { newSince } from "./new-product";
 import type { ProductFilter } from "./schemas";
 import type {
   Category,
@@ -91,7 +93,9 @@ export async function findPublished(
   if (filter.maxPrice !== undefined) {
     conditions.push(sql`${products.price} <= ${filter.maxPrice}`);
   }
-  if (filter.isNew) conditions.push(eq(products.isNew, true));
+  // "Solo novedades" = publicado en los últimos 30 días (antes miraba la
+  // casilla is_new, que había que tildar a mano y nadie destildaba nunca).
+  if (filter.isNew) conditions.push(gte(products.createdAt, newSince()));
   if (filter.onSale) conditions.push(sql`${products.salePrice} IS NOT NULL`);
 
   const where = and(...conditions);
@@ -503,9 +507,27 @@ export async function countProductsInCategory(
   return rows[0]?.count ?? 0;
 }
 
+/**
+ * Categorías con cuántos productos tienen.
+ *
+ * `publishedOnly` cambia QUÉ se cuenta y es importante:
+ * - la TIENDA tiene que contar solo publicados (una categoría cuyos productos
+ *   están todos en borrador figuraba con "1 producto" y al entrar no había
+ *   nada);
+ * - el ADMIN cuenta TODOS (incluidos borradores y archivados), porque el conteo
+ *   ahí sirve para saber si la categoría está en uso antes de borrarla.
+ */
 export async function listCategoriesWithCount(
-  database: Database = db,
+  database: Database | undefined = db,
+  opts: { publishedOnly?: boolean } = {},
 ): Promise<CategoryWithCount[]> {
+  database ??= db;
+  const join = opts.publishedOnly
+    ? and(
+        eq(products.categoryId, categories.id),
+        eq(products.status, "published"),
+      )
+    : eq(products.categoryId, categories.id);
   return database
     .select({
       id: categories.id,
@@ -520,7 +542,7 @@ export async function listCategoriesWithCount(
       productCount: sql<number>`count(${products.id})::int`,
     })
     .from(categories)
-    .leftJoin(products, eq(products.categoryId, categories.id))
+    .leftJoin(products, join)
     .groupBy(categories.id)
     .orderBy(asc(categories.sortOrder), asc(categories.name));
 }

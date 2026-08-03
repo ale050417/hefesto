@@ -136,7 +136,6 @@ export async function getProductFormDataAction(id: string): Promise<
     infillPercent: product.infillPercent?.toString() ?? "",
     productionTime: product.productionTime ?? "",
     isFeatured: product.isFeatured,
-    isNew: product.isNew,
     status: product.status === "published" ? "published" : "draft",
     variants: variants.map((v) => ({
       label: v.label,

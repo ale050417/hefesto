@@ -1,7 +1,8 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
 import { ToTop } from "@/components/layout/to-top";
+import { ScrollToTopOnNavigate } from "@/components/layout/scroll-to-top-on-navigate";
 import { WhatsappFab } from "@/components/layout/whatsapp-fab";
 import { TopBanner } from "@/components/layout/top-banner";
 import { CartDrawer } from "@/features/cart/components/cart-drawer";
@@ -18,6 +19,10 @@ export default function StorefrontLayout({
 }) {
   return (
     <div className="flex min-h-dvh flex-col">
+      {/* useSearchParams necesita Suspense en el layout (Next 15+). */}
+      <Suspense fallback={null}>
+        <ScrollToTopOnNavigate />
+      </Suspense>
       <Header />
       <TopBanner />
       <main className="flex-1">{children}</main>

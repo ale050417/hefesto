@@ -2,7 +2,7 @@
 export const HOME_SECTIONS: Array<{ id: string; label: string; icon: string }> =
   [
     { id: "trustBar", label: "Banda de confianza", icon: "shield" },
-    { id: "categorias", label: "Categorías destacadas", icon: "grid" },
+    { id: "categorias", label: "Categorías", icon: "grid" },
     { id: "nuevos", label: "Nuevos lanzamientos", icon: "sparkles" },
     { id: "stats", label: "Hefesto en números", icon: "chart" },
     { id: "ofertas", label: "Ofertas de la semana", icon: "zap" },

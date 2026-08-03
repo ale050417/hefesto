@@ -91,7 +91,6 @@ export const productInputSchema = z
     // Estado elegible al CREAR (borrador/publicado). En edición se maneja aparte.
     status: z.enum(["draft", "published", "archived"]).optional(),
     isFeatured: z.boolean().default(false),
-    isNew: z.boolean().default(false),
     // Variantes por TAMAÑO, cada una con su precio (opcional; vacío = precio
     // base). Se guardan en product_variants; el checkout cobra el precio del
     // tamaño elegido. Los labels no se pueden repetir dentro del producto.
