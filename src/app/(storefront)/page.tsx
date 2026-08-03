@@ -244,10 +244,10 @@ export default async function Home({
       l: "Clientes felices",
       ic: "users",
     },
-    { value: 12, l: "Materiales y acabados", ic: "layers" },
-    // La "Valoración promedio 4.9★" salió (2026-08-03): las reseñas están
-    // apagadas, así que era un número inventado en una sección que se llama
-    // "Hefesto en números".
+    // Quedan SOLO estos dos, y los dos salen de la base. Se fueron la
+    // "Valoración promedio 4.9★" (las reseñas están apagadas) y los "12
+    // materiales y acabados" (número escrito a mano que además contradecía la
+    // sección "Materiales que imprimimos", que muestra uno solo). 2026-08-03.
   ];
   const show = (id: string) => isPreview || sectionOn(brand.homeSections, id);
   const previewHidden = (id: string) =>
