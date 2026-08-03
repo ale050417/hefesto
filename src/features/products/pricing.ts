@@ -64,3 +64,66 @@ export function saleUnitPrice(params: {
     color ?? null,
   );
 }
+
+/** Producto tal como lo necesita `priceRange` (subconjunto de la fila + variantes). */
+export type PriceableProduct = {
+  /** `products.price` ya numérico. */
+  price: number;
+  /** `products.sale_price` numérico o null. */
+  salePrice: number | null;
+  colorMode: "single" | "multi";
+  colors: string[];
+  /** Solo significa PRECIO en color único (en multi son gramos). */
+  colorPrices: Record<string, number>;
+  variants: { price: number | null; colorPrices: Record<string, number> }[];
+};
+
+/**
+ * Rango REAL de precios de un producto: el mínimo y el máximo que un cliente
+ * puede llegar a pagar, recorriendo TODAS las combinaciones comprables
+ * (tamaño × color) con `saleUnitPrice` — la misma función que cobra el servidor.
+ *
+ * Por qué existe (bug del casco, 2026-07-29): la tarjeta del catálogo mostraba
+ * `products.price` crudo. Si el producto tiene tamaños con precio propio (o
+ * precio por color), ese número NO es comprable: el casco figuraba en $1.200
+ * y al entrar valía varias veces más. Un precio que el cliente no puede pagar
+ * es peor que no mostrar precio.
+ *
+ * `from` = hay más de un precio posible → la tarjeta muestra "desde". Con un
+ * solo precio posible (aunque haya 3 tamaños, todos al mismo valor) NO se
+ * muestra "desde", que ahí sería ruido.
+ */
+export function priceRange(p: PriceableProduct): {
+  min: number;
+  max: number;
+  from: boolean;
+} {
+  const onSale = p.salePrice != null && p.salePrice < p.price;
+  const basePrice = onSale ? (p.salePrice as number) : p.price;
+
+  // Ejes de la combinatoria. `[null]` = "no se elige" (sin tamaños / multicolor
+  // o sin colores cargados), que es exactamente lo que manda la página.
+  const variants: (PriceableProduct["variants"][number] | null)[] =
+    p.variants.length > 0 ? p.variants : [null];
+  const colors: (string | null)[] =
+    p.colorMode === "single" && p.colors.length > 0 ? p.colors : [null];
+
+  const prices: number[] = [];
+  for (const variant of variants) {
+    for (const color of colors) {
+      prices.push(
+        saleUnitPrice({
+          basePrice,
+          colorMode: p.colorMode,
+          productColorPrices: p.colorPrices,
+          variant,
+          color,
+        }),
+      );
+    }
+  }
+
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  return { min, max, from: max > min };
+}

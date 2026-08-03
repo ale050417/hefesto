@@ -270,17 +270,17 @@ export default async function MyOrdersPage() {
               return (
                 <div
                   key={o.orderNumber}
-                  className={`ui-card order-card${o.status === "ready" ? "is-ready" : ""}`}
+                  className={`ui-card order-card ${o.status === "ready" ? "is-ready" : ""}`}
                 >
-                  <div className="mb-4 flex items-center justify-between">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-3">
                       <div
-                        className={`oc-ic${o.status === "ready" ? "ready" : ""}`}
+                        className={`oc-ic ${o.status === "ready" ? "ready" : ""}`}
                       >
                         <Icon name={STATUS_ICON[o.status]} />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <b>{o.orderNumber}</b>
                           <Badge variant={ORDER_STATUS_VARIANT[o.status]}>
                             {ORDER_STATUS_LABEL[o.status]}
@@ -308,7 +308,7 @@ export default async function MyOrdersPage() {
                     ))}
                   </div>
 
-                  <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3.5">
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] pt-3.5">
                     <span className="text-faint text-[12.5px]">
                       {o.units} {o.units === 1 ? "producto" : "productos"} ·{" "}
                       {PAYMENT_METHOD_LABEL[o.paymentMethod]}

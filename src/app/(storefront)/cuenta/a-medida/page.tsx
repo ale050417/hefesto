@@ -105,7 +105,7 @@ export default async function CustomRequestsPage({
                 <Link
                   key={r.id}
                   href={`/cuenta/a-medida?req=${r.id}`}
-                  className={`acc-chat-conv${!showNew && selectedId === r.id ? "on" : ""}`}
+                  className={`acc-chat-conv ${!showNew && selectedId === r.id ? "on" : ""}`}
                 >
                   <span
                     className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg"

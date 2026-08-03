@@ -35,9 +35,12 @@ export function ProductGallery({
   const main = images[active] ?? images[0];
 
   return (
-    <div className="flex gap-3">
+    // En celular las miniaturas van DEBAJO en fila (el riel vertical de 64px se
+    // comía el 18% del ancho y achicaba la foto principal); de lg para arriba
+    // vuelve la barra lateral izquierda de siempre.
+    <div className="flex flex-col-reverse gap-3 lg:flex-row">
       {images.length > 1 ? (
-        <div className="flex shrink-0 flex-col gap-2" style={{ width: 64 }}>
+        <div className="flex shrink-0 gap-2 overflow-x-auto lg:w-16 lg:flex-col lg:overflow-visible">
           {images.map((img, i) => (
             <button
               key={i}
@@ -45,7 +48,7 @@ export function ProductGallery({
               onClick={() => setActive(i)}
               aria-label={`Ver imagen ${i + 1}`}
               className={cn(
-                "bg-surface-2 relative aspect-square overflow-hidden rounded-md border-2 transition-colors",
+                "bg-surface-2 relative aspect-square w-16 shrink-0 overflow-hidden rounded-md border-2 transition-colors lg:w-auto",
                 i === active
                   ? "border-[var(--gold)]"
                   : "border-surface-2 hover:border-surface-3",

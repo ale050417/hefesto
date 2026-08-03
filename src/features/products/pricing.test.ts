@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { colorUnitPrice, saleUnitPrice } from "./pricing";
+import { colorUnitPrice, priceRange, saleUnitPrice } from "./pricing";
 
 describe("colorUnitPrice (precio por color, modo color único)", () => {
   it("cobra el precio EXACTO del color elegido (absoluto, no recargo)", () => {
@@ -115,5 +115,121 @@ describe("saleUnitPrice (venta manual con variante elegida)", () => {
         productColorPrices: { Dorado: 1300 },
       }),
     ).toBe(1000);
+  });
+});
+
+describe("priceRange (precio de la tarjeta = el mínimo comprable)", () => {
+  const base = {
+    price: 1200,
+    salePrice: null,
+    colorMode: "single" as const,
+    colors: [] as string[],
+    colorPrices: {} as Record<string, number>,
+    variants: [] as {
+      price: number | null;
+      colorPrices: Record<string, number>;
+    }[],
+  };
+
+  it("producto simple: el precio es el precio, sin 'desde'", () => {
+    expect(priceRange(base)).toEqual({ min: 1200, max: 1200, from: false });
+  });
+
+  it("BUG DEL CASCO: con tamaños más caros NO muestra la base fantasma", () => {
+    // La base ($1.200) no la puede pagar nadie: al elegir tamaño se cobra el
+    // precio del tamaño. La tarjeta tiene que arrancar en el más barato REAL.
+    const r = priceRange({
+      ...base,
+      variants: [
+        { price: 8000, colorPrices: {} },
+        { price: 12000, colorPrices: {} },
+      ],
+    });
+    expect(r.min).toBe(8000);
+    expect(r.max).toBe(12000);
+    expect(r.from).toBe(true);
+  });
+
+  it("tamaños todos al mismo precio → sin 'desde' (sería ruido)", () => {
+    const r = priceRange({
+      ...base,
+      variants: [
+        { price: 5000, colorPrices: {} },
+        { price: 5000, colorPrices: {} },
+      ],
+    });
+    expect(r).toEqual({ min: 5000, max: 5000, from: false });
+  });
+
+  it("tamaño sin precio propio → hereda la base", () => {
+    const r = priceRange({
+      ...base,
+      variants: [
+        { price: null, colorPrices: {} },
+        { price: 3000, colorPrices: {} },
+      ],
+    });
+    expect(r).toEqual({ min: 1200, max: 3000, from: true });
+  });
+
+  it("precio por color sin tamaños: manda el color más barato", () => {
+    const r = priceRange({
+      ...base,
+      price: 300,
+      colors: ["Amarillo", "Arcoíris"],
+      colorPrices: { Amarillo: 300, Arcoíris: 3000 },
+    });
+    expect(r).toEqual({ min: 300, max: 3000, from: true });
+  });
+
+  it("un color más barato que la base también baja el mínimo", () => {
+    const r = priceRange({
+      ...base,
+      price: 1000,
+      colors: ["Negro", "Dorado"],
+      colorPrices: { Negro: 800, Dorado: 1300 },
+    });
+    expect(r).toEqual({ min: 800, max: 1300, from: true });
+  });
+
+  it("matriz tamaño × color: recorre TODAS las combinaciones", () => {
+    const r = priceRange({
+      ...base,
+      price: 1000,
+      colors: ["Azul", "Morado"],
+      colorPrices: {},
+      variants: [
+        { price: 2000, colorPrices: { Morado: 2500 } }, // Azul 2000, Morado 2500
+        { price: 4000, colorPrices: { Morado: 4500 } }, // Azul 4000, Morado 4500
+      ],
+    });
+    expect(r).toEqual({ min: 2000, max: 4500, from: true });
+  });
+
+  it("la oferta baja el mínimo cuando NO hay tamaños con precio propio", () => {
+    expect(priceRange({ ...base, price: 2000, salePrice: 1500 }).min).toBe(
+      1500,
+    );
+  });
+
+  it("con tamaños con precio propio la oferta NO aplica (y no debe mentir)", () => {
+    const r = priceRange({
+      ...base,
+      price: 2000,
+      salePrice: 1500,
+      variants: [{ price: 9000, colorPrices: {} }],
+    });
+    expect(r.min).toBe(9000); // ni 1500 ni 2000: se cobra el tamaño
+  });
+
+  it("multicolor: color_prices son GRAMOS, no tocan el precio", () => {
+    const r = priceRange({
+      ...base,
+      price: 5000,
+      colorMode: "multi",
+      colors: ["Rojo", "Azul"],
+      colorPrices: { Rojo: 30, Azul: 20 },
+    });
+    expect(r).toEqual({ min: 5000, max: 5000, from: false });
   });
 });

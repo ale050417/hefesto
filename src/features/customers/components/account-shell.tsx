@@ -60,7 +60,7 @@ export async function AccountShell({ children }: { children: ReactNode }) {
     <>
       <div className="ui-card acc-hero">
         <div className="acc-hero-bg" />
-        <div className="relative z-[2] flex items-center gap-4">
+        <div className="relative z-[2] flex flex-wrap items-center gap-4">
           <span
             className="avatar"
             style={{
@@ -72,9 +72,9 @@ export async function AccountShell({ children }: { children: ReactNode }) {
           >
             {initial}
           </span>
-          <div className="grow">
+          <div className="min-w-0 grow">
             <h1 className="font-display text-2xl font-bold">{name}</h1>
-            <div className="text-faint mt-1 text-sm">
+            <div className="text-faint mt-1 text-sm break-words">
               {user.email}
               {since ? ` · Cliente desde ${since}` : ""}
             </div>

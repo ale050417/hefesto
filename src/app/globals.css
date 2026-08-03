@@ -1092,6 +1092,11 @@ body > * {
   }
   .prod-price {
     display: flex;
+    /* En celular la tarjeta mide ~140px útiles: "desde $12.500 $15.000" no
+       entra en una línea y `.prod-card` tiene overflow:hidden, así que el
+       tachado se recortaba. Que baje de renglón en vez de cortarse. */
+    flex-wrap: wrap;
+    row-gap: 2px;
     align-items: baseline;
     gap: 8px;
     margin-top: auto;
@@ -2534,6 +2539,14 @@ body > * {
     color: var(--text-faint);
     font-weight: 600;
   }
+  /* 5 pasos repartidos en ~320px = 64px cada uno: a 10.5px "En producción" se
+     partía en dos renglones y desalineaba la fila (2026-07-29). */
+  @media (max-width: 480px) {
+    .oc-step .ocs-label {
+      font-size: 9.5px;
+      line-height: 1.15;
+    }
+  }
   .oc-step.done .ocs-dot {
     background: var(--success);
     color: #fff;
@@ -2569,6 +2582,13 @@ body > * {
     margin-bottom: 24px;
     position: relative;
     overflow: hidden;
+  }
+  /* En celular esos 28px de costado se comían 56px de los ~390 disponibles y
+     el email quedaba en 4 renglones contra el botón de salir (2026-07-29). */
+  @media (max-width: 640px) {
+    .acc-hero {
+      padding: 18px 16px;
+    }
   }
   .acc-hero-bg {
     position: absolute;
@@ -3192,6 +3212,13 @@ body > * {
       min-width: 140px;
     }
   }
+  /* Celular: con dos por fila, "Perfil y direcciones" / "Seguir mis pedidos"
+     se parten en dos renglones y las filas quedan desparejas (2026-07-29). */
+  @media (max-width: 480px) {
+    .acc-navitem {
+      min-width: 100%;
+    }
+  }
 
   /* ===== Home completo al estilo index ===== */
   .ph {
@@ -3467,7 +3494,13 @@ body > * {
   }
   @media (max-width: 768px) {
     .gallery-grid {
+      /* Alto automático + celda cuadrada: con `grid-auto-rows: 150px` fijo las
+         fotos quedaban 170x150 (deformadas) en celular. */
       grid-template-columns: repeat(2, 1fr);
+      grid-auto-rows: auto;
+    }
+    .gallery-grid > * {
+      aspect-ratio: 1 / 1;
     }
   }
 
@@ -3621,6 +3654,21 @@ body > * {
     .trust-grid,
     .stats-grid {
       grid-template-columns: 1fr 1fr;
+    }
+  }
+  /* Celular angosto: con 2 columnas cada celda queda en ~115px de contenido y
+     "Reimpresión garantizada" / "Valoración promedio" se parten en 4 renglones.
+     Una sola columna, y el número grande un poco más chico (2026-07-29). */
+  @media (max-width: 520px) {
+    .trust-grid,
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+    .stat-card {
+      padding: 20px 14px;
+    }
+    .stat-n {
+      font-size: 28px;
     }
   }
 }

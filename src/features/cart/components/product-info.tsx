@@ -165,7 +165,7 @@ export function ProductInfo({
 
       {/* Precio dinámico: cambia con la variante/color elegido. */}
       <div className="mt-4 flex items-baseline gap-3">
-        <span className="font-display text-fg text-4xl">
+        <span className="font-display text-fg text-3xl sm:text-4xl">
           {formatPrice(unitPrice)}
         </span>
         {showStrike ? (
@@ -278,7 +278,7 @@ export function ProductInfo({
             <button
               type="button"
               onClick={() => setQty((q) => Math.max(1, q - 1))}
-              className="border-surface-3 text-fg h-9 w-9 rounded-md border"
+              className="border-surface-3 text-fg h-11 w-11 rounded-md border sm:h-9 sm:w-9"
               aria-label="Restar"
             >
               −
@@ -287,7 +287,7 @@ export function ProductInfo({
             <button
               type="button"
               onClick={() => setQty((q) => q + 1)}
-              className="border-surface-3 text-fg h-9 w-9 rounded-md border"
+              className="border-surface-3 text-fg h-11 w-11 rounded-md border sm:h-9 sm:w-9"
               aria-label="Sumar"
             >
               +

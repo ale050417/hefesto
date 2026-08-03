@@ -107,7 +107,10 @@ export function SearchBox() {
                   </span>
                   <span className="ss-result-txt">
                     <b>{p.name}</b>
-                    <span>{formatPrice(p.effectivePrice)}</span>
+                    <span>
+                      {p.priceFrom ? "desde " : ""}
+                      {formatPrice(p.displayPrice)}
+                    </span>
                   </span>
                 </Link>
               ))}

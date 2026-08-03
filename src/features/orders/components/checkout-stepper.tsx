@@ -420,7 +420,7 @@ export function CheckoutStepper({
                 {i.quantity}× {i.name}
                 {i.variantLabel ? ` (${i.variantLabel})` : ""}
               </span>
-              <span className="text-fg">
+              <span className="text-fg shrink-0 whitespace-nowrap">
                 {formatPrice(i.unitPrice * i.quantity)}
               </span>
             </li>

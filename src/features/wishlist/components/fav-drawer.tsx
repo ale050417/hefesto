@@ -45,12 +45,15 @@ export function FavDrawer() {
 
   if (!mounted) return null;
 
+  // Un producto con tamaños o con colores NO se puede agregar de un botón: sin
+  // esa elección el servidor rechaza el pedido en el checkout (y el precio que
+  // se mostraría no sería el que se cobra). Esos van a su página a elegir.
   const addToCart = (p: ProductView) => {
     addItem({
       productId: p.id,
       slug: p.slug,
       name: p.name,
-      unitPrice: p.effectivePrice,
+      unitPrice: p.displayPrice,
       image: p.primaryImage?.url ?? null,
       variantId: null,
       variantLabel: null,
@@ -58,6 +61,8 @@ export function FavDrawer() {
     });
     toast(`${p.name} agregado al carrito`, "success");
   };
+
+  const addable = items.filter((p) => !p.needsChoice);
 
   const remove = async (p: ProductView) => {
     // Optimista: sale de la lista YA; si el backend falla, VUELVE (rollback:
@@ -76,19 +81,26 @@ export function FavDrawer() {
   };
 
   const addAll = () => {
-    items.forEach((p) =>
+    if (addable.length === 0) return;
+    addable.forEach((p) =>
       addItem({
         productId: p.id,
         slug: p.slug,
         name: p.name,
-        unitPrice: p.effectivePrice,
+        unitPrice: p.displayPrice,
         image: p.primaryImage?.url ?? null,
         variantId: null,
         variantLabel: null,
         color: null,
       }),
     );
-    toast("Favoritos agregados al carrito", "success");
+    const rest = items.length - addable.length;
+    toast(
+      rest > 0
+        ? `Agregados ${addable.length}. Los otros ${rest} necesitan que elijas tamaño o color.`
+        : "Favoritos agregados al carrito",
+      "success",
+    );
   };
 
   const clearAll = async () => {
@@ -207,17 +219,27 @@ export function FavDrawer() {
                       {p.name}
                     </Link>
                     <span className="text-sm font-semibold text-[var(--gold-bright)]">
-                      {p.hasVariants ? "Desde " : ""}
-                      {formatPrice(p.effectivePrice)}
+                      {p.priceFrom ? "Desde " : ""}
+                      {formatPrice(p.displayPrice)}
                     </span>
                     <div className="mt-auto flex items-center gap-3 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => addToCart(p)}
-                        className="text-xs font-semibold text-[var(--gold-bright)] hover:underline"
-                      >
-                        Agregar
-                      </button>
+                      {p.needsChoice ? (
+                        <Link
+                          href={`/producto/${p.slug}`}
+                          onClick={close}
+                          className="text-xs font-semibold text-[var(--gold-bright)] hover:underline"
+                        >
+                          Elegir opciones
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => addToCart(p)}
+                          className="text-xs font-semibold text-[var(--gold-bright)] hover:underline"
+                        >
+                          Agregar
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => remove(p)}
@@ -231,13 +253,20 @@ export function FavDrawer() {
               ))}
             </div>
             <div className="border-surface-2 space-y-2 border-t p-4">
-              <button
-                type="button"
-                onClick={addAll}
-                className={cn(buttonVariants({ size: "lg" }), "w-full")}
-              >
-                Agregar todo al carrito
-              </button>
+              {addable.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={addAll}
+                  className={cn(buttonVariants({ size: "lg" }), "w-full")}
+                >
+                  Agregar todo al carrito
+                </button>
+              ) : (
+                <p className="text-dim text-center text-xs">
+                  Estos productos se agregan desde su página: hay que elegir
+                  tamaño o color.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={clearAll}

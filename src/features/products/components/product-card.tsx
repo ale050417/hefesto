@@ -25,7 +25,9 @@ export function ProductCard({ product }: { product: ProductView }) {
           />
         ) : null}
         <div className="prod-badges">
-          {product.isOnSale && product.discountPercent ? (
+          {/* El % solo si la oferta de verdad es lo que se paga (con tamaños
+              con precio propio el sale_price no se aplica). */}
+          {product.saleApplies && product.discountPercent ? (
             <Badge variant="danger">-{product.discountPercent}%</Badge>
           ) : null}
           {product.isNew ? <Badge variant="info">Nuevo</Badge> : null}
@@ -36,12 +38,11 @@ export function ProductCard({ product }: { product: ProductView }) {
         {product.category ? (
           <span className="prod-cat">{product.category.name}</span>
         ) : null}
-        <h3 className="prod-name line-clamp-1">{product.name}</h3>
+        <h3 className="prod-name line-clamp-2 min-h-[2.6em]">{product.name}</h3>
         <PriceTag
-          price={product.price}
-          salePrice={product.salePrice}
-          isOnSale={product.isOnSale}
-          from={product.hasVariants}
+          price={product.displayPrice}
+          compareAt={product.saleApplies ? product.price : null}
+          from={product.priceFrom}
         />
       </div>
     </Link>

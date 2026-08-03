@@ -35,6 +35,7 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { randomUUID } from "node:crypto";
 import { deleteObject, optimizeImage, uploadObject } from "@/core/storage";
+import { priceRange } from "../pricing";
 import {
   productFilterSchema,
   type CategoryInput,
@@ -70,6 +71,30 @@ export function toProductView(p: ProductWithRelations): ProductView {
     : null;
   const primary = p.images.find((i) => i.isPrimary) ?? p.images[0] ?? null;
 
+  // Precio de la TARJETA: el mínimo realmente comprable (tamaños × colores),
+  // no `products.price` crudo. Un tamaño con precio propio reemplaza a la base
+  // y a la oferta, así que la base podía ser un precio fantasma: el casco
+  // figuraba en $1.200 y adentro valía mucho más (bug 2026-07-29).
+  const range = priceRange({
+    price,
+    salePrice: sale,
+    colorMode: p.colorMode === "multi" ? "multi" : "single",
+    colors: p.colors ?? [],
+    colorPrices: p.colorPrices ?? {},
+    variants: p.variants.map((v) => ({
+      price: v.priceOverride !== null ? Number(v.priceOverride) : null,
+      colorPrices: v.colorPrices ?? {},
+    })),
+  });
+  // La oferta solo se anuncia si de verdad es lo que se paga: con tamaños con
+  // precio propio el sale_price no se aplica, y mostrar "-30%" ahí es mentirle
+  // al cliente.
+  const saleApplies = isOnSale && sale !== null && range.min === sale;
+  const colorMode = p.colorMode === "multi" ? "multi" : "single";
+  const needsChoice =
+    p.variants.length > 0 ||
+    (colorMode === "single" && (p.colors ?? []).length > 0);
+
   return {
     id: p.id,
     name: p.name,
@@ -80,6 +105,10 @@ export function toProductView(p: ProductWithRelations): ProductView {
     isOnSale,
     discountPercent,
     hasVariants: p.variants.length > 0,
+    displayPrice: range.min,
+    priceFrom: range.from,
+    saleApplies,
+    needsChoice,
     isNew: p.isNew,
     isFeatured: p.isFeatured,
     material: p.material,

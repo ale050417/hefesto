@@ -31,7 +31,23 @@ export type ProductView = {
   effectivePrice: number;
   isOnSale: boolean;
   discountPercent: number | null;
-  hasVariants: boolean; // si true, el precio se muestra como "desde"
+  hasVariants: boolean;
+  /**
+   * Precio REAL más barato que un cliente puede pagar (recorre tamaños ×
+   * colores con la misma función que cobra el servidor). Es el que va en la
+   * tarjeta: `price` a secas puede ser un número que nadie puede comprar.
+   */
+  displayPrice: number;
+  /** Hay más de un precio posible → la tarjeta muestra "desde". */
+  priceFrom: boolean;
+  /** La oferta AFECTA de verdad al precio mostrado (si no, ni badge ni tachado). */
+  saleApplies: boolean;
+  /**
+   * El cliente TIENE que elegir algo (tamaño y/o color) antes de comprar. Los
+   * atajos tipo "Agregar" de favoritos no pueden saltearlo: sin esa elección el
+   * pedido se rechaza (y el precio que se cobraría no sería el correcto).
+   */
+  needsChoice: boolean;
   isNew: boolean;
   isFeatured: boolean;
   material: string | null;

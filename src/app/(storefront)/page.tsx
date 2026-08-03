@@ -589,7 +589,7 @@ export default async function Home({
               style={{ borderColor: "rgba(var(--gold-rgb),.25)" }}
             >
               <div className="cust-grid">
-                <div style={{ padding: "42px 44px" }}>
+                <div className="p-6 sm:p-10">
                   <div className="eyebrow">¿No encontrás lo que buscás?</div>
                   <h2 className="sec-title mt-2 mb-3">
                     Pedí tu pieza personalizada

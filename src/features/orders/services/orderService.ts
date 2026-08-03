@@ -131,6 +131,22 @@ export async function createOrder(
     // sin precio propio, el base. En "multicolor" no se elige color (combinación
     // fija; `colorPrices` del producto ahí guarda gramos, no precio).
     const lineColor = line.color ?? null;
+    // Color OBLIGATORIO en "color único" con colores cargados, por dos motivos:
+    // (1) sin color no sabemos de qué color imprimir la pieza; (2) si ese color
+    // tiene precio propio, dejarlo vacío cobraba la BASE — una línea sin color
+    // era un descuento involuntario. La página siempre manda uno (arranca en el
+    // primero); esto tapa los caminos que no pasan por ahí (favoritos, carritos
+    // viejos, requests armadas a mano).
+    if (
+      !lineColor &&
+      product.colorMode === "single" &&
+      product.colors.length > 0
+    ) {
+      throw new OrderError(
+        "COLOR_REQUIRED",
+        `Elegí un color para "${product.name}".`,
+      );
+    }
     if (lineColor && product.colorMode === "single") {
       if (!product.colors.includes(lineColor)) {
         throw new OrderError(

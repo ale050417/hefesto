@@ -60,8 +60,9 @@ export default async function ProductPage({ params }: Params) {
     specs.push({ label: "Tamaño", value: product.dimensions });
   }
 
-  const effectivePrice =
-    product.isOnSale && product.salePrice ? product.salePrice : product.price;
+  // Precio para Google (JSON-LD): el mínimo REAL comprable, el mismo que la
+  // tarjeta del catálogo. Antes usaba el precio base, así que en el buscador
+  // podía aparecer un precio que el cliente no puede pagar (2026-07-29).
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -72,7 +73,7 @@ export default async function ProductPage({ params }: Params) {
     ...(product.category ? { category: product.category.name } : {}),
     offers: {
       "@type": "Offer",
-      price: String(effectivePrice),
+      price: String(product.displayPrice),
       priceCurrency: "ARS",
       availability: "https://schema.org/InStock",
       url: `${siteUrl}/producto/${product.slug}`,

@@ -71,13 +71,13 @@ export function FilterPanel({ categories }: { categories: Category[] }) {
       <div className="flex items-center justify-between">
         <button
           type="button"
-          className="flex items-center gap-2 md:pointer-events-none"
+          className="flex items-center gap-2 lg:pointer-events-none"
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
         >
           <b className="text-fg text-sm">Filtros</b>
           <svg
-            className={`h-4 w-4 transition-transform md:hidden ${open ? "rotate-180" : ""}`}
+            className={`h-4 w-4 transition-transform lg:hidden ${open ? "rotate-180" : ""}`}
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -98,7 +98,7 @@ export function FilterPanel({ categories }: { categories: Category[] }) {
           Limpiar
         </button>
       </div>
-      <div className={`${open ? "block" : "hidden"} mt-1 md:block`}>
+      <div className={`${open ? "block" : "hidden"} mt-1 lg:block`}>
         {/* Lo más usado, arriba de todo. */}
         <div className="filter-group">
           <h5>Destacados</h5>

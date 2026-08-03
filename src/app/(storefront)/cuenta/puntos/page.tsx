@@ -80,15 +80,15 @@ export default async function PointsPage() {
                   Tu saldo
                 </div>
                 <div
-                  className="font-display leading-none font-bold"
-                  style={{ fontSize: 40, color: "var(--gold-bright)" }}
+                  className="font-display text-[32px] leading-none font-bold sm:text-[40px]"
+                  style={{ color: "var(--gold-bright)" }}
                 >
                   {balance}
                   <span className="text-dim text-lg"> pts</span>
                 </div>
               </div>
             </div>
-            <div className="min-w-[200px] text-right">
+            <div className="w-full text-left sm:w-auto sm:min-w-[200px] sm:text-right">
               <div className="text-faint mb-1.5 text-xs">
                 Ganás <b className="text-fg">1 punto</b> por cada $100
               </div>

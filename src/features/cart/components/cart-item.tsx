@@ -26,7 +26,7 @@ export function CartItem({ item }: { item: CartItemType }) {
         ) : null}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-fg truncate text-sm">{item.name}</p>
+        <p className="text-fg line-clamp-2 text-sm">{item.name}</p>
         {item.variantLabel || item.color ? (
           <p className="text-faint text-xs">
             {[item.variantLabel, item.color].filter(Boolean).join(" · ")}
@@ -44,7 +44,7 @@ export function CartItem({ item }: { item: CartItemType }) {
                 item.color,
               )
             }
-            className="border-surface-3 text-fg h-6 w-6 rounded border"
+            className="border-surface-3 text-fg h-9 w-9 rounded border sm:h-8 sm:w-8"
             aria-label="Restar"
           >
             −
@@ -62,7 +62,7 @@ export function CartItem({ item }: { item: CartItemType }) {
                 item.color,
               )
             }
-            className="border-surface-3 text-fg h-6 w-6 rounded border"
+            className="border-surface-3 text-fg h-9 w-9 rounded border sm:h-8 sm:w-8"
             aria-label="Sumar"
           >
             +

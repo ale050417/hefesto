@@ -239,7 +239,7 @@ export function CategoryCircles({
 
       <div
         ref={trackRef}
-        className={`cat-carousel${loop ? "" : "cat-carousel--static"}`}
+        className={`cat-carousel ${loop ? "" : "cat-carousel--static"}`}
         style={{
           display: "flex",
           gap: 20,

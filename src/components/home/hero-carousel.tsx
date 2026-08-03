@@ -190,7 +190,7 @@ export function HeroCarousel({
                   : undefined
               }
             >
-              <div className={`hero-tag${hasImg ? "max-md:hidden" : ""}`}>
+              <div className={`hero-tag ${hasImg ? "max-md:hidden" : ""}`}>
                 <Icon name="sparkles" size={15} /> Impresión 3D premium · Hecho
                 en Argentina
               </div>

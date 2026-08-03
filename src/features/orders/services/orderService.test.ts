@@ -23,6 +23,10 @@ function makeProduct(over: Partial<ProductDetailView> = {}): ProductDetailView {
     isOnSale: false,
     discountPercent: null,
     hasVariants: false,
+    displayPrice: 1000,
+    priceFrom: false,
+    saleApplies: false,
+    needsChoice: false,
     isNew: false,
     isFeatured: false,
     material: "PLA",
@@ -569,6 +573,52 @@ describe("createOrder", () => {
     expect(input.order.discountAmount).toBe("200.00");
     expect(input.order.total).toBe("1800.00");
     expect(input.redeemCoupon).toEqual({ couponId: "c1" });
+  });
+
+  it("EXIGE color cuando el producto tiene colores (sin él se cobraba la base)", async () => {
+    // Camino real del bug: "Agregar" desde favoritos mandaba color null y el
+    // servidor cobraba la base aunque ese color valiera el triple.
+    const { deps } = makeDeps({
+      dragon: makeProduct({
+        price: 300,
+        effectivePrice: 300,
+        colors: ["Amarillo", "Arcoíris"],
+        colorPrices: { Arcoíris: 3000 },
+      }),
+    });
+
+    await expect(
+      createOrder(
+        params({
+          items: [
+            { productId: "p1", slug: "dragon", variantId: null, quantity: 1 },
+          ],
+        }),
+        deps,
+      ),
+    ).rejects.toMatchObject({ code: "COLOR_REQUIRED" });
+  });
+
+  it("multicolor NO exige color (la combinación es fija)", async () => {
+    const { deps, persist } = makeDeps({
+      dragon: makeProduct({
+        price: 5000,
+        effectivePrice: 5000,
+        colorMode: "multi",
+        colors: ["Rojo", "Azul"],
+        colorPrices: { Rojo: 30, Azul: 20 },
+      }),
+    });
+
+    await createOrder(params(), deps);
+
+    expect(persist.mock.calls[0]![0].items[0]!.unitPrice).toBe("5000.00");
+  });
+
+  it("un producto sin colores cargados sigue comprándose sin elegir color", async () => {
+    const { deps, persist } = makeDeps({ dragon: makeProduct({ colors: [] }) });
+    await createOrder(params(), deps);
+    expect(persist.mock.calls[0]![0].items[0]!.unitPrice).toBe("1000.00");
   });
 
   it("rechaza un cupón inexistente", async () => {
