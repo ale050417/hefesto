@@ -56,11 +56,20 @@ function Icon({ name, size = 21 }: { name: string; size?: number }) {
   );
 }
 
-const heroStats = [
-  { n: "3.490+", l: "Productos impresos" },
-  { n: "4.9★", l: "Valoración media" },
-  { n: "48h", l: "Producción promedio" },
-];
+/**
+ * Números del hero. La valoración salió (2026-08-03): las reseñas están
+ * apagadas, así que un "4.9★" fijo era un dato inventado. Las piezas impresas
+ * ya no van fijas: se reciben desde la home con el número REAL (antes decía
+ * "3.490+" arriba y abajo, en "Hefesto en números", el conteo verdadero).
+ */
+function buildHeroStats(pieces: number) {
+  return [
+    ...(pieces > 0
+      ? [{ n: `${pieces.toLocaleString("es-AR")}+`, l: "Piezas impresas" }]
+      : []),
+    { n: "48h", l: "Producción promedio" },
+  ];
+}
 
 type Banner = {
   title: string;
@@ -133,8 +142,15 @@ function Cube() {
 export function HeroCarousel({
   slides,
   intervalMs = 5500,
-}: { slides?: Banner[]; intervalMs?: number } = {}) {
+  piecesPrinted = 0,
+}: {
+  slides?: Banner[];
+  intervalMs?: number;
+  /** Piezas impresas REALES (pedidos finalizados); 0 = no se muestra. */
+  piecesPrinted?: number;
+} = {}) {
   const data = slides && slides.length > 0 ? slides : banners;
+  const heroStats = buildHeroStats(piecesPrinted);
   const [idx, setIdx] = useState(0);
   const [touchX, setTouchX] = useState<number | null>(null);
   const count = data.length;

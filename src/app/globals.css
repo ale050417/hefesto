@@ -1127,6 +1127,15 @@ body > * {
   }
 
   /* Pasos "cómo funciona" */
+  /* "¿Cómo funciona?": los 3 pasos NO pueden usar `.grid-3` (auto-FILL), que
+     deja columnas vacías a la derecha en pantallas anchas y hacía que el bloque
+     se viera corrido a la izquierda en vez de centrado (2026-08-03). auto-FIT
+     colapsa las columnas de más: los 3 pasos ocupan el ancho completo, parejos. */
+  .steps-grid {
+    display: grid;
+    gap: 18px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
   .step {
     text-align: center;
     padding: 28px 22px;
@@ -3349,7 +3358,9 @@ body > * {
   /* Números / stats */
   .stats-grid {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    /* Se acomoda a la cantidad de números que haya (al sacar la valoración
+       quedaron 3): con `repeat(4, 1fr)` fijo quedaba un hueco a la derecha. */
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
     gap: 18px;
     margin-top: 8px;
   }

@@ -245,13 +245,9 @@ export default async function Home({
       ic: "users",
     },
     { value: 12, l: "Materiales y acabados", ic: "layers" },
-    {
-      value: 4.9,
-      decimals: 1,
-      suffix: "★",
-      l: "Valoración promedio",
-      ic: "star",
-    },
+    // La "Valoración promedio 4.9★" salió (2026-08-03): las reseñas están
+    // apagadas, así que era un número inventado en una sección que se llama
+    // "Hefesto en números".
   ];
   const show = (id: string) => isPreview || sectionOn(brand.homeSections, id);
   const previewHidden = (id: string) =>
@@ -287,6 +283,7 @@ export default async function Home({
       <HeroCarousel
         slides={slides}
         intervalMs={brand.bannerIntervalSec * 1000}
+        piecesPrinted={stats.pieces}
       />
 
       {show("trustBar") ? (
@@ -487,7 +484,7 @@ export default async function Home({
                 <h2 className="sec-title">¿Cómo funciona?</h2>
               </div>
             </div>
-            <div className="grid-3">
+            <div className="steps-grid">
               {steps.map((s) => (
                 <div key={s.t} className="step">
                   <div className="step-n">{s.n}</div>
