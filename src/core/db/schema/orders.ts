@@ -31,6 +31,11 @@ export const orders = pgTable(
     couponId: uuid("coupon_id").references(() => coupons.id, {
       onDelete: "set null",
     }),
+    // Envío APARTE del subtotal: total = subtotal - descuento + envío. Así
+    // Ganancias y Reportes siguen midiendo lo vendido y no el flete (0069).
+    shippingCost: numeric("shipping_cost", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
     total: numeric("total", { precision: 12, scale: 2 }).notNull(),
     paymentMethod: paymentMethod("payment_method").notNull(),
     shippingAddress: jsonb("shipping_address"),
@@ -50,6 +55,7 @@ export const orders = pgTable(
   (t) => [
     check("orders_subtotal_non_negative", sql`${t.subtotal} >= 0`),
     check("orders_discount_non_negative", sql`${t.discountAmount} >= 0`),
+    check("orders_shipping_non_negative", sql`${t.shippingCost} >= 0`),
     check("orders_total_non_negative", sql`${t.total} >= 0`),
     index("orders_customer_idx").on(t.customerId),
     index("orders_status_idx").on(t.status),

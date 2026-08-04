@@ -6,6 +6,11 @@ import { colorUnitPrice } from "@/features/products/pricing";
 import type { ProductDetailView } from "@/features/products/types";
 import type { CreateOrderInput } from "../repository";
 import type { CheckoutInput } from "../schemas";
+import {
+  quoteShipping,
+  toShippingAddress,
+  type ShippingConfig,
+} from "../shipping";
 import type { Order } from "../types";
 
 // El pedido se crea desde una entrada YA validada (Zod) más el id del cliente,
@@ -30,6 +35,8 @@ export class OrderError extends AppError {
 export type OrderServiceDeps = {
   getProduct: (slug: string) => Promise<ProductDetailView | null>;
   getCoupon: (code: string) => Promise<Coupon | null>;
+  /** Ciudad, barrios y precios de envío. El costo NUNCA viene del navegador. */
+  getShipping: () => Promise<ShippingConfig>;
   persist: (input: CreateOrderInput) => Promise<Order>;
   generateOrderNumber: () => string;
 };
@@ -43,6 +50,15 @@ const defaultDeps: OrderServiceDeps = {
     import("@/features/discounts/repository").then((m) =>
       m.findByCode(code.trim().toUpperCase()),
     ),
+  getShipping: () =>
+    import("@/features/settings/service").then(async (m) => {
+      const s = await m.getShippingSettings();
+      return {
+        city: s?.city ?? null,
+        freeOver: Number(s?.freeOver ?? 0),
+        zones: s?.zones ?? [],
+      };
+    }),
   persist: (input) => import("../repository").then((m) => m.createOrder(input)),
   generateOrderNumber: () =>
     `HEF-${Date.now().toString(36).toUpperCase()}-${crypto
@@ -204,7 +220,25 @@ export async function createOrder(
     couponId = coupon.id;
   }
 
-  const total = round2(subtotal - discountAmount);
+  // Envío: SIEMPRE resuelto en el servidor desde la configuración. El cliente
+  // dice de qué barrio es; el precio de ese barrio lo pone Hefesto. Si el
+  // barrio ya no existe, se rechaza en vez de cobrar 0 en silencio.
+  const shippingConfig = await deps.getShipping();
+  let shippingCost = 0;
+  try {
+    shippingCost = round2(
+      quoteShipping(params.delivery, shippingConfig, subtotal).cost,
+    );
+  } catch (e) {
+    throw new OrderError(
+      "ZONE_NOT_FOUND",
+      e instanceof Error ? e.message : "Elegí un barrio válido.",
+    );
+  }
+
+  // El envío se SUMA después del descuento: un cupón del 20% descuenta la
+  // mercadería, no el flete (que es un costo real del taller).
+  const total = round2(subtotal - discountAmount + shippingCost);
 
   return deps.persist({
     order: {
@@ -213,9 +247,10 @@ export async function createOrder(
       status: "pending_payment",
       subtotal: money(subtotal),
       discountAmount: money(discountAmount),
+      shippingCost: money(shippingCost),
       total: money(total),
       paymentMethod: params.paymentMethod,
-      shippingAddress: params.shippingAddress,
+      shippingAddress: toShippingAddress(params.delivery, shippingConfig),
       couponId,
     },
     items: lines,

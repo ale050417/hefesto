@@ -7,8 +7,15 @@ import { formatPrice } from "@/lib/format";
 import { selectSubtotal, useCartStore } from "@/stores/cartStore";
 import { runAction } from "@/lib/run-action";
 
-export function CouponInput() {
-  const subtotal = useCartStore(selectSubtotal);
+export function CouponInput({
+  subtotal: subtotalProp,
+}: {
+  /** Subtotal contra el que validar. Por defecto, TODO el carrito; el checkout
+   *  pasa el de las líneas tildadas (se compra solo eso). */
+  subtotal?: number;
+} = {}) {
+  const subtotalCarrito = useCartStore(selectSubtotal);
+  const subtotal = subtotalProp ?? subtotalCarrito;
   const applied = useCartStore((s) => s.appliedCoupon);
   const setCoupon = useCartStore((s) => s.setCoupon);
   const [code, setCode] = useState("");

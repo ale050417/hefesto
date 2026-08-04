@@ -77,6 +77,20 @@ export function OrderSummary({
               </span>
             </div>
           ) : null}
+          {/* El envío va desglosado: el cliente tiene que ver por qué el total
+              no es igual al subtotal (los pedidos viejos traen 0 y no se
+              muestra nada). */}
+          {Number(order.shippingCost ?? 0) > 0 ? (
+            <div className="flex justify-between">
+              <span className="text-dim">
+                Envío
+                {shipping?.zone ? ` · ${shipping.zone}` : ""}
+              </span>
+              <span className="text-fg">
+                {formatPrice(Number(order.shippingCost))}
+              </span>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between text-base font-medium">
             <span className="text-fg">Total</span>
             <span className="flex items-center gap-2">

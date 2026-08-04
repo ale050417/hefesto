@@ -62,6 +62,16 @@ function makeDeps(products: Record<string, ProductDetailView | null>) {
   const deps: OrderServiceDeps = {
     getProduct: async (slug) => products[slug] ?? null,
     getCoupon: async () => null,
+    // Config de envío por defecto de los tests: barrios cargados, sin mínimo
+    // de envío gratis. Los tests que miran el envío la sobreescriben.
+    getShipping: async () => ({
+      city: "Puerto Iguazú",
+      freeOver: 0,
+      zones: [
+        { name: "San Lucas", price: 1000 },
+        { name: "Centro", price: 700 },
+      ],
+    }),
     persist,
     generateOrderNumber: () => "HEF-TEST-0001",
   };
@@ -72,13 +82,12 @@ function params(over: Partial<CreateOrderParams> = {}): CreateOrderParams {
   return {
     customerId: "cust-1",
     paymentMethod: "mercadopago",
-    shippingAddress: {
+    // Por defecto los tests compran con RETIRO en el local: envío 0, así el
+    // total sigue siendo solo la mercadería y no cambia lo que ya verificaban.
+    delivery: {
+      type: "pickup",
       fullName: "Ada Lovelace",
       phone: "1122334455",
-      street: "Calle 123",
-      city: "CABA",
-      province: "Buenos Aires",
-      postalCode: "1000",
     },
     items: [{ productId: "p1", slug: "dragon", variantId: null, quantity: 1 }],
     ...over,
@@ -627,5 +636,137 @@ describe("createOrder", () => {
     await expect(
       createOrder(params({ couponCode: "NOPE" }), deps),
     ).rejects.toMatchObject({ code: "INVALID_COUPON" });
+  });
+
+  // --- Envío (plata: entra al total que paga el cliente) -------------------
+
+  it("retiro en el local: el total no lleva envío", async () => {
+    const { deps, persist } = makeDeps({
+      dragon: makeProduct({ price: 1000, effectivePrice: 1000 }),
+    });
+    await createOrder(params(), deps);
+    const order = persist.mock.calls[0]![0].order;
+    expect(order.shippingCost).toBe("0.00");
+    expect(order.total).toBe("1000.00");
+  });
+
+  it("envío al barrio: suma el precio configurado al total", async () => {
+    const { deps, persist } = makeDeps({
+      dragon: makeProduct({ price: 1000, effectivePrice: 1000 }),
+    });
+    await createOrder(
+      params({
+        delivery: {
+          type: "local",
+          fullName: "Ada Lovelace",
+          phone: "1122334455",
+          zone: "San Lucas",
+          street: "Los Lapachos 123",
+        },
+      }),
+      deps,
+    );
+    const order = persist.mock.calls[0]![0].order;
+    expect(order.subtotal).toBe("1000.00");
+    expect(order.shippingCost).toBe("1000.00");
+    expect(order.total).toBe("2000.00");
+  });
+
+  it("el precio del envío sale de la CONFIG, no de lo que mande el navegador", async () => {
+    const { deps, persist } = makeDeps({
+      dragon: makeProduct({ price: 1000, effectivePrice: 1000 }),
+    });
+    // El cliente elige "Centro" ($700 en la config). No hay forma de que mande
+    // otro número: el schema solo acepta el NOMBRE del barrio.
+    await createOrder(
+      params({
+        delivery: {
+          type: "local",
+          fullName: "Ada Lovelace",
+          phone: "1122334455",
+          zone: "Centro",
+          street: "Los Lapachos 123",
+        },
+      }),
+      deps,
+    );
+    expect(persist.mock.calls[0]![0].order.shippingCost).toBe("700.00");
+  });
+
+  it("un barrio que ya no existe rechaza el pedido (no cobra envío 0)", async () => {
+    const { deps } = makeDeps({ dragon: makeProduct() });
+    await expect(
+      createOrder(
+        params({
+          delivery: {
+            type: "local",
+            fullName: "Ada Lovelace",
+            phone: "1122334455",
+            zone: "Barrio Fantasma",
+            street: "Los Lapachos 123",
+          },
+        }),
+        deps,
+      ),
+    ).rejects.toMatchObject({ code: "ZONE_NOT_FOUND" });
+  });
+
+  it("el cupón descuenta la mercadería, NUNCA el envío", async () => {
+    const { deps, persist } = makeDeps({
+      dragon: makeProduct({ price: 1000, effectivePrice: 1000 }),
+    });
+    deps.getCoupon = async () =>
+      ({
+        id: "c1",
+        type: "percentage",
+        value: "50",
+        minPurchase: "0",
+        maxUses: null,
+        usedCount: 0,
+        startsAt: null,
+        expiresAt: null,
+        isActive: true,
+      }) as unknown as Awaited<ReturnType<typeof deps.getCoupon>>;
+    await createOrder(
+      params({
+        couponCode: "MITAD",
+        delivery: {
+          type: "local",
+          fullName: "Ada Lovelace",
+          phone: "1122334455",
+          zone: "San Lucas",
+          street: "Los Lapachos 123",
+        },
+      }),
+      deps,
+    );
+    const order = persist.mock.calls[0]![0].order;
+    // 1000 - 500 (cupón) + 1000 (envío) = 1500. El envío NO se descuenta.
+    expect(order.discountAmount).toBe("500.00");
+    expect(order.shippingCost).toBe("1000.00");
+    expect(order.total).toBe("1500.00");
+  });
+
+  it("la dirección guardada completa la ciudad desde la config", async () => {
+    const { deps, persist } = makeDeps({ dragon: makeProduct() });
+    await createOrder(
+      params({
+        delivery: {
+          type: "local",
+          fullName: "Ada Lovelace",
+          phone: "1122334455",
+          zone: "San Lucas",
+          street: "Los Lapachos 123",
+        },
+      }),
+      deps,
+    );
+    const addr = persist.mock.calls[0]![0].order.shippingAddress as Record<
+      string,
+      string
+    >;
+    expect(addr.city).toBe("Puerto Iguazú");
+    expect(addr.zone).toBe("San Lucas");
+    expect(addr.deliveryType).toBe("local");
   });
 });

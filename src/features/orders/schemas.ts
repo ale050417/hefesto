@@ -13,7 +13,9 @@ export const orderStatusSchema = z.enum([
   "refunded",
 ]);
 
-// Dirección de envío: snapshot que se guarda con el pedido (jsonb).
+// Dirección de envío: snapshot que se guarda con el pedido (jsonb). Lo ARMA el
+// servidor a partir de la entrega elegida (ver deliverySchema): la ciudad y la
+// provincia de un pedido local salen de la configuración, no se escriben.
 export const shippingAddressSchema = z.object({
   fullName: z.string().min(2, "Ingresá tu nombre y apellido."),
   phone: z.string().min(6, "Ingresá un teléfono de contacto."),
@@ -22,7 +24,60 @@ export const shippingAddressSchema = z.object({
   province: z.string().min(2, "Ingresá la provincia."),
   postalCode: z.string().min(3, "Ingresá el código postal."),
   notes: z.string().max(500).optional(),
+  /** Barrio elegido (solo envíos dentro de la ciudad del taller). */
+  zone: z.string().max(120).optional(),
+  /** Cómo recibe el pedido: retiro, envío local o envío al resto del país. */
+  deliveryType: z.enum(["pickup", "local", "national"]).optional(),
 });
+
+/* ---------------- Entrega elegida en el checkout ----------------
+ *
+ * Tres caminos, y cada uno pide SOLO lo que hace falta. El formulario largo
+ * (dirección + localidad + provincia + código postal) es un peaje que no tiene
+ * sentido cobrarle a alguien de la misma ciudad que va a retirar en el local:
+ * ahí alcanza con el nombre y el teléfono (pedido de Ale, 2026-08-03).
+ *
+ * `discriminatedUnion` por `type`: Zod valida el camino elegido y nada más, así
+ * el vecino que retira no puede quedar trabado por un código postal que no
+ * necesita.
+ */
+const nombre = shippingAddressSchema.shape.fullName;
+const telefono = shippingAddressSchema.shape.phone;
+const calle = shippingAddressSchema.shape.street;
+const notas = shippingAddressSchema.shape.notes;
+
+export const deliverySchema = z.discriminatedUnion("type", [
+  // Retira en el taller: sin envío, sin dirección. Solo para la ciudad propia.
+  z.object({
+    type: z.literal("pickup"),
+    fullName: nombre,
+    phone: telefono,
+    notes: notas,
+  }),
+  // Envío dentro de la ciudad del taller: el barrio define el precio.
+  z.object({
+    type: z.literal("local"),
+    fullName: nombre,
+    phone: telefono,
+    zone: z.string().min(1, "Elegí tu barrio."),
+    street: calle,
+    notes: notas,
+  }),
+  // Resto del país: el envío se coordina aparte, a cargo del comprador.
+  z.object({
+    type: z.literal("national"),
+    fullName: nombre,
+    phone: telefono,
+    street: calle,
+    city: shippingAddressSchema.shape.city,
+    province: shippingAddressSchema.shape.province,
+    postalCode: shippingAddressSchema.shape.postalCode,
+    notes: notas,
+  }),
+]);
+
+export type Delivery = z.infer<typeof deliverySchema>;
+export type DeliveryType = Delivery["type"];
 
 // Una línea del carrito: SOLO datos confiables. El precio NO viaja desde el
 // cliente; el servidor lo recalcula desde la base (Cap. 13).
@@ -42,8 +97,11 @@ export const checkoutLineSchema = z.object({
 
 export const checkoutSchema = z.object({
   items: z.array(checkoutLineSchema).min(1, "El carrito está vacío."),
+  // "transfer" sigue aceptándose porque hay pedidos viejos con ese método y el
+  // panel puede cargarlo a mano; la TIENDA ya no lo ofrece (Ale, 2026-08-03:
+  // "es lo mismo que MercadoPago").
   paymentMethod: z.enum(["transfer", "mercadopago", "cash"]),
-  shippingAddress: shippingAddressSchema,
+  delivery: deliverySchema,
   couponCode: z.string().trim().optional(),
 });
 
