@@ -362,6 +362,77 @@ const deleteOrdersSchema = z.object({
 });
 
 /**
+ * La tabla del panel mezcla pedidos online y ventas manuales, así que el
+ * borrado múltiple recibe las DOS listas y devuelve un solo total. Cada tipo se
+ * borra por su camino (el online repone filamento; la manual revierte su propia
+ * deducción), pero para Ale es una sola acción con una sola confirmación.
+ */
+const deleteSalesSchema = z.object({
+  online: z.array(z.string().uuid()).max(200),
+  manual: z.array(z.string().uuid()).max(200),
+});
+
+export async function deleteSalesAction(input: {
+  online: string[];
+  manual: string[];
+}): Promise<
+  | { ok: true; deleted: number }
+  | { ok: false; error: { code: string; message: string } }
+> {
+  if (!(await isAdmin())) {
+    return {
+      ok: false,
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Eliminar ventas es solo para administradores.",
+      },
+    };
+  }
+  const parsed = deleteSalesSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION", message: "Selección de ventas inválida." },
+    };
+  }
+  const { online, manual } = parsed.data;
+  if (online.length + manual.length === 0) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION", message: "No elegiste ninguna venta." },
+    };
+  }
+
+  const user = await getCurrentUser();
+  try {
+    let deleted = 0;
+    if (online.length > 0) deleted += await deleteOrdersAdmin(online);
+    for (const id of manual) {
+      // Una venta manual que falla no puede tumbar el resto del lote: se
+      // registra y se sigue. Al final se informa cuántas se borraron de verdad.
+      try {
+        await deleteManualSale(id);
+        deleted += 1;
+      } catch (e) {
+        console.error("[ventas] no se pudo borrar la venta manual", id, e);
+      }
+    }
+    await recordAudit({
+      actorId: user?.id ?? null,
+      action: "sales.bulk_deleted",
+      entityType: "order",
+      metadata: { count: deleted, online, manual },
+    });
+    revalidatePath("/admin/pedidos");
+    revalidatePath("/admin/ganancias");
+    revalidatePath("/admin/reportes");
+    return { ok: true, deleted };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+/**
  * Admin: elimina VARIOS pedidos de una (limpieza de pedidos mal creados /
  * duplicados / de prueba). Mismo criterio que el borrado individual: destructivo
  * y toca plata/puntos, así que SOLO admin. Valida los ids con Zod en el servidor.
