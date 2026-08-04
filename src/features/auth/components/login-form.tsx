@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
+import { GoogleButton } from "./google-button";
 import { loginAction } from "../actions";
 import { runAction } from "@/lib/run-action";
 
@@ -77,6 +78,9 @@ export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? "Ingresando..." : "Ingresar"}
       </Button>
+      {/* Desde el celular se entra por acá, no por el modal: si el botón de
+          Google no estuviera, la única opción sería crear una contraseña. */}
+      <GoogleButton next={redirectTo} label="Ingresar con Google" />
       <p className="text-dim text-center text-xs">
         <Link href="/recuperar" className="hover:text-fg">
           Olvidé mi contraseña

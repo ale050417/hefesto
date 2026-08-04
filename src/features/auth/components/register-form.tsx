@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { registerAction } from "../actions";
+import { GoogleButton } from "./google-button";
 import { PasswordStrengthMeter } from "./password-strength-meter";
 import { runAction } from "@/lib/run-action";
 
@@ -123,6 +124,9 @@ export function RegisterForm() {
       <Button type="submit" className="w-full" disabled={isSubmitting}>
         {isSubmitting ? "Creando..." : "Crear cuenta"}
       </Button>
+      {/* Crear la cuenta con Google evita la contraseña y el mail de
+          verificación: en el celular es el camino más corto. */}
+      <GoogleButton label="Crear cuenta con Google" />
     </form>
   );
 }
