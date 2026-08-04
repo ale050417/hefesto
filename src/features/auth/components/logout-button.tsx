@@ -1,6 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useFormStatus } from "react-dom";
+import { Spinner } from "@/components/ui/spinner";
 import { logoutAction } from "../actions";
 import { limpiarEstadoLocal } from "./session-guard";
 
@@ -22,9 +24,34 @@ export function LogoutButton({
 }) {
   return (
     <form action={logoutAction} onSubmit={() => limpiarEstadoLocal()}>
-      <button type="submit" className={className}>
-        {children}
-      </button>
+      <Boton className={className}>{children}</Boton>
     </form>
+  );
+}
+
+/**
+ * El estado "Cerrando sesión…" tiene que vivir DENTRO del form: `useFormStatus`
+ * solo ve el envío del formulario que lo contiene. Cerrar sesión implica un ida
+ * y vuelta al servidor y sin aviso parecía que el botón no había hecho nada.
+ */
+function Boton({
+  className,
+  children,
+}: {
+  className?: string;
+  children: ReactNode;
+}) {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" className={className} disabled={pending}>
+      {pending ? (
+        <>
+          <Spinner size={15} />
+          Cerrando sesión…
+        </>
+      ) : (
+        children
+      )}
+    </button>
   );
 }

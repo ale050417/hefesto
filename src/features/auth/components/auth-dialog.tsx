@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { BrandMark } from "@/components/layout/brand-mark";
-import { createClient } from "@/core/supabase/browser";
+import { GoogleButton } from "./google-button";
 import { loginAction, registerAction } from "../actions";
 import { runAction } from "@/lib/run-action";
 
@@ -122,17 +122,6 @@ export function AuthDialog({
       if (!res.ok) return setError(res.error.message);
       setRegistered(true);
     }
-  }
-
-  // Solo Google: Facebook exigía una app verificada y no lo íbamos a mantener.
-  async function social() {
-    setError(null);
-    const supabase = createClient();
-    const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=/` },
-    });
-    if (oauthError) setError("No se pudo iniciar el acceso con Google.");
   }
 
   return createPortal(
@@ -299,30 +288,10 @@ export function AuthDialog({
             </form>
           )}
 
+          {/* El MISMO botón que las páginas de ingreso y registro: redondo y
+              blanco, igual en celular y en computadora. */}
           <div className="auth-div">o accedé rápido con</div>
-          <div className="auth-social">
-            <button type="button" onClick={() => social()}>
-              <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden>
-                <path
-                  fill="#4285F4"
-                  d="M22.5 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.9a5 5 0 0 1-2.2 3.3v2.7h3.6c2.1-2 3.2-4.9 3.2-7.9z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.9 0 5.4-1 7.2-2.7l-3.6-2.7c-1 .7-2.3 1-3.6 1-2.8 0-5.1-1.9-6-4.4H2.3v2.8A11 11 0 0 0 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M6 14.2a6.6 6.6 0 0 1 0-4.2V7.2H2.3a11 11 0 0 0 0 9.8z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.4c1.6 0 3 .5 4.1 1.6l3.1-3.1A11 11 0 0 0 2.3 7.2L6 10c.9-2.6 3.2-4.5 6-4.5z"
-                />
-              </svg>
-              Continuar con Google
-            </button>
-          </div>
+          <GoogleButton divider={false} />
 
           <p className="auth-switch">
             {isLogin ? "¿No tenés cuenta? " : "¿Ya tenés cuenta? "}

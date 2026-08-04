@@ -16,10 +16,13 @@ import { createClient } from "@/core/supabase/browser";
 export function GoogleButton({
   next = "/",
   label = "Continuar con Google",
+  divider = true,
 }: {
   /** A dónde ir después de entrar. */
   next?: string;
   label?: string;
+  /** El modal ya trae su propio separador: ahí va en false. */
+  divider?: boolean;
 }) {
   const [yendo, setYendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,11 +48,13 @@ export function GoogleButton({
 
   return (
     <div>
-      <div className="my-4 flex items-center gap-3">
-        <span className="bg-surface-3 h-px flex-1" />
-        <span className="text-faint text-xs">o</span>
-        <span className="bg-surface-3 h-px flex-1" />
-      </div>
+      {divider ? (
+        <div className="my-4 flex items-center gap-3">
+          <span className="bg-surface-3 h-px flex-1" />
+          <span className="text-faint text-xs">o</span>
+          <span className="bg-surface-3 h-px flex-1" />
+        </div>
+      ) : null}
       {/* Redondeado y blanco: es el botón estándar de Google. Se reconoce de
           lejos y funciona igual en celular y en computadora (48px de alto = el
           mínimo táctil cómodo). */}
