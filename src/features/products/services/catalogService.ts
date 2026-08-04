@@ -110,6 +110,11 @@ export function toProductView(p: ProductWithRelations): ProductView {
     priceFrom: range.from,
     saleApplies,
     needsChoice,
+    // Multicolor: la pieza lleva SIEMPRE esta combinación (no se elige).
+    lineColor:
+      colorMode === "multi" && (p.colors ?? []).length > 0
+        ? (p.colors ?? []).join(" + ")
+        : null,
     // Calculado por fecha: ya no hay casilla que tildar (2026-07-29).
     isNew: isNewProduct(p.createdAt),
     isFeatured: p.isFeatured,

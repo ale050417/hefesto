@@ -2,9 +2,10 @@
 
 import { useEffect } from "react";
 import { useCartStore } from "@/stores/cartStore";
-
-/** Misma clave que escribe el checkout al confirmar. */
-const COMPRADO_KEY = "hefesto-comprado";
+// La clave la define selection.ts (el dueño de las claves de línea): tenerla
+// escrita a mano en los dos lados hacía que un cambio dejara el carrito sin
+// vaciar nunca.
+import { COMPRADO_KEY } from "../selection";
 
 /**
  * Limpia el carrito al llegar a la pantalla de éxito — pero SOLO las líneas que

@@ -1,4 +1,5 @@
 import { Suspense, type ReactNode } from "react";
+import { SessionGuardMount } from "@/features/auth/components/session-guard-mount";
 import { Footer } from "@/components/layout/footer";
 import { Header } from "@/components/layout/header";
 import { ToTop } from "@/components/layout/to-top";
@@ -9,7 +10,6 @@ import { CartDrawer } from "@/features/cart/components/cart-drawer";
 import { CartPopover } from "@/features/cart/components/cart-popover";
 import { AuthModal } from "@/features/auth/components/auth-modal";
 import { FavDrawer } from "@/features/wishlist/components/fav-drawer";
-import { WishlistLoader } from "@/features/wishlist/components/wishlist-loader";
 import { StoreSeasonDecoration } from "@/features/settings/components/store-season-decoration";
 
 export default function StorefrontLayout({
@@ -19,6 +19,12 @@ export default function StorefrontLayout({
 }) {
   return (
     <div className="flex min-h-dvh flex-col">
+      {/* Carrito y favoritos son de QUIEN inició sesión: si cambia el usuario o
+          se cierra sesión, se limpia todo lo guardado en el navegador. En
+          Suspense para no frenar el resto del layout. */}
+      <Suspense fallback={null}>
+        <SessionGuardMount />
+      </Suspense>
       {/* useSearchParams necesita Suspense en el layout (Next 15+). */}
       <Suspense fallback={null}>
         <ScrollToTopOnNavigate />
@@ -31,7 +37,6 @@ export default function StorefrontLayout({
       <CartPopover />
       <AuthModal />
       <FavDrawer />
-      <WishlistLoader />
       <ToTop />
       <WhatsappFab />
       <StoreSeasonDecoration />

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useCartStore } from "@/stores/cartStore";
@@ -26,22 +27,44 @@ export function FavDrawer() {
   const setInWishlist = useWishlistStore((s) => s.setInWishlist);
   const setIds = useWishlistStore((s) => s.setIds);
   const addItem = useCartStore((s) => s.addItem);
+  const flashCart = useUiStore((s) => s.flashCart);
   const mounted = useMounted();
 
   const [items, setItems] = useState<ProductView[]>([]);
+  /** Ids recién agregados al carrito: el botón muestra "Agregado ✓" un rato. */
+  const [agregados, setAgregados] = useState<string[]>([]);
+  const [agregandoTodo, setAgregandoTodo] = useState(false);
+  /** Para qué lista de favoritos son los `items` que ya tenemos. */
+  const [traidoPara, setTraidoPara] = useState<string | null>(null);
+
+  const clave = ids.join(",");
+  // Se muestra el spinner solo si NO hay nada para mostrar: al agregar o quitar
+  // un favorito se recarga la lista, y ahí un spinner sería un parpadeo. Es un
+  // valor DERIVADO, no un estado que un efecto tenga que sincronizar.
+  const cargando = open && traidoPara !== clave && items.length === 0;
 
   // Recarga la lista al abrir o cuando cambian los ids (agregar/quitar).
   // setState va en el .then (continuación async), no en el cuerpo del efecto.
   useEffect(() => {
     if (!open) return;
     let active = true;
-    getMyWishlistProductsAction().then((data) => {
-      if (active) setItems(data);
-    });
+    getMyWishlistProductsAction()
+      .then((data) => {
+        if (!active) return;
+        setItems(data);
+        setTraidoPara(clave);
+      })
+      .catch(() => {
+        // Sin catch el spinner quedaba girando para siempre y la promesa
+        // rechazada suelta.
+        if (!active) return;
+        setTraidoPara(clave);
+        toast("No pudimos cargar tus favoritos. Probá de nuevo.", "danger");
+      });
     return () => {
       active = false;
     };
-  }, [open, ids]);
+  }, [open, clave]);
 
   if (!mounted) return null;
 
@@ -57,8 +80,18 @@ export function FavDrawer() {
       image: p.primaryImage?.url ?? null,
       variantId: null,
       variantLabel: null,
-      color: null,
+      // Multicolor: la combinación fija de la pieza (lo mismo que guarda la
+      // página del producto), así la línea no queda sin color.
+      color: p.lineColor,
     });
+    // Confirmación en el botón, además del aviso: el carrito no se abre solo,
+    // así que sin esto no quedaba claro si el toque había hecho algo.
+    setAgregados((prev) => [...prev, p.id]);
+    setTimeout(
+      () => setAgregados((prev) => prev.filter((id) => id !== p.id)),
+      2000,
+    );
+    flashCart();
     toast(`${p.name} agregado al carrito`, "success");
   };
 
@@ -81,7 +114,9 @@ export function FavDrawer() {
   };
 
   const addAll = () => {
-    if (addable.length === 0) return;
+    if (addable.length === 0 || agregandoTodo) return;
+    setAgregandoTodo(true);
+    setTimeout(() => setAgregandoTodo(false), 2000);
     addable.forEach((p) =>
       addItem({
         productId: p.id,
@@ -91,9 +126,14 @@ export function FavDrawer() {
         image: p.primaryImage?.url ?? null,
         variantId: null,
         variantLabel: null,
-        color: null,
+        // Mismo color que "Agregar" de a uno: si no, el multicolor generaba DOS
+        // líneas del mismo producto que nunca se fusionaban.
+        color: p.lineColor,
       }),
     );
+    setAgregados(addable.map((p) => p.id));
+    setTimeout(() => setAgregados([]), 2000);
+    flashCart();
     const rest = items.length - addable.length;
     toast(
       rest > 0
@@ -160,7 +200,15 @@ export function FavDrawer() {
           </button>
         </div>
 
-        {items.length === 0 ? (
+        {cargando && items.length === 0 ? (
+          /* Antes, mientras cargaba, decía "No tenés favoritos todavía" — un
+             cartel falso justo al abrir. Ahora se ve que está trayendo la
+             lista. */
+          <div className="text-dim flex flex-1 flex-col items-center justify-center gap-3 p-6">
+            <Spinner size={22} />
+            <p className="text-sm">Cargando tus favoritos…</p>
+          </div>
+        ) : items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
             <svg
               viewBox="0 0 24 24"
@@ -231,6 +279,23 @@ export function FavDrawer() {
                         >
                           Elegir opciones
                         </Link>
+                      ) : agregados.includes(p.id) ? (
+                        <span className="text-success flex items-center gap-1 text-xs font-semibold">
+                          <svg
+                            viewBox="0 0 24 24"
+                            width="13"
+                            height="13"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden
+                          >
+                            <path d="m20 6-11 11-5-5" />
+                          </svg>
+                          En el carrito
+                        </span>
                       ) : (
                         <button
                           type="button"
@@ -257,9 +322,29 @@ export function FavDrawer() {
                 <button
                   type="button"
                   onClick={addAll}
+                  disabled={agregandoTodo}
                   className={cn(buttonVariants({ size: "lg" }), "w-full")}
                 >
-                  Agregar todo al carrito
+                  {agregandoTodo ? (
+                    <>
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                      >
+                        <path d="m20 6-11 11-5-5" />
+                      </svg>
+                      Agregado al carrito
+                    </>
+                  ) : (
+                    "Agregar todo al carrito"
+                  )}
                 </button>
               ) : (
                 <p className="text-dim text-center text-xs">

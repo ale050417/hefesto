@@ -27,6 +27,7 @@ function makeProduct(over: Partial<ProductDetailView> = {}): ProductDetailView {
     priceFrom: false,
     saleApplies: false,
     needsChoice: false,
+    lineColor: null,
     isNew: false,
     isFeatured: false,
     material: "PLA",

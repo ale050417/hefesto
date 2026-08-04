@@ -48,6 +48,13 @@ export type ProductView = {
    * pedido se rechaza (y el precio que se cobraría no sería el correcto).
    */
   needsChoice: boolean;
+  /**
+   * Color que lleva la línea del carrito cuando NO hay nada que elegir: en
+   * multicolor, la combinación fija ("Blanco + Negro"); si no, null. Así agregar
+   * desde la tarjeta o desde favoritos guarda lo MISMO que agregar desde la
+   * página del producto (y la columna Color del panel no queda vacía).
+   */
+  lineColor: string | null;
   isNew: boolean;
   isFeatured: boolean;
   material: string | null;

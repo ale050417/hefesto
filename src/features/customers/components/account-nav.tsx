@@ -35,9 +35,10 @@ function NavIcon({ name }: { name: string }) {
   );
 }
 
+// "A medida" salió de acá (2026-08-04): tiene su propia sección en el menú de
+// la tienda y no es parte de la cuenta del cliente.
 const tabs = [
   { href: "/cuenta/perfil", label: "Perfil y direcciones", icon: "user" },
-  { href: "/a-medida", label: "A medida", icon: "sparkles" },
   { href: "/cuenta/favoritos", label: "Favoritos", icon: "heart" },
   { href: "/cuenta/puntos", label: "Puntos", icon: "star" },
 ];

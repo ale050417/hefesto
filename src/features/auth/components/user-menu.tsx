@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ThemeSwitcher } from "@/components/layout/theme-switcher";
 import { cn } from "@/lib/utils";
-import { logoutAction } from "@/features/auth/actions";
+import { LogoutButton } from "./logout-button";
 
 type UserMenuProps = {
   name: string;
@@ -141,51 +141,20 @@ export function UserMenu({
                 </svg>
                 Mi cuenta
               </Link>
-
-              <Link
-                href="/cuenta/pedidos"
-                className="dropdown-item"
-                onClick={close}
-                role="menuitem"
-              >
-                <svg {...svgProps}>
-                  <path d="m7.5 4.27 9 5.15M21 8.5v7l-9 5-9-5v-7l9-5z" />
-                  <path d="m3.3 7 8.7 5 8.7-5M12 22V12" />
-                </svg>
-                Mis pedidos
-              </Link>
-
-              <Link
-                href="/cuenta/puntos"
-                className="dropdown-item"
-                onClick={close}
-                role="menuitem"
-              >
-                <svg {...svgProps}>
-                  <path d="m12 3 1.9 4.3 4.6.4-3.5 3 1.1 4.5L12 16.9 7.8 19.2l1.1-4.5-3.5-3 4.6-.4z" />
-                </svg>
-                Mis puntos
-                {points != null ? (
-                  <span className="user-menu-pts">{points}</span>
-                ) : null}
-              </Link>
+              {/* Pedidos y puntos NO van acá: viven dentro de Mi cuenta, que ya
+                  los muestra con su sidebar. Un desplegable con tres accesos
+                  al mismo lugar es ruido (pedido de Ale, 2026-08-04). */}
             </div>
 
             <div className="user-menu-sep" aria-hidden="true" />
 
-            <form action={logoutAction}>
-              <button
-                type="submit"
-                className="dropdown-item danger"
-                role="menuitem"
-              >
-                <svg {...svgProps}>
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <path d="m16 17 5-5-5-5M21 12H9" />
-                </svg>
-                Cerrar sesión
-              </button>
-            </form>
+            <LogoutButton className="dropdown-item danger">
+              <svg {...svgProps}>
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="m16 17 5-5-5-5M21 12H9" />
+              </svg>
+              Cerrar sesión
+            </LogoutButton>
           </div>
         ) : null}
       </div>

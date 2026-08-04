@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { requireUser } from "@/core/auth/session";
 import { AccountNav } from "@/features/customers/components/account-nav";
-import { logoutAction } from "@/features/auth/actions";
+import { LogoutButton } from "@/features/auth/components/logout-button";
 import { getMyOrders } from "@/features/orders/services/orderQueries";
 import { getBalance } from "@/features/rewards/service";
 import { getWishlistIds } from "@/features/wishlist/service";
@@ -79,11 +79,9 @@ export async function AccountShell({ children }: { children: ReactNode }) {
               {since ? ` · Cliente desde ${since}` : ""}
             </div>
           </div>
-          <form action={logoutAction}>
-            <button type="submit" className="btn btn-secondary">
-              <Ic d={ICONS.logout} size={16} /> Cerrar sesión
-            </button>
-          </form>
+          <LogoutButton className="btn btn-secondary">
+            <Ic d={ICONS.logout} size={16} /> Cerrar sesión
+          </LogoutButton>
         </div>
 
         <div className="acc-stats">

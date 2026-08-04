@@ -1,50 +1,28 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format";
-import { colorUnitPrice } from "@/features/products/pricing";
-import { ColorSwatches } from "@/components/shared/color-swatches";
-import { useCartStore } from "@/stores/cartStore";
-import { useUiStore } from "@/stores/uiStore";
+import { useProductChoice } from "../useProductChoice";
+import { useCartActions } from "../useCartActions";
+import { ChoiceControls } from "./choice-controls";
+import type { ChooserProduct } from "../types";
 
-type Variant = {
-  id: string;
-  label: string;
-  price: number | null;
-  /** Matriz tamaño × color: precio del color DENTRO de este tamaño. */
-  colorPrices: Record<string, number>;
-};
-
-export type ProductInfoData = {
-  id: string;
-  slug: string;
-  name: string;
+export type ProductInfoData = ChooserProduct & {
   categoryName: string | null;
   description: string | null;
-  price: number;
-  salePrice: number | null;
-  isOnSale: boolean;
   discountPercent: number | null;
   isNew: boolean;
-  image: string | null;
-  variants: Variant[];
-  colorMode: "single" | "multi";
-  colors: string[];
-  colorPrices: Record<string, number>;
-  /** Nombre del color → su hex REAL del catálogo (Filamentos), no un genérico. */
-  colorHex: Record<string, string>;
   specs: { label: string; value: string }[];
 };
 
 /**
- * Columna derecha de la página de producto (cliente): precio DINÁMICO que
- * cambia con la variante/color + selectores + "Comprar ahora" y "Agregar al
- * carrito". Reemplaza al viejo PriceTag + AddToCart para que el precio grande
- * refleje siempre lo elegido.
+ * Columna derecha de la página de producto: precio DINÁMICO que cambia con el
+ * tamaño/color + selectores + "Comprar ahora" y "Agregar al carrito".
+ *
+ * Los selectores y el cálculo del precio son los MISMOS que usa el modal rápido
+ * del catálogo (ChoiceControls + useProductChoice): dos pantallas que muestran
+ * el precio de lo mismo no pueden calcularlo cada una por su lado.
  */
 export function ProductInfo({
   product,
@@ -57,55 +35,10 @@ export function ProductInfo({
   /** Avisa la variante elegida (combinación multicolor → su foto). */
   onVariantChange?: (label: string | null) => void;
 }) {
-  const router = useRouter();
-  const hasVariants = product.variants.length > 0;
-  const hasColors = product.colors.length > 0;
-  const isMulti = product.colorMode === "multi";
+  const choice = useProductChoice(product);
+  const { unitPrice, qty, hasColorPrice, selected, buildItem } = choice;
+  const { agregar, comprarAhora } = useCartActions();
 
-  const [variantId, setVariantId] = useState<string | null>(
-    product.variants[0]?.id ?? null,
-  );
-  const [color, setColorState] = useState<string | null>(
-    !isMulti ? (product.colors[0] ?? null) : null,
-  );
-  const setColor = (c: string | null) => {
-    setColorState(c);
-    onColorChange?.(c);
-  };
-  const [qty, setQty] = useState(1);
-
-  const addItem = useCartStore((s) => s.addItem);
-  const flashCart = useUiStore((s) => s.flashCart);
-
-  const selected = product.variants.find((v) => v.id === variantId) ?? null;
-  // ¿Las variantes son combinaciones de colores o tamaños? Define el título
-  // del selector (un multicolor puede tener TAMAÑOS: "15 cm", no combos).
-  const variantsAreCombos =
-    isMulti && product.variants.some((v) => v.label.includes(" + "));
-  const basePrice =
-    product.isOnSale && product.salePrice != null
-      ? product.salePrice
-      : product.price;
-  // Precio base según variante/tamaño o precio (oferta) del producto.
-  const beforeColor = Math.max(0, selected?.price ?? basePrice);
-  // Precio por color (solo "color único"), ESPEJO exacto del servidor:
-  // - Con tamaño elegido manda la MATRIZ tamaño × color (el 10 cm morado puede
-  //   costar más que el 10 cm azul); sin celda queda el precio del tamaño.
-  // - Sin tamaños, el precio por color del producto (colorUnitPrice, la misma
-  //   función pura que usa el cobro) → nunca divergen.
-  const matrixPrice =
-    !isMulti && selected && color ? selected.colorPrices[color] : undefined;
-  const unitPrice = selected
-    ? matrixPrice != null && matrixPrice > 0
-      ? matrixPrice
-      : beforeColor
-    : colorUnitPrice(
-        beforeColor,
-        product.colorMode,
-        product.colorPrices,
-        color,
-      );
-  const hasColorPrice = !isMulti && color != null && unitPrice !== beforeColor;
   // ¿Mostrar el precio original tachado? Solo si es oferta y el precio no lo
   // reemplaza ni el tamaño ni el color.
   const showStrike =
@@ -113,55 +46,6 @@ export function ProductInfo({
     product.salePrice != null &&
     !selected?.price &&
     !hasColorPrice;
-  // ¿La variante elegida es una COMBINACIÓN de colores ("Negro + Rojo") o un
-  // TAMAÑO ("15 cm")? En multicolor conviven los dos casos y se tratan distinto.
-  const isCombo = isMulti && selected != null && selected.label.includes(" + ");
-  // Multicolor con COMBINACIONES: el label ya lleva los colores → color null
-  // para no duplicar. Multicolor con tamaños o fijo: todos los colores de la
-  // pieza. Color único: el elegido.
-  // Colores que se ofrecen: en un combo multicolor, los del combo elegido; si
-  // no, los del producto.
-  const colorChoices =
-    isCombo && selected
-      ? selected.label.split(" + ").map((x) => x.trim())
-      : product.colors;
-  // ¿Algún color cuesta distinto? (para explicar el punto dorado).
-  const hasSpecialPrice =
-    !isMulti &&
-    colorChoices.some((c) => {
-      const own = selected
-        ? (selected.colorPrices[c] ?? 0)
-        : (product.colorPrices[c] ?? 0);
-      return own > 0 && own !== beforeColor;
-    });
-  const lineColor = isMulti
-    ? isCombo
-      ? null
-      : hasColors
-        ? product.colors.join(" + ")
-        : null
-    : color;
-
-  function buildItem() {
-    return {
-      productId: product.id,
-      slug: product.slug,
-      name: product.name,
-      unitPrice,
-      image: product.image,
-      variantId: selected?.id ?? null,
-      variantLabel: selected?.label ?? null,
-      color: lineColor,
-    };
-  }
-  function handleAdd() {
-    addItem(buildItem(), qty);
-    flashCart();
-  }
-  function handleBuyNow() {
-    addItem(buildItem(), qty);
-    router.push("/checkout");
-  }
 
   return (
     <div>
@@ -196,140 +80,18 @@ export function ProductInfo({
       ) : null}
 
       <div className="mt-6 space-y-4">
-        {hasVariants ? (
-          <div>
-            <p className="text-fg mb-2 text-sm font-medium">
-              {variantsAreCombos ? "Combinación" : "Tamaño"}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {/* Solo el label: el precio grande de arriba ya refleja lo
-                  elegido (pedido de Ale: sin "$" en los botones de tamaño). */}
-              {product.variants.map((v) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => {
-                    setVariantId(v.id);
-                    // Combinación multicolor: la galería salta a su foto.
-                    onVariantChange?.(v.label);
-                  }}
-                  className={cn(
-                    "rounded-md border px-3 py-2 text-sm transition-colors",
-                    v.id === variantId
-                      ? "border-primary text-primary"
-                      : "border-surface-3 text-fg hover:border-primary",
-                  )}
-                >
-                  {v.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {hasColors && isMulti ? (
-          /* MULTICOLOR: la pieza lleva TODOS estos colores, no se elige uno.
-             Van agrupados dentro de un recuadro para que se lea como un
-             conjunto y no como botones para tocar (pedido de Ale 2026-08-03). */
-          <div className="border-surface-2 bg-surface-1 rounded-lg border p-3.5">
-            <p className="text-fg mb-2.5 text-[13px] font-medium">
-              Se imprime con estos colores
-            </p>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              {colorChoices.map((c) => (
-                <span
-                  key={c}
-                  className="text-dim flex items-center gap-1.5 text-[13px]"
-                >
-                  <span
-                    style={{
-                      width: 14,
-                      height: 14,
-                      borderRadius: "50%",
-                      background: product.colorHex[c] ?? "#888",
-                      border: "1px solid rgba(255,255,255,.25)",
-                      display: "inline-block",
-                    }}
-                  />
-                  {c}
-                </span>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {hasColors && !isMulti ? (
-          <div>
-            <p className="text-fg mb-2.5 text-sm font-medium">
-              Color
-              {/* El nombre del elegido va ACÁ, fijo. Es la condición que hace
-                  que los círculos funcionen: el cliente nunca tiene que
-                  adivinar cuál es "verde kriptonita" (2026-08-03). */}
-              {color ? (
-                <span className="text-primary ml-1.5 font-semibold">
-                  {color}
-                </span>
-              ) : null}
-            </p>
-            {/* Muestrario compartido: el MISMO control que usa el panel para
-                cargar un producto o registrar una venta. */}
-            <ColorSwatches
-              options={colorChoices.map((c) => {
-                // Precio del color: con tamaño elegido, la celda de SU matriz;
-                // sin tamaños, el precio por color del producto. Solo se
-                // ANUNCIA si es DISTINTO del precio del resto: repetir el mismo
-                // número en cada uno era ruido puro.
-                const own = selected
-                  ? (selected.colorPrices[c] ?? 0)
-                  : (product.colorPrices[c] ?? 0);
-                const distinto = own > 0 && own !== beforeColor;
-                return {
-                  name: c,
-                  hex: product.colorHex[c] ?? "#888",
-                  flag: distinto,
-                  ...(distinto ? { note: formatPrice(own) } : {}),
-                };
-              })}
-              selected={color ? [color] : []}
-              onSelect={setColor}
-            />
-            {hasSpecialPrice ? (
-              <p className="text-faint mt-2 text-xs">
-                Los colores con punto dorado tienen otro precio.
-              </p>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="flex items-center gap-3">
-          <span className="text-fg text-sm font-medium">Cantidad</span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setQty((q) => Math.max(1, q - 1))}
-              className="border-surface-3 text-fg h-11 w-11 rounded-md border sm:h-9 sm:w-9"
-              aria-label="Restar"
-            >
-              −
-            </button>
-            <span className="text-fg w-6 text-center">{qty}</span>
-            <button
-              type="button"
-              onClick={() => setQty((q) => q + 1)}
-              className="border-surface-3 text-fg h-11 w-11 rounded-md border sm:h-9 sm:w-9"
-              aria-label="Sumar"
-            >
-              +
-            </button>
-          </div>
-        </div>
+        <ChoiceControls
+          choice={choice}
+          onColorChange={onColorChange}
+          onVariantChange={onVariantChange}
+        />
 
         {/* Comprar ahora (directo al checkout) + agregar al carrito. */}
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button
             type="button"
             size="lg"
-            onClick={handleBuyNow}
+            onClick={() => comprarAhora(buildItem(), qty)}
             className="flex-1"
           >
             Comprar ahora · {formatPrice(unitPrice * qty)}
@@ -338,7 +100,7 @@ export function ProductInfo({
             type="button"
             size="lg"
             variant="secondary"
-            onClick={handleAdd}
+            onClick={() => agregar(buildItem(), qty)}
             className="flex-1"
           >
             Agregar al carrito

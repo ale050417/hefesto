@@ -104,6 +104,9 @@ export async function registerAction(input: unknown): Promise<Result> {
 export async function logoutAction(): Promise<void> {
   const supabase = await createClient();
   await supabase.auth.signOut();
+  // El estado local (carrito, favoritos) lo limpia el botón antes de enviar,
+  // así no hace falta un revalidatePath("/", "layout") acá: ese barrido tira
+  // también el caché de la vidriera y dejaría el sitio frío para todos.
   redirect("/");
 }
 

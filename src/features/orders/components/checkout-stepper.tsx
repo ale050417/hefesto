@@ -3,14 +3,20 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { CouponInput } from "@/features/cart/components/coupon-input";
+import {
+  COMPRADO_KEY,
+  excluidasParaComprarSolo,
+  lineKey,
+  tomarComprarSolo,
+} from "@/features/cart/selection";
 import { useMounted } from "@/hooks/use-mounted";
 import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useCartStore, type CartItem } from "@/stores/cartStore";
+import { useCartStore } from "@/stores/cartStore";
 import { createOrderAction } from "../actions";
 import {
   shippingAddressSchema,
@@ -48,20 +54,12 @@ function validarCampo(campo: CampoEnvio) {
   };
 }
 
-/** Identifica una línea del carrito (mismo criterio que el store). */
-function lineKey(i: CartItem): string {
-  return `${i.productId}|${i.variantId ?? ""}|${i.color ?? ""}`;
-}
-
 /** Qué campos pide cada forma de entrega. Nada de pedir de más. */
 const CAMPOS_POR_ENTREGA: Record<DeliveryType, CampoEnvio[]> = {
   pickup: ["fullName", "phone"],
   local: ["fullName", "phone", "street"],
   national: ["fullName", "phone", "street", "city", "province", "postalCode"],
 };
-
-/** Guarda qué se compró para que la pantalla de éxito borre SOLO eso. */
-const COMPRADO_KEY = "hefesto-comprado";
 
 const field =
   "w-full rounded-md border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-fg";
@@ -111,8 +109,34 @@ export function CheckoutStepper({
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [esProblemaDelCarrito, setEsProblemaDelCarrito] = useState(false);
+  // "Comprar ahora" desde el catálogo o la página del producto: llega con la
+  // línea elegida en la señal, y de arranque queda tildada SOLO esa.
+  //
+  // Se resuelve en el inicializador del estado (una vez, al montar) y no en un
+  // efecto: derivar el estado inicial con un efecto encadena un render de más y
+  // el checkout llegaría a pintarse con todo el carrito tildado antes de
+  // corregirse. `tomarComprarSolo` devuelve null si no hay storage (SSR).
+  const [arranque] = useState(() => {
+    const clave = tomarComprarSolo();
+    const { items: enCarrito, appliedCoupon } = useCartStore.getState();
+    const fuera = excluidasParaComprarSolo(enCarrito, clave);
+    // El cupón se validó contra el carrito ENTERO. Sobre un solo producto el
+    // descuento sería otro (o ni siquiera llegaría al mínimo), así que se saca
+    // y se avisa: mostrar un descuento que el servidor no va a cobrar es peor
+    // que no mostrarlo.
+    return { fuera, sacarCupon: fuera.size > 0 && appliedCoupon !== null };
+  });
+
   /** Líneas TILDADAS: se compra solo esto, el resto queda en el carrito. */
-  const [excluidas, setExcluidas] = useState<Set<string>>(new Set());
+  const [excluidas, setExcluidas] = useState<Set<string>>(arranque.fuera);
+  /** Se sacó el cupón porque la compra quedó reducida a un solo producto. */
+  const cuponSacado = arranque.sacarCupon;
+
+  // Lo ÚNICO que queda para el efecto: avisarle al store (sistema externo) que
+  // el cupón ya no corre.
+  useEffect(() => {
+    if (arranque.sacarCupon) useCartStore.getState().setCoupon(null);
+  }, [arranque.sacarCupon]);
 
   const {
     register,
@@ -837,6 +861,13 @@ export function CheckoutStepper({
             );
           })}
         </ul>
+
+        {cuponSacado ? (
+          <p className="mt-3 rounded-md border border-[var(--warning-border,var(--border))] bg-[var(--surface-2)] p-2.5 text-xs text-[var(--text-dim)]">
+            Sacamos el cupón porque estás comprando un solo producto. Si sigue
+            valiendo, aplicalo de nuevo acá abajo.
+          </p>
+        ) : null}
 
         <div className="mt-3">
           <CouponInput subtotal={subtotal} />

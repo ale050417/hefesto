@@ -1064,6 +1064,13 @@ body > * {
     background: var(--surface-2);
     overflow: hidden;
   }
+  /* El link cubre la foto entera. La tarjeta ya no es un link: si lo fuera,
+     tocar "Agregar al carrito" abriría además el producto (2026-08-04). */
+  .prod-media-link {
+    position: absolute;
+    inset: 0;
+    display: block;
+  }
   .prod-media img {
     transition: transform 0.4s var(--ease);
   }
@@ -1097,6 +1104,69 @@ body > * {
     font-size: 14.5px;
     line-height: 1.3;
     color: var(--text);
+  }
+  .prod-name-link {
+    color: inherit;
+  }
+  .prod-name-link:hover {
+    color: var(--gold-bright);
+  }
+
+  /* Comprar desde la tarjeta, sin entrar al producto. Siempre visibles (no
+     "al pasar el mouse"): en celular no hay mouse y ahí está la mayoría de las
+     visitas. 44px de alto = tamaño táctil cómodo. */
+  .prod-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .prod-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body), sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition:
+      background 0.2s,
+      border-color 0.2s,
+      color 0.2s,
+      box-shadow 0.2s;
+  }
+  .prod-action-buy {
+    flex: 1;
+    min-width: 0;
+    background: linear-gradient(135deg, var(--gold-bright), var(--gold-deep));
+    color: var(--gold-fg);
+  }
+  .prod-action-buy:hover {
+    box-shadow: 0 6px 18px rgba(var(--gold-rgb), 0.28);
+  }
+  .prod-action-add {
+    width: 44px;
+    flex: 0 0 44px;
+    background: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text-dim);
+  }
+  .prod-action-add:hover {
+    color: var(--gold-bright);
+    border-color: rgba(var(--gold-rgb), 0.45);
+  }
+  @media (max-width: 400px) {
+    /* Tarjetas de ~150px: el texto del botón no entra al lado del carrito. */
+    .prod-action {
+      min-height: 40px;
+      font-size: 12px;
+    }
+    .prod-action-add {
+      width: 40px;
+      flex: 0 0 40px;
+    }
   }
   .prod-price {
     display: flex;
