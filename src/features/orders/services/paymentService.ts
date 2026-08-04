@@ -7,6 +7,7 @@ import {
 import type { Order, OrderWithItems } from "../types";
 import { awardForOrder } from "@/features/rewards/service";
 import { OrderError } from "./orderService";
+import { buildMpItems, totalDeItems } from "./mpItems";
 
 export type StartPaymentResult = { redirectUrl: string; preferenceId: string };
 
@@ -35,13 +36,38 @@ export async function startMercadoPagoPayment(
   const order = await deps.getOrder(orderId);
   if (!order) throw new OrderError("NOT_FOUND", "No encontramos el pedido.");
 
-  const items = order.items.map((it) => ({
-    title: it.variantLabel
-      ? `${it.productName} (${it.variantLabel})`
-      : it.productName,
-    quantity: it.quantity,
-    unitPrice: Number(it.unitPrice),
-  }));
+  // Lo que se cobra tiene que ser EXACTAMENTE el total del pedido: productos
+  // − cupón + envío. Antes se mandaban solo los productos y MercadoPago
+  // cobraba de menos (envío) o de más (cupón) — bug real, 2026-08-03.
+  const items = buildMpItems({
+    orderNumber: order.orderNumber,
+    items: order.items.map((it) => ({
+      title: it.variantLabel
+        ? `${it.productName} (${it.variantLabel})`
+        : it.productName,
+      quantity: it.quantity,
+      unitPrice: Number(it.unitPrice),
+    })),
+    discountAmount: Number(order.discountAmount ?? 0),
+    shippingCost: Number(order.shippingCost ?? 0),
+  });
+
+  // Cinturón de seguridad: si por lo que sea las líneas no suman el total del
+  // pedido, se corta acá. Vale más un pago que no arranca que uno por el
+  // importe equivocado.
+  const aCobrar = totalDeItems(items);
+  const total = Number(order.total);
+  if (Math.abs(aCobrar - total) > 0.01) {
+    console.error("[checkout] descuadre con MercadoPago", {
+      orderNumber: order.orderNumber,
+      aCobrar,
+      total,
+    });
+    throw new OrderError(
+      "PAYMENT_ERROR",
+      "No pudimos iniciar el pago: el importe no coincide con el pedido. Escribinos por WhatsApp.",
+    );
+  }
 
   try {
     const pref = await deps.createPreference({
