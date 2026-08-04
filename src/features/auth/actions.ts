@@ -85,7 +85,10 @@ export async function registerAction(input: unknown): Promise<Result> {
     password: parsed.data.password,
     options: {
       data: { full_name: parsed.data.fullName },
-      emailRedirectTo: `${siteUrl}/ingresar`,
+      // A /auth/callback, que SÍ canjea el token por una sesión. Apuntar a
+      // /ingresar era el bug: el link del mail no confirmaba nada y el cliente
+      // veía un error (2026-08-04).
+      emailRedirectTo: `${siteUrl}/auth/callback?next=/`,
     },
   });
   if (error) {

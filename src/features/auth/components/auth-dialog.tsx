@@ -124,15 +124,15 @@ export function AuthDialog({
     }
   }
 
-  async function social(provider: "google" | "facebook") {
+  // Solo Google: Facebook exigía una app verificada y no lo íbamos a mantener.
+  async function social() {
     setError(null);
     const supabase = createClient();
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
-      provider,
+      provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback?next=/` },
     });
-    if (oauthError)
-      setError("No se pudo iniciar el acceso con " + provider + ".");
+    if (oauthError) setError("No se pudo iniciar el acceso con Google.");
   }
 
   return createPortal(
@@ -301,7 +301,7 @@ export function AuthDialog({
 
           <div className="auth-div">o accedé rápido con</div>
           <div className="auth-social">
-            <button type="button" onClick={() => social("google")}>
+            <button type="button" onClick={() => social()}>
               <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden>
                 <path
                   fill="#4285F4"
@@ -320,16 +320,7 @@ export function AuthDialog({
                   d="M12 5.4c1.6 0 3 .5 4.1 1.6l3.1-3.1A11 11 0 0 0 2.3 7.2L6 10c.9-2.6 3.2-4.5 6-4.5z"
                 />
               </svg>
-              Google
-            </button>
-            <button type="button" onClick={() => social("facebook")}>
-              <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden>
-                <path
-                  fill="#1877F2"
-                  d="M22 12a10 10 0 1 0-11.6 9.9v-7H7.9V12h2.5V9.8c0-2.5 1.5-3.9 3.8-3.9 1.1 0 2.2.2 2.2.2v2.5h-1.3c-1.2 0-1.6.8-1.6 1.6V12h2.8l-.4 2.9h-2.4v7A10 10 0 0 0 22 12z"
-                />
-              </svg>
-              Facebook
+              Continuar con Google
             </button>
           </div>
 
