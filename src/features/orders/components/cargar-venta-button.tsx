@@ -12,11 +12,14 @@ export function CargarVentaButton({
   estimator,
   products = [],
   categories = [],
+  colorHex = {},
 }: {
   partners?: Array<{ name: string; pct: number }>;
   estimator: EstimatorContext;
   products?: ProductForSale[];
   categories?: string[];
+  /** Nombre del color → su hex REAL del catálogo de Filamentos. */
+  colorHex?: Record<string, string>;
 }) {
   const [open, setOpen] = useState(false);
   const canCreate = useCan("pedidos", "crear");
@@ -52,6 +55,7 @@ export function CargarVentaButton({
           estimator={estimator}
           products={products}
           categories={categories}
+          colorHex={colorHex}
           onDone={() => setOpen(false)}
           onCancel={() => setOpen(false)}
         />

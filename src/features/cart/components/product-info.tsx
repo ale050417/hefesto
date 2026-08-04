@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { formatPrice } from "@/lib/format";
 import { colorUnitPrice } from "@/features/products/pricing";
+import { ColorSwatches } from "@/components/shared/color-swatches";
 import { useCartStore } from "@/stores/cartStore";
 import { useUiStore } from "@/stores/uiStore";
 
@@ -38,21 +39,6 @@ export type ProductInfoData = {
   colorHex: Record<string, string>;
   specs: { label: string; value: string }[];
 };
-
-/**
- * ¿El tilde va en blanco o en negro sobre este color? Se decide por la
- * luminancia percibida (el ojo ve el verde mucho más claro que el azul, de ahí
- * los pesos). Sin esto, el tilde blanco desaparecía sobre un swatch amarillo.
- */
-function readableOn(hex: string): string {
-  const h = hex.replace("#", "").trim();
-  const full = h.length === 3 ? h.replace(/./g, (ch) => ch + ch) : h;
-  const r = parseInt(full.slice(0, 2), 16);
-  const g = parseInt(full.slice(2, 4), 16);
-  const b = parseInt(full.slice(4, 6), 16);
-  if ([r, g, b].some((n) => Number.isNaN(n))) return "#ffffff";
-  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#111111" : "#ffffff";
-}
 
 /**
  * Columna derecha de la página de producto (cliente): precio DINÁMICO que
@@ -285,14 +271,10 @@ export function ProductInfo({
                 </span>
               ) : null}
             </p>
-            {/* Muestrario de color (patrón de Nike / Zara / Apple): SIEMPRE
-                círculos, sin importar cuántos haya. Un solo patrón se aprende
-                una vez; mezclar chips con texto y círculos obligaba a releer
-                la pantalla en cada producto. */}
-            <div className="flex flex-wrap gap-2.5">
-              {colorChoices.map((c) => {
-                const active = color === c;
-                const hex = product.colorHex[c] ?? "#888";
+            {/* Muestrario compartido: el MISMO control que usa el panel para
+                cargar un producto o registrar una venta. */}
+            <ColorSwatches
+              options={colorChoices.map((c) => {
                 // Precio del color: con tamaño elegido, la celda de SU matriz;
                 // sin tamaños, el precio por color del producto. Solo se
                 // ANUNCIA si es DISTINTO del precio del resto: repetir el mismo
@@ -300,72 +282,17 @@ export function ProductInfo({
                 const own = selected
                   ? (selected.colorPrices[c] ?? 0)
                   : (product.colorPrices[c] ?? 0);
-                const showPrice = own > 0 && own !== beforeColor;
-                return (
-                  <button
-                    key={c}
-                    type="button"
-                    title={showPrice ? `${c} · ${formatPrice(own)}` : c}
-                    aria-label={showPrice ? `${c}, ${formatPrice(own)}` : c}
-                    aria-pressed={active}
-                    onClick={() => setColor(c)}
-                    className={cn(
-                      // 44px de área táctil en celular: un círculo chico en el
-                      // teléfono es el error clásico de este patrón.
-                      "relative grid h-11 w-11 place-items-center rounded-full transition-transform sm:h-10 sm:w-10",
-                      active && "scale-105",
-                    )}
-                    style={{
-                      outline: active
-                        ? "2px solid var(--gold-bright)"
-                        : "1px solid var(--border)",
-                      outlineOffset: active ? 2 : -1,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 30,
-                        height: 30,
-                        borderRadius: "50%",
-                        background: hex,
-                        // Aro tenue: un color casi blanco necesita un límite
-                        // para no perderse contra el fondo.
-                        border: "1px solid rgba(128,128,128,.35)",
-                        display: "inline-block",
-                      }}
-                    />
-                    {/* Tilde adentro del elegido, en blanco o negro según el
-                        color. El borde solo no alcanza: ~8% de los hombres
-                        tiene algún grado de daltonismo, y sobre un círculo
-                        blanco el aro dorado casi no se ve. */}
-                    {active ? (
-                      <svg
-                        viewBox="0 0 24 24"
-                        width="16"
-                        height="16"
-                        fill="none"
-                        stroke={readableOn(hex)}
-                        strokeWidth="3.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        className="absolute"
-                        aria-hidden
-                      >
-                        <path d="M20 6 9 17l-5-5" />
-                      </svg>
-                    ) : null}
-                    {/* Punto dorado: este color cuesta distinto. */}
-                    {showPrice ? (
-                      <span
-                        aria-hidden
-                        className="bg-primary absolute top-0 right-0 h-2.5 w-2.5 rounded-full"
-                        style={{ border: "1.5px solid var(--surface-1)" }}
-                      />
-                    ) : null}
-                  </button>
-                );
+                const distinto = own > 0 && own !== beforeColor;
+                return {
+                  name: c,
+                  hex: product.colorHex[c] ?? "#888",
+                  flag: distinto,
+                  ...(distinto ? { note: formatPrice(own) } : {}),
+                };
               })}
-            </div>
+              selected={color ? [color] : []}
+              onSelect={setColor}
+            />
             {hasSpecialPrice ? (
               <p className="text-faint mt-2 text-xs">
                 Los colores con punto dorado tienen otro precio.

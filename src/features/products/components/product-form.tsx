@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ColorSwatches } from "@/components/shared/color-swatches";
 import { EstimatorModalButton } from "@/features/calculator/components/estimator-modal-button";
 import type { EstimatorValue } from "@/features/calculator/components/price-estimator";
 import type { EstimatorContext } from "@/features/calculator/service";
@@ -1034,28 +1035,17 @@ export function ProductForm({
                   ? "Colores que lleva la pieza"
                   : "Colores disponibles"}
               </label>
-              <div className="flex flex-wrap gap-2">
-                {colorList.map((fc) => (
-                  <button
-                    key={fc.n}
-                    type="button"
-                    className={cn("chip", colors.includes(fc.n) && "active")}
-                    onClick={() => toggleColor(fc.n)}
-                  >
-                    <span
-                      style={{
-                        width: 13,
-                        height: 13,
-                        borderRadius: "50%",
-                        background: fc.c,
-                        border: "1px solid rgba(255,255,255,.25)",
-                        display: "inline-block",
-                      }}
-                    />
-                    {fc.n}
-                  </button>
-                ))}
-              </div>
+              <ColorSwatches
+                size="sm"
+                options={colorList.map((fc) => ({ name: fc.n, hex: fc.c }))}
+                selected={colors}
+                onSelect={toggleColor}
+              />
+              {colors.length > 0 ? (
+                <div className="text-dim mt-1.5 text-[12px]">
+                  Elegidos: <b className="text-fg">{colors.join(" · ")}</b>
+                </div>
+              ) : null}
             </div>
           )}
 

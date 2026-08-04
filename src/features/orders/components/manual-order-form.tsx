@@ -8,6 +8,7 @@ import type { EstimatorValue } from "@/features/calculator/components/price-esti
 import type { EstimatorContext } from "@/features/calculator/service";
 import type { ProductForSale } from "@/features/products/services/catalogService";
 import { saleUnitPrice } from "@/features/products/pricing";
+import { ColorSwatches } from "@/components/shared/color-swatches";
 import { cn } from "@/lib/utils";
 import { createManualSaleAction } from "../actions";
 import { ORDER_STATUS_LABEL } from "../constants";
@@ -42,6 +43,7 @@ export function ManualSaleForm({
   estimator,
   products = [],
   categories = [],
+  colorHex = {},
   onDone,
   onCancel,
 }: {
@@ -49,6 +51,8 @@ export function ManualSaleForm({
   estimator: EstimatorContext;
   products?: ProductForSale[];
   categories?: string[];
+  /** Nombre del color → su hex REAL del catálogo de Filamentos. */
+  colorHex?: Record<string, string>;
   onDone?: () => void;
   onCancel?: () => void;
 }) {
@@ -148,6 +152,11 @@ export function ManualSaleForm({
   // "Cargar desde la tienda": autocompleta detalle, material, gramos, minutos
   // y precio desde un producto publicado. La amortización la calcula el
   // servidor con esos datos (igual que la calculadora, modo material).
+  /** Nombre del color de un carrete (para pintarle su círculo). */
+  function filamentColorName(id: string): string {
+    return estimator.filaments.find((x) => x.id === id)?.color ?? "";
+  }
+
   function matchFilamentId(material: string, color: string): string | null {
     const m = material.trim().toLowerCase();
     const c = color.trim().toLowerCase();
@@ -165,6 +174,21 @@ export function ManualSaleForm({
   const [picked, setPicked] = useState<ProductForSale | null>(null);
   const [saleVariant, setSaleVariant] = useState<string | null>(null);
   const [saleColor, setSaleColor] = useState<string | null>(null);
+  // Derivados del muestrario: la variante elegida y el precio "del resto" (el
+  // que se cobra cuando el color no tiene precio propio). Un círculo solo
+  // anuncia precio si es DISTINTO de ese; repetir el mismo número en 18
+  // círculos es ruido (misma regla que la tienda).
+  const pickedVariant =
+    picked?.variants.find((v) => v.label === saleVariant) ?? null;
+  const basePriceForPicked = picked
+    ? saleUnitPrice({
+        basePrice: picked.price,
+        colorMode: picked.colorMode,
+        productColorPrices: picked.colorPrices,
+        variant: pickedVariant,
+        color: null,
+      })
+    : 0;
 
   /** Aplica el producto + variante + color: precio ESPEJO del cobro online
    * (saleUnitPrice, testeado), gramos del tamaño/combo elegido para el stock
@@ -474,22 +498,42 @@ export function ManualSaleForm({
                     <div>
                       <div className="text-dim mb-1.5 text-[12px] font-medium">
                         ¿De qué color?
+                        {saleColor ? (
+                          <span className="text-primary ml-1.5 font-semibold">
+                            {saleColor}
+                          </span>
+                        ) : null}
                       </div>
-                      <div className="flex flex-wrap gap-2">
-                        {picked.colors.map((c) => (
-                          <button
-                            key={c}
-                            type="button"
-                            className={cn("chip", saleColor === c && "active")}
-                            onClick={() => {
-                              setSaleColor(c);
-                              applySelection(picked, saleVariant, c);
-                            }}
-                          >
-                            {c}
-                          </button>
-                        ))}
-                      </div>
+                      {/* MISMO muestrario que ve el cliente en la tienda y que
+                          se usa al cargar un producto: un solo control en toda
+                          la app (2026-08-03). El punto dorado marca los colores
+                          que cuestan distinto. */}
+                      <ColorSwatches
+                        size="sm"
+                        options={picked.colors.map((c) => {
+                          const price = saleUnitPrice({
+                            basePrice: picked.price,
+                            colorMode: picked.colorMode,
+                            productColorPrices: picked.colorPrices,
+                            variant: pickedVariant,
+                            color: c,
+                          });
+                          const distinto = price !== basePriceForPicked;
+                          return {
+                            name: c,
+                            hex: colorHex[c] ?? "#888",
+                            flag: distinto,
+                            ...(distinto
+                              ? { note: `$${price.toLocaleString("es-AR")}` }
+                              : {}),
+                          };
+                        })}
+                        selected={saleColor ? [saleColor] : []}
+                        onSelect={(c) => {
+                          setSaleColor(c);
+                          applySelection(picked, saleVariant, c);
+                        }}
+                      />
                     </div>
                   ) : null}
                   {unitPrice != null ? (
@@ -645,6 +689,23 @@ export function ManualSaleForm({
               </p>
               {colorLines.map((ln, i) => (
                 <div key={i} className="mt-2 flex items-center gap-2">
+                  {/* Círculo del color elegido: mismo lenguaje visual que el
+                      muestrario de arriba, para no leer el nombre y adivinar. */}
+                  <span
+                    aria-hidden
+                    style={{
+                      width: 22,
+                      height: 22,
+                      flex: "0 0 auto",
+                      borderRadius: "50%",
+                      background: ln.filamentId
+                        ? (colorHex[filamentColorName(ln.filamentId)] ?? "#888")
+                        : "transparent",
+                      border: ln.filamentId
+                        ? "1px solid rgba(128,128,128,.35)"
+                        : "1px dashed var(--border)",
+                    }}
+                  />
                   <select
                     className="select flex-1"
                     value={ln.filamentId}

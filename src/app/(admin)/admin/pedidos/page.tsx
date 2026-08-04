@@ -13,7 +13,7 @@ import {
   OrdersBoard,
   type UnifiedSale,
 } from "@/features/orders/components/orders-board";
-import { listSaleColors } from "@/features/inventory/queries";
+import { listColorCatalog, listSaleColors } from "@/features/inventory/queries";
 import { listProductsForSale } from "@/features/products/services/catalogService";
 import { safeLoad } from "@/lib/safe-load";
 
@@ -30,7 +30,7 @@ export default async function PedidosAdminPage() {
   // Se cargan todas las ventas (online + manuales) para una tabla unificada con
   // filtros del lado del cliente. safeLoad: si la base se traba, renderiza con
   // datos parciales + aviso en vez de colgarse.
-  const [ordersR, manualR, sharesR, estimatorR, colorsR, productsR] =
+  const [ordersR, manualR, sharesR, estimatorR, colorsR, productsR, catalogR] =
     await Promise.all([
       safeLoad("pedidos", listOrdersAdmin({ page: 1, pageSize: 500 }), {
         items: [],
@@ -51,6 +51,9 @@ export default async function PedidosAdminPage() {
         {} as Record<string, string[]>,
       ),
       safeLoad("productos", listProductsForSale(), []),
+      // Catálogo de colores (Filamentos): da el hex REAL de cada color para el
+      // muestrario de la venta manual. Nunca un hex hardcodeado.
+      safeLoad("colores", listColorCatalog(), []),
     ]);
   const online = ordersR.value.items;
   const manual = manualR.value;
@@ -58,6 +61,8 @@ export default async function PedidosAdminPage() {
   const estimator = estimatorR.value;
   const saleColors = colorsR.value;
   const products = productsR.value;
+  const colorHex: Record<string, string> = {};
+  for (const c of catalogR.value) colorHex[c.name] = c.hex ?? "#888";
   // Categorías para la venta manual (las presentes en el catálogo de productos).
   const saleCategories = [
     ...new Set(
@@ -138,6 +143,7 @@ export default async function PedidosAdminPage() {
               partners={partners}
               estimator={estimator}
               products={products}
+              colorHex={colorHex}
             />
           ) : null}
         </div>
