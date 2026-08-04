@@ -484,6 +484,13 @@
       "when": 1783307300000,
       "tag": "0068_realtime_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1783307400000,
+      "tag": "0069_order_shipping_cost",
+      "breakpoints": true
     }
   ]
 }
