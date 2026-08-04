@@ -81,5 +81,25 @@ export function toActionError(error: unknown): {
     };
   }
   console.error("[error] inesperado:", error);
+  if (esMigracionPendiente(error)) {
+    // Caso real y recurrente: se pushea el código y se olvida `db:migrate`, así
+    // que la app pide una columna/tabla que todavía no existe. Antes esto salía
+    // como "Ocurrió un error. Probá de nuevo" y perdíamos media hora buscando en
+    // el lugar equivocado (2026-08-03). Ahora el propio cartel dice qué hacer.
+    return {
+      code: "DB_SCHEMA",
+      message:
+        "La tienda tiene una actualización a medio aplicar (falta correr las migraciones de la base). Avisale al taller.",
+    };
+  }
   return { code: "INTERNAL", message: "Ocurrió un error. Probá de nuevo." };
+}
+
+/**
+ * ¿El error viene de que a la base le falta una columna o una tabla?
+ * Códigos de PostgreSQL: 42703 `undefined_column`, 42P01 `undefined_table`.
+ */
+function esMigracionPendiente(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === "42703" || code === "42P01";
 }
