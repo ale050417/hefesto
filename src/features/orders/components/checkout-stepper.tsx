@@ -10,9 +10,36 @@ import { formatPrice } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { selectSubtotal, useCartStore } from "@/stores/cartStore";
 import { createOrderAction } from "../actions";
-import type { ShippingAddress } from "../schemas";
+import { shippingAddressSchema, type ShippingAddress } from "../schemas";
 import type { PaymentMethod } from "../types";
 import { runAction } from "@/lib/run-action";
+
+/**
+ * Valida UN campo del envío con el MISMO schema que corre el servidor.
+ *
+ * Antes cada input usaba `required: "…"`, que solo exige "no vacío", mientras
+ * el servidor pide mínimos reales (nombre 2, teléfono 6, dirección 3…). Con
+ * "a" y "1" el formulario dejaba pasar y recién en el último paso aparecía
+ * "Revisá los datos del formulario", sin decir qué campo (bug real,
+ * 2026-08-03). Derivando la regla del schema, cliente y servidor no pueden
+ * divergir: si mañana cambia el mínimo, cambia en los dos lados solo.
+ */
+function validarCampo(campo: keyof ShippingAddress) {
+  return (valor: unknown) => {
+    const r = shippingAddressSchema.shape[campo].safeParse(valor);
+    return r.success || (r.error.issues[0]?.message ?? "Revisá este dato.");
+  };
+}
+
+/** Campos del paso de envío (para saber si un error del servidor es de ahí). */
+const CAMPOS_ENVIO = [
+  "fullName",
+  "phone",
+  "street",
+  "city",
+  "province",
+  "postalCode",
+] as const;
 
 const field =
   "w-full rounded-md border border-surface-3 bg-surface-2 px-3 py-2 text-sm text-fg";
@@ -65,15 +92,20 @@ export function CheckoutStepper({
     whatsapp,
     "¡Hola! Quiero coordinar el pago en efectivo de mi pedido.",
   );
+  const clearCart = useCartStore((s) => s.clear);
   const [step, setStep] = useState(0);
   const [payment, setPayment] = useState<PaymentMethod>("transfer");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  /** El error viene de una línea del carrito, no de los datos del cliente. */
+  const [esProblemaDelCarrito, setEsProblemaDelCarrito] = useState(false);
 
   const {
     register,
     trigger,
     getValues,
+    setError,
+    setFocus,
     formState: { errors },
   } = useForm<ShippingAddress>({
     defaultValues: {
@@ -104,20 +136,22 @@ export function CheckoutStepper({
   }
 
   const goToPayment = async () => {
-    const valid = await trigger([
-      "fullName",
-      "phone",
-      "street",
-      "city",
-      "province",
-      "postalCode",
-    ]);
-    if (valid) setStep(1);
+    const valid = await trigger([...CAMPOS_ENVIO]);
+    if (valid) {
+      setFormError(null);
+      setStep(1);
+      return;
+    }
+    // Que el cursor caiga en el primer campo con problema: en celular el error
+    // puede quedar fuera de la pantalla y parecía que el botón no hacía nada.
+    const primero = CAMPOS_ENVIO.find((c) => errors[c]);
+    if (primero) setFocus(primero);
   };
 
   const confirm = async () => {
     setSubmitting(true);
     setFormError(null);
+    setEsProblemaDelCarrito(false);
     const res = await runAction(
       () =>
         createOrderAction({
@@ -136,6 +170,35 @@ export function CheckoutStepper({
     );
     if (!res.ok) {
       setFormError(res.error.message);
+      // Códigos que significan "algo del carrito ya no se puede comprar".
+      setEsProblemaDelCarrito(
+        [
+          "CART_INVALID",
+          "PRODUCT_UNAVAILABLE",
+          "VARIANT_NOT_FOUND",
+          "VARIANT_REQUIRED",
+          "INVALID_COLOR",
+          "COLOR_REQUIRED",
+          "EMPTY_CART",
+        ].includes(res.error.code),
+      );
+      // Si el servidor señala campos del envío, los marco y VUELVO al paso 1:
+      // dejar el error en la pantalla de Revisión, sin decir cuál era el campo,
+      // era un callejón sin salida.
+      const fields = (res.error as { fields?: Record<string, string> }).fields;
+      if (fields) {
+        const delEnvio = CAMPOS_ENVIO.filter(
+          (c) => fields[c] ?? fields[`shippingAddress.${c}`],
+        );
+        for (const c of delEnvio) {
+          const msg = fields[c] ?? fields[`shippingAddress.${c}`];
+          if (msg) setError(c, { type: "server", message: msg });
+        }
+        if (delEnvio.length > 0) {
+          setStep(0);
+          setFocus(delEnvio[0] as keyof ShippingAddress);
+        }
+      }
       setSubmitting(false);
       return;
     }
@@ -184,9 +247,31 @@ export function CheckoutStepper({
         </ol>
 
         {formError ? (
-          <p className="bg-danger/10 text-danger mb-4 rounded-md px-3 py-2 text-sm">
-            {formError}
-          </p>
+          <div className="bg-danger/10 mb-4 rounded-md px-3 py-2 text-sm">
+            <p className="text-danger">{formError}</p>
+            {/* Cuando el problema es un producto del carrito (uno que se
+                despublicó, un tamaño que ya no existe, un carrito viejo
+                guardado en el navegador) el cliente no tenía salida: el error
+                aparecía en el último paso y el pedido no se podía crear NUNCA.
+                Ahora hay un camino concreto para destrabarlo. */}
+            {esProblemaDelCarrito ? (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <Link href="/carrito" className="text-fg underline">
+                  Revisar el carrito
+                </Link>
+                <button
+                  type="button"
+                  className="text-dim underline"
+                  onClick={() => {
+                    clearCart();
+                    setFormError(null);
+                  }}
+                >
+                  Vaciar el carrito
+                </button>
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         {/* Paso 1: envío */}
@@ -200,7 +285,7 @@ export function CheckoutStepper({
                 id="fullName"
                 className={field}
                 {...register("fullName", {
-                  required: "Ingresá tu nombre y apellido.",
+                  validate: validarCampo("fullName"),
                 })}
               />
               {errors.fullName ? (
@@ -216,7 +301,7 @@ export function CheckoutStepper({
               <input
                 id="phone"
                 className={field}
-                {...register("phone", { required: "Ingresá un teléfono." })}
+                {...register("phone", { validate: validarCampo("phone") })}
               />
               {errors.phone ? (
                 <p className="text-danger mt-1 text-xs">
@@ -232,7 +317,7 @@ export function CheckoutStepper({
                 id="postalCode"
                 className={field}
                 {...register("postalCode", {
-                  required: "Ingresá el código postal.",
+                  validate: validarCampo("postalCode"),
                 })}
               />
               {errors.postalCode ? (
@@ -248,7 +333,7 @@ export function CheckoutStepper({
               <input
                 id="street"
                 className={field}
-                {...register("street", { required: "Ingresá la dirección." })}
+                {...register("street", { validate: validarCampo("street") })}
               />
               {errors.street ? (
                 <p className="text-danger mt-1 text-xs">
@@ -263,7 +348,7 @@ export function CheckoutStepper({
               <input
                 id="city"
                 className={field}
-                {...register("city", { required: "Ingresá la localidad." })}
+                {...register("city", { validate: validarCampo("city") })}
               />
               {errors.city ? (
                 <p className="text-danger mt-1 text-xs">
@@ -278,7 +363,9 @@ export function CheckoutStepper({
               <input
                 id="province"
                 className={field}
-                {...register("province", { required: "Ingresá la provincia." })}
+                {...register("province", {
+                  validate: validarCampo("province"),
+                })}
               />
               {errors.province ? (
                 <p className="text-danger mt-1 text-xs">
@@ -358,7 +445,14 @@ export function CheckoutStepper({
               </div>
             ) : null}
             <div className="flex gap-3 pt-2">
-              <Button type="button" variant="ghost" onClick={() => setStep(0)}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setFormError(null);
+                  setStep(0);
+                }}
+              >
                 Volver
               </Button>
               <Button
@@ -391,7 +485,14 @@ export function CheckoutStepper({
               </p>
             </section>
             <div className="flex gap-3">
-              <Button type="button" variant="ghost" onClick={() => setStep(1)}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setFormError(null);
+                  setStep(1);
+                }}
+              >
                 Volver
               </Button>
               <Button

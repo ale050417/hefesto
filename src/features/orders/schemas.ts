@@ -30,7 +30,13 @@ export const checkoutLineSchema = z.object({
   productId: z.uuid(),
   slug: z.string().min(1),
   variantId: z.uuid().nullable(),
-  color: z.string().max(60).nullable().optional(),
+  // 300, no 60: en MULTICOLOR la línea manda TODOS los colores de la pieza
+  // unidos ("Blanco + Celeste + Dorado + Marron + Negro + Piel + verde
+  // kriptonita + Verde Manzana" = 84). Con el límite viejo, Zod rechazaba el
+  // pedido ENTERO con "Revisá los datos del formulario" — un producto de 8
+  // colores hacía imposible comprar (bug real, 2026-08-03). La columna
+  // order_items.variant_label es TEXT, así que no había motivo para 60.
+  color: z.string().max(300).nullable().optional(),
   quantity: z.number().int().min(1).max(99),
 });
 

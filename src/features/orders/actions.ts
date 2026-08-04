@@ -89,12 +89,20 @@ export async function createOrderAction(
 
   const parsed = checkoutSchema.safeParse(input);
   if (!parsed.success) {
+    // El mensaje tiene que decir DÓNDE está el problema. Antes todo caía en
+    // "Revisá los datos del formulario", incluso cuando el formulario estaba
+    // perfecto y lo que fallaba era una línea del carrito: el cliente revisaba
+    // sus datos una y otra vez sin poder comprar (bug real, 2026-08-03).
+    const fields = fieldErrors(parsed.error);
+    const enElCarrito = Object.keys(fields).some((k) => k.startsWith("items"));
     return {
       ok: false,
       error: {
-        code: "VALIDATION",
-        message: "Revisá los datos del formulario.",
-        fields: fieldErrors(parsed.error),
+        code: enElCarrito ? "CART_INVALID" : "VALIDATION",
+        message: enElCarrito
+          ? "Hay un producto del carrito que no podemos procesar. Quitalo y volvé a agregarlo desde su página."
+          : "Revisá los datos del formulario.",
+        fields,
       },
     };
   }
