@@ -40,6 +40,21 @@ export type ProductInfoData = {
 };
 
 /**
+ * ¿El tilde va en blanco o en negro sobre este color? Se decide por la
+ * luminancia percibida (el ojo ve el verde mucho más claro que el azul, de ahí
+ * los pesos). Sin esto, el tilde blanco desaparecía sobre un swatch amarillo.
+ */
+function readableOn(hex: string): string {
+  const h = hex.replace("#", "").trim();
+  const full = h.length === 3 ? h.replace(/./g, (ch) => ch + ch) : h;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  if ([r, g, b].some((n) => Number.isNaN(n))) return "#ffffff";
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? "#111111" : "#ffffff";
+}
+
+/**
  * Columna derecha de la página de producto (cliente): precio DINÁMICO que
  * cambia con la variante/color + selectores + "Comprar ahora" y "Agregar al
  * carrito". Reemplaza al viejo PriceTag + AddToCart para que el precio grande
@@ -124,10 +139,6 @@ export function ProductInfo({
     isCombo && selected
       ? selected.label.split(" + ").map((x) => x.trim())
       : product.colors;
-  // Con MUCHOS colores, los chips con nombre + precio tapaban media pantalla
-  // (el "Cuadro de Messi" tiene 18 y ocupaban 5 filas). A partir de 10 se
-  // muestran solo los círculos y el nombre del elegido va arriba (2026-08-03).
-  const compactColors = !isMulti && colorChoices.length > 10;
   // ¿Algún color cuesta distinto? (para explicar el punto dorado).
   const hasSpecialPrice =
     !isMulti &&
@@ -230,118 +241,133 @@ export function ProductInfo({
           </div>
         ) : null}
 
-        {hasColors ? (
+        {hasColors && isMulti ? (
+          /* MULTICOLOR: la pieza lleva TODOS estos colores, no se elige uno.
+             Van agrupados dentro de un recuadro para que se lea como un
+             conjunto y no como botones para tocar (pedido de Ale 2026-08-03). */
+          <div className="border-surface-2 bg-surface-1 rounded-lg border p-3.5">
+            <p className="text-fg mb-2.5 text-[13px] font-medium">
+              Se imprime con estos colores
+            </p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              {colorChoices.map((c) => (
+                <span
+                  key={c}
+                  className="text-dim flex items-center gap-1.5 text-[13px]"
+                >
+                  <span
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: "50%",
+                      background: product.colorHex[c] ?? "#888",
+                      border: "1px solid rgba(255,255,255,.25)",
+                      display: "inline-block",
+                    }}
+                  />
+                  {c}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {hasColors && !isMulti ? (
           <div>
-            <p className="text-fg mb-2 text-sm font-medium">
-              {isMulti ? "Colores de la pieza" : "Color"}
-              {/* El nombre del elegido va ACÁ, no repetido en cada chip: con 18
-                  colores, escribir el nombre y el precio en cada uno tapaba
-                  media pantalla (pedido de Ale, 2026-08-03). */}
-              {!isMulti && color ? (
+            <p className="text-fg mb-2.5 text-sm font-medium">
+              Color
+              {/* El nombre del elegido va ACÁ, fijo. Es la condición que hace
+                  que los círculos funcionen: el cliente nunca tiene que
+                  adivinar cuál es "verde kriptonita" (2026-08-03). */}
+              {color ? (
                 <span className="text-primary ml-1.5 font-semibold">
                   {color}
                 </span>
               ) : null}
             </p>
-            <div
-              className={cn(
-                "flex flex-wrap",
-                compactColors ? "gap-2.5" : "gap-2",
-              )}
-            >
-              {/* Multicolor con COMBINACIONES: se muestran los colores del combo
-                  ELEGIDO (label "Negro + Rojo"). Si la variante es un TAMAÑO
-                  ("15 cm", sin " + "), NO es un combo: van los colores del
-                  producto (bug chihuahua: mostraba "15 cm" como color gris). */}
+            {/* Muestrario de color (patrón de Nike / Zara / Apple): SIEMPRE
+                círculos, sin importar cuántos haya. Un solo patrón se aprende
+                una vez; mezclar chips con texto y círculos obligaba a releer
+                la pantalla en cada producto. */}
+            <div className="flex flex-wrap gap-2.5">
               {colorChoices.map((c) => {
-                const active = !isMulti && color === c;
+                const active = color === c;
                 const hex = product.colorHex[c] ?? "#888";
                 // Precio del color: con tamaño elegido, la celda de SU matriz;
                 // sin tamaños, el precio por color del producto. Solo se
                 // ANUNCIA si es DISTINTO del precio del resto: repetir el mismo
-                // número en cada chip era ruido puro.
+                // número en cada uno era ruido puro.
                 const own = selected
                   ? (selected.colorPrices[c] ?? 0)
                   : (product.colorPrices[c] ?? 0);
-                const showPrice = !isMulti && own > 0 && own !== beforeColor;
-
-                // MODO COMPACTO (más de 10 colores): solo el círculo. El nombre
-                // se lee arriba y en el tooltip. 18 colores entran en 2 filas
-                // en vez de 5.
-                if (compactColors) {
-                  return (
-                    <button
-                      key={c}
-                      type="button"
-                      title={showPrice ? `${c} · ${formatPrice(own)}` : c}
-                      aria-label={c}
-                      aria-pressed={active}
-                      onClick={() => setColor(c)}
-                      className={cn(
-                        "relative grid h-9 w-9 place-items-center rounded-full border-2 transition-colors",
-                        active
-                          ? "border-primary"
-                          : "border-surface-3 hover:border-primary",
-                      )}
-                    >
-                      <span
-                        style={{
-                          width: 22,
-                          height: 22,
-                          borderRadius: "50%",
-                          background: hex,
-                          border: "1px solid rgba(255,255,255,.25)",
-                          display: "inline-block",
-                        }}
-                      />
-                      {/* Punto dorado: este color cuesta distinto. */}
-                      {showPrice ? (
-                        <span
-                          aria-hidden
-                          className="bg-primary absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full"
-                        />
-                      ) : null}
-                    </button>
-                  );
-                }
-
+                const showPrice = own > 0 && own !== beforeColor;
                 return (
                   <button
                     key={c}
                     type="button"
-                    disabled={isMulti}
-                    onClick={() => !isMulti && setColor(c)}
+                    title={showPrice ? `${c} · ${formatPrice(own)}` : c}
+                    aria-label={showPrice ? `${c}, ${formatPrice(own)}` : c}
+                    aria-pressed={active}
+                    onClick={() => setColor(c)}
                     className={cn(
-                      "flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors",
-                      active
-                        ? "border-primary text-primary"
-                        : "border-surface-3 text-fg",
-                      !isMulti && "hover:border-primary",
-                      isMulti && "cursor-default",
+                      // 44px de área táctil en celular: un círculo chico en el
+                      // teléfono es el error clásico de este patrón.
+                      "relative grid h-11 w-11 place-items-center rounded-full transition-transform sm:h-10 sm:w-10",
+                      active && "scale-105",
                     )}
+                    style={{
+                      outline: active
+                        ? "2px solid var(--gold-bright)"
+                        : "1px solid var(--border)",
+                      outlineOffset: active ? 2 : -1,
+                    }}
                   >
                     <span
                       style={{
-                        width: 13,
-                        height: 13,
+                        width: 30,
+                        height: 30,
                         borderRadius: "50%",
                         background: hex,
-                        border: "1px solid rgba(255,255,255,.25)",
+                        // Aro tenue: un color casi blanco necesita un límite
+                        // para no perderse contra el fondo.
+                        border: "1px solid rgba(128,128,128,.35)",
                         display: "inline-block",
                       }}
                     />
-                    {c}
-                    {showPrice ? ` · ${formatPrice(own)}` : ""}
+                    {/* Tilde adentro del elegido, en blanco o negro según el
+                        color. El borde solo no alcanza: ~8% de los hombres
+                        tiene algún grado de daltonismo, y sobre un círculo
+                        blanco el aro dorado casi no se ve. */}
+                    {active ? (
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="16"
+                        height="16"
+                        fill="none"
+                        stroke={readableOn(hex)}
+                        strokeWidth="3.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="absolute"
+                        aria-hidden
+                      >
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    ) : null}
+                    {/* Punto dorado: este color cuesta distinto. */}
+                    {showPrice ? (
+                      <span
+                        aria-hidden
+                        className="bg-primary absolute top-0 right-0 h-2.5 w-2.5 rounded-full"
+                        style={{ border: "1.5px solid var(--surface-1)" }}
+                      />
+                    ) : null}
                   </button>
                 );
               })}
             </div>
-            {isMulti ? (
-              <p className="text-faint mt-1 text-xs">
-                Esta pieza se imprime con todos estos colores.
-              </p>
-            ) : hasSpecialPrice ? (
-              <p className="text-faint mt-1.5 text-xs">
+            {hasSpecialPrice ? (
+              <p className="text-faint mt-2 text-xs">
                 Los colores con punto dorado tienen otro precio.
               </p>
             ) : null}
