@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useMounted } from "@/hooks/use-mounted";
 import { cn } from "@/lib/utils";
 
 export function Modal({
@@ -18,6 +20,16 @@ export function Modal({
   footer?: ReactNode;
   size?: "md" | "lg";
 }) {
+  // El modal se dibuja al FINAL del body, no donde está escrito en el árbol.
+  //
+  // Un `position: fixed` deja de referirse a la pantalla si algún ancestro tiene
+  // `transform` — y la tarjeta del catálogo lo tiene (se levanta al pasar el
+  // mouse). Sin esto, el modal de opciones aparecía metido DENTRO de la
+  // tarjeta, de 262px de ancho y recortado por su `overflow: hidden`
+  // (2026-08-04). Con el portal, ningún contenedor puede volver a encerrarlo.
+  // `document` no existe en el servidor: el portal solo se arma en el cliente.
+  const montado = useMounted();
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -27,8 +39,8 @@ export function Modal({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
-  return (
+  if (!open || !montado) return null;
+  return createPortal(
     // No cierra al hacer click afuera (evita perder lo cargado por accidente).
     // Se cierra con la X o con Escape.
     <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -49,6 +61,7 @@ export function Modal({
         <div className="modal-body">{children}</div>
         {footer ? <div className="modal-foot">{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
