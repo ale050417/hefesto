@@ -43,7 +43,14 @@ export function Modal({
   return createPortal(
     // No cierra al hacer click afuera (evita perder lo cargado por accidente).
     // Se cierra con la X o con Escape.
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
+    // `data-portal`: lo saca de la regla `body > *` que pone position:relative
+    // (ver globals.css). Sin eso, el modal se dibuja al final de la página.
+    <div
+      className="modal-backdrop"
+      role="dialog"
+      aria-modal="true"
+      data-portal=""
+    >
       <div className={cn("modal", size === "lg" && "modal-lg")}>
         {title ? (
           <div className="modal-head">

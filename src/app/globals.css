@@ -265,7 +265,13 @@ body::before {
   pointer-events: none;
   z-index: 0;
 }
-body > * {
+/* El contenido va por encima del degradado de `body::before`.
+   EXCEPTO lo que se dibuja con portal (modales): esta regla está FUERA de
+   `@layer`, así que le gana al `position: fixed` de `.modal-backdrop` (que sí
+   está en una capa). Cuando el modal pasó a ser hijo directo del body quedaba
+   `position: relative; z-index: 1` → se dibujaba al final de la página, abajo
+   de todo, sin fondo oscuro: el clic "no hacía nada" (2026-08-04). */
+body > *:not([data-portal]) {
   position: relative;
   z-index: 1;
 }
