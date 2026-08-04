@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { toast } from "@/stores/toastStore";
 import { getProductOptionsAction } from "../actions";
 import { useCartActions } from "../useCartActions";
 import { ProductOptionsModal } from "./product-options-modal";
@@ -76,8 +75,8 @@ export function QuickAdd({ product }: { product: QuickAddProduct }) {
       return;
     }
     if (modo === "add") {
+      // El aviso lo da `agregar` (uno solo, en toda la tienda).
       agregar(itemDirecto());
-      toast(`${product.name} agregado al carrito`, "success");
       return;
     }
     // El doble toque en celular llegaba al checkout con 2 unidades.

@@ -27,7 +27,6 @@ export function FavDrawer() {
   const setInWishlist = useWishlistStore((s) => s.setInWishlist);
   const setIds = useWishlistStore((s) => s.setIds);
   const addItem = useCartStore((s) => s.addItem);
-  const flashCart = useUiStore((s) => s.flashCart);
   const mounted = useMounted();
 
   const [items, setItems] = useState<ProductView[]>([]);
@@ -91,7 +90,6 @@ export function FavDrawer() {
       () => setAgregados((prev) => prev.filter((id) => id !== p.id)),
       2000,
     );
-    flashCart();
     toast(`${p.name} agregado al carrito`, "success");
   };
 
@@ -133,7 +131,6 @@ export function FavDrawer() {
     );
     setAgregados(addable.map((p) => p.id));
     setTimeout(() => setAgregados([]), 2000);
-    flashCart();
     const rest = items.length - addable.length;
     toast(
       rest > 0
