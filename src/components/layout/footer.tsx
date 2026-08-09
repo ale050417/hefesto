@@ -1,6 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import { getPublicStoreInfo } from "@/features/settings/service";
+import {
+  getBrandSettings,
+  getPublicStoreInfo,
+} from "@/features/settings/service";
 import { listCategories } from "@/features/products/services/catalogService";
 import { BrandMark } from "./brand-mark";
 
@@ -45,10 +48,12 @@ const ICONS = {
 
 export async function Footer() {
   const year = new Date().getFullYear();
-  const [s, categories] = await Promise.all([
+  const [s, categories, brand] = await Promise.all([
     getPublicStoreInfo(),
     listCategories(),
+    getBrandSettings(),
   ]);
+  const isVidriera = brand.businessMode === "vidriera";
   const name = s?.storeName?.trim() || "Hefesto 3D";
   const slogan = s?.slogan?.trim() || "Forjado en capas";
   const desc =
@@ -134,10 +139,16 @@ export async function Footer() {
 
           <div>
             <h5>Ayuda</h5>
-            <Link href="/#faq">Envíos y devoluciones</Link>
-            <Link href="/cuenta/pedidos">Seguir mi pedido</Link>
+            {!isVidriera ? (
+              <Link href="/#faq">Envíos y devoluciones</Link>
+            ) : null}
+            {!isVidriera ? (
+              <Link href="/cuenta/pedidos">Seguir mi pedido</Link>
+            ) : null}
             <Link href="/#faq">Preguntas frecuentes</Link>
-            <Link href="/cuenta/a-medida">Pedidos personalizados</Link>
+            {!isVidriera ? (
+              <Link href="/cuenta/a-medida">Pedidos personalizados</Link>
+            ) : null}
           </div>
 
           <div>

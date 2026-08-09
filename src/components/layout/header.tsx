@@ -18,6 +18,10 @@ export async function Header() {
     getCurrentUser(),
     getBrandSettings(),
   ]);
+  // Vidriera digital: catálogo puro, sin nada que dependa de comprar online
+  // (carrito, favoritos, login, notificaciones). El logo, el buscador y el
+  // nav siguen igual (Ale, 2026-08-09).
+  const isVidriera = brand.businessMode === "vidriera";
   const role = user?.profile?.role;
   const isStaff = role === "admin" || role === "operator";
   const isClient = !!user && !isStaff;
@@ -65,24 +69,28 @@ export async function Header() {
           <span className="store-theme">
             <ThemeSwitcher compact />
           </span>
-          {/* Secundarias: en mobile viven dentro de Mi cuenta (CSS las oculta) */}
-          <span className="store-extra-actions">
-            <FavButton />
-            {user ? <NotificationBell /> : null}
-          </span>
-          <CartButton />
+          {!isVidriera ? (
+            <>
+              {/* Secundarias: en mobile viven dentro de Mi cuenta (CSS las oculta) */}
+              <span className="store-extra-actions">
+                <FavButton />
+                {user ? <NotificationBell /> : null}
+              </span>
+              <CartButton />
 
-          {user ? (
-            <UserMenu
-              name={displayName}
-              email={user.email}
-              points={points}
-              isClient={isClient}
-              isStaff={isStaff}
-            />
-          ) : (
-            <AuthTrigger />
-          )}
+              {user ? (
+                <UserMenu
+                  name={displayName}
+                  email={user.email}
+                  points={points}
+                  isClient={isClient}
+                  isStaff={isStaff}
+                />
+              ) : (
+                <AuthTrigger />
+              )}
+            </>
+          ) : null}
         </div>
       </header>
 
