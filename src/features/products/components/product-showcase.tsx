@@ -19,9 +19,14 @@ import {
 export function ProductShowcase({
   images,
   product,
+  isVidriera = false,
+  whatsappPhone = null,
 }: {
   images: GalleryImage[];
   product: ProductInfoData;
+  /** Vidriera digital: "Consultar por WhatsApp" en vez de comprar online. */
+  isVidriera?: boolean;
+  whatsappPhone?: string | null;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -44,6 +49,8 @@ export function ProductShowcase({
         product={product}
         onColorChange={jumpTo}
         onVariantChange={jumpTo}
+        isVidriera={isVidriera}
+        whatsappPhone={whatsappPhone}
       />
     </div>
   );

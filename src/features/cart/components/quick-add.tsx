@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { formatPrice } from "@/lib/format";
+import { buildWhatsappUrl, siteUrl } from "@/lib/site";
 import { getProductOptionsAction } from "../actions";
 import { useCartActions } from "../useCartActions";
 import { ProductOptionsModal } from "./product-options-modal";
@@ -30,7 +32,16 @@ export type QuickAddProduct = {
  *
  * Las opciones se piden al TOCAR el botón, no al cargar el catálogo.
  */
-export function QuickAdd({ product }: { product: QuickAddProduct }) {
+export function QuickAdd({
+  product,
+  isVidriera = false,
+  whatsappPhone = null,
+}: {
+  product: QuickAddProduct;
+  /** Vidriera digital: "Consultar por WhatsApp" en vez de comprar online. */
+  isVidriera?: boolean;
+  whatsappPhone?: string | null;
+}) {
   const { agregar, comprarAhora } = useCartActions();
   const [open, setOpen] = useState(false);
   const [intent, setIntent] = useState<"add" | "buy">("add");
@@ -40,6 +51,27 @@ export function QuickAdd({ product }: { product: QuickAddProduct }) {
   const [yendo, setYendo] = useState(false);
   /** Identifica la carga vigente: descarta respuestas viejas que llegan tarde. */
   const pedido = useRef(0);
+
+  if (isVidriera) {
+    const url = `${siteUrl}/producto/${product.slug}`;
+    const message =
+      `¡Hola! Quería consultar por "${product.name}"` +
+      (product.lineColor ? ` (color ${product.lineColor})` : "") +
+      ` — ${formatPrice(product.displayPrice)}.\n${url}`;
+    return (
+      <div className="prod-actions">
+        <a
+          href={buildWhatsappUrl(whatsappPhone, message)}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="prod-action prod-action-buy"
+          aria-label={`Consultar ${product.name} por WhatsApp`}
+        >
+          Consultar por WhatsApp
+        </a>
+      </div>
+    );
+  }
 
   const itemDirecto = () => ({
     productId: product.id,

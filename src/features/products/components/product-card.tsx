@@ -14,7 +14,16 @@ import type { ProductView } from "../types";
  * nombre, que es donde el cliente espera tocar (y así el corazón de favoritos
  * deja de ser un botón dentro de un link, que era HTML inválido).
  */
-export function ProductCard({ product }: { product: ProductView }) {
+export function ProductCard({
+  product,
+  isVidriera = false,
+  whatsappPhone = null,
+}: {
+  product: ProductView;
+  /** Vidriera digital: "Consultar por WhatsApp" en vez de comprar online. */
+  isVidriera?: boolean;
+  whatsappPhone?: string | null;
+}) {
   const href = `/producto/${product.slug}`;
   return (
     <article className="prod-card">
@@ -92,6 +101,8 @@ export function ProductCard({ product }: { product: ProductView }) {
             lineColor: product.lineColor,
             image: product.primaryImage?.url ?? null,
           }}
+          isVidriera={isVidriera}
+          whatsappPhone={whatsappPhone}
         />
       </div>
     </article>

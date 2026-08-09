@@ -16,3 +16,20 @@ export function whatsappUrl(message?: string): string {
     : "https://wa.me/";
   return message ? `${base}?text=${encodeURIComponent(message)}` : base;
 }
+
+/**
+ * Arma el link de WhatsApp priorizando el número configurado en el admin
+ * (Config → Negocio); si no hay, cae al de la variable de entorno. Mismo
+ * criterio que usa el botón flotante de contacto (WhatsappFab) — reusado acá
+ * para la "Vidriera digital" (consultar en vez de comprar).
+ */
+export function buildWhatsappUrl(
+  phone: string | null | undefined,
+  message?: string,
+): string {
+  const digits = (phone ?? "").replace(/\D/g, "");
+  if (!digits) return whatsappUrl(message);
+  return message
+    ? `https://wa.me/${digits}?text=${encodeURIComponent(message)}`
+    : `https://wa.me/${digits}`;
+}

@@ -1,8 +1,9 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { formatPrice } from "@/lib/format";
+import { buildWhatsappUrl, siteUrl } from "@/lib/site";
 import { useProductChoice } from "../useProductChoice";
 import { useCartActions } from "../useCartActions";
 import { ChoiceControls } from "./choice-controls";
@@ -28,15 +29,20 @@ export function ProductInfo({
   product,
   onColorChange,
   onVariantChange,
+  isVidriera = false,
+  whatsappPhone = null,
 }: {
   product: ProductInfoData;
   /** Avisa el color elegido (para que la galería salte a su foto). */
   onColorChange?: (color: string | null) => void;
   /** Avisa la variante elegida (combinación multicolor → su foto). */
   onVariantChange?: (label: string | null) => void;
+  /** Vidriera digital: "Consultar por WhatsApp" en vez de comprar online. */
+  isVidriera?: boolean;
+  whatsappPhone?: string | null;
 }) {
   const choice = useProductChoice(product);
-  const { unitPrice, qty, hasColorPrice, selected, buildItem } = choice;
+  const { unitPrice, qty, hasColorPrice, selected, color, buildItem } = choice;
   const { agregar, comprarAhora } = useCartActions();
 
   // ¿Mostrar el precio original tachado? Solo si es oferta y el precio no lo
@@ -86,26 +92,46 @@ export function ProductInfo({
           onVariantChange={onVariantChange}
         />
 
-        {/* Comprar ahora (directo al checkout) + agregar al carrito. */}
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Button
-            type="button"
-            size="lg"
-            onClick={() => comprarAhora(buildItem(), qty)}
-            className="flex-1"
+        {/* Vidriera digital: consulta por WhatsApp con la elección hecha
+            (tamaño/color/cantidad ya van en el mensaje). Sin carrito. */}
+        {isVidriera ? (
+          <a
+            href={buildWhatsappUrl(
+              whatsappPhone,
+              `¡Hola! Quería consultar por "${product.name}"` +
+                (selected ? ` (${selected.label})` : "") +
+                (color ? ` color ${color}` : "") +
+                (qty > 1 ? ` x${qty}` : "") +
+                ` — ${formatPrice(unitPrice * qty)}.\n${siteUrl}/producto/${product.slug}`,
+            )}
+            target="_blank"
+            rel="noreferrer noopener"
+            className={buttonVariants({ size: "lg" })}
           >
-            Comprar ahora · {formatPrice(unitPrice * qty)}
-          </Button>
-          <Button
-            type="button"
-            size="lg"
-            variant="secondary"
-            onClick={() => agregar(buildItem(), qty)}
-            className="flex-1"
-          >
-            Agregar al carrito
-          </Button>
-        </div>
+            Consultar por WhatsApp
+          </a>
+        ) : (
+          /* Comprar ahora (directo al checkout) + agregar al carrito. */
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              size="lg"
+              onClick={() => comprarAhora(buildItem(), qty)}
+              className="flex-1"
+            >
+              Comprar ahora · {formatPrice(unitPrice * qty)}
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              variant="secondary"
+              onClick={() => agregar(buildItem(), qty)}
+              className="flex-1"
+            >
+              Agregar al carrito
+            </Button>
+          </div>
+        )}
       </div>
 
       {product.specs.length > 0 ? (

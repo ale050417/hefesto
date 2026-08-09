@@ -8,6 +8,7 @@ import {
   getRelatedProducts,
 } from "@/features/products/services/catalogService";
 import { listColorCatalog } from "@/features/inventory/queries";
+import { getBrandSettings } from "@/features/settings/service";
 import { siteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -46,10 +47,12 @@ export default async function ProductPage({ params }: Params) {
   // selector de color mostraba un gris genérico porque usaba un mapa
   // hardcodeado de 10 nombres fijos en vez del catálogo real de colores que
   // Ale carga en Filamentos → cada color que exista ahí se ve con SU hex).
-  const [related, colorCatalog] = await Promise.all([
+  const [related, colorCatalog, brand] = await Promise.all([
     getRelatedProducts(slug),
     listColorCatalog(),
+    getBrandSettings(),
   ]);
+  const isVidriera = brand.businessMode === "vidriera";
   const colorHex: Record<string, string> = {};
   for (const c of colorCatalog) colorHex[c.name] = c.hex ?? "#888";
 
@@ -106,6 +109,8 @@ export default async function ProductPage({ params }: Params) {
           salta a la foto de ese color). */}
       <ProductShowcase
         images={product.images}
+        isVidriera={isVidriera}
+        whatsappPhone={brand.whatsapp}
         product={{
           id: product.id,
           slug: product.slug,
