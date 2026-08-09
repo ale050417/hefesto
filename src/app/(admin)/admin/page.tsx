@@ -11,6 +11,7 @@ import {
   getMonthFilamentUsage,
 } from "@/features/reports/service";
 import { getStaffUser } from "@/core/auth/session";
+import { getBrandSettings } from "@/features/settings/service";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Panel" };
@@ -48,14 +49,20 @@ export default async function AdminDashboard({
     ? (rawMes as string)
     : currentKey;
 
-  const [{ recentOrders, lowStock, degraded }, monthUsage, user] =
+  const [{ recentOrders, lowStock, degraded }, monthUsage, user, brand] =
     await Promise.all([
       getDashboardData(30),
       getMonthFilamentUsage(monthKey).catch(() => []),
       getStaffUser(),
+      getBrandSettings(),
     ]);
   const firstName =
     user?.profile?.fullName?.trim().split(/\s+/)[0] || "Hefesto";
+  // Vidriera digital: "Últimos pedidos" es SIEMPRE de venta online (nunca
+  // muestra ventas manuales) — en este modo estaría vacío o mostraría
+  // pedidos viejos, así que se esconde. El resto del panel (stock, consumo
+  // de filamento, ventas manuales) sigue funcionando igual (Ale, 2026-08-09).
+  const isVidriera = brand.businessMode === "vidriera";
 
   return (
     <div>
@@ -71,48 +78,53 @@ export default async function AdminDashboard({
       </div>
 
       {/* Últimos pedidos PRIMERO (2026-07-24); el consumo del mes es una
-          tarjeta chica más, del tamaño de las alertas. */}
-      <div className="dash-grid">
-        <div className="ui-card section-card">
-          <div className="mb-3.5 flex items-center justify-between">
-            <div className="section-title">Últimos pedidos</div>
-            <Link
-              href="/admin/pedidos"
-              prefetch={false}
-              className="btn btn-ghost btn-sm"
-            >
-              Ver todos →
-            </Link>
-          </div>
-          {recentOrders.length === 0 ? (
-            <p className="text-dim text-sm">Sin pedidos aún.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {recentOrders.map((o) => (
-                <Link
-                  key={o.id}
-                  href={`/admin/pedidos/${o.id}`}
-                  prefetch={false}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] p-3 text-sm transition hover:border-[var(--gold)]"
-                >
-                  <span className="min-w-0">
-                    {/* Qué se pidió (no el código HEF-XXX). El número y la fecha
-                        van chicos debajo, para identificar el pedido si hace falta. */}
-                    <b className="text-fg block truncate">
-                      {o.itemsSummary || o.orderNumber}
-                    </b>
-                    <span className="text-faint text-xs">
-                      {o.orderNumber} · {dateFmt.format(new Date(o.createdAt))}
-                    </span>
-                  </span>
-                  <Badge variant={ORDER_STATUS_VARIANT[o.status]}>
-                    {ORDER_STATUS_LABEL[o.status]}
-                  </Badge>
-                </Link>
-              ))}
+          tarjeta chica más, del tamaño de las alertas. En vidriera esta
+          tarjeta es SIEMPRE de venta online: se esconde y "Alertas de stock"
+          pasa a ancho completo (no queda un hueco al lado). */}
+      <div className={isVidriera ? undefined : "dash-grid"}>
+        {!isVidriera ? (
+          <div className="ui-card section-card">
+            <div className="mb-3.5 flex items-center justify-between">
+              <div className="section-title">Últimos pedidos</div>
+              <Link
+                href="/admin/pedidos"
+                prefetch={false}
+                className="btn btn-ghost btn-sm"
+              >
+                Ver todos →
+              </Link>
             </div>
-          )}
-        </div>
+            {recentOrders.length === 0 ? (
+              <p className="text-dim text-sm">Sin pedidos aún.</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {recentOrders.map((o) => (
+                  <Link
+                    key={o.id}
+                    href={`/admin/pedidos/${o.id}`}
+                    prefetch={false}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-[var(--border)] p-3 text-sm transition hover:border-[var(--gold)]"
+                  >
+                    <span className="min-w-0">
+                      {/* Qué se pidió (no el código HEF-XXX). El número y la fecha
+                          van chicos debajo, para identificar el pedido si hace falta. */}
+                      <b className="text-fg block truncate">
+                        {o.itemsSummary || o.orderNumber}
+                      </b>
+                      <span className="text-faint text-xs">
+                        {o.orderNumber} ·{" "}
+                        {dateFmt.format(new Date(o.createdAt))}
+                      </span>
+                    </span>
+                    <Badge variant={ORDER_STATUS_VARIANT[o.status]}>
+                      {ORDER_STATUS_LABEL[o.status]}
+                    </Badge>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
 
         {/* Alertas de stock GRÁFICAS (2026-07-24): barra de lo que queda del
             carrete con el color real del filamento; en rojo si quedó negativo. */}
