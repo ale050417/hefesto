@@ -8,6 +8,13 @@ import type {
 } from "@/core/db/schema";
 
 export type BusinessSettings = typeof businessSettings.$inferSelect;
+
+/**
+ * "checkout" = tienda con carrito y pago online (como siempre).
+ * "vidriera" = catálogo digital sin compra online: cada producto manda a
+ * WhatsApp en vez de al carrito.
+ */
+export type BusinessMode = "checkout" | "vidriera";
 export type StoreBanner = typeof storeBanners.$inferSelect;
 export type PaymentSettings = typeof paymentSettings.$inferSelect;
 export type ShippingSettings = typeof shippingSettings.$inferSelect;
@@ -41,6 +48,7 @@ export type TeamMember = {
 };
 
 export type BrandSettings = {
+  businessMode: BusinessMode;
   logoUrl: string | null;
   heroImageUrl: string | null;
   storeName: string | null;

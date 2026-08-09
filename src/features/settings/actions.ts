@@ -254,6 +254,7 @@ const UNAUTH = {
 };
 
 const appearanceSchema = z.object({
+  businessMode: z.enum(["checkout", "vidriera"]).optional(),
   accentColor: z
     .string()
     .trim()
@@ -280,6 +281,9 @@ export async function saveAppearanceAction(
   }
   try {
     await saveAppearance({
+      ...(parsed.data.businessMode
+        ? { businessMode: parsed.data.businessMode }
+        : {}),
       accentColor: parsed.data.accentColor ? parsed.data.accentColor : null,
       season: parsed.data.season ?? "none",
       seasonDeco: parsed.data.seasonDeco ?? false,

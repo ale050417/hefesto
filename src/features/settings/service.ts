@@ -25,6 +25,7 @@ import {
 } from "./repository";
 import type {
   BrandSettings,
+  BusinessMode,
   BusinessSettings,
   PaymentSettings,
   Role,
@@ -55,6 +56,7 @@ export const getBrandSettings = unstable_cache(
       instagram: s?.instagram ?? null,
       facebook: s?.facebook ?? null,
       contactEmail: s?.contactEmail ?? null,
+      businessMode: s?.businessMode === "vidriera" ? "vidriera" : "checkout",
       accentColor: s?.accentColor ?? null,
       season: s?.season ?? "none",
       seasonDeco: s?.seasonDeco ?? false,
@@ -551,6 +553,7 @@ export async function removeTeamMember(
 }
 
 export type AppearancePatch = {
+  businessMode?: BusinessMode;
   accentColor?: string | null;
   season?: string;
   seasonDeco?: boolean;

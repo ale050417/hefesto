@@ -25,6 +25,11 @@ export const businessSettings = pgTable(
     addressText: text("address_text"),
     instagram: text("instagram"),
     facebook: text("facebook"),
+    // Modo de negocio: "checkout" = tienda con carrito y pago online (como
+    // hoy). "vidriera" = catálogo digital sin compra online: cada producto
+    // manda a WhatsApp en vez de al carrito, y se esconden login/checkout/mis
+    // pedidos. Reversible desde Config→Tienda, sin tocar código (Ale, 2026-08-08).
+    businessMode: text("business_mode").notNull().default("checkout"),
     // Apariencia: color de acento + temporada/campaña activa.
     accentColor: text("accent_color"),
     season: text("season").notNull().default("none"),

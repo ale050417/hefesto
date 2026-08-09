@@ -16,7 +16,7 @@ import {
 } from "../actions";
 import { SEASONS, type SeasonKey } from "../seasons";
 import { HOME_SECTIONS, sectionOn } from "../home-sections";
-import type { BusinessSettings, StoreBanner } from "../types";
+import type { BusinessMode, BusinessSettings, StoreBanner } from "../types";
 import { BrandImageUpload } from "./brand-image-upload";
 import { StoreLivePreview } from "./store-live-preview";
 import { TrustBarEditor } from "./trust-bar-editor";
@@ -223,6 +223,7 @@ export function StoreAppearance({
   const [previewVersion, setPreviewVersion] = useState(0);
   const bumpPreview = () => setPreviewVersion((v) => v + 1);
   const [form, setForm] = useState({
+    businessMode: (settings?.businessMode as BusinessMode) ?? "checkout",
     accent: settings?.accentColor ?? "#C9A84C",
     name: settings?.storeName ?? "",
     slogan: settings?.slogan ?? "",
@@ -290,6 +291,7 @@ export function StoreAppearance({
         instagram: settings?.instagram ?? "",
       }),
       saveAppearanceAction({
+        businessMode: form.businessMode,
         accentColor: form.accent,
         season: form.season,
         seasonDeco: form.deco,
@@ -456,6 +458,46 @@ export function StoreAppearance({
 
         {/* Contacto y redes se editan solo en Config › Negocio (una sola fuente
             de verdad). La tienda los toma de ahí; acá no se duplican. */}
+
+        {/* Modo de negocio: reversible desde acá, sin tocar código (Ale,
+            2026-08-08). Reusa el mismo switch que "Decoración animada". */}
+        <div className="ui-card section-card flex flex-col gap-3">
+          <div>
+            <div className="section-title">Modo de negocio</div>
+            <div className="text-faint mt-0.5 text-[12.5px]">
+              Elegí si tu tienda vende online o funciona como vidriera digital.
+              Se puede cambiar cuando quieras, sin perder nada.
+            </div>
+          </div>
+          <div
+            className="ui-card flex items-center justify-between"
+            style={{ padding: "13px 15px" }}
+          >
+            <div>
+              <div className="text-[13.5px] font-semibold">
+                Vidriera digital
+              </div>
+              <div className="text-faint text-[12px]">
+                {form.businessMode === "vidriera"
+                  ? 'Sin carrito ni pago online: cada producto manda a WhatsApp. Se esconden el login y "Mis pedidos".'
+                  : "Apagado: la tienda vende online con carrito y pago, como ahora."}
+              </div>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.businessMode === "vidriera"}
+              aria-label="Vidriera digital"
+              className={`switch ${form.businessMode === "vidriera" ? "on" : ""}`}
+              onClick={() =>
+                set(
+                  "businessMode",
+                  form.businessMode === "vidriera" ? "checkout" : "vidriera",
+                )
+              }
+            />
+          </div>
+        </div>
 
         {/* Temporadas */}
         <div className="ui-card section-card flex flex-col gap-3">
