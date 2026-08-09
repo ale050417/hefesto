@@ -5,7 +5,6 @@ import { formatPrice } from "@/lib/format";
 import { buildWhatsappUrl, siteUrl } from "@/lib/site";
 import { getProductOptionsAction } from "../actions";
 import { useCartActions } from "../useCartActions";
-import { useInquiryActions } from "../useInquiryActions";
 import { ProductOptionsModal } from "./product-options-modal";
 import type { ChooserProduct } from "../types";
 
@@ -38,6 +37,8 @@ export type QuickAddProduct = {
   displayPrice: number;
   /** El cliente TIENE que elegir tamaño o color antes de comprar. */
   needsChoice: boolean;
+  /** Tiene tamaños entre los que elegir (no cuenta el color). */
+  hasVariants: boolean;
   /** Combinación fija de colores (multicolor); null si no aplica. */
   lineColor: string | null;
   image: string | null;
@@ -65,7 +66,6 @@ export function QuickAdd({
   whatsappPhone?: string | null;
 }) {
   const { agregar, comprarAhora } = useCartActions();
-  const { agregar: agregarConsulta } = useInquiryActions();
   const [open, setOpen] = useState(false);
   const [intent, setIntent] = useState<"add" | "buy">("add");
   const [opciones, setOpciones] = useState<ChooserProduct | null>(null);
@@ -104,11 +104,10 @@ export function QuickAdd({
   }
 
   if (isVidriera) {
-    // Con tamaños/colores para elegir, se abre el MISMO modal que la compra
-    // online: la elección importa para el mensaje igual que importaba para
-    // el precio (2026-08-09). `intent` "buy"→"Consultar ya" es la principal,
-    // "add"→"Agregar a la lista" es la secundaria (mismo orden de siempre).
-    if (product.needsChoice) {
+    // Solo el TAMAÑO obliga a elegir antes de consultar (2026-08-09, pedido
+    // de Ale): el color no importa acá, se conversa por WhatsApp. Un solo
+    // botón siempre — sin "agregar al carrito", consulta de a uno.
+    if (product.hasVariants) {
       return (
         <>
           <div className="prod-actions">
@@ -119,15 +118,6 @@ export function QuickAdd({
               aria-label={`Consultar ${product.name} por WhatsApp`}
             >
               Consultar ya
-            </button>
-            <button
-              type="button"
-              className="prod-action prod-action-add"
-              onClick={() => void abrir("add")}
-              aria-label={`Agregar ${product.name} a la lista de consulta`}
-              title="Agregar a la lista de consulta"
-            >
-              <PlusIcon />
             </button>
           </div>
           <ProductOptionsModal
@@ -163,15 +153,6 @@ export function QuickAdd({
         >
           Consultar ya
         </a>
-        <button
-          type="button"
-          className="prod-action prod-action-add"
-          onClick={() => agregarConsulta(itemDirecto())}
-          aria-label={`Agregar ${product.name} a la lista de consulta`}
-          title="Agregar a la lista de consulta"
-        >
-          <PlusIcon />
-        </button>
       </div>
     );
   }

@@ -98,6 +98,7 @@ export function ProductCard({
             name: product.name,
             displayPrice: product.displayPrice,
             needsChoice: product.needsChoice,
+            hasVariants: product.hasVariants,
             lineColor: product.lineColor,
             image: product.primaryImage?.url ?? null,
           }}

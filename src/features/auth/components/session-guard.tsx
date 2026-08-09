@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { useCartStore } from "@/stores/cartStore";
-import { useInquiryStore } from "@/stores/inquiryStore";
 import { useUiStore } from "@/stores/uiStore";
 import { useWishlistStore } from "@/features/wishlist/store";
 import { COMPRADO_KEY, SOLO_KEY } from "@/features/cart/selection";
@@ -18,10 +17,8 @@ import { decidirSesion, OWNER_KEY } from "../sessionScope";
  */
 export function limpiarEstadoLocal(): void {
   useCartStore.getState().clear(); // ítems + cupón
-  useInquiryStore.getState().clear(); // lista de consulta (vidriera digital)
   useWishlistStore.getState().setIds([]);
   useUiStore.getState().closeCart();
-  useUiStore.getState().closeInquiry();
   useUiStore.getState().closeFav();
   try {
     sessionStorage.removeItem(COMPRADO_KEY);

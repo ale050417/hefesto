@@ -10,7 +10,6 @@ import { buildWhatsappUrl, siteUrl } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { useProductChoice } from "../useProductChoice";
 import { useCartActions } from "../useCartActions";
-import { useInquiryActions } from "../useInquiryActions";
 import { ChoiceControls } from "./choice-controls";
 import type { ChooserProduct } from "../types";
 
@@ -116,8 +115,7 @@ function OptionsBody({
 
       <div className="flex flex-col gap-2 pt-1 sm:flex-row">
         {isVidriera ? (
-          <InquiryButtons
-            intent={intent}
+          <ConsultButton
             product={product}
             item={buildItem()}
             qty={qty}
@@ -187,10 +185,9 @@ function BuyButtons({
   return intent === "buy" ? [buy, add] : [add, buy];
 }
 
-/** Equivalente de `BuyButtons` para vidriera: consultar YA (WhatsApp directo)
- *  o agregar a la lista de consulta. Mismo orden según `intent`. */
-function InquiryButtons({
-  intent,
+/** Vidriera: un solo botón, directo a WhatsApp con el tamaño ya elegido. Sin
+ *  "agregar a la lista" (Ale, 2026-08-09): consulta de a un producto por vez. */
+function ConsultButton({
   product,
   item,
   qty,
@@ -198,7 +195,6 @@ function InquiryButtons({
   whatsappPhone,
   onDone,
 }: {
-  intent: "add" | "buy";
   product: ChooserProduct;
   item: ReturnType<ReturnType<typeof useProductChoice>["buildItem"]>;
   qty: number;
@@ -206,7 +202,6 @@ function InquiryButtons({
   whatsappPhone: string | null;
   onDone: () => void;
 }) {
-  const { agregar } = useInquiryActions();
   const message =
     `¡Hola! Quería consultar por "${product.name}"` +
     (item.variantLabel ? ` (${item.variantLabel})` : "") +
@@ -214,38 +209,15 @@ function InquiryButtons({
     (qty > 1 ? ` x${qty}` : "") +
     ` — ${formatPrice(total)}.\n${siteUrl}/producto/${product.slug}`;
 
-  const list = (
-    <Button
-      key="list"
-      type="button"
-      size="lg"
-      variant={intent === "buy" ? "secondary" : "primary"}
-      className="flex-1"
-      onClick={() => {
-        agregar(item, qty);
-        onDone();
-      }}
-    >
-      Agregar a la lista
-    </Button>
-  );
-  const consult = (
+  return (
     <a
-      key="consult"
       href={buildWhatsappUrl(whatsappPhone, message)}
       target="_blank"
       rel="noreferrer noopener"
       onClick={onDone}
-      className={cn(
-        buttonVariants({
-          size: "lg",
-          variant: intent === "buy" ? "primary" : "secondary",
-        }),
-        "flex-1 text-center",
-      )}
+      className={cn(buttonVariants({ size: "lg" }), "flex-1 text-center")}
     >
       Consultar ya
     </a>
   );
-  return intent === "buy" ? [consult, list] : [list, consult];
 }

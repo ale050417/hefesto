@@ -7,7 +7,6 @@ import { buildWhatsappUrl, siteUrl } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { useProductChoice } from "../useProductChoice";
 import { useCartActions } from "../useCartActions";
-import { useInquiryActions } from "../useInquiryActions";
 import { ChoiceControls } from "./choice-controls";
 import type { ChooserProduct } from "../types";
 
@@ -46,7 +45,6 @@ export function ProductInfo({
   const choice = useProductChoice(product);
   const { unitPrice, qty, hasColorPrice, selected, color, buildItem } = choice;
   const { agregar, comprarAhora } = useCartActions();
-  const { agregar: agregarConsulta } = useInquiryActions();
 
   // ¿Mostrar el precio original tachado? Solo si es oferta y el precio no lo
   // reemplaza ni el tamaño ni el color.
@@ -95,39 +93,25 @@ export function ProductInfo({
           onVariantChange={onVariantChange}
         />
 
-        {/* Vidriera digital: consulta por WhatsApp con la elección hecha
-            (tamaño/color/cantidad ya van en el mensaje), o sumarlo a la lista
-            de consulta para preguntar por varios juntos. Sin carrito. */}
+        {/* Vidriera digital: consulta por WhatsApp con la elección ya hecha
+            (tamaño/color/cantidad van en el mensaje). Sin carrito ni lista:
+            consulta de a un producto por vez (Ale, 2026-08-09). */}
         {isVidriera ? (
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <a
-              href={buildWhatsappUrl(
-                whatsappPhone,
-                `¡Hola! Quería consultar por "${product.name}"` +
-                  (selected ? ` (${selected.label})` : "") +
-                  (color ? ` color ${color}` : "") +
-                  (qty > 1 ? ` x${qty}` : "") +
-                  ` — ${formatPrice(unitPrice * qty)}.\n${siteUrl}/producto/${product.slug}`,
-              )}
-              target="_blank"
-              rel="noreferrer noopener"
-              className={cn(
-                buttonVariants({ size: "lg" }),
-                "flex-1 text-center",
-              )}
-            >
-              Consultar ya
-            </a>
-            <Button
-              type="button"
-              size="lg"
-              variant="secondary"
-              className="flex-1"
-              onClick={() => agregarConsulta(buildItem(), qty)}
-            >
-              Agregar a la lista
-            </Button>
-          </div>
+          <a
+            href={buildWhatsappUrl(
+              whatsappPhone,
+              `¡Hola! Quería consultar por "${product.name}"` +
+                (selected ? ` (${selected.label})` : "") +
+                (color ? ` color ${color}` : "") +
+                (qty > 1 ? ` x${qty}` : "") +
+                ` — ${formatPrice(unitPrice * qty)}.\n${siteUrl}/producto/${product.slug}`,
+            )}
+            target="_blank"
+            rel="noreferrer noopener"
+            className={cn(buttonVariants({ size: "lg" }), "block text-center")}
+          >
+            Consultar ya
+          </a>
         ) : (
           /* Comprar ahora (directo al checkout) + agregar al carrito. */
           <div className="flex flex-col gap-2 sm:flex-row">
