@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/core/auth/session";
 import { getBrandSettings } from "@/features/settings/service";
 import { CartButton } from "@/features/cart/components/cart-button";
+import { InquiryButton } from "@/features/cart/components/inquiry-button";
 import { SearchBox } from "@/features/products/components/search-box";
 import { AuthTrigger } from "@/features/auth/components/auth-trigger";
 import { UserMenu } from "@/features/auth/components/user-menu";
@@ -90,7 +91,10 @@ export async function Header() {
                 <AuthTrigger />
               )}
             </>
-          ) : null}
+          ) : (
+            /* El "carrito" de la vidriera: la lista de consulta. */
+            <InquiryButton />
+          )}
         </div>
       </header>
 

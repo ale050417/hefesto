@@ -5,8 +5,30 @@ import { formatPrice } from "@/lib/format";
 import { buildWhatsappUrl, siteUrl } from "@/lib/site";
 import { getProductOptionsAction } from "../actions";
 import { useCartActions } from "../useCartActions";
+import { useInquiryActions } from "../useInquiryActions";
 import { ProductOptionsModal } from "./product-options-modal";
 import type { ChooserProduct } from "../types";
+
+/** El "+" de agregar (al carrito real, o a la lista de consulta en vidriera). */
+function PlusIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="9" cy="21" r="1" />
+      <circle cx="20" cy="21" r="1" />
+      <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
+    </svg>
+  );
+}
 
 /** Lo que la tarjeta del catálogo sabe del producto. */
 export type QuickAddProduct = {
@@ -43,6 +65,7 @@ export function QuickAdd({
   whatsappPhone?: string | null;
 }) {
   const { agregar, comprarAhora } = useCartActions();
+  const { agregar: agregarConsulta } = useInquiryActions();
   const [open, setOpen] = useState(false);
   const [intent, setIntent] = useState<"add" | "buy">("add");
   const [opciones, setOpciones] = useState<ChooserProduct | null>(null);
@@ -51,27 +74,6 @@ export function QuickAdd({
   const [yendo, setYendo] = useState(false);
   /** Identifica la carga vigente: descarta respuestas viejas que llegan tarde. */
   const pedido = useRef(0);
-
-  if (isVidriera) {
-    const url = `${siteUrl}/producto/${product.slug}`;
-    const message =
-      `¡Hola! Quería consultar por "${product.name}"` +
-      (product.lineColor ? ` (color ${product.lineColor})` : "") +
-      ` — ${formatPrice(product.displayPrice)}.\n${url}`;
-    return (
-      <div className="prod-actions">
-        <a
-          href={buildWhatsappUrl(whatsappPhone, message)}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="prod-action prod-action-buy"
-          aria-label={`Consultar ${product.name} por WhatsApp`}
-        >
-          Consultar por WhatsApp
-        </a>
-      </div>
-    );
-  }
 
   const itemDirecto = () => ({
     productId: product.id,
@@ -99,6 +101,79 @@ export function QuickAdd({
     setCargando(false);
     if (res.ok) setOpciones(res.data);
     else setError(res.error.message);
+  }
+
+  if (isVidriera) {
+    // Con tamaños/colores para elegir, se abre el MISMO modal que la compra
+    // online: la elección importa para el mensaje igual que importaba para
+    // el precio (2026-08-09). `intent` "buy"→"Consultar ya" es la principal,
+    // "add"→"Agregar a la lista" es la secundaria (mismo orden de siempre).
+    if (product.needsChoice) {
+      return (
+        <>
+          <div className="prod-actions">
+            <button
+              type="button"
+              className="prod-action prod-action-buy"
+              onClick={() => void abrir("buy")}
+              aria-label={`Consultar ${product.name} por WhatsApp`}
+            >
+              Consultar ya
+            </button>
+            <button
+              type="button"
+              className="prod-action prod-action-add"
+              onClick={() => void abrir("add")}
+              aria-label={`Agregar ${product.name} a la lista de consulta`}
+              title="Agregar a la lista de consulta"
+            >
+              <PlusIcon />
+            </button>
+          </div>
+          <ProductOptionsModal
+            open={open}
+            onClose={() => {
+              pedido.current++;
+              setOpen(false);
+              setCargando(false);
+            }}
+            product={opciones}
+            loading={cargando}
+            error={error}
+            intent={intent}
+            isVidriera
+            whatsappPhone={whatsappPhone}
+          />
+        </>
+      );
+    }
+    const url = `${siteUrl}/producto/${product.slug}`;
+    const message =
+      `¡Hola! Quería consultar por "${product.name}"` +
+      (product.lineColor ? ` (color ${product.lineColor})` : "") +
+      ` — ${formatPrice(product.displayPrice)}.\n${url}`;
+    return (
+      <div className="prod-actions">
+        <a
+          href={buildWhatsappUrl(whatsappPhone, message)}
+          target="_blank"
+          rel="noreferrer noopener"
+          className="prod-action prod-action-buy"
+          aria-label={`Consultar ${product.name} por WhatsApp`}
+        >
+          Consultar ya
+        </a>
+        <button
+          type="button"
+          className="prod-action prod-action-add"
+          onClick={() => agregarConsulta(itemDirecto())}
+          aria-label={`Agregar ${product.name} a la lista de consulta`}
+          title="Agregar a la lista de consulta"
+        >
+          <PlusIcon />
+        </button>
+      </div>
+    );
   }
 
   function alTocar(modo: "add" | "buy") {
@@ -136,21 +211,7 @@ export function QuickAdd({
           aria-label={`Agregar ${product.name} al carrito`}
           title="Agregar al carrito"
         >
-          <svg
-            viewBox="0 0 24 24"
-            width="18"
-            height="18"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <circle cx="9" cy="21" r="1" />
-            <circle cx="20" cy="21" r="1" />
-            <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
-          </svg>
+          <PlusIcon />
         </button>
       </div>
 

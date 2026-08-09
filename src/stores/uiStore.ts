@@ -7,6 +7,11 @@ type UiState = {
   openCart: () => void;
   closeCart: () => void;
 
+  /** Lista de consulta (vidriera digital): el "carrito" cuando no hay compra online. */
+  inquiryOpen: boolean;
+  openInquiry: () => void;
+  closeInquiry: () => void;
+
   favOpen: boolean;
   openFav: () => void;
   closeFav: () => void;
@@ -22,6 +27,10 @@ export const useUiStore = create<UiState>((set) => ({
   cartOpen: false,
   openCart: () => set({ cartOpen: true }),
   closeCart: () => set({ cartOpen: false }),
+
+  inquiryOpen: false,
+  openInquiry: () => set({ inquiryOpen: true }),
+  closeInquiry: () => set({ inquiryOpen: false }),
 
   favOpen: false,
   openFav: () => set({ favOpen: true }),

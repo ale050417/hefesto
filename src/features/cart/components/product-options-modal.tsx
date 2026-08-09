@@ -2,12 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/spinner";
 import { formatPrice } from "@/lib/format";
+import { buildWhatsappUrl, siteUrl } from "@/lib/site";
+import { cn } from "@/lib/utils";
 import { useProductChoice } from "../useProductChoice";
 import { useCartActions } from "../useCartActions";
+import { useInquiryActions } from "../useInquiryActions";
 import { ChoiceControls } from "./choice-controls";
 import type { ChooserProduct } from "../types";
 
@@ -25,6 +28,8 @@ export function ProductOptionsModal({
   loading,
   error,
   intent,
+  isVidriera = false,
+  whatsappPhone = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -33,6 +38,9 @@ export function ProductOptionsModal({
   error: string | null;
   /** Con qué botón se abrió: define la acción principal del modal. */
   intent: "add" | "buy";
+  /** Vidriera digital: "Consultar" / "Agregar a la lista" en vez de comprar. */
+  isVidriera?: boolean;
+  whatsappPhone?: string | null;
 }) {
   return (
     <Modal
@@ -49,7 +57,13 @@ export function ProductOptionsModal({
           {error ?? "No pudimos cargar las opciones."}
         </p>
       ) : (
-        <OptionsBody product={product} intent={intent} onDone={onClose} />
+        <OptionsBody
+          product={product}
+          intent={intent}
+          onDone={onClose}
+          isVidriera={isVidriera}
+          whatsappPhone={whatsappPhone}
+        />
       )}
     </Modal>
   );
@@ -59,10 +73,14 @@ function OptionsBody({
   product,
   intent,
   onDone,
+  isVidriera,
+  whatsappPhone,
 }: {
   product: ChooserProduct;
   intent: "add" | "buy";
   onDone: () => void;
+  isVidriera: boolean;
+  whatsappPhone: string | null;
 }) {
   const choice = useProductChoice(product);
   const { unitPrice, qty, buildItem } = choice;
@@ -97,13 +115,25 @@ function OptionsBody({
       <ChoiceControls choice={choice} />
 
       <div className="flex flex-col gap-2 pt-1 sm:flex-row">
-        <BuyButtons
-          intent={intent}
-          item={buildItem()}
-          qty={qty}
-          total={unitPrice * qty}
-          onDone={onDone}
-        />
+        {isVidriera ? (
+          <InquiryButtons
+            intent={intent}
+            product={product}
+            item={buildItem()}
+            qty={qty}
+            total={unitPrice * qty}
+            whatsappPhone={whatsappPhone}
+            onDone={onDone}
+          />
+        ) : (
+          <BuyButtons
+            intent={intent}
+            item={buildItem()}
+            qty={qty}
+            total={unitPrice * qty}
+            onDone={onDone}
+          />
+        )}
       </div>
     </div>
   );
@@ -155,4 +185,67 @@ function BuyButtons({
     </Button>
   );
   return intent === "buy" ? [buy, add] : [add, buy];
+}
+
+/** Equivalente de `BuyButtons` para vidriera: consultar YA (WhatsApp directo)
+ *  o agregar a la lista de consulta. Mismo orden según `intent`. */
+function InquiryButtons({
+  intent,
+  product,
+  item,
+  qty,
+  total,
+  whatsappPhone,
+  onDone,
+}: {
+  intent: "add" | "buy";
+  product: ChooserProduct;
+  item: ReturnType<ReturnType<typeof useProductChoice>["buildItem"]>;
+  qty: number;
+  total: number;
+  whatsappPhone: string | null;
+  onDone: () => void;
+}) {
+  const { agregar } = useInquiryActions();
+  const message =
+    `¡Hola! Quería consultar por "${product.name}"` +
+    (item.variantLabel ? ` (${item.variantLabel})` : "") +
+    (item.color ? ` color ${item.color}` : "") +
+    (qty > 1 ? ` x${qty}` : "") +
+    ` — ${formatPrice(total)}.\n${siteUrl}/producto/${product.slug}`;
+
+  const list = (
+    <Button
+      key="list"
+      type="button"
+      size="lg"
+      variant={intent === "buy" ? "secondary" : "primary"}
+      className="flex-1"
+      onClick={() => {
+        agregar(item, qty);
+        onDone();
+      }}
+    >
+      Agregar a la lista
+    </Button>
+  );
+  const consult = (
+    <a
+      key="consult"
+      href={buildWhatsappUrl(whatsappPhone, message)}
+      target="_blank"
+      rel="noreferrer noopener"
+      onClick={onDone}
+      className={cn(
+        buttonVariants({
+          size: "lg",
+          variant: intent === "buy" ? "primary" : "secondary",
+        }),
+        "flex-1 text-center",
+      )}
+    >
+      Consultar ya
+    </a>
+  );
+  return intent === "buy" ? [consult, list] : [list, consult];
 }
