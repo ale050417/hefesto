@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { orderStatus, paymentMethod } from "./enums";
 import { filaments } from "./filaments";
+import { products } from "./products";
 import { profiles } from "./profiles";
 
 // Ventas manuales / históricas (mostrador o ventas previas al sistema).
@@ -30,6 +31,14 @@ export const manualSales = pgTable(
     // Categoria (snapshot del nombre) para agrupar en Reportes junto con la
     // tienda. Nullable: ventas viejas o sin categoria caen en "Sin categoria".
     category: text("category"),
+    // Producto REAL de catálogo elegido en "Cargar desde un producto de la
+    // tienda" (2026-08-09, pedido de Ale: "más vendidos" tiene que contar
+    // también el mostrador). Antes esa elección se perdía en `detail` (texto
+    // libre); ahora queda el id para poder sumar la venta al ranking real.
+    // Nullable: ventas de texto libre, importaciones o cargas viejas no lo tienen.
+    productId: uuid("product_id").references(() => products.id, {
+      onDelete: "set null",
+    }),
     // Cantidad de unidades de la venta (fix auditoría 2026-07: antes 80
     // unidades se cargaban una por una o multiplicando a mano). El total es de
     // TODA la venta; la amortización guardada también (unitaria × cantidad).
@@ -69,5 +78,6 @@ export const manualSales = pgTable(
     check("manual_sales_total_positive", sql`${t.total} > 0`),
     check("manual_sales_quantity_positive", sql`${t.quantity} > 0`),
     index("manual_sales_date_idx").on(t.saleDate),
+    index("manual_sales_product_idx").on(t.productId),
   ],
 );

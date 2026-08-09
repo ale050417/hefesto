@@ -8,7 +8,6 @@ import {
   findBySlug,
   findCategories,
   findCategoryById,
-  findFeatured,
   findImageById,
   findMaterials,
   deleteProductRow,
@@ -18,6 +17,7 @@ import {
   findVariantsForSale,
   findPublishedSlugs,
   findRelated,
+  findTopSelling,
   insertCategory,
   insertImage,
   insertProduct,
@@ -251,7 +251,10 @@ const getHomeDataUncached = async (): Promise<HomeData> => {
     productFilterSchema.parse({ pageSize: 8, ...extra });
 
   const [featured, latest, onSale, categories] = await Promise.all([
-    findFeatured(8),
+    // "Más vendidos" real: unidades vendidas online + mostrador (Ale,
+    // 2026-08-09), no un checkbox manual. Completa con los más nuevos si
+    // todavía no hay 8 productos con ventas.
+    findTopSelling(8),
     // "Nuevos lanzamientos" = los 8 publicados MÁS RECIENTES (el orden por
     // defecto es `newest`). Antes filtraba por la casilla `is_new`, así que si
     // el dueño no la tildaba la sección quedaba vacía: publicar un producto ya

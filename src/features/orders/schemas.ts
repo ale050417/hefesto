@@ -127,6 +127,13 @@ export const manualSaleSchema = z.object({
     (v) => (v === "" ? undefined : v),
     z.string().trim().max(80).optional(),
   ),
+  // Producto REAL de catálogo elegido en "Cargar desde un producto de la
+  // tienda" (2026-08-09): sin esto la venta no suma al ranking de "Más
+  // vendidos" del home, aunque haya salido de ahí.
+  productId: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.uuid().optional(),
+  ),
   // Cantidad de unidades (fix auditoría 2026-07: 80 unidades = un registro).
   // El total es de TODA la venta; la amortización se multiplica en el servidor.
   quantity: z.coerce

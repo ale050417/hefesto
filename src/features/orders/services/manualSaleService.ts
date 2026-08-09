@@ -91,6 +91,7 @@ export function toManualSaleRow(
     customerName: input.customerName,
     detail: input.detail ?? null,
     category: input.category ?? null,
+    productId: input.productId ?? null,
     quantity: input.quantity,
     total: input.total.toFixed(2),
     amortization:

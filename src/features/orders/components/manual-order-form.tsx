@@ -320,6 +320,9 @@ export function ManualSaleForm({
             total,
             extrasCost,
             quantity: qtyN,
+            // Producto elegido de la tienda (si lo hay): así la venta suma al
+            // ranking real de "Más vendidos" del home (Ale, 2026-08-09).
+            productId: picked?.id,
             filamentId: filamentFinal,
             material: estData.material,
             grams: gramsFinal,

@@ -8,6 +8,7 @@ import {
   inArray,
   isNotNull,
   ne,
+  notInArray,
   or,
   sql,
   type SQL,
@@ -15,10 +16,14 @@ import {
 import { db } from "@/core/db";
 import {
   categories,
+  manualSales,
+  orderItems,
+  orders,
   productImages,
   productVariants,
   products,
 } from "@/core/db/schema";
+import type { OrderStatus } from "@/features/orders/types";
 import { newSince } from "./new-product";
 import type { ProductFilter } from "./schemas";
 import type {
@@ -182,6 +187,136 @@ export async function findFeatured(
     orderBy: [desc(products.createdAt)],
     limit,
   });
+}
+
+// Estados donde la venta ya está cobrada (mismo criterio que Reportes/Ganancias:
+// features/reports/repository.ts SALES_STATUSES, features/orders/services/
+// manualSaleService.ts REVENUE_STATUSES). Copiado acá en vez de importado para
+// no crear una dependencia products → orders/reports (products es más de abajo:
+// orders ya importa cosas de products para la venta manual).
+const SOLD_STATUSES: OrderStatus[] = [
+  "confirmed",
+  "in_production",
+  "ready",
+  "shipped",
+  "delivered",
+];
+
+/**
+ * Suma dos o más listas de {productId, qty} en un mapa único por producto.
+ * Puro y testeable: separado de la query para poder probarlo sin base.
+ */
+export function mergeSalesCounts(
+  ...lists: Array<Array<{ productId: string | null; qty: number }>>
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const list of lists) {
+    for (const { productId, qty } of list) {
+      if (!productId || qty <= 0) continue;
+      map.set(productId, (map.get(productId) ?? 0) + qty);
+    }
+  }
+  return map;
+}
+
+/**
+ * Cuántas unidades se vendieron de cada producto, sumando pedidos ONLINE
+ * confirmados y ventas MANUALES confirmadas que tengan el producto cargado
+ * (Ale, 2026-08-09: "más vendidos" tiene que contar las dos vías, no solo un
+ * checkbox manual). Las ventas manuales de texto libre (sin `product_id`) no
+ * se pueden sumar acá: no hay forma de saber a qué producto correspondían.
+ */
+export async function sumSalesByProduct(
+  database: Database = db,
+): Promise<Map<string, number>> {
+  const [online, manual] = await Promise.all([
+    database
+      .select({
+        productId: orderItems.productId,
+        qty: sql<number>`sum(${orderItems.quantity})::int`,
+      })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .where(
+        and(
+          inArray(orders.status, SOLD_STATUSES),
+          isNotNull(orderItems.productId),
+        ),
+      )
+      .groupBy(orderItems.productId),
+    database
+      .select({
+        productId: manualSales.productId,
+        qty: sql<number>`sum(${manualSales.quantity})::int`,
+      })
+      .from(manualSales)
+      .where(
+        and(
+          inArray(manualSales.status, SOLD_STATUSES),
+          isNotNull(manualSales.productId),
+        ),
+      )
+      .groupBy(manualSales.productId),
+  ]);
+  return mergeSalesCounts(online, manual);
+}
+
+/**
+ * "Más vendidos" real para la Home: ranking por unidades vendidas (online +
+ * mostrador), no un checkbox manual. Si hay menos de `limit` productos con
+ * ventas (tienda nueva, o recién arrancando con esto), completa con los
+ * publicados más nuevos para no dejar la sección corta o vacía.
+ */
+export async function findTopSelling(
+  limit = 8,
+  database: Database = db,
+): Promise<ProductWithRelations[]> {
+  const counts = await sumSalesByProduct(database);
+  const rankedIds = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([id]) => id)
+    .slice(0, limit);
+
+  const ranked: ProductWithRelations[] =
+    rankedIds.length > 0
+      ? await database.query.products.findMany({
+          where: and(
+            eq(products.status, "published"),
+            inArray(products.id, rankedIds),
+          ),
+          with: {
+            category: true,
+            images: { orderBy: (img, { asc }) => [asc(img.sortOrder)] },
+            variants: true,
+          },
+        })
+      : [];
+  // `findMany` no respeta el orden de `inArray`: se reordena según el ranking real.
+  const byId = new Map(ranked.map((p) => [p.id, p]));
+  const orderedRanked = rankedIds
+    .map((id) => byId.get(id))
+    .filter((p): p is ProductWithRelations => !!p);
+
+  if (orderedRanked.length >= limit) return orderedRanked;
+
+  const usedIds = orderedRanked.map((p) => p.id);
+  const fillerConditions: SQL[] = [eq(products.status, "published")];
+  if (usedIds.length > 0) {
+    fillerConditions.push(notInArray(products.id, usedIds));
+  }
+  const fillers: ProductWithRelations[] =
+    await database.query.products.findMany({
+      where: and(...fillerConditions),
+      with: {
+        category: true,
+        images: { orderBy: (img, { asc }) => [asc(img.sortOrder)] },
+        variants: true,
+      },
+      orderBy: [desc(products.createdAt)],
+      limit: limit - orderedRanked.length,
+    });
+
+  return [...orderedRanked, ...fillers];
 }
 
 /** Materiales distintos de productos publicados (para el filtro). */

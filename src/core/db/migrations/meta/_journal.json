@@ -498,6 +498,13 @@
       "when": 1783307500000,
       "tag": "0070_business_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1783307600000,
+      "tag": "0071_manual_sale_product",
+      "breakpoints": true
     }
   ]
 }
