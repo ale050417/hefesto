@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { WhatsappIcon } from "@/components/shared/whatsapp-icon";
 import { Spinner } from "@/components/ui/spinner";
 import { formatPrice } from "@/lib/format";
 import { buildWhatsappUrl, siteUrl } from "@/lib/site";
@@ -215,8 +216,12 @@ function ConsultButton({
       target="_blank"
       rel="noreferrer noopener"
       onClick={onDone}
-      className={cn(buttonVariants({ size: "lg" }), "flex-1 text-center")}
+      className={cn(
+        buttonVariants({ size: "lg" }),
+        "flex flex-1 items-center justify-center gap-1.5 text-center",
+      )}
     >
+      <WhatsappIcon size={18} />
       Consultar ya
     </a>
   );

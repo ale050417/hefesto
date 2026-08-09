@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { WhatsappIcon } from "@/components/shared/whatsapp-icon";
 import { formatPrice } from "@/lib/format";
 import { buildWhatsappUrl, siteUrl } from "@/lib/site";
 import { cn } from "@/lib/utils";
@@ -108,8 +109,12 @@ export function ProductInfo({
             )}
             target="_blank"
             rel="noreferrer noopener"
-            className={cn(buttonVariants({ size: "lg" }), "block text-center")}
+            className={cn(
+              buttonVariants({ size: "lg" }),
+              "flex w-full items-center justify-center gap-1.5 text-center",
+            )}
           >
+            <WhatsappIcon size={18} />
             Consultar ya
           </a>
         ) : (

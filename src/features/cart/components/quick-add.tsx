@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { WhatsappIcon } from "@/components/shared/whatsapp-icon";
 import { formatPrice } from "@/lib/format";
 import { buildWhatsappUrl, siteUrl } from "@/lib/site";
 import { getProductOptionsAction } from "../actions";
@@ -113,10 +114,11 @@ export function QuickAdd({
           <div className="prod-actions">
             <button
               type="button"
-              className="prod-action prod-action-buy"
+              className="prod-action prod-action-buy inline-flex items-center justify-center gap-1.5"
               onClick={() => void abrir("buy")}
               aria-label={`Consultar ${product.name} por WhatsApp`}
             >
+              <WhatsappIcon size={16} />
               Consultar ya
             </button>
           </div>
@@ -148,9 +150,10 @@ export function QuickAdd({
           href={buildWhatsappUrl(whatsappPhone, message)}
           target="_blank"
           rel="noreferrer noopener"
-          className="prod-action prod-action-buy"
+          className="prod-action prod-action-buy inline-flex items-center justify-center gap-1.5"
           aria-label={`Consultar ${product.name} por WhatsApp`}
         >
+          <WhatsappIcon size={16} />
           Consultar ya
         </a>
       </div>
