@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { buttonVariants } from "@/components/ui/button";
 import { getCurrentUser } from "@/core/auth/session";
 import { ClearCartOnMount } from "@/features/cart/components/clear-cart-on-mount";
@@ -38,6 +39,8 @@ export default async function CheckoutExitoPage({
     orderNumber && user ? getOrderForCustomer(orderNumber, user.id) : null,
     getBrandSettings(),
   ]);
+  // Vidriera digital: no debería existir ningún pedido online que mostrar acá.
+  if (brand.businessMode === "vidriera") redirect("/");
 
   // Efectivo y transferencia se coordinan por WhatsApp: no hay cobro online.
   const aCoordinar =
