@@ -30,6 +30,8 @@ export * from "./reviews";
 export * from "./custom-requests";
 export * from "./custom-messages";
 export * from "./manual-sales";
+export * from "./manual-sale-items";
+export * from "./manual-sale-relations";
 export * from "./manual-customers";
 export * from "./rewards";
 export * from "./cost-settings";

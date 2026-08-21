@@ -190,17 +190,24 @@ export function ManualSaleForm({
       })
     : 0;
 
-  /** Aplica el producto + variante + color: precio ESPEJO del cobro online
-   * (saleUnitPrice, testeado), gramos del tamaño/combo elegido para el stock
-   * y detalle con lo vendido. Todo sigue editable a mano después. */
-  function applySelection(
+  /**
+   * Precio y gramos de UNA combinación (tamaño + color) del producto. Es la
+   * cuenta que comparten la carga simple y la carga por lote: el precio sale
+   * de `saleUnitPrice` (el MISMO helper que cobra la tienda, testeado) y los
+   * gramos del tamaño/combo elegido.
+   */
+  function buildLine(
     p: ProductForSale,
     variantLabel: string | null,
     color: string | null,
-  ) {
+  ): {
+    unitPrice: number;
+    lines: Array<{ filamentId: string; grams: string }>;
+    weight: number;
+  } {
     const variant = p.variants.find((v) => v.label === variantLabel) ?? null;
     const isMulti = p.colorMode === "multi";
-    const unit = saleUnitPrice({
+    const unitPrice = saleUnitPrice({
       basePrice: p.price,
       colorMode: p.colorMode,
       productColorPrices: p.colorPrices,
@@ -240,6 +247,23 @@ export function ManualSaleForm({
         },
       ];
     }
+    return { unitPrice, lines, weight };
+  }
+
+  /** Aplica el producto + variante + color: precio ESPEJO del cobro online
+   * (saleUnitPrice, testeado), gramos del tamaño/combo elegido para el stock
+   * y detalle con lo vendido. Todo sigue editable a mano después. */
+  function applySelection(
+    p: ProductForSale,
+    variantLabel: string | null,
+    color: string | null,
+  ) {
+    const isMulti = p.colorMode === "multi";
+    const {
+      unitPrice: unit,
+      lines,
+      weight,
+    } = buildLine(p, variantLabel, color);
     setColorLines(lines.length > 0 ? lines : [{ filamentId: "", grams: "" }]);
     setEstData({
       filamentId: lines.find((l) => l.filamentId)?.filamentId || null,
@@ -261,6 +285,91 @@ export function ManualSaleForm({
     }));
   }
 
+  // --- Venta por LOTE: varias combinaciones en la MISMA venta (2026-08-09) ---
+  //
+  // El caso de Ale: vendió 10 Dumplings, cada uno de una combinación distinta.
+  // Antes había que cargar 10 ventas (buscar el producto, elegir color,
+  // cantidad 1, guardar... por cada una). Acá se listan TODAS las
+  // combinaciones del producto con un campo de cantidad al lado: se llenan las
+  // que se vendieron y sale UNA sola venta con el desglose adentro.
+  const [batch, setBatch] = useState(false);
+  /** Cantidad vendida por combinación (clave = label|color). Vacío = 0. */
+  const [lineQty, setLineQty] = useState<Record<string, string>>({});
+
+  /** Todas las combinaciones vendibles del producto elegido, con su precio. */
+  const batchOptions = (() => {
+    if (!picked) return [];
+    const p = picked;
+    const isMulti = p.colorMode === "multi";
+    const variants =
+      p.variants.length > 0 ? p.variants.map((v) => v.label) : [];
+    // Multicolor: cada tamaño/combinación ya trae sus colores adentro.
+    // Color único: cada tamaño se cruza con cada color (o solo los colores si
+    // el producto no tiene tamaños).
+    const combos: Array<{ variantLabel: string | null; color: string | null }> =
+      isMulti
+        ? variants.length > 0
+          ? variants.map((label) => ({ variantLabel: label, color: null }))
+          : [{ variantLabel: null, color: null }]
+        : variants.length > 0
+          ? p.colors.length > 0
+            ? variants.flatMap((label) =>
+                p.colors.map((c) => ({ variantLabel: label, color: c })),
+              )
+            : variants.map((label) => ({ variantLabel: label, color: null }))
+          : p.colors.map((c) => ({ variantLabel: null, color: c }));
+
+    return combos.map((combo) => {
+      const built = buildLine(p, combo.variantLabel, combo.color);
+      return {
+        key: `${combo.variantLabel ?? ""}|${combo.color ?? ""}`,
+        variantLabel: combo.variantLabel,
+        color: combo.color,
+        unitPrice: built.unitPrice,
+        weight: built.weight,
+        colorLines: built.lines
+          .filter((l) => l.filamentId && Number(l.grams) > 0)
+          .map((l) => ({ filamentId: l.filamentId, grams: Number(l.grams) })),
+      };
+    });
+  })();
+
+  /** Solo tiene sentido ofrecer el lote si hay más de una combinación. */
+  const batchAvailable = batchOptions.length > 1;
+
+  const batchLines = batchOptions
+    .map((o) => ({ ...o, qty: Math.floor(Number(lineQty[o.key]) || 0) }))
+    .filter((o) => o.qty > 0);
+  const batchUnits = batchLines.reduce((a, l) => a + l.qty, 0);
+  const batchTotal = batchLines.reduce(
+    (a, l) => a + Math.round(l.unitPrice * l.qty * 100) / 100,
+    0,
+  );
+  /** Gramos totales por carrete (dos combinaciones pueden compartir color). */
+  const batchGrams = (() => {
+    const map = new Map<string, number>();
+    for (const l of batchLines) {
+      for (const cl of l.colorLines) {
+        map.set(
+          cl.filamentId,
+          (map.get(cl.filamentId) ?? 0) + cl.grams * l.qty,
+        );
+      }
+    }
+    return [...map.entries()].map(([filamentId, grams]) => ({
+      filamentId,
+      grams,
+    }));
+  })();
+  const batchGramsTotal = batchGrams.reduce((a, g) => a + g.grams, 0);
+  const usandoLote = batch && batchAvailable;
+
+  const setQty = (key: string, v: string) =>
+    setLineQty((q) => ({ ...q, [key]: v }));
+  /** Atajos: todas las combinaciones a 1, o volver todo a 0. */
+  const fillAll = (value: string) =>
+    setLineQty(Object.fromEntries(batchOptions.map((o) => [o.key, value])));
+
   function pickProduct(id: string) {
     const p = products.find((x) => x.id === id);
     if (!p) return;
@@ -269,6 +378,8 @@ export function ManualSaleForm({
     setPicked(p);
     setSaleVariant(firstVariant);
     setSaleColor(firstColor);
+    setLineQty({});
+    setBatch(false);
     applySelection(p, firstVariant, firstColor);
   }
   // El reparto de la ganancia lo resuelve Ganancias (socios actuales); esta venta
@@ -290,6 +401,56 @@ export function ManualSaleForm({
 
   async function submit() {
     setErr(null);
+    // LOTE: el total y los gramos salen de las combinaciones cargadas, así que
+    // no se pide la calculadora ni los colores de abajo (los trae cada línea).
+    if (usandoLote) {
+      if (batchLines.length === 0) {
+        return fail(
+          "Poné la cantidad vendida en al menos una combinación de colores.",
+        );
+      }
+      if (batchGramsTotal <= 0) {
+        return fail(
+          "Las combinaciones elegidas no tienen gramos/carrete cargados: no se podría descontar el stock.",
+        );
+      }
+      setBusy(true);
+      try {
+        const res = await runAction(
+          () =>
+            createManualSaleAction({
+              ...form,
+              // El servidor recalcula total/cantidad/gramos desde `items`
+              // (regla de dinero): esto va solo para pasar la validación.
+              total: batchTotal,
+              quantity: batchUnits,
+              extrasCost,
+              productId: picked?.id,
+              material: picked?.material ?? estData?.material,
+              printMinutes: picked?.printMinutes ?? estData?.printMinutes ?? 0,
+              items: batchLines.map((l) => ({
+                variantLabel: l.variantLabel,
+                color: l.color,
+                quantity: l.qty,
+                unitPrice: l.unitPrice,
+                colorLines: l.colorLines,
+              })),
+            }),
+          { silent: true },
+        );
+        if (!res.ok) return fe.fromAction(res.error);
+        if (onDone) {
+          onDone();
+        } else {
+          router.push("/admin/pedidos");
+        }
+      } catch {
+        setErr("No se pudo registrar la venta. Intentá de nuevo.");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     if (!estData) {
       return fail(
         "Calculá el precio con la calculadora (la amortización es obligatoria).",
@@ -465,12 +626,150 @@ export function ManualSaleForm({
                         setPicked(null);
                         setSaleVariant(null);
                         setSaleColor(null);
+                        setBatch(false);
+                        setLineQty({});
                       }}
                     >
                       Quitar
                     </button>
                   </div>
-                  {picked.variants.length > 0 ? (
+
+                  {/* Varias combinaciones en la MISMA venta: el caso de los 10
+                      Dumplings, cada uno de un color distinto (Ale 2026-08-09).
+                      Antes había que cargar una venta por combinación. */}
+                  {batchAvailable ? (
+                    <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-[var(--surface-2)] p-2.5">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--gold)]"
+                        checked={batch}
+                        onChange={(e) => setBatch(e.target.checked)}
+                      />
+                      <span>
+                        <span className="text-fg block text-[13px] font-semibold">
+                          Vendí varias combinaciones de colores
+                        </span>
+                        <span className="text-faint block text-[11.5px] leading-snug">
+                          Cargá cuántas vendiste de cada una. Queda UNA sola
+                          venta con el detalle adentro; el total y los gramos se
+                          calculan solos.
+                        </span>
+                      </span>
+                    </label>
+                  ) : null}
+
+                  {usandoLote ? (
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-dim text-[12px] font-medium">
+                          ¿Cuántas vendiste de cada una?
+                        </span>
+                        <span className="ml-auto flex gap-1.5">
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => fillAll("1")}
+                            title="Una de cada combinación"
+                          >
+                            Una de c/u
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => fillAll("")}
+                          >
+                            Limpiar
+                          </button>
+                        </span>
+                      </div>
+                      <div className="max-h-72 overflow-auto rounded-lg border border-[var(--border)]">
+                        {batchOptions.map((o) => {
+                          const qty = Math.floor(Number(lineQty[o.key]) || 0);
+                          return (
+                            <div
+                              key={o.key}
+                              className={cn(
+                                "flex items-center gap-2 border-b border-[var(--border)] px-2.5 py-2 last:border-b-0",
+                                qty > 0 && "bg-[rgba(var(--gold-rgb),.07)]",
+                              )}
+                            >
+                              {/* Los colores de la combinación, en círculos:
+                                  se reconoce de un vistazo cuál es cuál. */}
+                              <span className="flex shrink-0 -space-x-1">
+                                {o.colorLines.slice(0, 4).map((cl, i) => (
+                                  <span
+                                    key={`${cl.filamentId}-${i}`}
+                                    aria-hidden
+                                    style={{
+                                      width: 16,
+                                      height: 16,
+                                      borderRadius: "50%",
+                                      background:
+                                        colorHex[
+                                          filamentColorName(cl.filamentId)
+                                        ] ?? "#888",
+                                      border: "1.5px solid var(--surface-1)",
+                                    }}
+                                  />
+                                ))}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="text-fg block truncate text-[12.5px]">
+                                  {o.variantLabel ?? o.color ?? picked.name}
+                                  {o.variantLabel && o.color ? (
+                                    <span className="text-faint">
+                                      {" "}
+                                      · {o.color}
+                                    </span>
+                                  ) : null}
+                                </span>
+                                <span className="text-faint text-[11px]">
+                                  ${o.unitPrice.toLocaleString("es-AR")} c/u
+                                  {o.weight > 0 ? ` · ${o.weight} g` : ""}
+                                  {o.colorLines.length === 0
+                                    ? " · ⚠ sin carrete"
+                                    : ""}
+                                </span>
+                              </span>
+                              <input
+                                className="input shrink-0 text-center"
+                                style={{ width: 62 }}
+                                type="number"
+                                min={0}
+                                max={9999}
+                                placeholder="0"
+                                aria-label={`Cantidad vendida de ${o.variantLabel ?? o.color ?? picked.name}`}
+                                value={lineQty[o.key] ?? ""}
+                                onChange={(e) => setQty(o.key, e.target.value)}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
+                        <span className="text-faint">
+                          Unidades: <b className="text-fg">{batchUnits}</b>
+                        </span>
+                        <span className="text-faint">
+                          Total:{" "}
+                          <b className="text-fg">
+                            ${batchTotal.toLocaleString("es-AR")}
+                          </b>
+                        </span>
+                        <span className="text-faint">
+                          A descontar:{" "}
+                          <b className="text-fg">{batchGramsTotal} g</b>
+                        </span>
+                      </div>
+                      <p className="text-faint text-[11.5px] leading-relaxed">
+                        No hace falta la calculadora ni cargar colores abajo: el
+                        precio y los gramos salen del producto. Los insumos
+                        adicionales (paso 2) se siguen sumando al costo.
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {!usandoLote && picked.variants.length > 0 ? (
                     <div>
                       <div className="text-dim mb-1.5 text-[12px] font-medium">
                         {picked.variants.some((v) => v.label.includes(" + "))
@@ -497,7 +796,9 @@ export function ManualSaleForm({
                       </div>
                     </div>
                   ) : null}
-                  {picked.colorMode === "single" && picked.colors.length > 0 ? (
+                  {!usandoLote &&
+                  picked.colorMode === "single" &&
+                  picked.colors.length > 0 ? (
                     <div>
                       <div className="text-dim mb-1.5 text-[12px] font-medium">
                         ¿De qué color?
@@ -539,7 +840,7 @@ export function ManualSaleForm({
                       />
                     </div>
                   ) : null}
-                  {unitPrice != null ? (
+                  {!usandoLote && unitPrice != null ? (
                     <div className="text-faint text-[11.5px]">
                       Precio unitario:{" "}
                       <b className="text-fg">
@@ -600,10 +901,20 @@ export function ManualSaleForm({
                 min={1}
                 max={9999}
                 className="input"
-                value={form.quantity}
+                value={usandoLote ? batchUnits : form.quantity}
+                readOnly={usandoLote}
+                title={
+                  usandoLote
+                    ? "Sale de sumar las combinaciones cargadas arriba"
+                    : undefined
+                }
                 onChange={(e) => handleQtyChange(e.target.value)}
               />
-              {unitPrice != null && qtyN > 1 ? (
+              {usandoLote ? (
+                <div className="text-faint text-[11.5px]">
+                  Suma de las combinaciones cargadas arriba.
+                </div>
+              ) : unitPrice != null && qtyN > 1 ? (
                 <div className="text-faint text-[11.5px]">
                   {qtyN} × ${unitPrice.toLocaleString("es-AR")} c/u
                 </div>
@@ -643,26 +954,48 @@ export function ManualSaleForm({
                 type="number"
                 className="input"
                 placeholder="Se completa con la calculadora"
-                value={total > 0 ? total : ""}
+                value={
+                  usandoLote
+                    ? batchTotal > 0
+                      ? batchTotal
+                      : ""
+                    : total > 0
+                      ? total
+                      : ""
+                }
                 readOnly
-                title="Precio unitario (calculadora/producto) × cantidad"
+                title={
+                  usandoLote
+                    ? "Suma de las combinaciones vendidas"
+                    : "Precio unitario (calculadora/producto) × cantidad"
+                }
               />
-              <div className="mt-1">
-                <EstimatorModalButton
-                  estimator={estimator}
-                  onUse={handleEstUse}
-                />
-              </div>
-              {/* Contrato de la cantidad (pedido de Ale): TODO va de la mano.
-                  Se cotiza UNA pieza; precio, stock y costo escalan solos. */}
-              <div className="text-faint text-[11.5px]">
-                Cotizá <b className="text-fg">una unidad</b>: el total, los
-                gramos y el costo se multiplican solos por la cantidad
-                {qtyN > 1 ? ` (×${qtyN})` : ""}. ¿Ya sabés cuánto cobrás (ej:
-                $2.500 el parche)? Ponelo en la calculadora en{" "}
-                <b className="text-fg">“¿Ya sabés cuánto cobrás?”</b> y se usa
-                ese precio; la ganancia sale exacta.
-              </div>
+              {usandoLote ? (
+                <div className="text-faint text-[11.5px]">
+                  Sale de sumar las combinaciones que cargaste
+                  {batchUnits > 0 ? ` (${batchUnits} unidades)` : ""}: no hace
+                  falta la calculadora. Si sumás insumos abajo, van al costo.
+                </div>
+              ) : (
+                <>
+                  <div className="mt-1">
+                    <EstimatorModalButton
+                      estimator={estimator}
+                      onUse={handleEstUse}
+                    />
+                  </div>
+                  {/* Contrato de la cantidad (pedido de Ale): TODO va de la mano.
+                      Se cotiza UNA pieza; precio, stock y costo escalan solos. */}
+                  <div className="text-faint text-[11.5px]">
+                    Cotizá <b className="text-fg">una unidad</b>: el total, los
+                    gramos y el costo se multiplican solos por la cantidad
+                    {qtyN > 1 ? ` (×${qtyN})` : ""}. ¿Ya sabés cuánto cobrás
+                    (ej: $2.500 el parche)? Ponelo en la calculadora en{" "}
+                    <b className="text-fg">“¿Ya sabés cuánto cobrás?”</b> y se
+                    usa ese precio; la ganancia sale exacta.
+                  </div>
+                </>
+              )}
             </div>
             <div className="field">
               <label htmlFor="ms-pay">Método de pago</label>
@@ -681,7 +1014,42 @@ export function ManualSaleForm({
             </div>
           </div>
 
-          {colorLines.length > 0 ? (
+          {usandoLote ? (
+            <div className="field">
+              <label>Colores usados (descuenta stock)</label>
+              <p className="text-faint text-[12px] leading-relaxed">
+                Salen de las combinaciones que cargaste arriba. Se descuentan{" "}
+                <b className="text-fg">{batchGramsTotal} g</b> en total
+                {batchGrams.length > 0
+                  ? ` (${batchGrams.length} carrete${batchGrams.length > 1 ? "s" : ""})`
+                  : ""}
+                . Si un color pide más de lo que hay, la venta se registra igual
+                y te avisa por notificación.
+              </p>
+              <div className="mt-2 flex flex-col gap-1.5">
+                {batchGrams.map((g) => (
+                  <div key={g.filamentId} className="flex items-center gap-2">
+                    <span
+                      aria-hidden
+                      style={{
+                        width: 18,
+                        height: 18,
+                        flex: "0 0 auto",
+                        borderRadius: "50%",
+                        background:
+                          colorHex[filamentColorName(g.filamentId)] ?? "#888",
+                        border: "1px solid rgba(128,128,128,.35)",
+                      }}
+                    />
+                    <span className="text-dim flex-1 truncate text-[12.5px]">
+                      {filamentColorName(g.filamentId) || "Sin carrete"}
+                    </span>
+                    <b className="text-fg text-[12.5px]">{g.grams} g</b>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : colorLines.length > 0 ? (
             <div className="field">
               <label>Colores usados (descuenta stock)</label>
               <p className="text-faint text-[12px] leading-relaxed">

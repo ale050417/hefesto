@@ -23,8 +23,10 @@ import {
 } from "./schemas";
 import { createOrder } from "./services/orderService";
 import {
+  applyManualSaleLines,
   computeManualSaleCosts,
   createManualSale,
+  deductQuantityFor,
   deleteManualSale,
   updateManualSale,
   updateManualSaleStatus,
@@ -170,15 +172,20 @@ export async function createManualSaleAction(
       },
     };
   }
+  // Venta con VARIAS combinaciones de colores (2026-08-09): el total, la
+  // cantidad y los gramos se recalculan acá desde las líneas ANTES de costear.
+  // Sin líneas, `data` es la entrada tal cual (venta simple de siempre).
+  const data = applyManualSaleLines(parsed.data);
+  const hasItems = (parsed.data.items?.length ?? 0) > 0;
   // Amortización (costo) obligatoria: se calcula en el servidor desde
   // gramos/horas y el FILAMENTO elegido (por id; `material` queda de fallback
   // para cargas viejas). La calculadora cotiza UNA pieza: acá se escala por la
   // cantidad. La ganancia (total − amort total) es lo que se reparte.
   const unitAmort = await getAmortization({
-    filamentId: parsed.data.filamentId ?? null,
-    material: parsed.data.material ?? null,
-    grams: parsed.data.grams ?? 0,
-    hours: (parsed.data.printMinutes ?? 0) / 60,
+    filamentId: data.filamentId ?? null,
+    material: data.material ?? null,
+    grams: data.grams ?? 0,
+    hours: (data.printMinutes ?? 0) / 60,
   });
   if (!(unitAmort > 0)) {
     return {
@@ -192,17 +199,19 @@ export async function createManualSaleAction(
   }
   const costs = computeManualSaleCosts({
     unitAmortization: unitAmort,
-    total: parsed.data.total,
-    quantity: parsed.data.quantity,
+    total: data.total,
+    // Con líneas, los gramos YA son los de toda la venta (se sumaron las
+    // combinaciones): volver a multiplicar por la cantidad costearía de más.
+    quantity: deductQuantityFor({ hasItems, quantity: data.quantity }),
   });
   // Insumos: son un COSTO real (vaso, argollas, etc.), NO se cobran aparte. Van a
   // la amortización y BAJAN la ganancia; el total no los incluye (fix 2026-07).
-  const extrasCost = parsed.data.extrasCost ?? 0;
+  const extrasCost = data.extrasCost ?? 0;
   const amortization = costs.amortization + extrasCost;
   const withCosts = {
-    ...parsed.data,
+    ...data,
     amortization,
-    profit: parsed.data.total - amortization,
+    profit: data.total - amortization,
   };
   try {
     const sale = await createManualSale(withCosts, user?.id ?? null);

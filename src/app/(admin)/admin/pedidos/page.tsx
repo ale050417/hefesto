@@ -109,6 +109,14 @@ export default async function PedidosAdminPage() {
         detail: s.detail,
         category: s.category,
         amortization: s.amortization != null ? Number(s.amortization) : null,
+        // Desglose por combinación (venta con varias combinaciones de colores).
+        items: s.items.map((it) => ({
+          variantLabel: it.variantLabel,
+          color: it.color,
+          quantity: it.quantity,
+          unitPrice: Number(it.unitPrice),
+          lineTotal: Number(it.lineTotal),
+        })),
       }),
     ),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());

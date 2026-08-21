@@ -161,6 +161,30 @@ export const manualSaleSchema = z.object({
   colorLines: z
     .array(z.object({ filamentId: z.uuid(), grams: z.coerce.number().min(0) }))
     .optional(),
+  // LÍNEAS: varias combinaciones de colores en la MISMA venta (2026-08-09).
+  // Ej. 10 Dumplings, cada uno de una combinación distinta, en una sola venta.
+  // Cuando vienen líneas, el `total`, la `quantity` y los gramos a descontar se
+  // recalculan en el SERVIDOR a partir de ellas (regla de dinero, Cap. 11/14):
+  // lo que mande el cliente en esos campos se ignora.
+  items: z
+    .array(
+      z.object({
+        variantLabel: z.string().trim().max(120).nullish(),
+        color: z.string().trim().max(80).nullish(),
+        quantity: z.coerce.number().int().min(1).max(9999),
+        unitPrice: z.coerce.number().min(0),
+        colorLines: z
+          .array(
+            z.object({
+              filamentId: z.uuid(),
+              grams: z.coerce.number().min(0),
+            }),
+          )
+          .optional(),
+      }),
+    )
+    .max(100, "Demasiadas combinaciones en una sola venta.")
+    .optional(),
   // Insumos/agregados (argollas, vaso del chop, polímero, etc.): su costo TOTAL
   // (ya calculado en el cliente) suma al total cobrado y a la amortización.
   extrasCost: z.coerce.number().min(0).optional(),

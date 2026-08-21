@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/core/db";
-import { manualSales } from "@/core/db/schema";
+import { manualSaleItems, manualSales } from "@/core/db/schema";
 import { recordAudit } from "@/core/audit";
 import type {
   Filament,
@@ -77,6 +77,122 @@ export function editedManualSaleEconomics(
   return { amortization: a, profit: round2(Math.max(0, total - a)) };
 }
 
+// --- Venta con VARIAS combinaciones de colores (2026-08-09, pedido de Ale) ---
+//
+// Caso real: 10 Dumplings vendidos, cada uno de una combinación distinta. Antes
+// había que cargar 10 ventas. Ahora la venta lleva LÍNEAS adentro (una por
+// combinación, con su cantidad) y el total/los gramos salen de sumarlas.
+//
+// Estos dos helpers son PUROS a propósito (Cap. 15: tocan plata y stock): la
+// cuenta se puede probar sin base ni formulario.
+
+/** Una combinación vendida: qué, cuántas, a cuánto y con qué gramos por color. */
+export type ManualSaleLine = {
+  variantLabel?: string | null;
+  color?: string | null;
+  quantity: number;
+  unitPrice: number;
+  /** Gramos por filamento de UNA unidad de esta combinación. */
+  colorLines?: Array<{ filamentId: string; grams: number }>;
+};
+
+/**
+ * Total cobrado y unidades de una venta con líneas.
+ *
+ * El total NO se carga a mano: es la suma de `precio × cantidad` de cada línea.
+ * Cada línea se redondea a 2 decimales ANTES de sumar (igual que el pedido
+ * online): así lo que se muestra por línea es exactamente lo que suma el total,
+ * sin diferencias de un centavo al final.
+ */
+export function manualSaleTotals(lines: ManualSaleLine[]): {
+  total: number;
+  quantity: number;
+} {
+  let total = 0;
+  let quantity = 0;
+  for (const ln of lines) {
+    const qty = Math.max(0, Math.floor(ln.quantity));
+    if (qty <= 0) continue;
+    total += round2(Math.max(0, ln.unitPrice) * qty);
+    quantity += qty;
+  }
+  return { total: round2(total), quantity };
+}
+
+/**
+ * Gramos TOTALES a descontar por filamento, sumando todas las líneas.
+ *
+ * Dos combinaciones distintas pueden compartir un color (ej. las dos llevan
+ * rojo): tienen que terminar en UN solo movimiento de stock de ese carrete, no
+ * en dos. Por eso se consolida por `filamentId`.
+ *
+ * Los gramos de cada línea ya vienen multiplicados por su propia cantidad, así
+ * que el resultado es el consumo final de la venta: quien lo use debe descontar
+ * tal cual (cantidad 1), sin volver a multiplicar.
+ */
+export function consolidateGrams(
+  lines: ManualSaleLine[],
+): Array<{ filamentId: string; grams: number }> {
+  const byFilament = new Map<string, number>();
+  for (const ln of lines) {
+    const qty = Math.max(0, Math.floor(ln.quantity));
+    if (qty <= 0) continue;
+    for (const cl of ln.colorLines ?? []) {
+      if (!cl.filamentId || !(cl.grams > 0)) continue;
+      const acc = byFilament.get(cl.filamentId) ?? 0;
+      byFilament.set(cl.filamentId, acc + cl.grams * qty);
+    }
+  }
+  return [...byFilament.entries()].map(([filamentId, grams]) => ({
+    filamentId,
+    grams: round2(grams),
+  }));
+}
+
+/**
+ * Normaliza una venta CON líneas: el total, la cantidad y los gramos salen de
+ * sumar las combinaciones, NO de lo que mandó el formulario (regla de dinero,
+ * Cap. 11/14: el servidor recalcula, no confía en el cliente).
+ *
+ * Los `colorLines` que devuelve ya están multiplicados por la cantidad de cada
+ * línea, así que representan el consumo TOTAL de la venta: al descontar stock
+ * hay que usarlos con cantidad 1, sin volver a multiplicar (ver
+ * `deductQuantityFor`). Puro y testeable.
+ *
+ * Sin líneas devuelve la entrada tal cual: la venta simple de siempre.
+ */
+export function applyManualSaleLines(input: ManualSaleInput): ManualSaleInput {
+  const items = input.items ?? [];
+  if (items.length === 0) return input;
+  const { total, quantity } = manualSaleTotals(items);
+  const grams = consolidateGrams(items);
+  return {
+    ...input,
+    total,
+    quantity: Math.max(1, quantity),
+    colorLines: grams.length > 0 ? grams : undefined,
+    // Los gramos ya van consolidados por carrete en `colorLines`; este campo
+    // queda como total informativo de la venta.
+    grams: grams.reduce((a, g) => a + g.grams, 0) || undefined,
+    // El filamento "principal" pierde sentido con varias combinaciones: el
+    // descuento real sale de colorLines.
+    filamentId: grams[0]?.filamentId ?? input.filamentId,
+  };
+}
+
+/**
+ * Con qué cantidad descontar el stock. Con líneas los gramos guardados YA son
+ * el total de la venta (`consolidateGrams` los multiplicó por línea), así que
+ * multiplicar de nuevo por la cantidad de la venta descontaría de más — el bug
+ * clásico de este cambio. Sin líneas, la cantidad de la venta manda, como antes.
+ */
+export function deductQuantityFor(params: {
+  hasItems: boolean;
+  quantity: number;
+}): number {
+  return params.hasItems ? 1 : Math.max(1, Math.floor(params.quantity));
+}
+
 /**
  * Mapea la entrada validada (Zod) a la fila de la base. Puro y testeable.
  * El total se guarda como string con 2 decimales (numeric). La fecha del input
@@ -115,20 +231,51 @@ export function toManualSaleRow(
 }
 
 export async function createManualSale(
-  input: ManualSaleInput,
+  rawInput: ManualSaleInput,
   createdBy: string | null,
 ): Promise<ManualSale> {
-  const [row] = await db
-    .insert(manualSales)
-    .values(toManualSaleRow(input, createdBy))
-    .returning();
-  if (!row) throw new Error("No se pudo registrar la venta manual");
+  // Con varias combinaciones, el total/cantidad/gramos se recalculan acá desde
+  // las líneas (el cliente no decide plata ni stock).
+  const input = applyManualSaleLines(rawInput);
+  const items = rawInput.items ?? [];
+
+  // La venta y sus líneas van juntas o no van: una venta cuyo total salió de
+  // líneas que no se guardaron sería un número sin respaldo.
+  const row = await db.transaction(async (tx) => {
+    const [created] = await tx
+      .insert(manualSales)
+      .values(toManualSaleRow(input, createdBy))
+      .returning();
+    if (!created) throw new Error("No se pudo registrar la venta manual");
+    if (items.length > 0) {
+      await tx.insert(manualSaleItems).values(
+        items.map((it) => ({
+          manualSaleId: created.id,
+          variantLabel: it.variantLabel ?? null,
+          color: it.color ?? null,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice.toFixed(2),
+          lineTotal: round2(it.unitPrice * it.quantity).toFixed(2),
+          colorLines:
+            it.colorLines && it.colorLines.length > 0 ? it.colorLines : null,
+        })),
+      );
+    }
+    return created;
+  });
+
   // Stock (Bloque C): solo se descuenta si la venta NACE cobrada (confirmado+),
   // por ejemplo una importación de venta ya entregada. Si nace pendiente (flujo
   // normal del form), el descuento ocurre al CONFIRMAR (updateManualSaleStatus).
   // No bloquea la venta: la función atrapa sus errores y deja warning en auditoría.
   if (REVENUE_STATUSES.includes(row.status)) {
-    await deductFilamentForManualSale(row.id, input);
+    await deductFilamentForManualSale(row.id, {
+      ...input,
+      quantity: deductQuantityFor({
+        hasItems: items.length > 0,
+        quantity: input.quantity,
+      }),
+    });
   }
   return row;
 }
@@ -298,8 +445,16 @@ export async function deductFilamentForManualSale(
   }
 }
 
-export async function listManualSales(): Promise<ManualSale[]> {
+/** Una venta manual con su desglose por combinación (vacío = venta simple). */
+export type ManualSaleWithItems = ManualSale & {
+  items: (typeof manualSaleItems.$inferSelect)[];
+};
+
+export async function listManualSales(): Promise<ManualSaleWithItems[]> {
+  // `items` viene para mostrar el desglose por combinación en el tablero
+  // (2026-08-09). Las ventas simples lo traen vacío y se ven igual que antes.
   return db.query.manualSales.findMany({
+    with: { items: true },
     orderBy: (m, { desc }) => [desc(m.saleDate)],
   });
 }
@@ -317,8 +472,11 @@ export async function updateManualSaleStatus(
   status: ManualSale["status"],
   reason?: string | null,
 ): Promise<void> {
+  // `items` viene para saber si los gramos guardados ya son el total de la
+  // venta (venta con varias combinaciones) o son por unidad (venta simple).
   const sale = await db.query.manualSales.findFirst({
     where: eq(manualSales.id, id),
+    with: { items: true },
   });
   if (!sale) throw new ValidationError("No encontramos la venta.");
   if (sale.status === status) return; // sin cambios
@@ -346,7 +504,10 @@ export async function updateManualSaleStatus(
       filamentId: sale.filamentId ?? undefined,
       material: undefined,
       grams: sale.grams != null ? Number(sale.grams) : 0,
-      quantity: sale.quantity,
+      quantity: deductQuantityFor({
+        hasItems: sale.items.length > 0,
+        quantity: sale.quantity,
+      }),
       colorLines: sale.colorLines ?? undefined,
     });
   } else if (action === "restore") {

@@ -36,6 +36,15 @@ export type UnifiedSale = {
   detail?: string | null;
   category?: string | null;
   amortization?: number | null;
+  /** Desglose por combinación de colores (venta con varias combinaciones).
+   *  Vacío/ausente = venta simple de siempre. */
+  items?: Array<{
+    variantLabel: string | null;
+    color: string | null;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+  }>;
 };
 
 const dateFmt = new Intl.DateTimeFormat("es-AR", { dateStyle: "medium" });
@@ -182,6 +191,37 @@ export function OrdersBoard({
     ) : (
       <DeleteManualSaleButton id={o.id} label={o.customerName ?? ""} />
     );
+  /**
+   * Desglose de una venta con VARIAS combinaciones de colores (2026-08-09):
+   * qué combinación, cuántas y a qué precio. Colapsado por defecto para no
+   * ensuciar la lista; la venta simple no muestra nada (no tiene líneas).
+   */
+  const Desglose = ({ o }: { o: UnifiedSale }) => {
+    const items = o.items ?? [];
+    if (items.length === 0) return null;
+    const unidades = items.reduce((a, it) => a + it.quantity, 0);
+    return (
+      <details className="mt-1">
+        <summary className="text-primary cursor-pointer text-[11.5px] hover:underline">
+          {items.length} combinaciones · {unidades} unidades
+        </summary>
+        <div className="border-surface-2 mt-1 flex flex-col gap-0.5 border-l pl-2">
+          {items.map((it, i) => (
+            <div
+              key={`${it.variantLabel ?? ""}-${it.color ?? ""}-${i}`}
+              className="text-faint flex items-center justify-between gap-2 text-[11.5px]"
+            >
+              <span className="truncate">
+                {it.quantity}× {it.variantLabel ?? it.color ?? "—"}
+                {it.variantLabel && it.color ? ` · ${it.color}` : ""}
+              </span>
+              <span className="shrink-0">{formatPrice(it.lineTotal)}</span>
+            </div>
+          ))}
+        </div>
+      </details>
+    );
+  };
   // Datos de la venta manual para el modal de edición de números.
   const toEditData = (o: UnifiedSale) => ({
     id: o.id,
@@ -338,6 +378,7 @@ export function OrdersBoard({
                           {o.ref ? `${o.ref} · ` : ""}
                           {dateFmt.format(new Date(o.date))}
                         </div>
+                        <Desglose o={o} />
                       </td>
                       <td className="text-dim">{o.customerName ?? "—"}</td>
                       <td className="text-dim">
@@ -412,6 +453,7 @@ export function OrdersBoard({
                     Color: {o.colors.join(", ")}
                   </div>
                 ) : null}
+                <Desglose o={o} />
                 <div className="border-surface-2 mt-3 flex items-center justify-between border-t pt-3">
                   <div className="text-fg text-lg font-medium">
                     {formatPrice(o.total)}

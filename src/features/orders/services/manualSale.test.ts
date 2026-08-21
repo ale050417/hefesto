@@ -4,8 +4,10 @@ import type { Filament, NewFilamentMovement } from "@/features/inventory/types";
 import { manualSaleSchema } from "../schemas";
 import {
   computeManualSaleCosts,
+  consolidateGrams,
   editedManualSaleEconomics,
   deductFilamentForManualSale,
+  manualSaleTotals,
   stockActionForTransition,
   toManualSaleRow,
   type ManualSaleStockDeps,
@@ -470,5 +472,133 @@ describe("toManualSaleRow (filamento persistido, Bloque C)", () => {
     expect(row.filamentId).toBeNull();
     expect(row.grams).toBeNull();
     expect(row.colorLines).toBeNull();
+  });
+});
+
+// Venta con VARIAS combinaciones en una sola fila (los 10 Dumplings de colores
+// distintos). Toca plata y stock → tests en el mismo paso (Cap. 15).
+describe("manualSaleTotals (el total sale de las líneas, no se carga a mano)", () => {
+  it("suma precio × cantidad de cada combinación", () => {
+    const r = manualSaleTotals([
+      { variantLabel: "Rojo + Blanco", quantity: 3, unitPrice: 1000 },
+      { variantLabel: "Azul + Negro", quantity: 2, unitPrice: 1500 },
+    ]);
+    expect(r.total).toBe(6000); // 3000 + 3000
+    expect(r.quantity).toBe(5);
+  });
+
+  it("combinaciones a distinto precio en la MISMA venta", () => {
+    const r = manualSaleTotals([
+      { variantLabel: "Simple", quantity: 1, unitPrice: 800 },
+      { variantLabel: "Premium", quantity: 1, unitPrice: 3000 },
+    ]);
+    expect(r.total).toBe(3800);
+  });
+
+  it("ignora líneas en 0 (combinaciones que no se vendieron)", () => {
+    const r = manualSaleTotals([
+      { variantLabel: "Rojo", quantity: 0, unitPrice: 1000 },
+      { variantLabel: "Azul", quantity: 2, unitPrice: 1000 },
+    ]);
+    expect(r.total).toBe(2000);
+    expect(r.quantity).toBe(2);
+  });
+
+  it("sanea cantidades raras (decimales/negativas) y precios negativos", () => {
+    const r = manualSaleTotals([
+      { quantity: 2.7, unitPrice: 100 },
+      { quantity: -5, unitPrice: 100 },
+      { quantity: 1, unitPrice: -50 },
+    ]);
+    expect(r.total).toBe(200); // 2 × 100, la negativa no cuenta, el precio se clampa a 0
+    expect(r.quantity).toBe(3); // 2 + 1
+  });
+
+  it("redondea cada línea antes de sumar (sin diferencia de centavos)", () => {
+    const r = manualSaleTotals([
+      { quantity: 3, unitPrice: 33.333 },
+      { quantity: 3, unitPrice: 33.333 },
+    ]);
+    // 99.999 → 100 por línea; 100 + 100 = 200
+    expect(r.total).toBe(200);
+  });
+
+  it("sin líneas → total y cantidad en 0", () => {
+    expect(manualSaleTotals([])).toEqual({ total: 0, quantity: 0 });
+  });
+});
+
+describe("consolidateGrams (stock: un movimiento por carrete, no uno por línea)", () => {
+  it("multiplica los gramos de cada combinación por SU cantidad", () => {
+    const r = consolidateGrams([
+      {
+        quantity: 3,
+        unitPrice: 0,
+        colorLines: [{ filamentId: "f1", grams: 10 }],
+      },
+    ]);
+    expect(r).toEqual([{ filamentId: "f1", grams: 30 }]);
+  });
+
+  it("dos combinaciones que comparten color → UN solo movimiento sumado", () => {
+    const r = consolidateGrams([
+      {
+        quantity: 2,
+        unitPrice: 0,
+        colorLines: [
+          { filamentId: "rojo", grams: 5 },
+          { filamentId: "blanco", grams: 3 },
+        ],
+      },
+      {
+        quantity: 4,
+        unitPrice: 0,
+        colorLines: [
+          { filamentId: "rojo", grams: 5 },
+          { filamentId: "negro", grams: 2 },
+        ],
+      },
+    ]);
+    const byId = Object.fromEntries(r.map((x) => [x.filamentId, x.grams]));
+    expect(byId.rojo).toBe(30); // 2×5 + 4×5
+    expect(byId.blanco).toBe(6); // 2×3
+    expect(byId.negro).toBe(8); // 4×2
+    expect(r).toHaveLength(3);
+  });
+
+  it("ignora líneas en 0 unidades (no descuentan stock)", () => {
+    const r = consolidateGrams([
+      {
+        quantity: 0,
+        unitPrice: 0,
+        colorLines: [{ filamentId: "f1", grams: 10 }],
+      },
+      {
+        quantity: 1,
+        unitPrice: 0,
+        colorLines: [{ filamentId: "f2", grams: 7 }],
+      },
+    ]);
+    expect(r).toEqual([{ filamentId: "f2", grams: 7 }]);
+  });
+
+  it("descarta colores sin filamento o sin gramos (nunca 0 silencioso)", () => {
+    const r = consolidateGrams([
+      {
+        quantity: 2,
+        unitPrice: 0,
+        colorLines: [
+          { filamentId: "", grams: 10 },
+          { filamentId: "f1", grams: 0 },
+          { filamentId: "f2", grams: 4 },
+        ],
+      },
+    ]);
+    expect(r).toEqual([{ filamentId: "f2", grams: 8 }]);
+  });
+
+  it("líneas sin colores cargados → no rompe, devuelve vacío", () => {
+    expect(consolidateGrams([{ quantity: 3, unitPrice: 100 }])).toEqual([]);
+    expect(consolidateGrams([])).toEqual([]);
   });
 });
