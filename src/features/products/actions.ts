@@ -23,6 +23,7 @@ import {
   publishProduct,
   removeProductImage,
   setCategoryImage,
+  setProductImageColor,
   updateCategory,
   updateProduct,
 } from "./services/catalogService";
@@ -403,10 +404,13 @@ export async function uploadProductImageAction(
         ? scaleRaw
         : "1";
     // Imagen por color (opcional): la foto del producto en ESE color.
+    // El tope va con `variant_label` (120): una combinación multicolor como
+    // "Negro + Rojo + Azul + Amarillo + Blanco" pasa los 40 y, truncada, ya no
+    // coincidía con la etiqueta → la galería nunca encontraba la foto.
     const colorRaw = formData.get("color");
     const color =
       typeof colorRaw === "string" && colorRaw.trim().length > 0
-        ? colorRaw.trim().slice(0, 40)
+        ? colorRaw.trim().slice(0, 120)
         : null;
     const image = await addProductImage(
       productId,
@@ -478,6 +482,41 @@ export async function deleteProductImageAction(
         code: "INTERNAL",
         message: e instanceof Error ? e.message : "No se pudo borrar la imagen",
       },
+    };
+  }
+}
+
+/**
+ * Asigna (o saca, con `null`) el color de una foto YA cargada.
+ *
+ * Sin esto no había forma de arreglar una foto subida desde el gestor de
+ * edición, que siempre guardaba color nulo: la galería de la tienda no saltaba
+ * a la foto del color porque el dato no existía (bug 2026-08-09).
+ */
+export async function setImageColorAction(
+  imageId: string,
+  color: string | null,
+): Promise<ActionResult> {
+  if (!(await can("productos", "editar"))) return UNAUTHORIZED;
+  if (!uuidSchema.safeParse(imageId).success) {
+    return validationError("Imagen inválida");
+  }
+  const limpio =
+    typeof color === "string" && color.trim().length > 0
+      ? color.trim().slice(0, 120)
+      : null;
+  try {
+    const productId = await setProductImageColor(imageId, limpio);
+    revalidatePath(`/admin/productos/${productId}/editar`);
+    revalidatePath("/admin/productos");
+    // La tienda muestra la foto por color: sin esto el cambio no se ve hasta
+    // que caduque el caché del catálogo.
+    revalidatePath("/", "layout");
+    return { ok: true, data: undefined };
+  } catch {
+    return {
+      ok: false,
+      error: { code: "INTERNAL", message: "No se pudo asignar el color" },
     };
   }
 }

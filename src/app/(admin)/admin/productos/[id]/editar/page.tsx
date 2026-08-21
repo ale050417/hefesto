@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermissionPage } from "@/core/auth/permissions";
 import { ImageUpload } from "@/features/products/components/image-upload";
+import { photoColorOptions } from "@/features/products/photo-colors";
 import {
   ProductForm,
   type ProductFormValues,
@@ -101,7 +102,17 @@ export default async function EditarProductoPage({
         </div>
         <div>
           <h2 className="font-display text-fg mb-3 text-lg">Imágenes</h2>
-          <ImageUpload productId={product.id} images={images} />
+          <ImageUpload
+            productId={product.id}
+            images={images}
+            // A qué color puede corresponder cada foto: MISMAS etiquetas que
+            // elige el cliente en la tienda (si no coinciden, no salta).
+            colorOptions={photoColorOptions({
+              colorMode: product.colorMode === "multi" ? "multi" : "single",
+              colors: product.colors ?? [],
+              variantLabels: variants.map((v) => v.label),
+            })}
+          />
         </div>
       </div>
     </div>

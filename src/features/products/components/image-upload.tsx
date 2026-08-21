@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { compressImageToWebp } from "@/lib/image-compress";
 import {
   deleteProductImageAction,
+  setImageColorAction,
   setPrimaryImageAction,
   uploadProductImageAction,
 } from "../actions";
@@ -17,10 +18,20 @@ import { useDeleteResource } from "@/hooks/use-delete-resource";
 export function ImageUpload({
   productId,
   images,
+  colorOptions = [],
   onChanged,
 }: {
   productId: string;
   images: ProductImage[];
+  /**
+   * Colores/combinaciones a los que se puede asignar cada foto. Vacío = el
+   * producto no tiene variaciones y no hay nada que elegir.
+   *
+   * Sin esto, toda foto subida desde acá quedaba SIN color y la galería de la
+   * tienda no saltaba al elegir el color: el alta por wizard lo guardaba, la
+   * edición no (bug 2026-08-09). Usar `photoColorOptions` para armarlo.
+   */
+  colorOptions?: string[];
   /** Aviso extra tras cada operación (para refrescar dentro de un modal). */
   onChanged?: () => void;
 }) {
@@ -79,6 +90,19 @@ export function ImageUpload({
     });
   }
 
+  /** Asigna el color de esta foto (o lo saca con ""). */
+  function handleColor(imageId: string, value: string) {
+    setError(null);
+    startTransition(async () => {
+      const res = await runAction(
+        () => setImageColorAction(imageId, value || null),
+        { silent: true },
+      );
+      if (!res.ok) setError(res.error.message);
+      onChanged?.();
+    });
+  }
+
   return (
     <div className="space-y-4">
       <div>
@@ -100,6 +124,18 @@ export function ImageUpload({
         ) : null}
         {error ? <p className="text-danger mt-2 text-xs">{error}</p> : null}
       </div>
+
+      {/* Aviso cuando el producto tiene colores pero ninguna foto tiene el suyo:
+          es exactamente el caso en que la tienda "no cambia la imagen". */}
+      {colorOptions.length > 0 &&
+      images.length > 0 &&
+      images.every((i) => !i.color) ? (
+        <p className="bg-warning/10 text-warning rounded-md px-3 py-2 text-[12.5px] leading-relaxed">
+          Ninguna foto tiene color asignado, así que en la tienda la imagen no
+          cambia al elegir el color. Elegí abajo a qué color corresponde cada
+          foto.
+        </p>
+      ) : null}
 
       {images.length === 0 ? (
         <p className="text-faint text-sm">Todavía no hay imágenes.</p>
@@ -123,8 +159,42 @@ export function ImageUpload({
                     Principal
                   </Badge>
                 ) : null}
+                {img.color ? (
+                  <Badge
+                    className="absolute right-1 bottom-1"
+                    variant="neutral"
+                  >
+                    {img.color}
+                  </Badge>
+                ) : null}
               </div>
               <div className="flex flex-col gap-1 p-2">
+                {/* A qué color/combinación corresponde ESTA foto. Es lo que la
+                    tienda busca al elegir el color; sin esto la galería no
+                    salta (bug 2026-08-09). */}
+                {colorOptions.length > 0 ? (
+                  <select
+                    className="select"
+                    style={{ height: 30, fontSize: 12 }}
+                    disabled={isPending}
+                    value={img.color ?? ""}
+                    aria-label="Color de esta foto"
+                    onChange={(e) => handleColor(img.id, e.target.value)}
+                  >
+                    <option value="">— Sin color —</option>
+                    {/* El color guardado puede ya no estar en la lista (se
+                        renombró o se sacó): se muestra igual para no perderlo
+                        en silencio. */}
+                    {(img.color && !colorOptions.includes(img.color)
+                      ? [img.color, ...colorOptions]
+                      : colorOptions
+                    ).map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
                 {!img.isPrimary ? (
                   <Button
                     type="button"

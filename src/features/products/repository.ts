@@ -535,6 +535,26 @@ export async function deleteImageRow(
   await database.delete(productImages).where(eq(productImages.id, id));
 }
 
+/**
+ * Asigna (o saca, con `null`) el COLOR de una imagen ya cargada.
+ *
+ * Sin esto, una foto subida desde el gestor de edición quedaba con `color`
+ * nulo para siempre y la galería de la tienda no tenía a qué saltar al elegir
+ * el color: el alta por wizard lo guardaba, la edición no (bug 2026-08-09).
+ */
+export async function setImageColorRow(
+  imageId: string,
+  color: string | null,
+  database: Database = db,
+): Promise<ProductImage | null> {
+  const [row] = await database
+    .update(productImages)
+    .set({ color })
+    .where(eq(productImages.id, imageId))
+    .returning();
+  return row ?? null;
+}
+
 /** Marca una imagen como principal (y las demás del producto como no principal). */
 export async function setPrimaryImage(
   productId: string,

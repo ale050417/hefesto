@@ -25,6 +25,7 @@ import {
   listImagesByProduct,
   listVariantsByProduct,
   replaceProductVariants,
+  setImageColorRow,
   setPrimaryImage,
   setProductStatus,
   updateCategoryRow,
@@ -527,6 +528,23 @@ export async function makeImagePrimary(
   imageId: string,
 ): Promise<void> {
   await setPrimaryImage(productId, imageId);
+}
+
+/**
+ * Cambia el COLOR de una imagen ya cargada (o lo saca con `null`).
+ *
+ * Existe porque el alta por wizard guardaba el color de cada foto pero el
+ * gestor de la EDICIÓN no: toda foto subida o recargada desde ahí quedaba sin
+ * color y la galería de la tienda no tenía a qué saltar (bug 2026-08-09).
+ * Devuelve el productId para revalidar la pantalla correcta.
+ */
+export async function setProductImageColor(
+  imageId: string,
+  color: string | null,
+): Promise<string> {
+  const row = await setImageColorRow(imageId, color);
+  if (!row) throw new Error("Imagen no encontrada");
+  return row.productId;
 }
 
 export async function listProductImages(

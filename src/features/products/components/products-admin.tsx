@@ -23,6 +23,7 @@ import { ProductForm, type ProductFormValues } from "./product-form";
 import { EditSection } from "./edit-section";
 import { ProductWizard } from "./product-wizard";
 import { ImageUpload } from "./image-upload";
+import { photoColorOptions } from "../photo-colors";
 import { ProductStatusActions } from "./product-status-actions";
 import { runAction } from "@/lib/run-action";
 import { useDeleteResource } from "@/hooks/use-delete-resource";
@@ -585,6 +586,14 @@ export function ProductsAdmin({
               <ImageUpload
                 productId={modal.productId}
                 images={modal.images}
+                // A qué color puede corresponder cada foto: MISMAS etiquetas
+                // que elige el cliente en la tienda (si no coinciden, la
+                // galería no salta).
+                colorOptions={photoColorOptions({
+                  colorMode: modal.defaults.colorMode,
+                  colors: modal.defaults.colors,
+                  variantLabels: modal.defaults.variants.map((v) => v.label),
+                })}
                 onChanged={reloadEdit}
               />
             </EditSection>
