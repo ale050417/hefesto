@@ -1704,12 +1704,68 @@ body > *:not([data-portal]) {
     opacity: 0.6;
     margin-bottom: 14px;
   }
+  /* Buscador del historial: ancho fijo en desktop, fluido en móvil (abajo). */
+  .calc-hist-tools .search {
+    width: 220px;
+  }
   @media (max-width: 1100px) {
     .calc-grid {
       grid-template-columns: 1fr;
     }
     .calc-stats {
       grid-template-columns: repeat(2, 1fr);
+    }
+    /* Con cantidad impar de stats (5 admin / 3 operador) la última tarjeta
+       ocupa el ancho completo en vez de dejar un hueco. */
+    .calc-stat:nth-child(odd):last-child {
+      grid-column: 1 / -1;
+    }
+  }
+  /* Móvil (≤640): la calculadora quedaba desproporcionada — stats como filas
+     compactas (ícono a la izquierda), precio final más chico para no desbordar
+     y controles del historial a ancho completo (2026-08-27). */
+  @media (max-width: 640px) {
+    .calc-stats {
+      gap: 10px;
+    }
+    .calc-stat {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+    }
+    .calc-stat .cs-ic {
+      width: 32px;
+      height: 32px;
+      margin-bottom: 0;
+      flex-shrink: 0;
+    }
+    .calc-stat .cs-n {
+      font-size: 17px;
+    }
+    .calc-stat .cs-l {
+      margin-top: 3px;
+      font-size: 11px;
+    }
+    .calc-final {
+      padding: 18px 16px;
+    }
+    .calc-final .cf-val {
+      font-size: 30px;
+    }
+    .calc-empty {
+      padding: 36px 16px;
+    }
+    .calc-hist-tools {
+      width: 100%;
+    }
+    .calc-hist-tools .search {
+      width: 100%;
+    }
+    /* Orden + Exportar CSV se reparten la segunda fila en partes iguales. */
+    .calc-hist-tools .select,
+    .calc-hist-tools .btn {
+      flex: 1 1 auto;
     }
   }
   /* Pares de campos (nombre+cliente, horas+minutos) apilados en celular: a
@@ -2178,6 +2234,26 @@ body > *:not([data-portal]) {
     }
     .dash-grid {
       grid-template-columns: 1fr;
+    }
+  }
+  /* "Filamentos más usados" en móvil: nombre y gramos en una línea y la barra
+     a ancho completo debajo — antes el nombre (160px) + los gramos (80px)
+     dejaban una barra de ~30px, ilegible en celular (2026-08-27). */
+  @media (max-width: 640px) {
+    .fu-row {
+      flex-wrap: wrap;
+      row-gap: 5px;
+    }
+    .fu-row .fu-name {
+      width: auto;
+      flex: 1 1 auto;
+    }
+    .fu-row .fu-val {
+      width: auto;
+    }
+    .fu-row .fu-bar {
+      order: 3;
+      flex: 1 1 100%;
     }
   }
 

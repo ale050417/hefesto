@@ -92,7 +92,7 @@ export function FilamentUsageCard({
             return (
               <div
                 key={`${u.material}-${u.color}-${i}`}
-                className="flex items-center gap-3"
+                className="fu-row flex items-center gap-3"
               >
                 <span
                   className="shrink-0"
@@ -105,13 +105,13 @@ export function FilamentUsageCard({
                   }}
                 />
                 <span
-                  className="text-fg w-40 shrink-0 truncate text-[13px]"
+                  className="fu-name text-fg w-40 shrink-0 truncate text-[13px]"
                   title={`${u.material} · ${u.color}`}
                 >
                   {u.material} · {u.color}
                 </span>
                 <div
-                  className="h-3.5 flex-1 overflow-hidden rounded-full"
+                  className="fu-bar h-3.5 flex-1 overflow-hidden rounded-full"
                   style={{ background: "var(--surface-2)" }}
                 >
                   <div
@@ -124,7 +124,7 @@ export function FilamentUsageCard({
                     }}
                   />
                 </div>
-                <b className="w-20 shrink-0 text-right text-[13px]">
+                <b className="fu-val w-20 shrink-0 text-right text-[13px]">
                   {fmtG(u.grams)}
                 </b>
               </div>

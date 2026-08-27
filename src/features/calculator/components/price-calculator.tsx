@@ -292,8 +292,10 @@ export function PriceCalculator({
         {statCards.map(([icon, n, l]) => (
           <div className="calc-stat" key={l}>
             <div className="cs-ic">{svg(icon)}</div>
-            <div className="cs-n">{n}</div>
-            <div className="cs-l">{l}</div>
+            <div className="cs-body">
+              <div className="cs-n">{n}</div>
+              <div className="cs-l">{l}</div>
+            </div>
           </div>
         ))}
       </div>
@@ -459,7 +461,7 @@ export function PriceCalculator({
 
         {/* DESGLOSE */}
         <div className="ui-card section-card">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <div className="section-title">
               {isAdmin ? "Desglose detallado" : "Precio sugerido"}
             </div>
@@ -582,9 +584,8 @@ export function PriceCalculator({
       <div className="ui-card section-card">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="section-title">Historial de cálculos</div>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Fluida en móvil: el ancho fijo pasa a tope máximo. */}
-            <div className="search" style={{ width: "100%", maxWidth: 220 }}>
+          <div className="calc-hist-tools flex flex-wrap items-center gap-2">
+            <div className="search">
               <svg
                 viewBox="0 0 24 24"
                 fill="none"
@@ -633,7 +634,9 @@ export function PriceCalculator({
           </p>
         ) : (
           <div className="table-wrap" style={{ border: "none" }}>
-            <table className="tbl">
+            {/* tbl-cards: en móvil/tablet se apila como tarjetas legibles en
+               vez de desbordar con scroll horizontal (patrón global). */}
+            <table className="tbl tbl-cards">
               <thead>
                 <tr>
                   <th>Pieza</th>
@@ -648,39 +651,47 @@ export function PriceCalculator({
               <tbody>
                 {filtered.map((h) => (
                   <tr key={h.id}>
-                    <td>
+                    <td data-label="Pieza">
                       <b>{h.name}</b>
                     </td>
-                    <td className="muted">{h.customer ?? "—"}</td>
-                    <td className="muted">{h.material ?? "—"}</td>
-                    <td className="text-right">{Number(h.grams)} g</td>
-                    <td className="price text-right">
+                    <td className="muted" data-label="Cliente">
+                      {h.customer ?? "—"}
+                    </td>
+                    <td className="muted" data-label="Material">
+                      {h.material ?? "—"}
+                    </td>
+                    <td className="text-right" data-label="Gramos">
+                      {Number(h.grams)} g
+                    </td>
+                    <td className="price text-right" data-label="Precio">
                       <b style={{ color: "var(--gold-bright)" }}>
                         {formatPrice(Number(h.precioFinal))}
                       </b>
                     </td>
-                    <td className="muted whitespace-nowrap">
+                    <td className="muted whitespace-nowrap" data-label="Fecha">
                       {dateFmt.format(new Date(h.createdAt))}
                     </td>
-                    <td className="text-right">
-                      <button
-                        className="btn-icon btn-ghost"
-                        title="Eliminar"
-                        disabled={pendingId === h.id}
-                        onClick={() => remove(h.id)}
-                      >
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          aria-hidden
+                    <td className="text-right" data-label="">
+                      <div className="flex justify-end">
+                        <button
+                          className="btn-icon btn-ghost"
+                          title="Eliminar"
+                          disabled={pendingId === h.id}
+                          onClick={() => remove(h.id)}
                         >
-                          <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-                        </svg>
-                      </button>
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden
+                          >
+                            <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
