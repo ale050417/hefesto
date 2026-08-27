@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { resolveFilamentForManualSale } from "@/features/inventory/service";
 import type { Filament, NewFilamentMovement } from "@/features/inventory/types";
-import { manualSaleSchema } from "../schemas";
+import { manualSaleSchema, type ManualSaleInput } from "../schemas";
 import {
+  applyManualSaleLines,
   computeManualSaleCosts,
   consolidateGrams,
   editedManualSaleEconomics,
@@ -525,6 +526,59 @@ describe("manualSaleTotals (el total sale de las líneas, no se carga a mano)", 
 
   it("sin líneas → total y cantidad en 0", () => {
     expect(manualSaleTotals([])).toEqual({ total: 0, quantity: 0 });
+  });
+});
+
+// La amortización de una venta con líneas se calcula DESPUÉS con cantidad 1
+// (los gramos ya vienen sumados), así que TODO lo que escala por unidad tiene
+// que salir de acá ya escalado. Bug real 2026-08: vender 3 Dumplings (300 min
+// c/u) costeaba la luz y el desgaste de UNA sola unidad porque printMinutes
+// quedaba por unidad.
+describe("applyManualSaleLines (venta con varias combinaciones)", () => {
+  const base: ManualSaleInput = {
+    saleDate: "2026-08-20",
+    customerName: "Cliente",
+    quantity: 1,
+    total: 1,
+    printMinutes: 300,
+    paymentMethod: "cash",
+    status: "delivered",
+    items: [
+      {
+        variantLabel: "Blanco + Negro + Rosa + Celeste",
+        quantity: 2,
+        unitPrice: 7000,
+        colorLines: [{ filamentId: "f1", grams: 84 }],
+      },
+      {
+        variantLabel: "Rosa + Rojo + Negro + Blanco",
+        quantity: 1,
+        unitPrice: 7000,
+        colorLines: [{ filamentId: "f2", grams: 84 }],
+      },
+    ],
+  };
+
+  it("multiplica los minutos de impresión por las unidades vendidas", () => {
+    const r = applyManualSaleLines(base);
+    expect(r.quantity).toBe(3);
+    expect(r.printMinutes).toBe(900); // 300 × 3, no 300
+  });
+
+  it("los gramos también quedan totales (por carrete)", () => {
+    const r = applyManualSaleLines(base);
+    expect(r.grams).toBe(252); // 84×2 + 84×1
+    expect(r.total).toBe(21000);
+  });
+
+  it("sin minutos cargados no inventa horas (queda 0)", () => {
+    const r = applyManualSaleLines({ ...base, printMinutes: undefined });
+    expect(r.printMinutes).toBe(0);
+  });
+
+  it("sin líneas devuelve la entrada tal cual (venta simple)", () => {
+    const simple: ManualSaleInput = { ...base, items: undefined };
+    expect(applyManualSaleLines(simple)).toBe(simple);
   });
 });
 

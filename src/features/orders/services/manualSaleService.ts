@@ -150,9 +150,10 @@ export function consolidateGrams(
 }
 
 /**
- * Normaliza una venta CON líneas: el total, la cantidad y los gramos salen de
- * sumar las combinaciones, NO de lo que mandó el formulario (regla de dinero,
- * Cap. 11/14: el servidor recalcula, no confía en el cliente).
+ * Normaliza una venta CON líneas: el total, la cantidad, los gramos y los
+ * minutos de impresión salen de sumar las combinaciones, NO de lo que mandó el
+ * formulario (regla de dinero, Cap. 11/14: el servidor recalcula, no confía en
+ * el cliente).
  *
  * Los `colorLines` que devuelve ya están multiplicados por la cantidad de cada
  * línea, así que representan el consumo TOTAL de la venta: al descontar stock
@@ -165,15 +166,22 @@ export function applyManualSaleLines(input: ManualSaleInput): ManualSaleInput {
   const items = input.items ?? [];
   if (items.length === 0) return input;
   const { total, quantity } = manualSaleTotals(items);
+  const units = Math.max(1, quantity);
   const grams = consolidateGrams(items);
   return {
     ...input,
     total,
-    quantity: Math.max(1, quantity),
+    quantity: units,
     colorLines: grams.length > 0 ? grams : undefined,
     // Los gramos ya van consolidados por carrete en `colorLines`; este campo
     // queda como total informativo de la venta.
     grams: grams.reduce((a, g) => a + g.grams, 0) || undefined,
+    // Las horas también pasan a ser de TODA la venta: la amortización se
+    // calcula después con cantidad 1 (los gramos ya vienen sumados), así que
+    // si el tiempo quedara por unidad, la luz y el desgaste de máquina se
+    // cobrarían UNA sola vez por más unidades que haya (bug 2026-08: vender
+    // 3 Dumplings costeaba las horas de 1).
+    printMinutes: (input.printMinutes ?? 0) * units,
     // El filamento "principal" pierde sentido con varias combinaciones: el
     // descuento real sale de colorLines.
     filamentId: grams[0]?.filamentId ?? input.filamentId,
