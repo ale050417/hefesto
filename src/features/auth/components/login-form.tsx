@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -16,7 +15,6 @@ const field =
 const labelCls = "mb-1 block text-xs font-medium text-dim";
 
 export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
-  const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
   const {
     register,
@@ -37,8 +35,10 @@ export function LoginForm({ redirectTo = "/" }: { redirectTo?: string }) {
       res.data.isStaff && (redirectTo === "/" || redirectTo === "")
         ? "/admin"
         : redirectTo;
-    router.push(dest);
-    router.refresh();
+    // Navegación COMPLETA, no router.push: el push reutilizaba el Router Cache
+    // de antes del login (/admin cacheado como "redirect a /ingresar"), así
+    // que a veces pedía loguearse dos veces o rebotaba al home (2026-08-27).
+    window.location.assign(dest);
   });
 
   return (

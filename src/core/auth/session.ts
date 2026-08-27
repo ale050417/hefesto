@@ -122,7 +122,20 @@ export async function requireStaff(): Promise<CurrentUser> {
   // "No pude leer el rol" ≠ "no sos staff": error visible, no redirect mudo.
   if (user.profileUnavailable) throwAuthUnavailable();
   const role = user.profile?.role;
-  if (role !== "admin" && role !== "operator") redirect("/");
+  if (role !== "admin" && role !== "operator") {
+    // NO rebotar mudo al home: cuando alguien entraba al panel con la cuenta
+    // equivocada del selector de Google (una de cliente), aterrizaba en la
+    // tienda sin explicación y parecía que el login "no andaba" (2026-08-27).
+    // Se le dice con qué cuenta está y se le ofrece ingresar de nuevo.
+    const quien = user.email
+      ? `Estás con la cuenta ${user.email}, que`
+      : "Esta cuenta";
+    redirect(
+      `/ingresar?redirect=/admin&error=${encodeURIComponent(
+        `${quien} no tiene acceso al panel. Ingresá con tu cuenta de administrador u operador.`,
+      )}`,
+    );
+  }
   // Invitado que todavía no creó SU contraseña: primero la crea. El perfil
   // está cacheado 60 s, así que ANTES de rebotar confirmamos contra la base
   // (si no, quien acaba de crearla quedaba en loop). Es una lectura extra

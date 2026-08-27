@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "@/core/supabase/server";
+import { getProfileRoleById } from "@/features/auth/repository";
 import { siteUrl } from "@/lib/site";
 
 /**
@@ -54,8 +55,24 @@ export async function GET(request: Request) {
   }
 
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) return NextResponse.redirect(`${siteUrl}${next}`);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    if (!error) {
+      // Paridad con el login por contraseña: si no vino un destino explícito,
+      // un miembro del equipo que entra con Google va directo al PANEL, no al
+      // home (antes siempre caía en "/" y había que navegar a mano, 2026-08-27).
+      let dest = next;
+      if (next === "/") {
+        try {
+          const role = data.user?.id
+            ? await getProfileRoleById(data.user.id)
+            : null;
+          if (role === "admin" || role === "operator") dest = "/admin";
+        } catch {
+          // Sin rol legible: queda el destino normal de la tienda.
+        }
+      }
+      return NextResponse.redirect(`${siteUrl}${dest}`);
+    }
     console.error("[auth] exchangeCodeForSession falló:", error.message);
     return NextResponse.redirect(
       `${siteUrl}/ingresar?error=${encodeURIComponent(motivo(error.message))}`,
