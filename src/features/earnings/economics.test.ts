@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   computeOrderEconomics,
   distribute,
+  itemExtrasCost,
   manualSaleEconomics,
   productAmort,
   sharesTotal,
@@ -137,5 +138,79 @@ describe("sharesTotal", () => {
   it("suma porcentajes", () => {
     expect(sharesTotal([{ pct: 60 }, { pct: 40 }])).toBe(100);
     expect(sharesTotal([{ pct: 50 }, { pct: 30 }])).toBe(80);
+  });
+});
+
+// Insumo por TAMAÑO (2026-08-27): el vaso del chop de 1L no cuesta lo mismo
+// que el de 500cc. Toca plata → tests en el mismo paso (Cap. 15).
+describe("itemExtrasCost (insumo por tamaño/combinación)", () => {
+  const chop = new Map([
+    ["500cc", 5000],
+    ["1L", 8000],
+  ]);
+
+  it("usa el insumo del tamaño vendido, no el del producto", () => {
+    expect(
+      itemExtrasCost({
+        variantLabel: "1L",
+        variantExtras: chop,
+        productExtras: 7000,
+      }),
+    ).toBe(8000);
+    expect(
+      itemExtrasCost({
+        variantLabel: "500cc",
+        variantExtras: chop,
+        productExtras: 7000,
+      }),
+    ).toBe(5000);
+  });
+
+  it('matchea "Tamaño · Color" (snapshot del pedido online)', () => {
+    expect(
+      itemExtrasCost({
+        variantLabel: "1L · Rojo",
+        variantExtras: chop,
+        productExtras: 7000,
+      }),
+    ).toBe(8000);
+  });
+
+  it("0 explícito vale: ese tamaño NO lleva insumo", () => {
+    const m = new Map([["Chico", 0]]);
+    expect(
+      itemExtrasCost({
+        variantLabel: "Chico",
+        variantExtras: m,
+        productExtras: 7000,
+      }),
+    ).toBe(0);
+  });
+
+  it("tamaño sin insumo propio → cae al del producto", () => {
+    expect(
+      itemExtrasCost({
+        variantLabel: "2L",
+        variantExtras: chop,
+        productExtras: 7000,
+      }),
+    ).toBe(7000);
+  });
+
+  it("sin label o sin mapa → el del producto", () => {
+    expect(
+      itemExtrasCost({
+        variantLabel: null,
+        variantExtras: chop,
+        productExtras: 7000,
+      }),
+    ).toBe(7000);
+    expect(
+      itemExtrasCost({
+        variantLabel: "1L",
+        variantExtras: undefined,
+        productExtras: 7000,
+      }),
+    ).toBe(7000);
   });
 });

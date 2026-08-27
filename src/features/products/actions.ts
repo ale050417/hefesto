@@ -144,6 +144,7 @@ export async function getProductFormDataAction(id: string): Promise<
       colorGrams: v.colorGrams ?? {},
       weightGrams: v.weightGrams ?? "",
       colorPrices: v.colorPrices ?? {},
+      extrasCost: v.extrasCost ?? "",
     })),
   };
   return {

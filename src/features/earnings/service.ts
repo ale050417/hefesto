@@ -2,6 +2,7 @@ import * as repo from "./repository";
 import {
   computeOrderEconomics,
   distribute,
+  itemExtrasCost,
   manualSaleEconomics,
   type CostSettings,
   type EconItem,
@@ -106,14 +107,25 @@ export type EarningsMonth = { value: string; label: string };
  * `month` (YYYY-MM) filtra el período; si es vacío/inválido, muestra todo.
  */
 export async function getEarningsOverview(month?: string | null) {
-  const [settings, shares, ords, items, costMap, manual] = await Promise.all([
-    getCostSettings(),
-    repo.listProfitShares(),
-    repo.getDeliveredOrders(),
-    repo.getDeliveredItems(),
-    repo.getFilamentCostByMaterial(),
-    repo.getDeliveredManualSales(),
-  ]);
+  const [settings, shares, ords, items, costMap, manual, variantExtras] =
+    await Promise.all([
+      getCostSettings(),
+      repo.listProfitShares(),
+      repo.getDeliveredOrders(),
+      repo.getDeliveredItems(),
+      repo.getFilamentCostByMaterial(),
+      repo.getDeliveredManualSales(),
+      repo.getVariantExtras(),
+    ]);
+
+  // Insumo POR tamaño: productId → (label del tamaño → costo propio). El vaso
+  // del chop de 1L no cuesta lo mismo que el de 500cc (Ale, 2026-08-27).
+  const extrasByProduct = new Map<string, Map<string, number>>();
+  for (const v of variantExtras) {
+    const m = extrasByProduct.get(v.productId) ?? new Map<string, number>();
+    m.set(v.label, v.extrasCost);
+    extrasByProduct.set(v.productId, m);
+  }
 
   const byOrder = new Map<string, EconItem[]>();
   for (const it of items) {
@@ -124,7 +136,14 @@ export async function getEarningsOverview(month?: string | null) {
       weightGrams: it.weightGrams,
       printMinutes: it.printMinutes,
       costPerKg,
-      extrasCost: it.extrasCost,
+      // El insumo del TAMAÑO vendido manda; sin uno propio, el del producto.
+      extrasCost: itemExtrasCost({
+        variantLabel: it.variantLabel,
+        variantExtras: it.productId
+          ? extrasByProduct.get(it.productId)
+          : undefined,
+        productExtras: it.extrasCost,
+      }),
     });
     byOrder.set(it.orderId, arr);
   }

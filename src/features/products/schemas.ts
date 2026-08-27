@@ -120,6 +120,11 @@ export const productInputSchema = z
           colorPrices: z
             .record(z.string().max(40), z.coerce.number().positive())
             .default({}),
+          // Costo del insumo de ESTE tamaño (el vaso de 1L ≠ el de 500cc).
+          // Vacío = usa el extras_cost del producto; 0 = este tamaño no lleva.
+          extrasCost: z
+            .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
+            .optional(),
         }),
       )
       .max(20, "Demasiados tamaños")

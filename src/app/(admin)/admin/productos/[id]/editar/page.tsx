@@ -68,6 +68,7 @@ export default async function EditarProductoPage({
       colorGrams: v.colorGrams ?? {},
       weightGrams: v.weightGrams ?? "",
       colorPrices: v.colorPrices ?? {},
+      extrasCost: v.extrasCost ?? "",
     })),
   };
 

@@ -69,6 +69,34 @@ export type OrderEconomics = {
   hours: number;
 };
 
+/**
+ * Insumo por unidad de un ITEM vendido: el del TAMAÑO/combinación si lo define
+ * (0 vale: "este tamaño no lleva"), si no el del producto. El vaso del chop de
+ * 1L no cuesta lo mismo que el de 500cc (pedido de Ale, 2026-08-27).
+ *
+ * El label guardado en el item puede venir "Tamaño · Color" (pedido online en
+ * color único): si no matchea exacto, se prueba sin el último " · …". Puro.
+ */
+export function itemExtrasCost(params: {
+  variantLabel: string | null;
+  /** label del tamaño → insumo propio (solo los tamaños que lo definen). */
+  variantExtras: ReadonlyMap<string, number> | undefined;
+  productExtras: number;
+}): number {
+  const { variantLabel, variantExtras, productExtras } = params;
+  if (!variantLabel || !variantExtras || variantExtras.size === 0) {
+    return productExtras;
+  }
+  const exact = variantExtras.get(variantLabel);
+  if (exact != null) return exact;
+  const sep = variantLabel.lastIndexOf(" · ");
+  if (sep > 0) {
+    const base = variantExtras.get(variantLabel.slice(0, sep));
+    if (base != null) return base;
+  }
+  return productExtras;
+}
+
 /** Economía de un pedido: suma la amortización de sus items y la resta del total. */
 export function computeOrderEconomics(
   total: number,

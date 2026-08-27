@@ -165,6 +165,8 @@ export function ProductWizard({
       colorGrams: Record<string, number>;
       weightGrams: string;
       colorPrices: Record<string, number>;
+      /** Insumo de ESTE tamaño/combo ("" = usa el general del producto). */
+      extrasCost: string;
       comboColors: string[];
     }>
   >([]);
@@ -226,8 +228,18 @@ export function ProductWizard({
     setExtras((es) => [...es, { name: "", cost: "", qty: "1" }]);
   const removeExtra = (i: number) =>
     setExtras((es) => es.filter((_, j) => j !== i));
-  const setVariant = (i: number, k: "label" | "price", v: string) =>
-    setVariants((vs) => vs.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  const setVariant = (
+    i: number,
+    k: "label" | "price" | "extrasCost",
+    v: string,
+  ) => setVariants((vs) => vs.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
+  // Insumo de UNA variante: el propio si lo definió (0 vale: "no lleva"); si
+  // no, el general del producto. El vaso de 1L no cuesta lo mismo que el de
+  // 500cc (pedido de Ale, 2026-08-27).
+  const variantExtrasNow = (i: number) => {
+    const own = (variants[i]?.extrasCost ?? "").trim();
+    return own === "" ? extrasCost : Number(own) || 0;
+  };
   const setVariantGrams = (i: number, grams: Record<string, number>) =>
     setVariants((vs) =>
       vs.map((x, j) => (j === i ? { ...x, colorGrams: grams } : x)),
@@ -262,6 +274,7 @@ export function ProductWizard({
         colorGrams: {},
         weightGrams: "",
         colorPrices: {},
+        extrasCost: "",
         comboColors: [],
       },
     ]);
@@ -569,6 +582,7 @@ export function ProductWizard({
             colorGrams: v.colorGrams,
             weightGrams: "",
             colorPrices: {},
+            extrasCost: v.extrasCost,
           }))
         : hasSizes
           ? variants
@@ -579,6 +593,7 @@ export function ProductWizard({
                 colorGrams: v.colorGrams,
                 weightGrams: v.weightGrams,
                 colorPrices: isDistinct ? v.colorPrices : {},
+                extrasCost: v.extrasCost,
               }))
           : [],
       status,
@@ -1221,11 +1236,12 @@ export function ProductWizard({
                           onUse={(val) => {
                             // Insumos: se SUMAN al precio (la ganancia ya los
                             // descuenta como costo; sin esto se pierde plata).
+                            // El del combo manda; si no tiene, el general.
                             if (val.price != null)
                               setVariant(
                                 i,
                                 "price",
-                                String(val.price + extrasCost),
+                                String(val.price + variantExtrasNow(i)),
                               );
                             setEst(val);
                             setVariantGrams(i, val.colorGrams ?? {});
@@ -1256,6 +1272,29 @@ export function ProductWizard({
                             Igual a la 1ª
                           </button>
                         ) : null}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-dim text-[12px]">
+                          Insumo de esta combinación
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-faint text-[12px]">$</span>
+                          <input
+                            className="input"
+                            style={{ width: 100 }}
+                            type="number"
+                            min={0}
+                            placeholder={String(extrasCost || 0)}
+                            value={v.extrasCost}
+                            onChange={(ev) =>
+                              setVariant(i, "extrasCost", ev.target.value)
+                            }
+                          />
+                        </div>
+                        <span className="text-faint text-[11.5px]">
+                          Vacío = usa los insumos generales. Cargalo antes de
+                          “Calcular”.
+                        </span>
                       </div>
                     </div>
                   ))}
@@ -1304,6 +1343,31 @@ export function ProductWizard({
                           ✕
                         </button>
                       </div>
+                      {/* Insumo de ESTE tamaño (el vaso de 1L ≠ el de 500cc).
+                          Vacío = usa los insumos generales del producto. */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-dim text-[12px]">
+                          Insumo de este tamaño
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-faint text-[12px]">$</span>
+                          <input
+                            className="input"
+                            style={{ width: 100 }}
+                            type="number"
+                            min={0}
+                            placeholder={String(extrasCost || 0)}
+                            value={v.extrasCost}
+                            onChange={(ev) =>
+                              setVariant(i, "extrasCost", ev.target.value)
+                            }
+                          />
+                        </div>
+                        <span className="text-faint text-[11.5px]">
+                          Vacío = usa los insumos generales. Cargalo antes de
+                          “Calcular”.
+                        </span>
+                      </div>
                       {distinctColorPrice ? (
                         /* MATRIZ: fila por color dentro del tamaño. El peso del
                            tamaño (stock) lo trae el primer Calcular. */
@@ -1350,7 +1414,7 @@ export function ProductWizard({
                                     setVariantColorPrice(
                                       i,
                                       c,
-                                      val.price + extrasCost,
+                                      val.price + variantExtrasNow(i),
                                     );
                                   setEst(val);
                                   // El peso del tamaño (stock): mismo para todos
@@ -1387,7 +1451,7 @@ export function ProductWizard({
                                 setVariant(
                                   i,
                                   "price",
-                                  String(val.price + extrasCost),
+                                  String(val.price + variantExtrasNow(i)),
                                 );
                               setEst(val);
                               if (colorMode === "multi")

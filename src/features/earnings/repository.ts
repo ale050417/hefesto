@@ -1,4 +1,4 @@
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { db } from "@/core/db";
 import {
   costSettings,
@@ -7,6 +7,7 @@ import {
   orderItems,
   orders,
   products,
+  productVariants,
   profiles,
   profitShares,
 } from "@/core/db/schema";
@@ -130,11 +131,15 @@ export async function getDeliveredOrders(
 
 export type DeliveredItem = {
   orderId: string;
+  productId: string | null;
+  /** Snapshot del tamaño/color vendido ("500cc", "500cc · Rojo", …). */
+  variantLabel: string | null;
   quantity: number;
   weightGrams: number;
   printMinutes: number;
   material: string | null;
-  /** Costo de insumos del producto (por unidad). */
+  /** Costo de insumos del producto (por unidad). El del TAMAÑO, si lo define,
+   * lo resuelve el service con getVariantExtras (vaso 1L ≠ vaso 500cc). */
   extrasCost: number;
 };
 
@@ -144,6 +149,8 @@ export async function getDeliveredItems(
   const rows = await database
     .select({
       orderId: orderItems.orderId,
+      productId: orderItems.productId,
+      variantLabel: orderItems.variantLabel,
       quantity: orderItems.quantity,
       weightGrams: products.weightGrams,
       printMinutes: products.printTimeMinutes,
@@ -156,11 +163,33 @@ export async function getDeliveredItems(
     .where(inArray(orders.status, REVENUE_STATUSES));
   return rows.map((r) => ({
     orderId: r.orderId,
+    productId: r.productId,
+    variantLabel: r.variantLabel,
     quantity: r.quantity,
     weightGrams: r.weightGrams != null ? Number(r.weightGrams) : 0,
     printMinutes: r.printMinutes != null ? Number(r.printMinutes) : 0,
     material: r.material,
     extrasCost: r.extrasCost != null ? Number(r.extrasCost) : 0,
+  }));
+}
+
+/** Insumos POR tamaño/combinación (solo las variantes que definen el propio).
+ * El service los cruza con cada item vendido: vaso 1L ≠ vaso 500cc. */
+export async function getVariantExtras(
+  database: Database = db,
+): Promise<Array<{ productId: string; label: string; extrasCost: number }>> {
+  const rows = await database
+    .select({
+      productId: productVariants.productId,
+      label: productVariants.label,
+      extrasCost: productVariants.extrasCost,
+    })
+    .from(productVariants)
+    .where(isNotNull(productVariants.extrasCost));
+  return rows.map((r) => ({
+    productId: r.productId,
+    label: r.label,
+    extrasCost: Number(r.extrasCost),
   }));
 }
 

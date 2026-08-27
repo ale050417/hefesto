@@ -32,11 +32,18 @@ export const productVariants = pgTable(
     // morado cuesta más que el azul en el mismo tamaño). Null = precio del
     // tamaño (price_override) para todos los colores.
     colorPrices: jsonb("color_prices").$type<Record<string, number>>(),
+    // Costo del insumo de ESTE tamaño (el vaso de 1L cuesta distinto al de
+    // 500cc). Null = usar products.extras_cost; 0 = este tamaño no lleva.
+    extrasCost: numeric("extras_cost", { precision: 12, scale: 2 }),
   },
   (t) => [
     check(
       "variants_price_override_positive",
       sql`${t.priceOverride} IS NULL OR ${t.priceOverride} > 0`,
+    ),
+    check(
+      "variants_extras_cost_non_negative",
+      sql`${t.extrasCost} IS NULL OR ${t.extrasCost} >= 0`,
     ),
     uniqueIndex("variants_product_label_unique").on(t.productId, t.label),
     index("variants_product_idx").on(t.productId),

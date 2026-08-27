@@ -80,6 +80,10 @@ export function ManualSaleForm({
   const [extras, setExtras] = useState<
     Array<{ name: string; cost: string; qty: string }>
   >([]);
+  // Insumo del producto/tamaño elegido (POR UNIDAD, ej. el vaso del chop):
+  // viene del catálogo al elegir producto+tamaño y queda editable. Null = el
+  // producto no lleva insumo (la fila no se muestra).
+  const [prodExtraUnit, setProdExtraUnit] = useState<string | null>(null);
   const [prodSearch, setProdSearch] = useState("");
   const [prodCat, setProdCat] = useState("all");
   const [colorLines, setColorLines] = useState<
@@ -204,6 +208,9 @@ export function ManualSaleForm({
     unitPrice: number;
     lines: Array<{ filamentId: string; grams: string }>;
     weight: number;
+    /** Insumo POR UNIDAD: el del tamaño si lo define (vaso 1L ≠ vaso 500cc),
+     * si no el del producto. Suma al costo, no al total (ya está en el precio). */
+    extrasCost: number;
   } {
     const variant = p.variants.find((v) => v.label === variantLabel) ?? null;
     const isMulti = p.colorMode === "multi";
@@ -214,6 +221,7 @@ export function ManualSaleForm({
       variant,
       color,
     });
+    const extrasCost = variant?.extrasCost ?? p.extrasCost ?? 0;
     let lines: Array<{ filamentId: string; grams: string }> = [];
     let weight = 0;
     if (isMulti) {
@@ -247,7 +255,7 @@ export function ManualSaleForm({
         },
       ];
     }
-    return { unitPrice, lines, weight };
+    return { unitPrice, lines, weight, extrasCost };
   }
 
   /** Aplica el producto + variante + color: precio ESPEJO del cobro online
@@ -263,7 +271,11 @@ export function ManualSaleForm({
       unitPrice: unit,
       lines,
       weight,
+      extrasCost: extra,
     } = buildLine(p, variantLabel, color);
+    // Insumo del producto/tamaño elegido (por unidad): precargado y editable.
+    // Null = el producto no lleva insumo (no se muestra la fila).
+    setProdExtraUnit(extra > 0 ? String(extra) : null);
     setColorLines(lines.length > 0 ? lines : [{ filamentId: "", grams: "" }]);
     setEstData({
       filamentId: lines.find((l) => l.filamentId)?.filamentId || null,
@@ -327,6 +339,8 @@ export function ManualSaleForm({
         color: combo.color,
         unitPrice: built.unitPrice,
         weight: built.weight,
+        // Insumo POR UNIDAD de esta combinación (el vaso de su tamaño).
+        extrasCost: built.extrasCost,
         colorLines: built.lines
           .filter((l) => l.filamentId && Number(l.grams) > 0)
           .map((l) => ({ filamentId: l.filamentId, grams: Number(l.grams) })),
@@ -363,6 +377,16 @@ export function ManualSaleForm({
   })();
   const batchGramsTotal = batchGrams.reduce((a, g) => a + g.grams, 0);
   const usandoLote = batch && batchAvailable;
+  /** Insumos del producto en el lote: el de CADA combinación × su cantidad
+   * (vaso 1L ≠ vaso 500cc). */
+  const batchInsumos = batchLines.reduce((a, l) => a + l.extrasCost * l.qty, 0);
+  // Insumo total del producto: en lote, por combinación; en carga simple, el
+  // unitario (editable) × cantidad. Se suma al COSTO que va al servidor: el
+  // precio ya lo incluye, así que baja la ganancia, no cambia el total.
+  const prodInsumosTotal = usandoLote
+    ? batchInsumos
+    : (Number(prodExtraUnit) || 0) * qtyN;
+  const extrasTotal = extrasCost + prodInsumosTotal;
 
   const setQty = (key: string, v: string) =>
     setLineQty((q) => ({ ...q, [key]: v }));
@@ -424,7 +448,8 @@ export function ManualSaleForm({
               // (regla de dinero): esto va solo para pasar la validación.
               total: batchTotal,
               quantity: batchUnits,
-              extrasCost,
+              // Insumos manuales + el del producto por combinación (vasos).
+              extrasCost: extrasTotal,
               productId: picked?.id,
               material: picked?.material ?? estData?.material,
               printMinutes: picked?.printMinutes ?? estData?.printMinutes ?? 0,
@@ -479,7 +504,8 @@ export function ManualSaleForm({
           createManualSaleAction({
             ...form,
             total,
-            extrasCost,
+            // Insumos manuales + el del producto (unitario × cantidad).
+            extrasCost: extrasTotal,
             quantity: qtyN,
             // Producto elegido de la tienda (si lo hay): así la venta suma al
             // ranking real de "Más vendidos" del home (Ale, 2026-08-09).
@@ -628,6 +654,7 @@ export function ManualSaleForm({
                         setSaleColor(null);
                         setBatch(false);
                         setLineQty({});
+                        setProdExtraUnit(null);
                       }}
                     >
                       Quitar
@@ -760,6 +787,14 @@ export function ManualSaleForm({
                           A descontar:{" "}
                           <b className="text-fg">{batchGramsTotal} g</b>
                         </span>
+                        {batchInsumos > 0 ? (
+                          <span className="text-faint">
+                            Insumos:{" "}
+                            <b className="text-fg">
+                              ${batchInsumos.toLocaleString("es-AR")}
+                            </b>
+                          </span>
+                        ) : null}
                       </div>
                       <p className="text-faint text-[11.5px] leading-relaxed">
                         No hace falta la calculadora ni cargar colores abajo: el
@@ -1145,6 +1180,35 @@ export function ManualSaleForm({
               Argollas, vaso del chop, polímero, etc. Su costo se suma al total
               y a la amortización (costo real de la venta).
             </p>
+            {/* Insumo del PRODUCTO elegido (viene del catálogo, por tamaño):
+                precargado y editable. En lote sale por combinación (arriba). */}
+            {picked && !usandoLote && prodExtraUnit !== null ? (
+              <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-[var(--surface-2)] px-2.5 py-2">
+                <span className="text-dim text-[12.5px]">
+                  Insumo del producto{" "}
+                  <span className="text-faint">(c/u, según el tamaño)</span>
+                </span>
+                <div className="ml-auto flex items-center gap-1">
+                  <span className="text-faint text-[12px]">$</span>
+                  <input
+                    className="input"
+                    style={{ width: 110 }}
+                    type="number"
+                    min={0}
+                    value={prodExtraUnit}
+                    onChange={(e) => setProdExtraUnit(e.target.value)}
+                  />
+                </div>
+                {qtyN > 1 ? (
+                  <span className="text-faint text-[12px]">
+                    × {qtyN} = $
+                    {((Number(prodExtraUnit) || 0) * qtyN).toLocaleString(
+                      "es-AR",
+                    )}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
             {extras.map((e, i) => (
               <div key={i} className="mt-2 flex items-center gap-2">
                 <input
@@ -1190,9 +1254,9 @@ export function ManualSaleForm({
               >
                 + Agregar insumo
               </button>
-              {extrasCost > 0 ? (
+              {extrasTotal > 0 ? (
                 <span className="text-faint ml-auto text-[12px]">
-                  Insumos: ${extrasCost.toLocaleString("es-AR")}
+                  Insumos: ${extrasTotal.toLocaleString("es-AR")}
                 </span>
               ) : null}
             </div>

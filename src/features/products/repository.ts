@@ -378,6 +378,7 @@ export async function replaceProductVariants(
     colorGrams: Record<string, number> | null;
     weightGrams: string | null;
     colorPrices: Record<string, number> | null;
+    extrasCost: string | null;
   }[],
   database: Database = db,
 ): Promise<void> {
@@ -393,6 +394,7 @@ export async function replaceProductVariants(
         colorGrams: v.colorGrams,
         weightGrams: v.weightGrams,
         colorPrices: v.colorPrices,
+        extrasCost: v.extrasCost,
       })),
     );
   }
@@ -410,6 +412,7 @@ export async function listVariantsByProduct(
     colorGrams: Record<string, number> | null;
     weightGrams: string | null;
     colorPrices: Record<string, number> | null;
+    extrasCost: string | null;
   }[]
 > {
   return database
@@ -420,6 +423,7 @@ export async function listVariantsByProduct(
       colorGrams: productVariants.colorGrams,
       weightGrams: productVariants.weightGrams,
       colorPrices: productVariants.colorPrices,
+      extrasCost: productVariants.extrasCost,
     })
     .from(productVariants)
     .where(eq(productVariants.productId, productId));
@@ -741,6 +745,7 @@ export async function findProductsForSale() {
       material: products.material,
       weightGrams: products.weightGrams,
       printTimeMinutes: products.printTimeMinutes,
+      extrasCost: products.extrasCost,
       colors: products.colors,
       colorMode: products.colorMode,
       colorPrices: products.colorPrices,
@@ -763,6 +768,7 @@ export async function findVariantsForSale() {
       colorGrams: productVariants.colorGrams,
       weightGrams: productVariants.weightGrams,
       colorPrices: productVariants.colorPrices,
+      extrasCost: productVariants.extrasCost,
     })
     .from(productVariants);
 }

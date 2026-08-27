@@ -342,6 +342,7 @@ function toVariantRows(variants: ProductInput["variants"]): {
   colorGrams: Record<string, number> | null;
   weightGrams: string | null;
   colorPrices: Record<string, number> | null;
+  extrasCost: string | null;
 }[] {
   return (variants ?? [])
     .filter((v) => v.label.trim().length > 0)
@@ -364,6 +365,8 @@ function toVariantRows(variants: ProductInput["variants"]): {
             ? v.weightGrams.toString()
             : null,
         colorPrices: Object.keys(prices).length > 0 ? prices : null,
+        // Insumo de ESTE tamaño: null = usa el del producto; 0 vale (no lleva).
+        extrasCost: v.extrasCost != null ? v.extrasCost.toString() : null,
       };
     });
 }
@@ -599,6 +602,7 @@ export async function getProductAdmin(id: string): Promise<{
     colorGrams: Record<string, number> | null;
     weightGrams: string | null;
     colorPrices: Record<string, number> | null;
+    extrasCost: string | null;
   }[];
 } | null> {
   const product = await findProductById(id);
@@ -616,6 +620,7 @@ export async function getProductAdmin(id: string): Promise<{
       colorGrams: v.colorGrams,
       weightGrams: v.weightGrams,
       colorPrices: v.colorPrices,
+      extrasCost: v.extrasCost,
     })),
   };
 }
@@ -757,6 +762,8 @@ export type SaleVariant = {
   weightGrams: number | null;
   /** Matriz tamaño × color: precio POR color de este tamaño. */
   colorPrices: Record<string, number>;
+  /** Insumo de ESTE tamaño (vaso 1L ≠ vaso 500cc). Null = usa el del producto. */
+  extrasCost: number | null;
 };
 
 export type ProductForSale = {
@@ -766,6 +773,8 @@ export type ProductForSale = {
   material: string | null;
   weightGrams: number | null;
   printMinutes: number | null;
+  /** Costo de insumos del producto por unidad (fallback de los tamaños). */
+  extrasCost: number;
   colors: string[];
   colorMode: "single" | "multi";
   /** Columna reusada: en color único = PRECIO exacto por color; en multicolor
@@ -795,6 +804,7 @@ export async function listProductsForSale(): Promise<ProductForSale[]> {
       colorGrams: v.colorGrams ?? {},
       weightGrams: weight != null && weight > 0 ? weight : null,
       colorPrices: v.colorPrices ?? {},
+      extrasCost: v.extrasCost != null ? Number(v.extrasCost) : null,
     });
     byProduct.set(v.productId, list);
   }
@@ -805,6 +815,7 @@ export async function listProductsForSale(): Promise<ProductForSale[]> {
     material: p.material,
     weightGrams: p.weightGrams,
     printMinutes: p.printTimeMinutes,
+    extrasCost: p.extrasCost != null ? Number(p.extrasCost) : 0,
     colors: p.colors ?? [],
     colorMode: p.colorMode === "multi" ? "multi" : "single",
     colorPrices: p.colorPrices ?? {},
