@@ -580,6 +580,22 @@ describe("applyManualSaleLines (venta con varias combinaciones)", () => {
     const simple: ManualSaleInput = { ...base, items: undefined };
     expect(applyManualSaleLines(simple)).toBe(simple);
   });
+
+  it("los insumos cobrados sobreviven al recálculo del total", () => {
+    // Sin esto, la venta por combinaciones perdía los insumos cargados a mano
+    // (la calculadora no los cotiza) y los pagaba el negocio.
+    const r = applyManualSaleLines({ ...base, chargedExtras: 1500 });
+    expect(r.total).toBe(22500); // 21000 de las piezas + 1500 de insumos
+  });
+
+  it("sin insumos cobrados el total es solo la suma de las líneas", () => {
+    expect(applyManualSaleLines({ ...base, chargedExtras: 0 }).total).toBe(
+      21000,
+    );
+    expect(
+      applyManualSaleLines({ ...base, chargedExtras: undefined }).total,
+    ).toBe(21000);
+  });
 });
 
 describe("consolidateGrams (stock: un movimiento por carrete, no uno por línea)", () => {

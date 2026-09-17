@@ -170,7 +170,10 @@ export function applyManualSaleLines(input: ManualSaleInput): ManualSaleInput {
   const grams = consolidateGrams(items);
   return {
     ...input,
-    total,
+    // Los insumos cargados a mano SÍ se cobran (la calculadora no los conoce),
+    // así que sobreviven al recálculo del total; si no se sumaran acá, la venta
+    // por combinaciones los perdería y los pagaría el negocio.
+    total: round2(total + Math.max(0, input.chargedExtras ?? 0)),
     quantity: units,
     colorLines: grams.length > 0 ? grams : undefined,
     // Los gramos ya van consolidados por carrete en `colorLines`; este campo

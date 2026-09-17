@@ -8,6 +8,7 @@ import type { EstimatorValue } from "@/features/calculator/components/price-esti
 import type { EstimatorContext } from "@/features/calculator/service";
 import type { ProductForSale } from "@/features/products/services/catalogService";
 import { saleUnitPrice } from "@/features/products/pricing";
+import { filamentTag } from "@/features/inventory/filament-label";
 import { ColorSwatches } from "@/components/shared/color-swatches";
 import { cn } from "@/lib/utils";
 import { createManualSaleAction } from "../actions";
@@ -95,9 +96,16 @@ export function ManualSaleForm({
     (a, e) => a + (Number(e.cost) || 0) * (Number(e.qty) || 0),
     0,
   );
-  // El total COBRADO es solo el precio × cantidad. Los insumos NO se cobran:
-  // son un costo (van a la amortización y bajan la ganancia), no al total.
-  const total = Math.round((unitPrice ?? 0) * qtyN * 100) / 100;
+  /** Lo que valen las piezas: precio unitario × cantidad, sin insumos. */
+  const piezasTotal = Math.round((unitPrice ?? 0) * qtyN * 100) / 100;
+  // El total COBRADO son las piezas MÁS los insumos cargados a mano. La
+  // calculadora cotiza material + luz + desgaste + margen: no tiene campo de
+  // insumos, así que si no se suman acá, las argollas del llavero las paga el
+  // negocio (bug 2026-09). Siguen sumando también al costo, así que se
+  // recupera lo pagado y la ganancia queda igual que antes.
+  // El insumo que viene del CATÁLOGO (`prodExtraUnit`) NO se suma: el precio
+  // de venta del producto ya lo incluye y se cobraría dos veces.
+  const total = Math.round((piezasTotal + extrasCost) * 100) / 100;
   const setExtra = (i: number, k: "name" | "cost" | "qty", v: string) =>
     setExtras((es) => es.map((e, j) => (j === i ? { ...e, [k]: v } : e)));
   const addExtra = () =>
@@ -387,6 +395,12 @@ export function ManualSaleForm({
     ? batchInsumos
     : (Number(prodExtraUnit) || 0) * qtyN;
   const extrasTotal = extrasCost + prodInsumosTotal;
+  /** Lo que se le cobra al cliente, en los DOS modos: las piezas (precio de la
+   *  calculadora/producto, o la suma de las combinaciones) más los insumos
+   *  cargados a mano. Es el número que se muestra y el que se manda. */
+  const totalCobrado = usandoLote
+    ? Math.round((batchTotal + extrasCost) * 100) / 100
+    : total;
 
   const setQty = (key: string, v: string) =>
     setLineQty((q) => ({ ...q, [key]: v }));
@@ -446,10 +460,13 @@ export function ManualSaleForm({
               ...form,
               // El servidor recalcula total/cantidad/gramos desde `items`
               // (regla de dinero): esto va solo para pasar la validación.
-              total: batchTotal,
+              total: totalCobrado,
               quantity: batchUnits,
               // Insumos manuales + el del producto por combinación (vasos).
               extrasCost: extrasTotal,
+              // De esos insumos, los cargados a mano se COBRAN (la calculadora
+              // no los contempla); el del catálogo ya está en el precio.
+              chargedExtras: extrasCost,
               productId: picked?.id,
               material: picked?.material ?? estData?.material,
               printMinutes: picked?.printMinutes ?? estData?.printMinutes ?? 0,
@@ -506,6 +523,9 @@ export function ManualSaleForm({
             total,
             // Insumos manuales + el del producto (unitario × cantidad).
             extrasCost: extrasTotal,
+            // `total` ya incluye los insumos cargados a mano: se avisa al
+            // servidor para que la cuenta de ganancia cierre igual.
+            chargedExtras: extrasCost,
             quantity: qtyN,
             // Producto elegido de la tienda (si lo hay): así la venta suma al
             // ranking real de "Más vendidos" del home (Ale, 2026-08-09).
@@ -799,7 +819,7 @@ export function ManualSaleForm({
                       <p className="text-faint text-[11.5px] leading-relaxed">
                         No hace falta la calculadora ni cargar colores abajo: el
                         precio y los gramos salen del producto. Los insumos
-                        adicionales (paso 2) se siguen sumando al costo.
+                        adicionales (paso 2) se suman al total y al costo.
                       </p>
                     </div>
                   ) : null}
@@ -989,27 +1009,37 @@ export function ManualSaleForm({
                 type="number"
                 className="input"
                 placeholder="Se completa con la calculadora"
-                value={
-                  usandoLote
-                    ? batchTotal > 0
-                      ? batchTotal
-                      : ""
-                    : total > 0
-                      ? total
-                      : ""
-                }
+                value={totalCobrado > 0 ? totalCobrado : ""}
                 readOnly
                 title={
                   usandoLote
-                    ? "Suma de las combinaciones vendidas"
-                    : "Precio unitario (calculadora/producto) × cantidad"
+                    ? "Suma de las combinaciones vendidas + insumos cargados a mano"
+                    : "Precio unitario (calculadora/producto) × cantidad + insumos cargados a mano"
                 }
               />
+              {/* Con insumos a mano el total no es "precio × cantidad" y sin
+                  esta línea parece un error de la calculadora. */}
+              {extrasCost > 0 ? (
+                <div className="text-faint text-[11.5px]">
+                  {(usandoLote ? batchTotal : piezasTotal).toLocaleString(
+                    "es-AR",
+                    { style: "currency", currency: "ARS" },
+                  )}{" "}
+                  de{usandoLote ? " las combinaciones" : " piezas"} +{" "}
+                  {extrasCost.toLocaleString("es-AR", {
+                    style: "currency",
+                    currency: "ARS",
+                  })}{" "}
+                  de insumos cargados abajo (se cobran: la calculadora no los
+                  cuenta).
+                </div>
+              ) : null}
               {usandoLote ? (
                 <div className="text-faint text-[11.5px]">
                   Sale de sumar las combinaciones que cargaste
                   {batchUnits > 0 ? ` (${batchUnits} unidades)` : ""}: no hace
-                  falta la calculadora. Si sumás insumos abajo, van al costo.
+                  falta la calculadora. Los insumos que sumes abajo se agregan
+                  al total.
                 </div>
               ) : (
                 <>
@@ -1122,7 +1152,7 @@ export function ManualSaleForm({
                     <option value="">— Elegí color / carrete —</option>
                     {estimator.filaments.map((f) => (
                       <option key={f.id} value={f.id}>
-                        {f.material} · {f.color}
+                        {filamentTag(f)}
                       </option>
                     ))}
                   </select>
@@ -1177,8 +1207,11 @@ export function ManualSaleForm({
           <div className="field">
             <label>Insumos adicionales (opcional)</label>
             <p className="text-faint text-[12px] leading-relaxed">
-              Argollas, vaso del chop, polímero, etc. Su costo se suma al total
-              y a la amortización (costo real de la venta).
+              Argollas, vaso del chop, polímero, etc. Lo que cargues acá se suma
+              al <b className="text-fg">total cobrado</b> y al costo: la
+              calculadora no cotiza insumos, así que si no se cobran los paga el
+              negocio. El “insumo del producto” de más abajo es distinto: ya
+              está incluido en el precio de venta, así que solo va al costo.
             </p>
             {/* Insumo del PRODUCTO elegido (viene del catálogo, por tamaño):
                 precargado y editable. En lote sale por combinación (arriba). */}
@@ -1257,6 +1290,14 @@ export function ManualSaleForm({
               {extrasTotal > 0 ? (
                 <span className="text-faint ml-auto text-[12px]">
                   Insumos: ${extrasTotal.toLocaleString("es-AR")}
+                  {prodInsumosTotal > 0 ? (
+                    <>
+                      {" "}
+                      (${extrasCost.toLocaleString("es-AR")} se cobran, $
+                      {prodInsumosTotal.toLocaleString("es-AR")} ya están en el
+                      precio)
+                    </>
+                  ) : null}
                 </span>
               ) : null}
             </div>

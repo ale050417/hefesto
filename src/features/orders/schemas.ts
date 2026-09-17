@@ -185,9 +185,17 @@ export const manualSaleSchema = z.object({
     )
     .max(100, "Demasiadas combinaciones en una sola venta.")
     .optional(),
-  // Insumos/agregados (argollas, vaso del chop, polímero, etc.): su costo TOTAL
-  // (ya calculado en el cliente) suma al total cobrado y a la amortización.
+  // Insumos/agregados (argollas, vaso del chop, polímero, etc.): su costo
+  // TOTAL (ya calculado en el cliente). Suma a la AMORTIZACIÓN (es un costo
+  // real de la venta); que se cobre o no lo dice `chargedExtras`.
   extrasCost: z.coerce.number().min(0).optional(),
+  // Parte de `extrasCost` que SÍ se le cobra al cliente, y por lo tanto está
+  // incluida en `total`. Son los insumos cargados A MANO en el formulario: la
+  // calculadora no tiene campo de insumos, así que su precio no los contempla
+  // y sin cobrarlos los pagaba el negocio (bug 2026-09, las argollas de los
+  // llaveros). El insumo que viene del CATÁLOGO no entra acá: el precio de
+  // venta del producto ya lo incluye, y cobrarlo de nuevo sería duplicarlo.
+  chargedExtras: z.coerce.number().min(0).optional(),
   // Costos resueltos en el servidor (no se confía en el cliente).
   amortization: z.coerce.number().min(0).optional(),
   profit: z.coerce.number().optional(),
