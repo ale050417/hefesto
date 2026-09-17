@@ -18,6 +18,7 @@ import { DeleteOrderButton } from "./order-actions";
 import { DeleteManualSaleButton } from "./delete-manual-sale-button";
 import { ManualSaleStatusSelect } from "./manual-sale-status-select";
 import { OrderStatusSelect } from "./order-status-select";
+import { saleMatches } from "../sale-search";
 import { ManualSaleEditButton } from "./manual-sale-edit-modal";
 
 export type UnifiedSale = {
@@ -70,23 +71,33 @@ export function OrdersBoard({
 }) {
   const [tipo, setTipo] = useState<Tipo>("todo");
   const [status, setStatus] = useState<OrderStatus | "all">("all");
+  /** Buscador por texto: con muchas ventas, el filtro por estado no alcanza
+   *  para llegar a UNA en particular (pedido de Ale, 2026-09). */
+  const [q, setQ] = useState("");
   /** Ventas tildadas para borrar en lote. La clave lleva el TIPO adelante
    *  porque un pedido online y una venta manual pueden compartir id. */
   const [elegidas, setElegidas] = useState<Set<string>>(new Set());
   const [confirmar, setConfirmar] = useState(false);
 
+  // Orden del filtrado: tipo → búsqueda → estado. La búsqueda va ANTES de los
+  // contadores de estado, así los chips muestran cuántas coinciden con lo
+  // buscado (y no un número que no se corresponde con la lista de abajo).
   const byTipo = useMemo(
     () => items.filter((o) => tipo === "todo" || o.source === tipo),
     [items, tipo],
   );
+  const byQuery = useMemo(
+    () => byTipo.filter((o) => saleMatches(o, q)),
+    [byTipo, q],
+  );
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
-    for (const o of byTipo) c[o.status] = (c[o.status] ?? 0) + 1;
+    for (const o of byQuery) c[o.status] = (c[o.status] ?? 0) + 1;
     return c;
-  }, [byTipo]);
+  }, [byQuery]);
   const list = useMemo(
-    () => byTipo.filter((o) => status === "all" || o.status === status),
-    [byTipo, status],
+    () => byQuery.filter((o) => status === "all" || o.status === status),
+    [byQuery, status],
   );
 
   // --- Selección múltiple (solo admin) ---------------------------------
@@ -253,13 +264,48 @@ export function OrdersBoard({
         ))}
       </div>
 
+      {/* Buscador: mismo patrón que el board de Filamentos. Filtra del lado del
+          cliente sobre el set ya cargado, así responde mientras se escribe. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* maxWidth 100%: en celular el buscador no se desborda del tablero. */}
+        <div className="search" style={{ width: 260, maxWidth: "100%" }}>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <circle cx="11" cy="11" r="8" />
+            <path d="m21 21-4.3-4.3" />
+          </svg>
+          <input
+            className="input"
+            type="search"
+            aria-label="Buscar ventas"
+            placeholder="Buscar cliente, detalle, nº, color..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+        {q.trim() ? (
+          <span className="text-faint text-[12.5px]">
+            {byQuery.length}{" "}
+            {byQuery.length === 1 ? "coincidencia" : "coincidencias"}
+            {byQuery.length === 0 ? " — probá con menos palabras" : ""}
+          </span>
+        ) : null}
+      </div>
+
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
           className={cn("chip", status === "all" && "active")}
           onClick={() => setStatus("all")}
         >
-          Todos <b className="opacity-60">{byTipo.length}</b>
+          Todos <b className="opacity-60">{byQuery.length}</b>
         </button>
         {STATUSES.map((s) => (
           <button
