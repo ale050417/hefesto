@@ -6,6 +6,7 @@ import { toast } from "@/stores/toastStore";
 import { registerFailureAction, updateFailureAction } from "../actions";
 import { runAction } from "@/lib/run-action";
 import { useFormErrors } from "@/hooks/use-form-errors";
+import { filamentTag } from "../filament-label";
 import {
   FAIL_REASONS,
   FILAMENT_COLORS,
@@ -27,6 +28,8 @@ export type FailureFilament = {
   id: string;
   material: string;
   color: string;
+  /** Marca: sin ella, tres carretes rojos son tres opciones idénticas. */
+  brand: string;
   stockGrams: number;
 };
 
@@ -229,7 +232,7 @@ export function FailureForm({
                 <option value="">- Elegi carrete -</option>
                 {filaments.map((f) => (
                   <option key={f.id} value={f.id}>
-                    {f.material} - {f.color} ({f.stockGrams} g)
+                    {filamentTag(f)} ({f.stockGrams} g)
                   </option>
                 ))}
               </select>

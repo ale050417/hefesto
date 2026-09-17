@@ -78,6 +78,7 @@ export default async function FallasPage() {
     id: f.id,
     material: f.material,
     color: f.color,
+    brand: f.brand,
     stockGrams: f.stockGrams,
   }));
 

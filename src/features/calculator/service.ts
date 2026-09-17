@@ -202,6 +202,9 @@ export type FilamentOption = {
   id: string;
   material: string;
   color: string;
+  /** Marca del carrete: dos "Rojo" del mismo material se distinguen por acá
+   * (pedido de Ale, 2026-09: "me saltan tres rojo y ni idea de cual es cual"). */
+  brand: string;
   costPerKg: number;
 };
 
@@ -272,6 +275,7 @@ export async function getEstimatorContext(): Promise<EstimatorContext> {
     id: f.id,
     material: f.material,
     color: f.color,
+    brand: f.brand,
     costPerKg: f.costPerKg,
   }));
   return { config, filaments, presetOptions, presets, isAdmin: admin };

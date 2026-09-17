@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
+import { filamentTag } from "@/features/inventory/filament-label";
 import { computeQuote } from "../calculator";
 import { saveCalcAction, deleteCalcAction, quotePriceAction } from "../actions";
 import type {
@@ -349,7 +350,7 @@ export function PriceCalculator({
                 >
                   {filaments.map((x) => (
                     <option key={x.id} value={x.id}>
-                      {x.material} · {x.color} — {formatPrice(x.costPerKg)}/kg
+                      {filamentTag(x)} — {formatPrice(x.costPerKg)}/kg
                     </option>
                   ))}
                 </select>

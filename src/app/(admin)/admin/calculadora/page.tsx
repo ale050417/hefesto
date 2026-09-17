@@ -40,6 +40,7 @@ export default async function CalculatorPage() {
     id: f.id,
     material: f.material,
     color: f.color,
+    brand: f.brand,
     costPerKg: f.costPerKg,
   }));
 

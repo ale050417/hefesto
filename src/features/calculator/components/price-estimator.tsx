@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatPrice } from "@/lib/format";
+import { filamentTag } from "@/features/inventory/filament-label";
 import { computeQuote, roundPrice } from "../calculator";
 import { quotePriceAction } from "../actions";
 import type {
@@ -30,9 +31,10 @@ export type EstimatorValue = {
   colorGrams?: Record<string, number>;
 };
 
-/** Etiqueta del selector: "PLA · Dorado — $35.000/kg". */
+/** Etiqueta del selector: "PLA · Dorado · Grilon3 — $35.000/kg" (la marca
+ *  distingue dos carretes del mismo color). */
 function filamentLabel(f: FilamentOption): string {
-  return `${f.material} · ${f.color} — ${formatPrice(f.costPerKg)}/kg`;
+  return `${filamentTag(f)} — ${formatPrice(f.costPerKg)}/kg`;
 }
 
 /**
