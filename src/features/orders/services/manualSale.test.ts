@@ -8,6 +8,8 @@ import {
   consolidateGrams,
   editedManualSaleEconomics,
   deductFilamentForManualSale,
+  manualSalePrintMinutes,
+  manualSaleProductId,
   manualSaleTotals,
   stockActionForTransition,
   toManualSaleRow,
@@ -670,5 +672,89 @@ describe("consolidateGrams (stock: un movimiento por carrete, no uno por línea)
   it("líneas sin colores cargados → no rompe, devuelve vacío", () => {
     expect(consolidateGrams([{ quantity: 3, unitPrice: 100 }])).toEqual([]);
     expect(consolidateGrams([])).toEqual([]);
+  });
+});
+
+describe("varios productos en la misma venta (2026-09-21)", () => {
+  const base: ManualSaleInput = {
+    saleDate: "2026-09-21",
+    customerName: "Cliente",
+    quantity: 1,
+    total: 1,
+    printMinutes: 45,
+    productId: "11111111-1111-4111-8111-111111111111",
+    paymentMethod: "cash",
+    status: "delivered",
+    items: [
+      {
+        productId: "11111111-1111-4111-8111-111111111111",
+        productName: "Porta sahumerio",
+        printMinutes: 40,
+        color: "Negro",
+        quantity: 7,
+        unitPrice: 3000,
+        colorLines: [
+          { filamentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", grams: 30 },
+        ],
+      },
+      {
+        productId: "22222222-2222-4222-8222-222222222222",
+        productName: "Llavero",
+        printMinutes: 10,
+        color: "Rojo",
+        quantity: 2,
+        unitPrice: 1500,
+        colorLines: [
+          { filamentId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", grams: 8 },
+        ],
+      },
+    ],
+  };
+
+  it("los minutos salen línea por línea: cada producto tarda distinto", () => {
+    // 7 × 40 + 2 × 10 = 300, no 45 × 9 = 405.
+    expect(manualSalePrintMinutes(base.items!, 45)).toBe(300);
+    expect(applyManualSaleLines(base).printMinutes).toBe(300);
+  });
+
+  it("una línea sin minutos propios usa los de la venta (cargas viejas)", () => {
+    const items = base.items!.map((it) => ({ ...it, printMinutes: undefined }));
+    expect(manualSalePrintMinutes(items, 45)).toBe(45 * 9);
+  });
+
+  it("con productos distintos la venta no tiene UN producto principal", () => {
+    expect(manualSaleProductId(base.items!, base.productId)).toBeUndefined();
+    expect(applyManualSaleLines(base).productId).toBeUndefined();
+  });
+
+  it("si todas las líneas son del mismo producto, ese es el de la venta", () => {
+    const items = base.items!.map((it) => ({
+      ...it,
+      productId: "22222222-2222-4222-8222-222222222222",
+    }));
+    expect(manualSaleProductId(items, undefined)).toBe(
+      "22222222-2222-4222-8222-222222222222",
+    );
+  });
+
+  it("líneas sin producto (cargas viejas) conservan el producto de la venta", () => {
+    const items = base.items!.map((it) => ({ ...it, productId: undefined }));
+    expect(manualSaleProductId(items, base.productId)).toBe(base.productId);
+  });
+
+  it("el total y las unidades suman TODOS los productos", () => {
+    const r = applyManualSaleLines(base);
+    expect(r.total).toBe(7 * 3000 + 2 * 1500);
+    expect(r.quantity).toBe(9);
+    expect(r.grams).toBe(7 * 30 + 2 * 8);
+  });
+
+  it("el schema acepta producto, nombre y minutos por línea", () => {
+    const r = manualSaleSchema.safeParse(base);
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.items?.[1]?.productName).toBe("Llavero");
+      expect(r.data.items?.[1]?.printMinutes).toBe(10);
+    }
   });
 });

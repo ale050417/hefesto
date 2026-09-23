@@ -9,13 +9,13 @@ import {
   isNotNull,
   ne,
   notInArray,
-  or,
   sql,
   type SQL,
 } from "drizzle-orm";
 import { db } from "@/core/db";
 import {
   categories,
+  manualSaleItems,
   manualSales,
   orderItems,
   orders,
@@ -68,27 +68,23 @@ export async function findPublished(
   if (filter.q) conditions.push(ilike(products.name, `%${filter.q}%`));
 
   if (filter.category) {
-    // Filtrar por una categoría incluye sus subcategorías (Fase 6): ids cuya
-    // slug coincide O cuyo padre tiene esa slug.
+    // Filtrar por una categoría incluye TODA su descendencia (Fase 6 era un
+    // nivel; desde 2026-09-21 las subcategorías tienen subcategorías): un CTE
+    // recursivo baja por parent_id desde la categoría con esa slug.
+    // OJO: la tabla `categories` va como identificador LITERAL, no como
+    // `${categories.id}`. En las consultas relacionales (`db.query...`)
+    // Drizzle reescribe toda columna del `where` con el alias de la tabla
+    // principal, y el CTE quedaba con `"products"."slug"`: la lista salía
+    // vacía mientras el contador (query plana) daba 35 (2026-09-21).
     conditions.push(
-      inArray(
-        products.categoryId,
-        database
-          .select({ id: categories.id })
-          .from(categories)
-          .where(
-            or(
-              eq(categories.slug, filter.category),
-              inArray(
-                categories.parentId,
-                database
-                  .select({ id: categories.id })
-                  .from(categories)
-                  .where(eq(categories.slug, filter.category)),
-              ),
-            ),
-          ),
-      ),
+      sql`${products.categoryId} in (
+        with recursive sub as (
+          select id from categories where slug = ${filter.category}
+          union all
+          select c.id from categories c join sub on c.parent_id = sub.id
+        )
+        select id from sub
+      )`,
     );
   }
   if (filter.material) conditions.push(eq(products.material, filter.material));
@@ -225,11 +221,22 @@ export function mergeSalesCounts(
  * (Ale, 2026-08-09: "más vendidos" tiene que contar las dos vías, no solo un
  * checkbox manual). Las ventas manuales de texto libre (sin `product_id`) no
  * se pueden sumar acá: no hay forma de saber a qué producto correspondían.
+ *
+ * Una venta manual puede mezclar productos (2026-09-21: 7 porta sahumerios +
+ * 2 llaveros en la misma carga). En ese caso el producto está en CADA LÍNEA
+ * (`manual_sale_items.product_id`) y se suma línea por línea. Para no contar
+ * dos veces, la venta entera solo cuenta por su `product_id` cuando ninguna
+ * de sus líneas dice de qué producto es (cargas viejas).
  */
 export async function sumSalesByProduct(
   database: Database = db,
 ): Promise<Map<string, number>> {
-  const [online, manual] = await Promise.all([
+  // Ventas cuyas líneas ya traen producto: se cuentan por línea, no enteras.
+  const salesWithProductLines = database
+    .select({ id: manualSaleItems.manualSaleId })
+    .from(manualSaleItems)
+    .where(isNotNull(manualSaleItems.productId));
+  const [online, manual, manualLines] = await Promise.all([
     database
       .select({
         productId: orderItems.productId,
@@ -254,11 +261,26 @@ export async function sumSalesByProduct(
         and(
           inArray(manualSales.status, SOLD_STATUSES),
           isNotNull(manualSales.productId),
+          notInArray(manualSales.id, salesWithProductLines),
         ),
       )
       .groupBy(manualSales.productId),
+    database
+      .select({
+        productId: manualSaleItems.productId,
+        qty: sql<number>`sum(${manualSaleItems.quantity})::int`,
+      })
+      .from(manualSaleItems)
+      .innerJoin(manualSales, eq(manualSaleItems.manualSaleId, manualSales.id))
+      .where(
+        and(
+          inArray(manualSales.status, SOLD_STATUSES),
+          isNotNull(manualSaleItems.productId),
+        ),
+      )
+      .groupBy(manualSaleItems.productId),
   ]);
-  return mergeSalesCounts(online, manual);
+  return mergeSalesCounts(online, manual, manualLines);
 }
 
 /**

@@ -14,6 +14,7 @@ import {
   uploadProductImageAction,
 } from "../actions";
 import type { Category } from "../types";
+import { flattenTree, rootsOf } from "../category-tree";
 import { runAction } from "@/lib/run-action";
 import { useActionOverlayStore } from "@/stores/actionOverlayStore";
 import { compressImageToWebp } from "@/lib/image-compress";
@@ -728,25 +729,27 @@ export function ProductWizard({
                 onChange={(e) => setCategoryId(e.target.value)}
               >
                 <option value="">Elegí una categoría</option>
-                {categories
-                  .filter((c) => !c.parentId)
-                  .map((p) => {
-                    const kids = categories.filter((c) => c.parentId === p.id);
-                    return kids.length > 0 ? (
-                      <optgroup key={p.id} label={p.name}>
-                        <option value={p.id}>{p.name} (toda)</option>
-                        {kids.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ) : (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    );
-                  })}
+                {/* Un grupo por categoría principal con TODA su descendencia
+                    adentro (subcategorías de subcategorías, 2026-09-21),
+                    indentada según el nivel. */}
+                {rootsOf(categories).map((p) => {
+                  const kids = flattenTree(categories, p.id);
+                  return kids.length > 0 ? (
+                    <optgroup key={p.id} label={p.name}>
+                      <option value={p.id}>{p.name} (toda)</option>
+                      {kids.map(({ node: c, depth }) => (
+                        <option key={c.id} value={c.id}>
+                          {depth > 0 ? `${"   ".repeat(depth)}└ ` : ""}
+                          {c.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ) : (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  );
+                })}
               </select>
               {fe.errors.category ? (
                 <p className="field-error">{fe.errors.category}</p>

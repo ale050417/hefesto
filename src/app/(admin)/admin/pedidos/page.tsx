@@ -111,6 +111,7 @@ export default async function PedidosAdminPage() {
         amortization: s.amortization != null ? Number(s.amortization) : null,
         // Desglose por combinación (venta con varias combinaciones de colores).
         items: s.items.map((it) => ({
+          productName: it.productName,
           variantLabel: it.variantLabel,
           color: it.color,
           quantity: it.quantity,

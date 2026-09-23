@@ -32,6 +32,7 @@ import {
   productSlugExists,
   updateProductRow,
 } from "../repository";
+import { isDescendantOf } from "../category-tree";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { randomUUID } from "node:crypto";
@@ -671,7 +672,13 @@ export async function getCategoryAdmin(id: string): Promise<Category | null> {
   return findCategoryById(id);
 }
 
-/** Regla de subcategorías (1 nivel): el padre debe existir y ser raíz. */
+/**
+ * Regla de subcategorías. Desde 2026-09-21 (pedido de Ale: "Figuras de
+ * colección › Funko Pop › Superhéroes") NO hay límite de niveles: una
+ * subcategoría puede tener subcategorías. Lo único prohibido es el ciclo: el
+ * padre debe existir y no puede ser la propia categoría ni una que cuelgue de
+ * ella (A dentro de B dentro de A dejaría el árbol sin raíz).
+ */
 async function assertValidParent(
   parentId: string | null | undefined,
   selfId?: string,
@@ -682,17 +689,11 @@ async function assertValidParent(
   }
   const parent = await findCategoryById(parentId);
   if (!parent) throw new Error("La categoría padre no existe.");
-  if (parent.parentId) {
-    throw new Error(
-      "Solo hay un nivel de subcategorías: elegí una categoría raíz como padre.",
-    );
-  }
   if (selfId) {
-    // Un padre con hijas no puede convertirse en hija (dejaría 2 niveles).
-    const children = await countChildCategories(selfId);
-    if (children > 0) {
+    const all = await findCategories();
+    if (isDescendantOf(all, parentId, selfId)) {
       throw new Error(
-        "Esta categoría tiene subcategorías: no puede ser hija de otra.",
+        "Esa categoría está dentro de esta: elegí otra como padre (se armaría un ciclo).",
       );
     }
   }

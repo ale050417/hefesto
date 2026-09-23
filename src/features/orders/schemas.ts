@@ -166,9 +166,19 @@ export const manualSaleSchema = z.object({
   // Cuando vienen líneas, el `total`, la `quantity` y los gramos a descontar se
   // recalculan en el SERVIDOR a partir de ellas (regla de dinero, Cap. 11/14):
   // lo que mande el cliente en esos campos se ignora.
+  // Desde 2026-09-21 cada línea puede ser de un producto DISTINTO (7 porta
+  // sahumerios + 2 llaveros en la misma venta): lleva su `productId` (para
+  // que "más vendidos" sume a cada uno), el nombre como snapshot y los minutos
+  // de impresión POR UNIDAD (cada producto tarda distinto).
   items: z
     .array(
       z.object({
+        productId: z.preprocess(
+          (v) => (v === "" || v == null ? undefined : v),
+          z.uuid().optional(),
+        ),
+        productName: z.string().trim().max(160).nullish(),
+        printMinutes: z.coerce.number().min(0).optional(),
         variantLabel: z.string().trim().max(120).nullish(),
         color: z.string().trim().max(80).nullish(),
         quantity: z.coerce.number().int().min(1).max(9999),

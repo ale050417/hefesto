@@ -8,6 +8,12 @@ import { deleteCategoryAction } from "../actions";
 import { catIconPath } from "../category-icons";
 import type { CategoryWithCount } from "../types";
 import { CategoryForm, type CategoryFormData } from "./category-form";
+import {
+  childrenByParent,
+  flattenTree,
+  rootsOf,
+  sumSubtree,
+} from "../category-tree";
 import { useDeleteResource } from "@/hooks/use-delete-resource";
 
 function IconSvg({ name, size }: { name: string | null; size?: number }) {
@@ -59,23 +65,25 @@ export function CategoriesAdmin({
 }: {
   categories: CategoryWithCount[];
 }) {
-  // Subcategorías (Fase 6): mostramos cada raíz seguida de sus hijas.
-  const roots = categories.filter((c) => !c.parentId);
-  const byParent = new Map<string, CategoryWithCount[]>();
-  for (const c of categories) {
-    if (!c.parentId) continue;
-    const list = byParent.get(c.parentId) ?? [];
-    list.push(c);
-    byParent.set(c.parentId, list);
-  }
-  const parentOptions = roots.map(({ id, name }) => ({ id, name }));
+  // Subcategorías sin límite de nivel (2026-09-21, pedido de Ale: Figuras de
+  // colección › Funko Pop › Superhéroes). Cada raíz muestra TODO su subárbol,
+  // indentado por nivel; raíces, hijas y descendencia salen del helper puro.
+  const roots = rootsOf(categories);
+  const byParent = childrenByParent(categories);
+  // Cualquier categoría puede ser padre (el form saca la propia y su rama).
+  const parentOptions = categories.map(({ id, name, parentId }) => ({
+    id,
+    name,
+    parentId,
+  }));
   const subCount = categories.length - roots.length;
   const totalProducts = categories.reduce((acc, c) => acc + c.productCount, 0);
-  // El conteo de una RAÍZ suma los productos de sus subcategorías (fix
-  // 2026-07-24: decía "0 productos" cuando los productos estaban en las hijas).
+  // El conteo de una categoría suma los productos de TODA su descendencia
+  // (fix 2026-07-24 para las hijas; ahora también nietas y más abajo).
   const countWithChildren = (c: CategoryWithCount) =>
-    c.productCount +
-    (byParent.get(c.id) ?? []).reduce((acc, x) => acc + x.productCount, 0);
+    sumSubtree(categories, c.id, (x) => x.productCount);
+  /** Descendencia completa de una raíz, en orden de lectura y con nivel. */
+  const subtreeOf = (c: CategoryWithCount) => flattenTree(categories, c.id);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CategoryFormData | null>(null);
   const [view, setView] = useState<"grilla" | "lista">("grilla");
@@ -309,8 +317,8 @@ export function CategoriesAdmin({
                                 ? "producto"
                                 : "productos"}
                               {" · "}
-                              {children.length} subcategoría
-                              {children.length === 1 ? "" : "s"}
+                              {subtreeOf(c).length} subcategoría
+                              {subtreeOf(c).length === 1 ? "" : "s"}
                             </div>
                           </div>
                         </button>
@@ -350,7 +358,9 @@ export function CategoriesAdmin({
                             }}
                           >
                             Subcategorías
-                            {children.length > 0 ? ` (${children.length})` : ""}
+                            {subtreeOf(c).length > 0
+                              ? ` (${subtreeOf(c).length})`
+                              : ""}
                           </span>
                           <button
                             type="button"
@@ -385,8 +395,11 @@ export function CategoriesAdmin({
                           </button>
                         ) : (
                           <ul className="mt-2 flex flex-col gap-1.5">
-                            {children.map((child) => {
+                            {/* Todo el subárbol: cada nivel entra un poco
+                                más (Funko Pop › Superhéroes). */}
+                            {subtreeOf(c).map(({ node: child, depth }) => {
                               const childColor = child.color ?? color;
+                              const nietas = byParent.get(child.id) ?? [];
                               return (
                                 <li
                                   key={child.id}
@@ -394,6 +407,7 @@ export function CategoriesAdmin({
                                   style={{
                                     background: "var(--surface-2)",
                                     border: "1px solid var(--border)",
+                                    marginLeft: depth * 16,
                                   }}
                                 >
                                   <div className="flex min-w-0 items-center gap-2.5">
@@ -428,10 +442,20 @@ export function CategoriesAdmin({
                                         color: childColor,
                                       }}
                                     >
-                                      {child.productCount}
+                                      {nietas.length > 0
+                                        ? countWithChildren(child)
+                                        : child.productCount}
                                     </span>
                                   </div>
                                   <div className="flex shrink-0 items-center">
+                                    <button
+                                      type="button"
+                                      className="btn btn-ghost btn-sm"
+                                      title={`Nueva subcategoría de ${child.name}`}
+                                      onClick={() => openNewChild(child.id)}
+                                    >
+                                      + Sub
+                                    </button>
                                     <button
                                       className="btn-icon btn-ghost"
                                       title="Editar"
@@ -441,7 +465,11 @@ export function CategoriesAdmin({
                                     </button>
                                     <button
                                       className="btn-icon btn-ghost"
-                                      title="Eliminar"
+                                      title={
+                                        nietas.length > 0
+                                          ? "Tiene subcategorías: borralas primero"
+                                          : "Eliminar"
+                                      }
                                       onClick={() => setToDelete(child)}
                                     >
                                       {TrashIcon}
@@ -550,7 +578,9 @@ export function CategoriesAdmin({
                             </span>
                           </td>
                           <td data-label="Productos">{countWithChildren(c)}</td>
-                          <td data-label="Subcategorías">{children.length}</td>
+                          <td data-label="Subcategorías">
+                            {subtreeOf(c).length}
+                          </td>
                           <td data-label="Acciones">
                             <span className="flex items-center justify-end gap-1">
                               <button
@@ -578,68 +608,86 @@ export function CategoriesAdmin({
                             </span>
                           </td>
                         </tr>,
-                        // Hijas solo si el padre está desplegado.
-                        ...(expanded.has(c.id) ? children : []).map((child) => {
-                          const childColor = child.color ?? color;
-                          return (
-                            <tr key={child.id}>
-                              <td data-label="Categoría">
-                                <span
-                                  className="flex items-center gap-2.5"
-                                  style={{ paddingLeft: 22 }}
-                                >
-                                  <span className="text-faint">└</span>
+                        // Todo el subárbol, solo si la raíz está desplegada.
+                        // Cada nivel entra un poco más.
+                        ...(expanded.has(c.id) ? subtreeOf(c) : []).map(
+                          ({ node: child, depth }) => {
+                            const childColor = child.color ?? color;
+                            const nietas = byParent.get(child.id) ?? [];
+                            return (
+                              <tr key={child.id}>
+                                <td data-label="Categoría">
                                   <span
-                                    className="kpi-ic relative shrink-0 overflow-hidden"
-                                    style={{
-                                      width: 24,
-                                      height: 24,
-                                      background: `${childColor}22`,
-                                      color: childColor,
-                                    }}
+                                    className="flex items-center gap-2.5"
+                                    style={{ paddingLeft: 22 + depth * 18 }}
                                   >
-                                    {child.imageUrl ? (
-                                      <Image
-                                        src={child.imageUrl}
-                                        alt=""
-                                        fill
-                                        sizes="24px"
-                                        className="object-cover"
-                                      />
-                                    ) : (
-                                      <IconSvg name={child.icon} size={12} />
-                                    )}
+                                    <span className="text-faint">└</span>
+                                    <span
+                                      className="kpi-ic relative shrink-0 overflow-hidden"
+                                      style={{
+                                        width: 24,
+                                        height: 24,
+                                        background: `${childColor}22`,
+                                        color: childColor,
+                                      }}
+                                    >
+                                      {child.imageUrl ? (
+                                        <Image
+                                          src={child.imageUrl}
+                                          alt=""
+                                          fill
+                                          sizes="24px"
+                                          className="object-cover"
+                                        />
+                                      ) : (
+                                        <IconSvg name={child.icon} size={12} />
+                                      )}
+                                    </span>
+                                    <span className="text-[13px]">
+                                      {child.name}
+                                    </span>
                                   </span>
-                                  <span className="text-[13px]">
-                                    {child.name}
+                                </td>
+                                <td data-label="Productos">
+                                  {countWithChildren(child)}
+                                </td>
+                                <td data-label="Subcategorías">
+                                  {nietas.length > 0 ? nietas.length : "—"}
+                                </td>
+                                <td data-label="Acciones">
+                                  <span className="flex items-center justify-end gap-1">
+                                    <button
+                                      type="button"
+                                      className="btn btn-ghost btn-sm"
+                                      title={`Nueva subcategoría de ${child.name}`}
+                                      onClick={() => openNewChild(child.id)}
+                                    >
+                                      + Sub
+                                    </button>
+                                    <button
+                                      className="btn-icon btn-ghost"
+                                      title="Editar"
+                                      onClick={() => openEdit(child)}
+                                    >
+                                      {EditIcon}
+                                    </button>
+                                    <button
+                                      className="btn-icon btn-ghost"
+                                      title={
+                                        nietas.length > 0
+                                          ? "Tiene subcategorías: borralas primero"
+                                          : "Eliminar"
+                                      }
+                                      onClick={() => setToDelete(child)}
+                                    >
+                                      {TrashIcon}
+                                    </button>
                                   </span>
-                                </span>
-                              </td>
-                              <td data-label="Productos">
-                                {child.productCount}
-                              </td>
-                              <td data-label="Subcategorías">—</td>
-                              <td data-label="Acciones">
-                                <span className="flex items-center justify-end gap-1">
-                                  <button
-                                    className="btn-icon btn-ghost"
-                                    title="Editar"
-                                    onClick={() => openEdit(child)}
-                                  >
-                                    {EditIcon}
-                                  </button>
-                                  <button
-                                    className="btn-icon btn-ghost"
-                                    title="Eliminar"
-                                    onClick={() => setToDelete(child)}
-                                  >
-                                    {TrashIcon}
-                                  </button>
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        }),
+                                </td>
+                              </tr>
+                            );
+                          },
+                        ),
                       ];
                     })}
                   </tbody>

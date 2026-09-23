@@ -519,6 +519,13 @@
       "when": 1783307800000,
       "tag": "0073_variant_extras_cost",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1783307900000,
+      "tag": "0074_manual_sale_item_product",
+      "breakpoints": true
     }
   ]
 }

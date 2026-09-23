@@ -88,6 +88,11 @@ export function editedManualSaleEconomics(
 
 /** Una combinación vendida: qué, cuántas, a cuánto y con qué gramos por color. */
 export type ManualSaleLine = {
+  /** Producto de la línea (2026-09-21: varios productos en la misma venta). */
+  productId?: string | null;
+  productName?: string | null;
+  /** Minutos de impresión de UNA unidad de esta línea. */
+  printMinutes?: number | null;
   variantLabel?: string | null;
   color?: string | null;
   quantity: number;
@@ -95,6 +100,47 @@ export type ManualSaleLine = {
   /** Gramos por filamento de UNA unidad de esta combinación. */
   colorLines?: Array<{ filamentId: string; grams: number }>;
 };
+
+/**
+ * Minutos de impresión de TODA la venta a partir de sus líneas.
+ *
+ * Con varios productos en la misma venta cada línea tarda distinto (un porta
+ * sahumerio no imprime lo mismo que un llavero), así que se suma línea por
+ * línea: minutos por unidad × cantidad. Una línea sin minutos propios usa los
+ * de la venta (`fallbackPerUnit`, lo que mandaba el formulario cuando era un
+ * solo producto): así las cargas viejas dan exactamente lo mismo que antes.
+ */
+export function manualSalePrintMinutes(
+  lines: ManualSaleLine[],
+  fallbackPerUnit: number,
+): number {
+  let total = 0;
+  for (const ln of lines) {
+    const qty = Math.max(0, Math.floor(ln.quantity));
+    if (qty <= 0) continue;
+    const perUnit = ln.printMinutes ?? fallbackPerUnit;
+    total += Math.max(0, perUnit) * qty;
+  }
+  return total;
+}
+
+/**
+ * Producto "principal" de una venta con líneas. Si todas las líneas son del
+ * mismo producto (o ninguna dice de cuál es: cargas viejas), ese es el de la
+ * venta. Si mezclan productos, la venta no tiene UNO: queda null y el ranking
+ * de "más vendidos" suma línea por línea (ver sumSalesByProduct).
+ */
+export function manualSaleProductId(
+  lines: ManualSaleLine[],
+  fallback: string | null | undefined,
+): string | undefined {
+  const ids = new Set(
+    lines.map((l) => l.productId).filter((id): id is string => !!id),
+  );
+  if (ids.size === 0) return fallback ?? undefined;
+  if (ids.size === 1) return [...ids][0];
+  return undefined;
+}
 
 /**
  * Total cobrado y unidades de una venta con líneas.
@@ -183,8 +229,12 @@ export function applyManualSaleLines(input: ManualSaleInput): ManualSaleInput {
     // calcula después con cantidad 1 (los gramos ya vienen sumados), así que
     // si el tiempo quedara por unidad, la luz y el desgaste de máquina se
     // cobrarían UNA sola vez por más unidades que haya (bug 2026-08: vender
-    // 3 Dumplings costeaba las horas de 1).
-    printMinutes: (input.printMinutes ?? 0) * units,
+    // 3 Dumplings costeaba las horas de 1). Con varios productos, cada línea
+    // aporta sus propios minutos.
+    printMinutes: manualSalePrintMinutes(items, input.printMinutes ?? 0),
+    // Varios productos en la misma venta: el producto de la venta solo tiene
+    // sentido si todas las líneas son del mismo.
+    productId: manualSaleProductId(items, input.productId),
     // El filamento "principal" pierde sentido con varias combinaciones: el
     // descuento real sale de colorLines.
     filamentId: grams[0]?.filamentId ?? input.filamentId,
@@ -262,6 +312,8 @@ export async function createManualSale(
       await tx.insert(manualSaleItems).values(
         items.map((it) => ({
           manualSaleId: created.id,
+          productId: it.productId ?? null,
+          productName: it.productName ?? null,
           variantLabel: it.variantLabel ?? null,
           color: it.color ?? null,
           quantity: it.quantity,

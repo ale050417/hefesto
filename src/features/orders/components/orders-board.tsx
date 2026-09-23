@@ -40,6 +40,8 @@ export type UnifiedSale = {
   /** Desglose por combinación de colores (venta con varias combinaciones).
    *  Vacío/ausente = venta simple de siempre. */
   items?: Array<{
+    /** Producto de la línea (venta con varios productos); null en las viejas. */
+    productName?: string | null;
     variantLabel: string | null;
     color: string | null;
     quantity: number;
@@ -211,24 +213,43 @@ export function OrdersBoard({
     const items = o.items ?? [];
     if (items.length === 0) return null;
     const unidades = items.reduce((a, it) => a + it.quantity, 0);
+    // Varios productos en la misma venta (2026-09-21): el resumen habla de
+    // productos, no de combinaciones, y cada línea dice de cuál es.
+    const productos = new Set(
+      items.map((it) => it.productName).filter((n): n is string => !!n),
+    );
+    const resumen =
+      productos.size > 1
+        ? `${productos.size} productos · ${unidades} unidades`
+        : `${items.length} combinaciones · ${unidades} unidades`;
     return (
       <details className="mt-1">
         <summary className="text-primary cursor-pointer text-[11.5px] hover:underline">
-          {items.length} combinaciones · {unidades} unidades
+          {resumen}
         </summary>
         <div className="border-surface-2 mt-1 flex flex-col gap-0.5 border-l pl-2">
-          {items.map((it, i) => (
-            <div
-              key={`${it.variantLabel ?? ""}-${it.color ?? ""}-${i}`}
-              className="text-faint flex items-center justify-between gap-2 text-[11.5px]"
-            >
-              <span className="truncate">
-                {it.quantity}× {it.variantLabel ?? it.color ?? "—"}
-                {it.variantLabel && it.color ? ` · ${it.color}` : ""}
-              </span>
-              <span className="shrink-0">{formatPrice(it.lineTotal)}</span>
-            </div>
-          ))}
+          {items.map((it, i) => {
+            const combo = [it.variantLabel, it.color]
+              .filter(Boolean)
+              .join(" · ");
+            const nombre = [
+              productos.size > 1 ? it.productName : null,
+              combo || (it.productName ? null : "—"),
+            ]
+              .filter(Boolean)
+              .join(" · ");
+            return (
+              <div
+                key={`${it.productName ?? ""}-${it.variantLabel ?? ""}-${it.color ?? ""}-${i}`}
+                className="text-faint flex items-center justify-between gap-2 text-[11.5px]"
+              >
+                <span className="truncate">
+                  {it.quantity}× {nombre || it.productName || "—"}
+                </span>
+                <span className="shrink-0">{formatPrice(it.lineTotal)}</span>
+              </div>
+            );
+          })}
         </div>
       </details>
     );

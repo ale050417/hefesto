@@ -4,6 +4,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ProductGrid } from "@/features/products/components/product-grid";
 import { getHomeData } from "@/features/products/services/catalogService";
+import { sumSubtree } from "@/features/products/category-tree";
 import { HeroCarousel } from "@/components/home/hero-carousel";
 import {
   getActiveBanners,
@@ -200,15 +201,12 @@ export default async function Home({
   // en subcategorías mostraba "0 productos" aunque al entrar hubiera 12
   // (2026-07-29). Solo van categorías PRINCIPALES: las subcategorías se ven
   // dentro del catálogo, no en la home.
+  // El conteo baja TODOS los niveles (subcategorías de subcategorías).
   const parentCategories = categories
     .filter((c) => !c.parentId)
     .map((c) => ({
       ...c,
-      productCount:
-        c.productCount +
-        categories
-          .filter((s) => s.parentId === c.id)
-          .reduce((sum, s) => sum + s.productCount, 0),
+      productCount: sumSubtree(categories, c.id, (x) => x.productCount),
     }))
     .filter((c) => c.productCount > 0);
   // FAQ editable: si el dueño cargó preguntas desde Config, usamos esas; si no,

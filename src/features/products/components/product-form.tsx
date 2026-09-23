@@ -15,6 +15,7 @@ import {
   updateProductAction,
 } from "../actions";
 import type { Category } from "../types";
+import { categoryPath, flattenTree } from "../category-tree";
 import { runAction } from "@/lib/run-action";
 import { EditSection } from "./edit-section";
 
@@ -501,27 +502,14 @@ export function ProductForm({
             <option value="" disabled>
               Elegí una categoría
             </option>
-            {[...categories]
-              .sort((a, b) => {
-                // Raíces primero (por nombre) con sus hijas debajo (Fase 6).
-                const ka = a.parentId
-                  ? `${categories.find((x) => x.id === a.parentId)?.name ?? ""}›${a.name}`
-                  : a.name;
-                const kb = b.parentId
-                  ? `${categories.find((x) => x.id === b.parentId)?.name ?? ""}›${b.name}`
-                  : b.name;
-                return ka.localeCompare(kb);
-              })
-              .map((c) => {
-                const parent = c.parentId
-                  ? categories.find((x) => x.id === c.parentId)?.name
-                  : null;
-                return (
-                  <option key={c.id} value={c.id}>
-                    {parent ? `${parent} › ${c.name}` : c.name}
-                  </option>
-                );
-              })}
+            {/* En orden de árbol, con la ruta completa: con subcategorías de
+                subcategorías (2026-09-21) el nombre solo no dice de quién es
+                hija ("Superhéroes" ¿de Funko Pop o de Anime?). */}
+            {flattenTree(categories).map(({ node: c }) => (
+              <option key={c.id} value={c.id}>
+                {categoryPath(categories, c.id)}
+              </option>
+            ))}
           </select>
           {errors.categoryId ? (
             <p className="text-danger text-xs">{errors.categoryId.message}</p>

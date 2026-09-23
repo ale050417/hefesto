@@ -10,6 +10,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 import { manualSales } from "./manual-sales";
+import { products } from "./products";
 
 /**
  * Líneas de una venta manual: UNA venta con VARIAS combinaciones de colores
@@ -35,6 +36,16 @@ export const manualSaleItems = pgTable(
     manualSaleId: uuid("manual_sale_id")
       .notNull()
       .references(() => manualSales.id, { onDelete: "cascade" }),
+    // De QUÉ producto es la línea (2026-09-21, pedido de Ale: varios productos
+    // en la misma carga manual, ej. 7 porta sahumerios + 2 llaveros). Nullable:
+    // las líneas viejas (un producto, varias combinaciones) no lo tienen y el
+    // producto de la venta sigue siendo `manual_sales.product_id`.
+    productId: uuid("product_id").references(() => products.id, {
+      onDelete: "set null",
+    }),
+    // Snapshot del nombre (igual criterio que order_items): si el producto se
+    // renombra o se borra, la venta sigue diciendo qué se vendió.
+    productName: text("product_name"),
     // Snapshot de qué se vendió (igual criterio que order_items): si mañana se
     // renombra la combinación en el catálogo, la venta conserva lo que fue.
     variantLabel: text("variant_label"),
@@ -58,5 +69,6 @@ export const manualSaleItems = pgTable(
       sql`${t.unitPrice} >= 0`,
     ),
     index("manual_sale_items_sale_idx").on(t.manualSaleId),
+    index("manual_sale_items_product_idx").on(t.productId),
   ],
 );

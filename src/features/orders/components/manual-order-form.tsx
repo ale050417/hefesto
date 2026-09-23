@@ -183,7 +183,15 @@ export function ManualSaleForm({
 
   // Producto elegido de la tienda + variante (tamaño/combinación) + color:
   // task #188 — el chihuahua tiene 2 tamaños y antes se tomaba uno solo.
-  const [picked, setPicked] = useState<ProductForSale | null>(null);
+  // Productos elegidos de la tienda. Con UNO es la carga de siempre (variante
+  // + color, o el lote de combinaciones). Con VARIOS (2026-09-21, pedido de
+  // Ale: "7 porta sahumerios y no cargarlos uno por uno") la venta va por
+  // líneas: cada producto lista sus combinaciones con su cantidad y sale UNA
+  // sola venta con todo adentro.
+  const [pickedList, setPickedList] = useState<ProductForSale[]>([]);
+  /** El producto de la carga SIMPLE (cuando hay uno solo). */
+  const picked = pickedList[0] ?? null;
+  const multi = pickedList.length > 1;
   const [saleVariant, setSaleVariant] = useState<string | null>(null);
   const [saleColor, setSaleColor] = useState<string | null>(null);
   // Derivados del muestrario: la variante elegida y el precio "del resto" (el
@@ -316,10 +324,23 @@ export function ManualSaleForm({
   /** Cantidad vendida por combinación (clave = label|color). Vacío = 0. */
   const [lineQty, setLineQty] = useState<Record<string, string>>({});
 
-  /** Todas las combinaciones vendibles del producto elegido, con su precio. */
-  const batchOptions = (() => {
-    if (!picked) return [];
-    const p = picked;
+  /** Una combinación vendible (tamaño + color) de un producto, con su precio. */
+  type BatchOption = {
+    key: string;
+    productId: string;
+    productName: string;
+    /** Minutos de impresión de UNA unidad (para costear cada producto). */
+    printMinutes: number;
+    variantLabel: string | null;
+    color: string | null;
+    unitPrice: number;
+    weight: number;
+    extrasCost: number;
+    colorLines: Array<{ filamentId: string; grams: number }>;
+  };
+
+  /** Todas las combinaciones vendibles de UN producto, con su precio. */
+  function optionsFor(p: ProductForSale): BatchOption[] {
     const isMulti = p.colorMode === "multi";
     const variants =
       p.variants.length > 0 ? p.variants.map((v) => v.label) : [];
@@ -342,7 +363,12 @@ export function ManualSaleForm({
     return combos.map((combo) => {
       const built = buildLine(p, combo.variantLabel, combo.color);
       return {
-        key: `${combo.variantLabel ?? ""}|${combo.color ?? ""}`,
+        // La clave lleva el producto: dos productos pueden tener el mismo
+        // color/tamaño y no deben pisarse la cantidad.
+        key: `${p.id}|${combo.variantLabel ?? ""}|${combo.color ?? ""}`,
+        productId: p.id,
+        productName: p.name,
+        printMinutes: p.printMinutes ?? 0,
         variantLabel: combo.variantLabel,
         color: combo.color,
         unitPrice: built.unitPrice,
@@ -354,10 +380,15 @@ export function ManualSaleForm({
           .map((l) => ({ filamentId: l.filamentId, grams: Number(l.grams) })),
       };
     });
-  })();
+  }
 
-  /** Solo tiene sentido ofrecer el lote si hay más de una combinación. */
-  const batchAvailable = batchOptions.length > 1;
+  /** Las combinaciones de TODOS los productos elegidos. */
+  const batchOptions = pickedList.flatMap(optionsFor);
+
+  /** Con un solo producto, el lote se ofrece si hay más de una combinación.
+   * Con varios productos la venta va SIEMPRE por líneas (no hay otra forma
+   * de decir cuántas de cada uno). */
+  const batchAvailable = !multi && batchOptions.length > 1;
 
   const batchLines = batchOptions
     .map((o) => ({ ...o, qty: Math.floor(Number(lineQty[o.key]) || 0) }))
@@ -384,7 +415,7 @@ export function ManualSaleForm({
     }));
   })();
   const batchGramsTotal = batchGrams.reduce((a, g) => a + g.grams, 0);
-  const usandoLote = batch && batchAvailable;
+  const usandoLote = multi || (batch && batchAvailable);
   /** Insumos del producto en el lote: el de CADA combinación × su cantidad
    * (vaso 1L ≠ vaso 500cc). */
   const batchInsumos = batchLines.reduce((a, l) => a + l.extrasCost * l.qty, 0);
@@ -404,21 +435,73 @@ export function ManualSaleForm({
 
   const setQty = (key: string, v: string) =>
     setLineQty((q) => ({ ...q, [key]: v }));
-  /** Atajos: todas las combinaciones a 1, o volver todo a 0. */
-  const fillAll = (value: string) =>
-    setLineQty(Object.fromEntries(batchOptions.map((o) => [o.key, value])));
+  /** Atajos por producto: todas sus combinaciones a 1, o volver todo a 0. */
+  const fillAll = (p: ProductForSale, value: string) =>
+    setLineQty((q) => ({
+      ...q,
+      ...Object.fromEntries(optionsFor(p).map((o) => [o.key, value])),
+    }));
+
+  /** Detalle automático con varios productos: "Porta sahumerio + Llavero". */
+  const detailFor = (list: ProductForSale[]) =>
+    list
+      .map((x) => x.name)
+      .join(" + ")
+      .slice(0, 300);
 
   function pickProduct(id: string) {
     const p = products.find((x) => x.id === id);
-    if (!p) return;
-    const firstVariant = p.variants[0]?.label ?? null;
-    const firstColor = p.colorMode === "single" ? (p.colors[0] ?? null) : null;
-    setPicked(p);
-    setSaleVariant(firstVariant);
-    setSaleColor(firstColor);
-    setLineQty({});
-    setBatch(false);
-    applySelection(p, firstVariant, firstColor);
+    if (!p || pickedList.some((x) => x.id === id)) return;
+    if (pickedList.length === 0) {
+      // Primer producto: carga simple de siempre (variante + color).
+      const firstVariant = p.variants[0]?.label ?? null;
+      const firstColor =
+        p.colorMode === "single" ? (p.colors[0] ?? null) : null;
+      setPickedList([p]);
+      setSaleVariant(firstVariant);
+      setSaleColor(firstColor);
+      setLineQty({});
+      setBatch(false);
+      applySelection(p, firstVariant, firstColor);
+      return;
+    }
+    // Segundo en adelante: la venta pasa a ser por líneas (varios productos).
+    const next = [...pickedList, p];
+    setPickedList(next);
+    setForm((f) => ({ ...f, detail: detailFor(next) }));
+  }
+
+  function removeProduct(id: string) {
+    const next = pickedList.filter((x) => x.id !== id);
+    // Las cantidades del producto quitado no tienen que sobrevivir.
+    setLineQty((q) =>
+      Object.fromEntries(
+        Object.entries(q).filter(([k]) => !k.startsWith(`${id}|`)),
+      ),
+    );
+    setPickedList(next);
+    if (next.length === 0) {
+      setSaleVariant(null);
+      setSaleColor(null);
+      setBatch(false);
+      setLineQty({});
+      setProdExtraUnit(null);
+      return;
+    }
+    if (next.length === 1) {
+      // Vuelve a ser un solo producto: se conservan sus cantidades (queda en
+      // lote si tiene más de una combinación) y se recalculan precio/gramos.
+      const p = next[0]!;
+      const firstVariant = p.variants[0]?.label ?? null;
+      const firstColor =
+        p.colorMode === "single" ? (p.colors[0] ?? null) : null;
+      setSaleVariant(firstVariant);
+      setSaleColor(firstColor);
+      setBatch(true);
+      applySelection(p, firstVariant, firstColor);
+      return;
+    }
+    setForm((f) => ({ ...f, detail: detailFor(next) }));
   }
   // El reparto de la ganancia lo resuelve Ganancias (socios actuales); esta venta
   // ya no lleva un reparto propio (se sacó "Personalizar").
@@ -467,10 +550,15 @@ export function ManualSaleForm({
               // De esos insumos, los cargados a mano se COBRAN (la calculadora
               // no los contempla); el del catálogo ya está en el precio.
               chargedExtras: extrasCost,
-              productId: picked?.id,
+              // Con varios productos la venta no tiene UNO principal: el
+              // servidor lo resuelve desde las líneas (manualSaleProductId).
+              productId: multi ? undefined : picked?.id,
               material: picked?.material ?? estData?.material,
               printMinutes: picked?.printMinutes ?? estData?.printMinutes ?? 0,
               items: batchLines.map((l) => ({
+                productId: l.productId,
+                productName: l.productName,
+                printMinutes: l.printMinutes,
                 variantLabel: l.variantLabel,
                 color: l.color,
                 quantity: l.qty,
@@ -551,6 +639,106 @@ export function ManualSaleForm({
     }
   }
 
+  /**
+   * Las combinaciones de UN producto con su campo de cantidad al lado: se
+   * llenan las que se vendieron. Se usa igual en la venta de un solo producto
+   * (lote de colores) y en la de varios (una lista por producto).
+   */
+  function renderCombos(p: ProductForSale) {
+    const opts = optionsFor(p);
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-dim text-[12px] font-medium">
+            {opts.length > 1
+              ? "¿Cuántas vendiste de cada una?"
+              : "¿Cuántas vendiste?"}
+          </span>
+          {opts.length > 1 ? (
+            <span className="ml-auto flex gap-1.5">
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => fillAll(p, "1")}
+                title="Una de cada combinación"
+              >
+                Una de c/u
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => fillAll(p, "")}
+              >
+                Limpiar
+              </button>
+            </span>
+          ) : null}
+        </div>
+        <div className="max-h-72 overflow-auto rounded-lg border border-[var(--border)]">
+          {opts.map((o) => {
+            const qty = Math.floor(Number(lineQty[o.key]) || 0);
+            return (
+              <div
+                key={o.key}
+                className={cn(
+                  "flex items-center gap-2 border-b border-[var(--border)] px-2.5 py-2 last:border-b-0",
+                  qty > 0 && "bg-[rgba(var(--gold-rgb),.07)]",
+                )}
+              >
+                {/* Los colores de la combinación, en círculos: se reconoce de
+                    un vistazo cuál es cuál. */}
+                <span className="flex shrink-0 -space-x-1">
+                  {o.colorLines.slice(0, 4).map((cl, i) => (
+                    <span
+                      key={`${cl.filamentId}-${i}`}
+                      aria-hidden
+                      style={{
+                        width: 16,
+                        height: 16,
+                        borderRadius: "50%",
+                        background:
+                          colorHex[filamentColorName(cl.filamentId)] ?? "#888",
+                        border: "1.5px solid var(--surface-1)",
+                      }}
+                    />
+                  ))}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="text-fg block truncate text-[12.5px]">
+                    {o.variantLabel ?? o.color ?? p.name}
+                    {o.variantLabel && o.color ? (
+                      <span className="text-faint"> · {o.color}</span>
+                    ) : null}
+                  </span>
+                  <span className="text-faint text-[11px]">
+                    ${o.unitPrice.toLocaleString("es-AR")} c/u
+                    {o.weight > 0 ? ` · ${o.weight} g` : ""}
+                    {o.colorLines.length === 0 ? " · ⚠ sin carrete" : ""}
+                  </span>
+                </span>
+                <input
+                  className="input shrink-0 text-center"
+                  style={{ width: 62 }}
+                  type="number"
+                  min={0}
+                  max={9999}
+                  placeholder="0"
+                  aria-label={`Cantidad vendida de ${p.name}${
+                    (o.variantLabel ?? o.color)
+                      ? ` (${o.variantLabel ?? o.color})`
+                      : ""
+                  }`}
+                  value={lineQty[o.key] ?? ""}
+                  onChange={(e) => setQty(o.key, e.target.value)}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={
@@ -623,7 +811,9 @@ export function ManualSaleForm({
               </div>
               {!prodSearch.trim() ? (
                 <div className="text-faint mt-2 text-[11.5px]">
-                  Escribí arriba para buscar un producto de la tienda.
+                  {pickedList.length > 0
+                    ? "¿Se llevó otro producto? Buscalo arriba y se agrega a la misma venta."
+                    : "Escribí arriba para buscar un producto de la tienda."}
                 </div>
               ) : (
                 <div className="mt-2 max-h-48 overflow-auto rounded-md border border-[var(--border)]">
@@ -659,140 +849,142 @@ export function ManualSaleForm({
                   )}
                 </div>
               )}
-              {/* Producto elegido: variante (tamaño/combinación) + color. El
-                  precio y los gramos siguen lo elegido, igual que la tienda. */}
-              {picked ? (
-                <div className="mt-2 flex flex-col gap-2.5 rounded-xl border border-[var(--border)] p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <b className="text-[13px]">{picked.name}</b>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => {
-                        setPicked(null);
-                        setSaleVariant(null);
-                        setSaleColor(null);
-                        setBatch(false);
-                        setLineQty({});
-                        setProdExtraUnit(null);
-                      }}
+              {/* Productos elegidos. Con UNO: variante (tamaño/combinación) +
+                  color, o el lote de combinaciones. Con VARIOS (2026-09-21):
+                  cada producto lista sus combinaciones con la cantidad
+                  vendida y sale UNA sola venta con todo adentro. */}
+              {pickedList.length > 0 ? (
+                <div className="mt-2 flex flex-col gap-2.5">
+                  {pickedList.map((p) => (
+                    <div
+                      key={p.id}
+                      className="flex flex-col gap-2.5 rounded-xl border border-[var(--border)] p-3"
                     >
-                      Quitar
-                    </button>
-                  </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <b className="text-[13px]">{p.name}</b>
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => removeProduct(p.id)}
+                        >
+                          Quitar
+                        </button>
+                      </div>
 
-                  {/* Varias combinaciones en la MISMA venta: el caso de los 10
-                      Dumplings, cada uno de un color distinto (Ale 2026-08-09).
-                      Antes había que cargar una venta por combinación. */}
-                  {batchAvailable ? (
-                    <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-[var(--surface-2)] p-2.5">
-                      <input
-                        type="checkbox"
-                        className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--gold)]"
-                        checked={batch}
-                        onChange={(e) => setBatch(e.target.checked)}
-                      />
-                      <span>
-                        <span className="text-fg block text-[13px] font-semibold">
-                          Vendí varias combinaciones de colores
-                        </span>
-                        <span className="text-faint block text-[11.5px] leading-snug">
-                          Cargá cuántas vendiste de cada una. Queda UNA sola
-                          venta con el detalle adentro; el total y los gramos se
-                          calculan solos.
-                        </span>
-                      </span>
-                    </label>
-                  ) : null}
+                      {/* Varias combinaciones en la MISMA venta: el caso de los
+                          10 Dumplings, cada uno de un color distinto (Ale
+                          2026-08-09). Con varios productos va siempre así. */}
+                      {!multi && batchAvailable ? (
+                        <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-[var(--surface-2)] p-2.5">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--gold)]"
+                            checked={batch}
+                            onChange={(e) => setBatch(e.target.checked)}
+                          />
+                          <span>
+                            <span className="text-fg block text-[13px] font-semibold">
+                              Vendí varias combinaciones de colores
+                            </span>
+                            <span className="text-faint block text-[11.5px] leading-snug">
+                              Cargá cuántas vendiste de cada una. Queda UNA sola
+                              venta con el detalle adentro; el total y los
+                              gramos se calculan solos.
+                            </span>
+                          </span>
+                        </label>
+                      ) : null}
+
+                      {usandoLote ? renderCombos(p) : null}
+
+                      {!usandoLote && p.variants.length > 0 ? (
+                        <div>
+                          <div className="text-dim mb-1.5 text-[12px] font-medium">
+                            {p.variants.some((v) => v.label.includes(" + "))
+                              ? "¿Qué combinación se vendió?"
+                              : "¿Qué tamaño se vendió?"}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {p.variants.map((v) => (
+                              <button
+                                key={v.label}
+                                type="button"
+                                className={cn(
+                                  "chip",
+                                  saleVariant === v.label && "active",
+                                )}
+                                onClick={() => {
+                                  setSaleVariant(v.label);
+                                  applySelection(p, v.label, saleColor);
+                                }}
+                              >
+                                {v.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                      {!usandoLote &&
+                      p.colorMode === "single" &&
+                      p.colors.length > 0 ? (
+                        <div>
+                          <div className="text-dim mb-1.5 text-[12px] font-medium">
+                            ¿De qué color?
+                            {saleColor ? (
+                              <span className="text-primary ml-1.5 font-semibold">
+                                {saleColor}
+                              </span>
+                            ) : null}
+                          </div>
+                          {/* MISMO muestrario que ve el cliente en la tienda y
+                              que se usa al cargar un producto: un solo control
+                              en toda la app (2026-08-03). El punto dorado marca
+                              los colores que cuestan distinto. */}
+                          <ColorSwatches
+                            size="sm"
+                            options={p.colors.map((c) => {
+                              const price = saleUnitPrice({
+                                basePrice: p.price,
+                                colorMode: p.colorMode,
+                                productColorPrices: p.colorPrices,
+                                variant: pickedVariant,
+                                color: c,
+                              });
+                              const distinto = price !== basePriceForPicked;
+                              return {
+                                name: c,
+                                hex: colorHex[c] ?? "#888",
+                                flag: distinto,
+                                ...(distinto
+                                  ? {
+                                      note: `$${price.toLocaleString("es-AR")}`,
+                                    }
+                                  : {}),
+                              };
+                            })}
+                            selected={saleColor ? [saleColor] : []}
+                            onSelect={(c) => {
+                              setSaleColor(c);
+                              applySelection(p, saleVariant, c);
+                            }}
+                          />
+                        </div>
+                      ) : null}
+                      {!usandoLote && unitPrice != null ? (
+                        <div className="text-faint text-[11.5px]">
+                          Precio unitario:{" "}
+                          <b className="text-fg">
+                            ${unitPrice.toLocaleString("es-AR")}
+                          </b>{" "}
+                          (el mismo que cobra la tienda para esa elección) ·
+                          gramos cargados abajo en “Colores usados”.
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
 
                   {usandoLote ? (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-dim text-[12px] font-medium">
-                          ¿Cuántas vendiste de cada una?
-                        </span>
-                        <span className="ml-auto flex gap-1.5">
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-sm"
-                            onClick={() => fillAll("1")}
-                            title="Una de cada combinación"
-                          >
-                            Una de c/u
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => fillAll("")}
-                          >
-                            Limpiar
-                          </button>
-                        </span>
-                      </div>
-                      <div className="max-h-72 overflow-auto rounded-lg border border-[var(--border)]">
-                        {batchOptions.map((o) => {
-                          const qty = Math.floor(Number(lineQty[o.key]) || 0);
-                          return (
-                            <div
-                              key={o.key}
-                              className={cn(
-                                "flex items-center gap-2 border-b border-[var(--border)] px-2.5 py-2 last:border-b-0",
-                                qty > 0 && "bg-[rgba(var(--gold-rgb),.07)]",
-                              )}
-                            >
-                              {/* Los colores de la combinación, en círculos:
-                                  se reconoce de un vistazo cuál es cuál. */}
-                              <span className="flex shrink-0 -space-x-1">
-                                {o.colorLines.slice(0, 4).map((cl, i) => (
-                                  <span
-                                    key={`${cl.filamentId}-${i}`}
-                                    aria-hidden
-                                    style={{
-                                      width: 16,
-                                      height: 16,
-                                      borderRadius: "50%",
-                                      background:
-                                        colorHex[
-                                          filamentColorName(cl.filamentId)
-                                        ] ?? "#888",
-                                      border: "1.5px solid var(--surface-1)",
-                                    }}
-                                  />
-                                ))}
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="text-fg block truncate text-[12.5px]">
-                                  {o.variantLabel ?? o.color ?? picked.name}
-                                  {o.variantLabel && o.color ? (
-                                    <span className="text-faint">
-                                      {" "}
-                                      · {o.color}
-                                    </span>
-                                  ) : null}
-                                </span>
-                                <span className="text-faint text-[11px]">
-                                  ${o.unitPrice.toLocaleString("es-AR")} c/u
-                                  {o.weight > 0 ? ` · ${o.weight} g` : ""}
-                                  {o.colorLines.length === 0
-                                    ? " · ⚠ sin carrete"
-                                    : ""}
-                                </span>
-                              </span>
-                              <input
-                                className="input shrink-0 text-center"
-                                style={{ width: 62 }}
-                                type="number"
-                                min={0}
-                                max={9999}
-                                placeholder="0"
-                                aria-label={`Cantidad vendida de ${o.variantLabel ?? o.color ?? picked.name}`}
-                                value={lineQty[o.key] ?? ""}
-                                onChange={(e) => setQty(o.key, e.target.value)}
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
+                    <>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
                         <span className="text-faint">
                           Unidades: <b className="text-fg">{batchUnits}</b>
@@ -818,92 +1010,12 @@ export function ManualSaleForm({
                       </div>
                       <p className="text-faint text-[11.5px] leading-relaxed">
                         No hace falta la calculadora ni cargar colores abajo: el
-                        precio y los gramos salen del producto. Los insumos
-                        adicionales (paso 2) se suman al total y al costo.
+                        precio y los gramos salen{" "}
+                        {multi ? "de cada producto" : "del producto"}. Los
+                        insumos adicionales (paso 2) se suman al total y al
+                        costo.
                       </p>
-                    </div>
-                  ) : null}
-
-                  {!usandoLote && picked.variants.length > 0 ? (
-                    <div>
-                      <div className="text-dim mb-1.5 text-[12px] font-medium">
-                        {picked.variants.some((v) => v.label.includes(" + "))
-                          ? "¿Qué combinación se vendió?"
-                          : "¿Qué tamaño se vendió?"}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {picked.variants.map((v) => (
-                          <button
-                            key={v.label}
-                            type="button"
-                            className={cn(
-                              "chip",
-                              saleVariant === v.label && "active",
-                            )}
-                            onClick={() => {
-                              setSaleVariant(v.label);
-                              applySelection(picked, v.label, saleColor);
-                            }}
-                          >
-                            {v.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                  {!usandoLote &&
-                  picked.colorMode === "single" &&
-                  picked.colors.length > 0 ? (
-                    <div>
-                      <div className="text-dim mb-1.5 text-[12px] font-medium">
-                        ¿De qué color?
-                        {saleColor ? (
-                          <span className="text-primary ml-1.5 font-semibold">
-                            {saleColor}
-                          </span>
-                        ) : null}
-                      </div>
-                      {/* MISMO muestrario que ve el cliente en la tienda y que
-                          se usa al cargar un producto: un solo control en toda
-                          la app (2026-08-03). El punto dorado marca los colores
-                          que cuestan distinto. */}
-                      <ColorSwatches
-                        size="sm"
-                        options={picked.colors.map((c) => {
-                          const price = saleUnitPrice({
-                            basePrice: picked.price,
-                            colorMode: picked.colorMode,
-                            productColorPrices: picked.colorPrices,
-                            variant: pickedVariant,
-                            color: c,
-                          });
-                          const distinto = price !== basePriceForPicked;
-                          return {
-                            name: c,
-                            hex: colorHex[c] ?? "#888",
-                            flag: distinto,
-                            ...(distinto
-                              ? { note: `$${price.toLocaleString("es-AR")}` }
-                              : {}),
-                          };
-                        })}
-                        selected={saleColor ? [saleColor] : []}
-                        onSelect={(c) => {
-                          setSaleColor(c);
-                          applySelection(picked, saleVariant, c);
-                        }}
-                      />
-                    </div>
-                  ) : null}
-                  {!usandoLote && unitPrice != null ? (
-                    <div className="text-faint text-[11.5px]">
-                      Precio unitario:{" "}
-                      <b className="text-fg">
-                        ${unitPrice.toLocaleString("es-AR")}
-                      </b>{" "}
-                      (el mismo que cobra la tienda para esa elección) · gramos
-                      cargados abajo en “Colores usados”.
-                    </div>
+                    </>
                   ) : null}
                 </div>
               ) : null}

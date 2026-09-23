@@ -10,6 +10,7 @@ import {
   uploadCategoryImageAction,
 } from "../actions";
 import { CAT_COLORS, CAT_ICONS, catIconPath } from "../category-icons";
+import { flattenTree, subtreeIds } from "../category-tree";
 import { runAction } from "@/lib/run-action";
 import { compressImageToWebp } from "@/lib/image-compress";
 import { useFormErrors } from "@/hooks/use-form-errors";
@@ -25,8 +26,12 @@ export type CategoryFormData = {
   imageUrl?: string | null;
 };
 
-/** Opción de padre para el select (solo categorías raíz). */
-export type ParentOption = { id: string; name: string };
+/** Opción de padre para el select: cualquier categoría (niveles ilimitados). */
+export type ParentOption = {
+  id: string;
+  name: string;
+  parentId: string | null;
+};
 
 function slugify(text: string): string {
   return text
@@ -62,7 +67,8 @@ export function CategoryForm({
   onCancel,
 }: {
   category?: CategoryFormData;
-  /** Categorías raíz elegibles como padre (sin la propia). */
+  /** Todas las categorías: el padre puede ser cualquiera que no cuelgue de
+   *  la propia (2026-09-21: subcategorías de subcategorías). */
   parents?: ParentOption[];
   /** Padre preseleccionado al crear desde el "+ Sub" de una tarjeta. */
   defaultParentId?: string;
@@ -84,7 +90,15 @@ export function CategoryForm({
   const [imgBusy, setImgBusy] = useState(false);
   const imgInputRef = useRef<HTMLInputElement>(null);
   const fe = useFormErrors();
-  const parentOptions = parents.filter((c) => c.id !== category?.id);
+  // Padres posibles: todas menos la propia y las que cuelgan de ella (sería
+  // un ciclo). En orden de árbol e indentadas, para ver de quién es hija cada
+  // opción: "Figuras de colección › Funko Pop › Superhéroes".
+  const excluded = new Set(
+    category?.id ? subtreeIds(parents, category.id) : [],
+  );
+  const parentOptions = flattenTree(parents).filter(
+    ({ node }) => !excluded.has(node.id),
+  );
 
   async function onPickImage(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -224,14 +238,16 @@ export function CategoryForm({
           onChange={(e) => setParentId(e.target.value)}
         >
           <option value="">— Ninguna (categoría raíz) —</option>
-          {parentOptions.map((c) => (
+          {parentOptions.map(({ node: c, depth }) => (
             <option key={c.id} value={c.id}>
+              {depth > 0 ? `${"   ".repeat(depth)}└ ` : ""}
               {c.name}
             </option>
           ))}
         </select>
         <p className="text-faint mt-1 text-[11.5px]">
-          Un solo nivel: las subcategorías no pueden tener hijas.
+          Podés anidar todos los niveles que quieras (ej. Figuras de colección ›
+          Funko Pop › Superhéroes).
         </p>
       </div>
 

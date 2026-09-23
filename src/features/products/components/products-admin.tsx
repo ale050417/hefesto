@@ -24,6 +24,7 @@ import { EditSection } from "./edit-section";
 import { ProductWizard } from "./product-wizard";
 import { ImageUpload } from "./image-upload";
 import { photoColorOptions } from "../photo-colors";
+import { subtreeIds } from "../category-tree";
 import { ProductStatusActions } from "./product-status-actions";
 import { runAction } from "@/lib/run-action";
 import { useDeleteResource } from "@/hooks/use-delete-resource";
@@ -152,16 +153,10 @@ export function ProductsAdmin({
   );
   const list = useMemo(() => {
     const q = search.trim().toLowerCase();
-    // Ids que cubre el filtro: la raíz elegida + todas sus hijas.
+    // Ids que cubre el filtro: la raíz elegida + toda su descendencia (las
+    // subcategorías pueden tener subcategorías desde 2026-09-21).
     const covered =
-      catFilter === "all"
-        ? null
-        : new Set([
-            catFilter,
-            ...categories
-              .filter((c) => c.parentId === catFilter)
-              .map((c) => c.id),
-          ]);
+      catFilter === "all" ? null : new Set(subtreeIds(categories, catFilter));
     return products.filter((p) => {
       if (covered && (!p.categoryId || !covered.has(p.categoryId)))
         return false;
