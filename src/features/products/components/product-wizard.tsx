@@ -20,6 +20,7 @@ import { useActionOverlayStore } from "@/stores/actionOverlayStore";
 import { compressImageToWebp } from "@/lib/image-compress";
 import { useDragReframe } from "@/hooks/use-drag-reframe";
 import { useFormErrors } from "@/hooks/use-form-errors";
+import { AiImagePanel } from "./ai-image-panel";
 
 function slugify(text: string): string {
   return text
@@ -77,6 +78,9 @@ export function ProductWizard({
     [extraUrls],
   );
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  // Foto original de la pieza cuando la principal se reemplazó por la
+  // generada con IA (para poder volver atrás).
+  const [originalPhoto, setOriginalPhoto] = useState<File | null>(null);
   // Foto POR color/combinación: una imagen elegida para cada color (single) o
   // combo (multi). La tienda salta a ella al elegirlo. Clave = color o combo.
   const [colorImages, setColorImages] = useState<Record<string, File>>({});
@@ -916,6 +920,40 @@ export function ProductWizard({
                 </div>
               )}
             </div>
+
+            {imageFile ? (
+              <div className="field">
+                <AiImagePanel
+                  source={originalPhoto ?? imageFile}
+                  context={{
+                    name,
+                    category:
+                      categories.find((c) => c.id === categoryId)?.name ?? null,
+                    colors,
+                    description,
+                  }}
+                  useLabel="Usar como imagen principal"
+                  onUse={(file) => {
+                    // La generada pasa a ser la portada; la foto del celular
+                    // queda guardada por si quiere volver.
+                    if (!originalPhoto) setOriginalPhoto(imageFile);
+                    pickImage(file);
+                  }}
+                />
+                {originalPhoto ? (
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm mt-2 self-start"
+                    onClick={() => {
+                      pickImage(originalPhoto);
+                      setOriginalPhoto(null);
+                    }}
+                  >
+                    Volver a la foto original
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="field">
               <label>

@@ -53,6 +53,12 @@ const envSchema = z.object({
   ANTHROPIC_MODEL: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().optional(),
+  // Foto de producto con IA (features/products/ai-image, 2026-10-21): FLUX.2
+  // klein en Cloudflare Workers AI, capa gratuita (10.000 neurons/día, sin
+  // tarjeta). Sin estas dos, el botón "Generar con IA" avisa cómo configurarlo.
+  CLOUDFLARE_ACCOUNT_ID: z.string().optional(),
+  CLOUDFLARE_AI_TOKEN: z.string().optional(),
+  CLOUDFLARE_AI_IMAGE_MODEL: z.string().optional(),
 });
 
 type Env = z.infer<typeof envSchema>;

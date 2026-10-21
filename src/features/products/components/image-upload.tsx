@@ -14,12 +14,14 @@ import {
 import type { ProductImage } from "../types";
 import { runAction } from "@/lib/run-action";
 import { useDeleteResource } from "@/hooks/use-delete-resource";
+import { AiImagePanel, type AiImageContext } from "./ai-image-panel";
 
 export function ImageUpload({
   productId,
   images,
   colorOptions = [],
   onChanged,
+  aiContext,
 }: {
   productId: string;
   images: ProductImage[];
@@ -34,6 +36,11 @@ export function ImageUpload({
   colorOptions?: string[];
   /** Aviso extra tras cada operación (para refrescar dentro de un modal). */
   onChanged?: () => void;
+  /**
+   * Contexto del producto para "Foto de producto con IA" (nombre, categoría,
+   * colores): sin esto el bloque no se muestra.
+   */
+  aiContext?: AiImageContext;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,9 +53,16 @@ export function ImageUpload({
     onDeleted: () => onChanged?.(),
   });
   const [isPending, startTransition] = useTransition();
+  // Foto de la pieza (del celular) para generar la foto de producto con IA.
+  const [aiSource, setAiSource] = useState<File | null>(null);
 
   function handleUpload(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
+    uploadFiles(Array.from(fileList));
+  }
+
+  function uploadFiles(picked: File[]) {
+    if (picked.length === 0) return;
     setError(null);
     const remaining = Math.max(0, 5 - images.length); // máximo 5 fotos
     if (remaining === 0) {
@@ -56,7 +70,7 @@ export function ImageUpload({
       if (inputRef.current) inputRef.current.value = "";
       return;
     }
-    const files = Array.from(fileList).slice(0, remaining);
+    const files = picked.slice(0, remaining);
     startTransition(async () => {
       for (const file of files) {
         const compact = await compressImageToWebp(file, 1600);
@@ -124,6 +138,29 @@ export function ImageUpload({
         ) : null}
         {error ? <p className="text-danger mt-2 text-xs">{error}</p> : null}
       </div>
+
+      {aiContext ? (
+        <div className="flex flex-col gap-2">
+          <label className="text-dim block text-xs font-medium">
+            Foto de la pieza para generar con IA
+          </label>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            disabled={isPending}
+            className="text-dim text-sm"
+            onChange={(e) => {
+              setAiSource(e.target.files?.[0] ?? null);
+            }}
+          />
+          <AiImagePanel
+            source={aiSource}
+            context={aiContext}
+            useLabel="Subir como foto del producto"
+            onUse={(file) => uploadFiles([file])}
+          />
+        </div>
+      ) : null}
 
       {/* Aviso cuando el producto tiene colores pero ninguna foto tiene el suyo:
           es exactamente el caso en que la tienda "no cambia la imagen". */}

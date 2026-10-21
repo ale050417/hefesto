@@ -93,3 +93,41 @@ export async function compressImageToWebp(
     return file;
   }
 }
+
+/**
+ * Versión chica en PNG para mandar a la IA de imágenes (ai-image): el modelo
+ * de Cloudflare exige referencias menores a 512×512, y PNG porque no está
+ * claro que acepte WebP. No agranda. Si algo falla, devuelve el original (el
+ * servidor valida tamaño y formato).
+ */
+export async function resizeImageToPng(
+  file: File,
+  maxSize = 500,
+): Promise<File> {
+  if (typeof window === "undefined" || !file.type.startsWith("image/")) {
+    return file;
+  }
+  try {
+    const img = await loadImage(await readAsDataURL(file));
+    let { width, height } = img;
+    if (width > maxSize || height > maxSize) {
+      const r = Math.min(maxSize / width, maxSize / height);
+      width = Math.round(width * r);
+      height = Math.round(height * r);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0, width, height);
+    const blob = await new Promise<Blob | null>((res) =>
+      canvas.toBlob(res, "image/png"),
+    );
+    if (!blob) return file;
+    const name = file.name.replace(/\.[^.]+$/, "") || "foto";
+    return new File([blob], `${name}.png`, { type: "image/png" });
+  } catch {
+    return file;
+  }
+}

@@ -581,6 +581,16 @@ export function ProductsAdmin({
               <ImageUpload
                 productId={modal.productId}
                 images={modal.images}
+                // Contexto para "Foto de producto con IA" (escena según la
+                // pieza): mismos datos que ya tiene el formulario del modal.
+                aiContext={{
+                  name: modal.defaults.name,
+                  category:
+                    categories.find((c) => c.id === modal.defaults.categoryId)
+                      ?.name ?? null,
+                  colors: modal.defaults.colors,
+                  description: modal.defaults.description || null,
+                }}
                 // A qué color puede corresponder cada foto: MISMAS etiquetas
                 // que elige el cliente en la tienda (si no coinciden, la
                 // galería no salta).

@@ -106,6 +106,14 @@ export default async function EditarProductoPage({
           <ImageUpload
             productId={product.id}
             images={images}
+            aiContext={{
+              name: product.name,
+              category:
+                categories.find((c) => c.id === product.categoryId)?.name ??
+                null,
+              colors: product.colors ?? [],
+              description: product.description ?? null,
+            }}
             // A qué color puede corresponder cada foto: MISMAS etiquetas que
             // elige el cliente en la tienda (si no coinciden, no salta).
             colorOptions={photoColorOptions({
