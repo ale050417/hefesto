@@ -40,16 +40,20 @@ export function ReceiptDocument({
       <header className="rcp-head">
         <div className="rcp-brand">
           {b.logoUrl ? (
+            // Grande y entero (2026-10-21, pedido de Ale): el logo del taller
+            // es un dibujo con detalle y lleva el nombre adentro; a 56px
+            // recortado y con esquinas redondas quedaba una mancha. Va a
+            // 96px de alto, con su proporción real y sin recorte (.rcp-logo).
             <Image
               src={b.logoUrl}
               alt={b.name}
-              width={56}
-              height={56}
+              width={96}
+              height={96}
               className="rcp-logo"
               priority
             />
           ) : (
-            <BrandMark size={56} />
+            <BrandMark size={64} />
           )}
           <div>
             <div className="rcp-brand-name">{b.name}</div>

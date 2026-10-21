@@ -5407,14 +5407,17 @@ td[role="checkbox"]:focus-visible .check {
 }
 .rcp-brand {
   display: flex;
-  gap: 14px;
-  align-items: flex-start;
+  gap: 16px;
+  align-items: center;
 }
+/* Logo entero, sin recorte ni esquinas: alto fijo y ancho según su
+   proporción (un isotipo cuadrado queda 96×96; un logo apaisado, más ancho).
+   Es PNG/WebP con fondo transparente sobre papel blanco. */
 .rcp-logo {
-  width: 56px;
-  height: 56px;
-  border-radius: 12px;
-  object-fit: cover;
+  height: 96px;
+  width: auto;
+  max-width: 200px;
+  object-fit: contain;
   flex-shrink: 0;
 }
 .rcp-brand-name {

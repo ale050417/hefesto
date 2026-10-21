@@ -95,12 +95,30 @@ async function registerFonts(): Promise<void> {
   Font.registerHyphenationCallback((word) => [word]);
 }
 
-type Logo = { data: Buffer; format: "png" };
+type Logo = { data: Buffer; format: "png"; width: number; height: number };
+
+// Alto del logo en la hoja PDF (en puntos). Mismo criterio que .rcp-logo en
+// la hoja HTML (96px a escala 0.75 = 72pt): entero, sin recorte, con su
+// proporción. Un logo muy apaisado se achica hasta entrar en LOGO_MAX_W.
+const LOGO_H = 72;
+const LOGO_MAX_W = 150;
+
+/** Caja del logo en el PDF: proporción real, dentro de LOGO_H × LOGO_MAX_W. */
+function logoBox(logo: Logo): { width: number; height: number } {
+  const scale = Math.min(LOGO_H / logo.height, LOGO_MAX_W / logo.width);
+  return {
+    width: Math.round(logo.width * scale),
+    height: Math.round(logo.height * scale),
+  };
+}
 
 /**
  * Logo del taller como PNG. Las fotos se suben en WebP (ver optimizeImage) y
- * react-pdf solo entiende PNG/JPG, así que se convierte con sharp. Si no hay
- * logo, no responde a tiempo o falla, va la marca dibujada (como en la web).
+ * react-pdf solo entiende PNG/JPG, así que se convierte con sharp. Se escala
+ * a 400px de lado mayor (sobra para 72pt impresos) SIN recortar y conservando
+ * la transparencia: antes se recortaba a un cuadrado de 160px y el logo salía
+ * una mancha. Si no hay logo, no responde a tiempo o falla, va la marca
+ * dibujada (como en la web).
  */
 async function loadLogo(url: string | null): Promise<Logo | null> {
   if (!url) return null;
@@ -108,11 +126,11 @@ async function loadLogo(url: string | null): Promise<Logo | null> {
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return null;
     const sharp = (await import("sharp")).default;
-    const data = await sharp(Buffer.from(await res.arrayBuffer()))
-      .resize(160, 160, { fit: "cover" })
+    const { data, info } = await sharp(Buffer.from(await res.arrayBuffer()))
+      .resize(400, 400, { fit: "inside", withoutEnlargement: true })
       .png()
-      .toBuffer();
-    return { data, format: "png" };
+      .toBuffer({ resolveWithObject: true });
+    return { data, format: "png", width: info.width, height: info.height };
   } catch (error) {
     console.error(
       "[comprobante] no se pudo cargar el logo para el PDF:",
@@ -167,17 +185,17 @@ const s = StyleSheet.create({
     borderBottomWidth: 1.5,
     borderBottomColor: C.gold,
   },
-  brand: { flexDirection: "row", gap: 10, alignItems: "flex-start", flex: 1 },
-  logo: { width: 42, height: 42, borderRadius: 9 },
+  brand: { flexDirection: "row", gap: 12, alignItems: "center", flex: 1 },
   brandName: {
     fontFamily: "Orbitron",
     fontWeight: 800,
     fontSize: 14,
     letterSpacing: 0.8,
+    lineHeight: 1.2,
     textTransform: "uppercase",
     color: C.ink,
   },
-  brandSub: { fontSize: 8.5, color: C.dim, marginTop: 1 },
+  brandSub: { fontSize: 8.5, color: C.dim, marginTop: 2 },
   contact: {
     marginTop: 6,
     flexDirection: "row",
@@ -432,9 +450,13 @@ function ReceiptPdf({
       <Page size="A4" style={s.page}>
         <View style={[s.head, { borderBottomColor: gold }]}>
           <View style={s.brand}>
-            {/* Image de react-pdf, no la etiqueta HTML: no lleva alt. */}
-            {/* eslint-disable-next-line jsx-a11y/alt-text */}
-            {logo ? <Image src={logo} style={s.logo} /> : <Mark />}
+            {logo ? (
+              // Image de react-pdf, no la etiqueta HTML: no lleva alt.
+              // eslint-disable-next-line jsx-a11y/alt-text
+              <Image src={logo} style={logoBox(logo)} />
+            ) : (
+              <Mark />
+            )}
             <View>
               <Text style={s.brandName}>{b.name}</Text>
               {b.slogan ? <Text style={s.brandSub}>{b.slogan}</Text> : null}
