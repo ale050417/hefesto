@@ -21,6 +21,7 @@ import { compressImageToWebp } from "@/lib/image-compress";
 import { useDragReframe } from "@/hooks/use-drag-reframe";
 import { useFormErrors } from "@/hooks/use-form-errors";
 import { AiImagePanel } from "./ai-image-panel";
+import { PhotoPicker } from "./photo-picker";
 
 function slugify(text: string): string {
   return text
@@ -668,7 +669,7 @@ export function ProductWizard({
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px]">
       {/* Columna del formulario por pasos. min-w-0: sin esto, el track 1fr no
           puede achicarse y el contenido desborda el modal (se veía recortado). */}
       <div className="flex min-w-0 flex-col gap-4">
@@ -790,6 +791,27 @@ export function ProductWizard({
             están definidos → una fila por cada uno con su "Elegir imagen") */}
         {step === 3 ? (
           <div className="flex flex-col gap-4">
+            {/* FOTO DE PRODUCTO CON IA: siempre visible (pedido de Ale
+                2026-10-21: antes aparecía recién al elegir la principal y
+                "no salía nada de crear con IA"). La generada pasa a ser la
+                portada; la foto del celular queda guardada por si quiere
+                volver. */}
+            <AiImagePanel
+              context={{
+                name,
+                category:
+                  categories.find((c) => c.id === categoryId)?.name ?? null,
+                colors,
+                description,
+              }}
+              useLabel="Usar como imagen principal"
+              fallbackSource={originalPhoto ? null : imageFile}
+              onUse={(file, source) => {
+                if (!originalPhoto) setOriginalPhoto(imageFile ?? source);
+                pickImage(file);
+              }}
+            />
+
             {/* FOTO POR COLOR / COMBINACIÓN: una fila por cada uno con su
                 "Elegir imagen" (la tienda salta a esa foto al elegirlo). */}
             {photoColorOptions.length > 0 ? (
@@ -886,12 +908,35 @@ export function ProductWizard({
                   <span className="text-danger">*</span>
                 )}
               </label>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                className="input"
-                onChange={(e) => pickImage(e.target.files?.[0] ?? null)}
+              <PhotoPicker
+                previewUrl={imageUrl}
+                fileName={imageFile?.name}
+                title="Arrastrá la foto de portada"
+                hint={
+                  imageUrl
+                    ? originalPhoto
+                      ? "Generada con IA a partir de tu foto."
+                      : "Cuadrada y de 1000 px o más queda mejor."
+                    : "O generala arriba con IA a partir de una foto de la pieza."
+                }
+                onPick={(files) => pickImage(files[0] ?? null)}
+                onClear={() => {
+                  pickImage(null);
+                  setOriginalPhoto(null);
+                }}
               />
+              {originalPhoto ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm self-start"
+                  onClick={() => {
+                    pickImage(originalPhoto);
+                    setOriginalPhoto(null);
+                  }}
+                >
+                  Volver a la foto original
+                </button>
+              ) : null}
               {imageUrl ? (
                 <div className="mt-2 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
@@ -921,40 +966,6 @@ export function ProductWizard({
               )}
             </div>
 
-            {imageFile ? (
-              <div className="field">
-                <AiImagePanel
-                  source={originalPhoto ?? imageFile}
-                  context={{
-                    name,
-                    category:
-                      categories.find((c) => c.id === categoryId)?.name ?? null,
-                    colors,
-                    description,
-                  }}
-                  useLabel="Usar como imagen principal"
-                  onUse={(file) => {
-                    // La generada pasa a ser la portada; la foto del celular
-                    // queda guardada por si quiere volver.
-                    if (!originalPhoto) setOriginalPhoto(imageFile);
-                    pickImage(file);
-                  }}
-                />
-                {originalPhoto ? (
-                  <button
-                    type="button"
-                    className="btn btn-ghost btn-sm mt-2 self-start"
-                    onClick={() => {
-                      pickImage(originalPhoto);
-                      setOriginalPhoto(null);
-                    }}
-                  >
-                    Volver a la foto original
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-
             <div className="field">
               <label>
                 Más fotos generales{" "}
@@ -962,16 +973,15 @@ export function ProductWizard({
                   (opcional, hasta 4)
                 </span>
               </label>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
+              <PhotoPicker
                 multiple
-                className="input"
-                onChange={(e) => {
-                  const picked = Array.from(e.target.files ?? []);
-                  setExtraFiles((prev) => [...prev, ...picked].slice(0, 4));
-                  e.currentTarget.value = "";
-                }}
+                title="Arrastrá más fotos"
+                hint="Ambiente o detalle, sin color asignado."
+                cta="Elegir fotos"
+                disabled={extraFiles.length >= 4}
+                onPick={(picked) =>
+                  setExtraFiles((prev) => [...prev, ...picked].slice(0, 4))
+                }
               />
               {extraUrls.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -999,9 +1009,6 @@ export function ProductWizard({
                   ))}
                 </div>
               ) : null}
-              <div className="text-faint mt-1 text-[11.5px]">
-                Fotos de ambiente o detalle, sin color asignado.
-              </div>
             </div>
           </div>
         ) : null}

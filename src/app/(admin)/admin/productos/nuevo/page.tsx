@@ -44,7 +44,10 @@ export default async function NuevoProductoPage() {
     );
   }
   return (
-    <div className="mx-auto max-w-2xl">
+    // max-w-4xl (antes 2xl): con la vista previa de 320 px al lado, el
+    // formulario quedaba en ~330 px y el paso Imágenes se veía apretado
+    // (pedido de Ale, 2026-10-21).
+    <div className="mx-auto max-w-4xl">
       <Link href="/admin/productos" className="text-dim hover:text-fg text-sm">
         ← Productos
       </Link>

@@ -5747,3 +5747,225 @@ td[role="checkbox"]:focus-visible .check {
   justify-content: flex-end;
   gap: 10px;
 }
+
+/* ============================================================
+   Alta/edición de productos: selector de fotos y tarjeta "Foto de
+   producto con IA" (rediseño 2026-10-21, pedido de Ale: "la vista se ve
+   re feo"; también en el celular). Clases usadas en photo-picker.tsx y
+   ai-image-panel.tsx.
+   ============================================================ */
+.photo-drop {
+  cursor: pointer;
+  border: 1.5px dashed var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.photo-drop:hover,
+.photo-drop:focus-visible,
+.photo-drop.is-over {
+  outline: none;
+  border-color: var(--gold);
+  background: rgba(var(--gold-rgb), 0.06);
+  box-shadow: 0 0 0 3px rgba(var(--gold-rgb), 0.12);
+}
+.photo-drop-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  color: var(--gold);
+  background: rgba(var(--gold-rgb), 0.12);
+}
+.photo-picked {
+  background: var(--surface-2);
+}
+
+.ai-card {
+  container: ai-card / inline-size;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(var(--gold-rgb), 0.28);
+  background:
+    radial-gradient(
+      120% 90% at 0% 0%,
+      rgba(var(--gold-rgb), 0.1),
+      transparent 55%
+    ),
+    var(--surface-1);
+  box-shadow: 0 10px 30px -22px rgba(var(--gold-rgb), 0.6);
+}
+.ai-card-ic {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  color: var(--gold-fg);
+  background: linear-gradient(135deg, var(--gold-bright), var(--gold-deep));
+  box-shadow: 0 6px 16px -8px var(--gold-glow);
+}
+.ai-card-badge {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: var(--gold-bright);
+  background: rgba(var(--gold-rgb), 0.12);
+  border: 1px solid rgba(var(--gold-rgb), 0.25);
+  white-space: nowrap;
+}
+.ai-card-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+/* Las dos columnas (foto / escena) solo cuando la tarjeta tiene lugar: se
+   mide la tarjeta, no la pantalla (en el wizard convive con la vista previa). */
+@container ai-card (min-width: 540px) {
+  .ai-card-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+.ai-step {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.ai-step-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gold-fg);
+  background: var(--gold);
+}
+.ai-chip {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.ai-chip:hover:not(:disabled) {
+  border-color: var(--gold);
+}
+.ai-chip.active {
+  border-color: var(--gold);
+  background: rgba(var(--gold-rgb), 0.14);
+  color: var(--gold-bright);
+}
+.ai-chip:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Comparación "tu foto → catálogo": dos cuadrados; en el celular, uno
+   debajo del otro con la flecha girada. */
+.ai-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  max-width: 520px;
+}
+.ai-slot {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.ai-slot img,
+.ai-slot-empty {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 14px;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.ai-slot-empty {
+  font-size: 12px;
+  color: var(--text-faint);
+  border: 1.5px dashed var(--border-strong);
+  background: var(--surface-2);
+}
+.ai-slot.is-result .ai-slot-empty {
+  border-color: rgba(var(--gold-rgb), 0.45);
+}
+.ai-slot.is-busy .ai-slot-empty {
+  color: var(--gold-bright);
+  border-style: solid;
+  background: linear-gradient(
+      100deg,
+      transparent 20%,
+      rgba(var(--gold-rgb), 0.16) 50%,
+      transparent 80%
+    )
+    var(--surface-2);
+  background-size: 220% 100%;
+  animation: hef-ai-shimmer 1.4s linear infinite;
+}
+.ai-slot figcaption {
+  font-size: 11.5px;
+  text-align: center;
+  color: var(--text-faint);
+}
+.ai-arrow {
+  color: var(--gold);
+  display: inline-flex;
+}
+@keyframes hef-ai-shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+@container ai-card (max-width: 340px) {
+  .ai-stage {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+  }
+  .ai-slot {
+    width: min(100%, 220px);
+  }
+  .ai-arrow {
+    transform: rotate(90deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-slot.is-busy .ai-slot-empty {
+    animation: none;
+  }
+}

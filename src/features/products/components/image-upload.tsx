@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { compressImageToWebp } from "@/lib/image-compress";
 import {
   deleteProductImageAction,
@@ -15,6 +16,7 @@ import type { ProductImage } from "../types";
 import { runAction } from "@/lib/run-action";
 import { useDeleteResource } from "@/hooks/use-delete-resource";
 import { AiImagePanel, type AiImageContext } from "./ai-image-panel";
+import { PhotoPicker } from "./photo-picker";
 
 export function ImageUpload({
   productId,
@@ -42,7 +44,6 @@ export function ImageUpload({
    */
   aiContext?: AiImageContext;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   // Patrón único de eliminación (modo toast; el error se ve como toast).
   const { deleteResource: removeImage } = useDeleteResource({
@@ -53,21 +54,12 @@ export function ImageUpload({
     onDeleted: () => onChanged?.(),
   });
   const [isPending, startTransition] = useTransition();
-  // Foto de la pieza (del celular) para generar la foto de producto con IA.
-  const [aiSource, setAiSource] = useState<File | null>(null);
-
-  function handleUpload(fileList: FileList | null) {
-    if (!fileList || fileList.length === 0) return;
-    uploadFiles(Array.from(fileList));
-  }
-
   function uploadFiles(picked: File[]) {
     if (picked.length === 0) return;
     setError(null);
     const remaining = Math.max(0, 5 - images.length); // máximo 5 fotos
     if (remaining === 0) {
       setError("Máximo 5 fotos por producto.");
-      if (inputRef.current) inputRef.current.value = "";
       return;
     }
     const files = picked.slice(0, remaining);
@@ -82,7 +74,6 @@ export function ImageUpload({
         });
         if (!res.ok) setError(res.error.message);
       }
-      if (inputRef.current) inputRef.current.value = "";
       onChanged?.();
     });
   }
@@ -119,48 +110,31 @@ export function ImageUpload({
 
   return (
     <div className="space-y-4">
-      <div>
-        <label className="text-dim mb-1 block text-xs font-medium">
-          Subir imagen (hasta 5, se convierte a WebP). Recomendado: cuadrada,
-          1000×1000 px o más — así llena la tarjeta sin recortes raros.
-        </label>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
+      {aiContext ? (
+        <AiImagePanel
+          context={aiContext}
+          useLabel="Subir como foto del producto"
+          disabled={isPending || images.length >= 5}
+          onUse={(file) => uploadFiles([file])}
+        />
+      ) : null}
+
+      <div className="flex flex-col gap-2">
+        <PhotoPicker
           multiple
-          disabled={isPending}
-          onChange={(e) => handleUpload(e.target.files)}
-          className="text-dim text-sm"
+          title={images.length >= 5 ? "Ya hay 5 fotos" : "Subir fotos"}
+          hint="Hasta 5 por producto, se convierten a WebP. Cuadradas y de 1000 px o más llenan la tarjeta sin recortes."
+          cta="Elegir fotos"
+          disabled={isPending || images.length >= 5}
+          onPick={uploadFiles}
         />
         {isPending ? (
-          <p className="text-dim mt-2 text-xs">Procesando...</p>
+          <p className="text-dim flex items-center gap-2 text-xs">
+            <Spinner size={13} /> Subiendo…
+          </p>
         ) : null}
-        {error ? <p className="text-danger mt-2 text-xs">{error}</p> : null}
+        {error ? <p className="text-danger text-xs">{error}</p> : null}
       </div>
-
-      {aiContext ? (
-        <div className="flex flex-col gap-2">
-          <label className="text-dim block text-xs font-medium">
-            Foto de la pieza para generar con IA
-          </label>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            disabled={isPending}
-            className="text-dim text-sm"
-            onChange={(e) => {
-              setAiSource(e.target.files?.[0] ?? null);
-            }}
-          />
-          <AiImagePanel
-            source={aiSource}
-            context={aiContext}
-            useLabel="Subir como foto del producto"
-            onUse={(file) => uploadFiles([file])}
-          />
-        </div>
-      ) : null}
 
       {/* Aviso cuando el producto tiene colores pero ninguna foto tiene el suyo:
           es exactamente el caso en que la tienda "no cambia la imagen". */}

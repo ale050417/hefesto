@@ -89,7 +89,10 @@ export default async function EditarProductoPage({
         <ProductStatusActions productId={product.id} status={product.status} />
       </div>
 
-      <div className="mt-6 grid gap-8 lg:grid-cols-2">
+      {/* grid-cols-1 explícito: sin él la columna implícita mide el
+          contenido (min-content) y en el celular la página desbordaba a lo
+          ancho (2026-10-21). */}
+      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <div>
           <h2 className="font-display text-fg mb-3 text-lg">Datos</h2>
           <ProductForm
