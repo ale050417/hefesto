@@ -227,3 +227,33 @@ export async function clearDefaultAddresses(
     .set({ isDefault: false })
     .where(and(eq(addresses.customerId, customerId)));
 }
+
+/* ----- Búsqueda por nombre (comprobante de una venta manual) ----- */
+
+/**
+ * Clientes manuales con ese nombre EXACTO (sin distinguir mayúsculas). Tope 2:
+ * a quien llama solo le importa si hay uno, ninguno o varios.
+ */
+export async function findManualCustomersByName(
+  name: string,
+  database: Database = db,
+): Promise<ManualCustomer[]> {
+  return database.query.manualCustomers.findMany({
+    where: sql`lower(${manualCustomers.name}) = lower(${name})`,
+    limit: 2,
+  });
+}
+
+/** Clientes registrados con ese nombre exacto (mismo criterio y tope). */
+export async function findProfilesByName(
+  name: string,
+  database: Database = db,
+): Promise<Profile[]> {
+  return database.query.profiles.findMany({
+    where: and(
+      eq(profiles.role, "customer"),
+      sql`lower(${profiles.fullName}) = lower(${name})`,
+    ),
+    limit: 2,
+  });
+}

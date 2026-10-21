@@ -20,6 +20,8 @@ import { ManualSaleStatusSelect } from "./manual-sale-status-select";
 import { OrderStatusSelect } from "./order-status-select";
 import { saleMatches } from "../sale-search";
 import { ManualSaleEditButton } from "./manual-sale-edit-modal";
+import { ReceiptButton } from "./receipt-button";
+import { manualSaleCode } from "../receipt";
 
 export type UnifiedSale = {
   id: string;
@@ -254,6 +256,9 @@ export function OrdersBoard({
       </details>
     );
   };
+  // Número del comprobante: el del pedido en online; derivado del id en manual.
+  const codeOf = (o: UnifiedSale) =>
+    o.source === "online" ? o.ref || o.label : manualSaleCode(o.id);
   // Datos de la venta manual para el modal de edición de números.
   const toEditData = (o: UnifiedSale) => ({
     id: o.id,
@@ -466,18 +471,27 @@ export function OrdersBoard({
                         </div>
                       </td>
                       <td className="text-right">
-                        {o.source === "online" ? (
-                          <Link
-                            href={`/admin/pedidos/${o.id}`}
-                            className="text-primary hover:underline"
-                          >
-                            Ver
-                          </Link>
-                        ) : canEdit ? (
-                          <ManualSaleEditButton sale={toEditData(o)} />
-                        ) : (
-                          <span className="text-faint">—</span>
-                        )}
+                        <div className="flex items-center justify-end gap-1">
+                          {/* Comprobante para el cliente (2026-10-20): abre
+                              el modal con vista previa, Imprimir y Descargar. */}
+                          <ReceiptButton
+                            kind={o.source}
+                            id={o.id}
+                            code={codeOf(o)}
+                            customerName={o.customerName}
+                            total={o.total}
+                          />
+                          {o.source === "online" ? (
+                            <Link
+                              href={`/admin/pedidos/${o.id}`}
+                              className="text-primary hover:underline"
+                            >
+                              Ver
+                            </Link>
+                          ) : canEdit ? (
+                            <ManualSaleEditButton sale={toEditData(o)} />
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -527,6 +541,13 @@ export function OrdersBoard({
                   </div>
                   <div className="flex items-center gap-2">
                     <DeleteCell o={o} />
+                    <ReceiptButton
+                      kind={o.source}
+                      id={o.id}
+                      code={codeOf(o)}
+                      customerName={o.customerName}
+                      total={o.total}
+                    />
                     {o.source === "online" ? (
                       <Link
                         href={`/admin/pedidos/${o.id}`}

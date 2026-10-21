@@ -507,3 +507,20 @@ export async function getSaleColors(
     .from(filamentMovements)
     .where(inArray(filamentMovements.reason, ["order", "manual_sale"]));
 }
+
+/** Colores que consumió UNA venta/pedido (comprobante de una venta simple). */
+export async function getSaleColorsFor(
+  refId: string,
+  database: Database = db,
+): Promise<string[]> {
+  const rows = await database
+    .selectDistinct({ color: filamentMovements.color })
+    .from(filamentMovements)
+    .where(
+      and(
+        eq(filamentMovements.refId, refId),
+        inArray(filamentMovements.reason, ["order", "manual_sale"]),
+      ),
+    );
+  return rows.map((r) => r.color);
+}

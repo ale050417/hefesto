@@ -232,3 +232,9 @@ export async function listSaleColors(): Promise<Record<string, string[]>> {
     map[k] = [...new Set(map[k])].sort((a, b) => a.localeCompare(b, "es"));
   return map;
 }
+
+/** Colores de UNA venta (orden alfabético), para su comprobante. */
+export async function listColorsForSale(refId: string): Promise<string[]> {
+  const colors = await repo.getSaleColorsFor(refId);
+  return [...new Set(colors)].sort((a, b) => a.localeCompare(b, "es"));
+}

@@ -635,3 +635,14 @@ export async function deleteManualSale(id: string): Promise<void> {
   });
   await db.delete(manualSales).where(eq(manualSales.id, id));
 }
+
+/** Una venta manual con sus líneas, por id (comprobante). Null si no existe. */
+export async function getManualSale(
+  id: string,
+): Promise<ManualSaleWithItems | null> {
+  const sale = await db.query.manualSales.findFirst({
+    where: eq(manualSales.id, id),
+    with: { items: true },
+  });
+  return sale ?? null;
+}

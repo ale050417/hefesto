@@ -5352,3 +5352,382 @@ td[role="checkbox"]:focus-visible .check {
     transform: none;
   }
 }
+
+/* ============================================================
+   Comprobante de venta (/comprobante/[tipo]/[id]) — hoja imprimible.
+   Colores FIJOS (papel blanco, tinta oscura, dorado de marca): el
+   comprobante se ve igual en tema claro u oscuro y al guardar como PDF.
+   ============================================================ */
+.rcp-page {
+  min-height: 100dvh;
+  background: #e6e7ec;
+  padding: 20px 16px 56px;
+  color: #18181f;
+}
+.rcp-toolbar {
+  max-width: 820px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.rcp-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.rcp-hint {
+  font-size: 12px;
+  color: #5b5b68;
+}
+.rcp-sheet {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 40px 44px 32px;
+  background: #fff;
+  color: #18181f;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.14);
+  font-family: var(--font-sora), system-ui, sans-serif;
+  font-size: 13.5px;
+  line-height: 1.45;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.rcp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid var(--gold);
+}
+.rcp-brand {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.rcp-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.rcp-brand-name {
+  font-family: var(--font-orbitron), system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 19px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0a0a0f;
+  line-height: 1.15;
+}
+.rcp-brand-sub {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #5b5b68;
+}
+.rcp-contact {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  font-size: 11.5px;
+  color: #5b5b68;
+}
+.rcp-doc {
+  text-align: right;
+  flex-shrink: 0;
+}
+.rcp-doc-title {
+  font-family: var(--font-orbitron), system-ui, sans-serif;
+  font-size: 10.5px;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: #5b5b68;
+}
+.rcp-doc-code {
+  margin-top: 4px;
+  font-family: var(--font-orbitron), system-ui, sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: #0a0a0f;
+}
+.rcp-doc-meta {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #5b5b68;
+}
+.rcp-status {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid #cfd0d8;
+  background: #f1f2f6;
+  color: #5b5b68;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.rcp-status[data-tone="success"] {
+  color: #1f7a4d;
+  border-color: #9fd6b8;
+  background: #eaf7ef;
+}
+.rcp-status[data-tone="info"] {
+  color: #2a5f99;
+  border-color: #a9c8ea;
+  background: #eaf2fb;
+}
+.rcp-status[data-tone="warning"] {
+  color: #8a5a0f;
+  border-color: #ecc98a;
+  background: #fbf3e3;
+}
+.rcp-status[data-tone="danger"] {
+  color: #9b2f22;
+  border-color: #efb0a7;
+  background: #fdecea;
+}
+.rcp-alert {
+  margin-top: 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #efb0a7;
+  background: #fdecea;
+  color: #9b2f22;
+  font-size: 12.5px;
+}
+.rcp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 20px 24px;
+  padding: 22px 0;
+  border-bottom: 1px solid #e3e5ec;
+}
+.rcp-block h3 {
+  margin: 0 0 8px;
+  font-family: var(--font-orbitron), system-ui, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--gold-deep);
+}
+.rcp-block p {
+  margin: 0 0 2px;
+}
+.rcp-strong {
+  font-weight: 600;
+  font-size: 14.5px;
+  color: #0a0a0f;
+}
+.rcp-muted {
+  color: #5b5b68;
+}
+.rcp-dates {
+  display: grid;
+  gap: 4px;
+}
+.rcp-dates > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rcp-dates > div > span:last-child {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.rcp-table {
+  width: 100%;
+  margin-top: 22px;
+  border-collapse: collapse;
+}
+.rcp-table th {
+  padding: 0 8px 10px;
+  border-bottom: 1px solid #e3e5ec;
+  font-family: var(--font-orbitron), system-ui, sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-align: left;
+  color: #5b5b68;
+}
+.rcp-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #eef0f4;
+  vertical-align: top;
+}
+.rcp-table .num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.rcp-line-name {
+  font-weight: 500;
+  color: #0a0a0f;
+}
+.rcp-line-detail {
+  font-size: 12px;
+  color: #5b5b68;
+}
+.rcp-totals {
+  width: 100%;
+  max-width: 300px;
+  margin: 14px 0 0 auto;
+  display: grid;
+  gap: 6px;
+}
+.rcp-totals > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.rcp-totals .rcp-total {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 2px solid var(--gold);
+  font-family: var(--font-orbitron), system-ui, sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: #0a0a0f;
+}
+.rcp-pay {
+  margin-top: 18px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  border: 1px solid #e3e5ec;
+  background: #f8f9fc;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 20px;
+  font-size: 12.5px;
+}
+.rcp-foot {
+  margin-top: 28px;
+  padding-top: 16px;
+  border-top: 1px solid #e3e5ec;
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  font-size: 11px;
+  color: #9a9aa6;
+}
+.rcp-foot-right {
+  text-align: right;
+}
+.rcp-thanks {
+  margin-bottom: 2px;
+  font-family: var(--font-orbitron), system-ui, sans-serif;
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  color: var(--gold-deep);
+}
+@media (max-width: 640px) {
+  .rcp-sheet {
+    padding: 24px 18px;
+    border-radius: 10px;
+  }
+  .rcp-head {
+    flex-direction: column;
+  }
+  .rcp-doc,
+  .rcp-foot-right {
+    text-align: left;
+  }
+}
+@page {
+  size: A4;
+  margin: 12mm;
+}
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+  .rcp-page {
+    min-height: auto;
+    padding: 0;
+    background: #fff;
+  }
+  .rcp-toolbar {
+    display: none !important;
+  }
+  .rcp-sheet {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .rcp-table tr,
+  .rcp-block,
+  .rcp-totals,
+  .rcp-pay {
+    break-inside: avoid;
+  }
+}
+
+/* Modo embebido (?embed=1): la hoja sola dentro del iframe del modal
+   "Comprobante" del panel, sin barra ni fondo gris. */
+.rcp-embed {
+  min-height: auto;
+  padding: 0;
+  background: #fff;
+}
+.rcp-embed .rcp-sheet {
+  max-width: none;
+  margin: 0;
+  padding: 28px 30px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Modal "Comprobante": vista previa + Imprimir / Descargar PDF. */
+.rcp-modal-sub {
+  margin: 0 0 12px;
+  color: var(--text-dim);
+  font-size: 13.5px;
+}
+.rcp-preview {
+  position: relative;
+  height: 58vh;
+  min-height: 320px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+.rcp-preview iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.rcp-preview-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #fff;
+  color: #5b5b68;
+  font-size: 13.5px;
+}
+.rcp-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}

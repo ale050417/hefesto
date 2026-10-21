@@ -24,7 +24,14 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  serverExternalPackages: ["sharp"],
+  // react-pdf (comprobante en PDF) se carga desde node_modules, sin empaquetar:
+  // es la forma soportada en el App Router.
+  serverExternalPackages: ["sharp", "@react-pdf/renderer"],
+  // Las fuentes del PDF (public/fonts) se leen con fs en el servidor: hay que
+  // incluirlas en el trazado de la función, si no en Vercel no existen.
+  outputFileTracingIncludes: {
+    "/comprobante/**": ["./public/fonts/*.ttf"],
+  },
   // Subir imágenes (logo/hero/banner/productos) por Server Actions: el límite
   // por defecto es 1 MB. Lo subimos a 8 MB (igual al tope que valida el server).
   experimental: {

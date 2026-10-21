@@ -16,6 +16,8 @@ import {
   clearDefaultAddresses,
   deleteAddressRow,
   findAddressById,
+  findManualCustomersByName,
+  findProfilesByName,
   getCustomerOrderAggregates,
   getDefaultCities,
   getManualCustomerById,
@@ -286,4 +288,38 @@ export async function updateCustomerNote(
       ? await updateManualCustomerRow(id, { note })
       : await updateProfileNote(id, note);
   if (!row) throw new NotFoundError("No encontramos el cliente.");
+}
+
+export type CustomerContact = {
+  phone: string | null;
+  email: string | null;
+  city: string | null;
+};
+
+/**
+ * Contacto de un cliente a partir de su NOMBRE, para el comprobante de una
+ * venta manual (que guarda al cliente como texto). Solo devuelve algo si hay
+ * UNA coincidencia exacta entre los clientes manuales o, si no, entre los
+ * registrados: con dos "Juan Pérez" no se adivina — mejor nada que el
+ * teléfono de otro en un documento que recibe el cliente.
+ */
+export async function findContactByName(
+  name: string,
+): Promise<CustomerContact | null> {
+  const clean = name.trim();
+  if (!clean) return null;
+  const manual = await findManualCustomersByName(clean);
+  const m = manual[0];
+  if (manual.length === 1 && m) {
+    return { phone: m.phone, email: m.email, city: m.city };
+  }
+  if (manual.length > 1) return null;
+  const registered = await findProfilesByName(clean);
+  const p = registered[0];
+  if (registered.length !== 1 || !p) return null;
+  const [email, cities] = await Promise.all([
+    getUserEmail(p.id).catch(() => null),
+    getDefaultCities([p.id]),
+  ]);
+  return { phone: p.phone, email, city: cities.get(p.id) ?? null };
 }

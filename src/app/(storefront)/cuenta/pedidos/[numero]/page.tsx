@@ -8,6 +8,7 @@ import {
   ORDER_STATUS_VARIANT,
 } from "@/features/orders/constants";
 import { OrderSummary } from "@/features/orders/components/order-summary";
+import { ReceiptButton } from "@/features/orders/components/receipt-button";
 import { getOrderForCustomer } from "@/features/orders/services/orderQueries";
 import { getOrderMessages } from "@/features/orders/services/orderChat";
 import { OrderChat } from "@/features/orders/components/order-chat";
@@ -105,6 +106,15 @@ export default async function MyOrderDetailPage({
             </Badge>
           </div>
         </div>
+        {/* El cliente se baja o imprime su propio comprobante (la página y el
+            PDF validan que el pedido sea suyo). */}
+        <ReceiptButton
+          kind="online"
+          id={order.id}
+          code={order.orderNumber}
+          total={Number(order.total)}
+          variant="button"
+        />
       </div>
 
       {order.status === "ready" ? (

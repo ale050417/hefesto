@@ -9,6 +9,7 @@ import {
 import { OrderStatusManager } from "@/features/orders/components/order-status-manager";
 import { DeleteOrderButton } from "@/features/orders/components/order-actions";
 import { OrderSummary } from "@/features/orders/components/order-summary";
+import { ReceiptButton } from "@/features/orders/components/receipt-button";
 import { getOrderAdmin } from "@/features/orders/services/orderAdminService";
 import { getOrderMessages } from "@/features/orders/services/orderChat";
 import { OrderChat } from "@/features/orders/components/order-chat";
@@ -60,6 +61,16 @@ export default async function OrderDetailAdminPage({
           </div>
           <div className="page-sub">{dateFmt.format(order.createdAt)}</div>
         </div>
+        {/* Comprobante para el cliente: modal con vista previa, Imprimir y
+            Descargar PDF. */}
+        <ReceiptButton
+          kind="online"
+          id={order.id}
+          code={order.orderNumber}
+          customerName={order.customer?.fullName ?? null}
+          total={Number(order.total)}
+          variant="button"
+        />
       </div>
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_320px]">
