@@ -35,6 +35,7 @@ import {
   paidLabel,
   RECEIPT_FOOT_NOTE,
 } from "../receipt-format";
+import { logoToPng, type LogoPng } from "./logo-png";
 
 /**
  * El comprobante como PDF (botón "Descargar PDF", 2026-10-20). Mismo diseño
@@ -95,7 +96,7 @@ async function registerFonts(): Promise<void> {
   Font.registerHyphenationCallback((word) => [word]);
 }
 
-type Logo = { data: Buffer; format: "png"; width: number; height: number };
+type Logo = LogoPng;
 
 // Logo en la hoja PDF (en puntos), mismo criterio que .rcp-logo-tile en la
 // hoja HTML a escala 0.75: placa oscura de 72pt de alto con el logo entero
@@ -116,24 +117,17 @@ function logoBox(logo: Logo): { width: number; height: number } {
 }
 
 /**
- * Logo del taller como PNG. Las fotos se suben en WebP (ver optimizeImage) y
- * react-pdf solo entiende PNG/JPG, así que se convierte con sharp. Se escala
- * a 400px de lado mayor (sobra para 72pt impresos) SIN recortar y conservando
- * la transparencia: antes se recortaba a un cuadrado de 160px y el logo salía
- * una mancha. Si no hay logo, no responde a tiempo o falla, va la marca
- * dibujada (como en la web).
+ * Logo del taller como PNG, entero y con transparencia (la conversión vive
+ * en logo-png.ts: sharp si está, si no un decodificador wasm, porque en
+ * Vercel sharp no carga). Si no hay logo, no responde a tiempo o falla, va
+ * la marca dibujada (como en la web).
  */
 async function loadLogo(url: string | null): Promise<Logo | null> {
   if (!url) return null;
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!res.ok) return null;
-    const sharp = (await import("sharp")).default;
-    const { data, info } = await sharp(Buffer.from(await res.arrayBuffer()))
-      .resize(400, 400, { fit: "inside", withoutEnlargement: true })
-      .png()
-      .toBuffer({ resolveWithObject: true });
-    return { data, format: "png", width: info.width, height: info.height };
+    return await logoToPng(Buffer.from(await res.arrayBuffer()));
   } catch (error) {
     console.error(
       "[comprobante] no se pudo cargar el logo para el PDF:",
