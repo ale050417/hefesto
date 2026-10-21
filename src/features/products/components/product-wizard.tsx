@@ -21,7 +21,7 @@ import { compressImageToWebp } from "@/lib/image-compress";
 import { useDragReframe } from "@/hooks/use-drag-reframe";
 import { useFormErrors } from "@/hooks/use-form-errors";
 import { AiImagePanel } from "./ai-image-panel";
-import { PhotoPicker } from "./photo-picker";
+import { ColorPhotoRow, MediaBoard } from "./media-board";
 
 function slugify(text: string): string {
   return text
@@ -37,6 +37,14 @@ const money = (n: number) => "$" + Math.round(n).toLocaleString("es-AR");
 // Imágenes va DESPUÉS de Precio: las combinaciones/colores se definen antes y
 // recién ahí se asigna la imagen de cada uno (fila por color → "Elegir imagen").
 const STEPS = ["Básicos", "Detalle", "Precio", "Imágenes", "Publicación"];
+/** Qué se hace en cada paso: va debajo del stepper (2026-10-21). */
+const STEP_SUBTITLES = [
+  "Nombre, categoría y descripción.",
+  "Colores, tiempo de entrega y medidas.",
+  "Calculá el precio con la calculadora; tamaños y colores si varían.",
+  "La portada, más fotos y la foto de cada color. Generá una con IA.",
+  "Publicado o borrador, y si va en el inicio.",
+];
 
 type Props = {
   categories: Category[];
@@ -673,32 +681,46 @@ export function ProductWizard({
       {/* Columna del formulario por pasos. min-w-0: sin esto, el track 1fr no
           puede achicarse y el contenido desborda el modal (se veía recortado). */}
       <div className="flex min-w-0 flex-col gap-4">
-        {/* Stepper */}
-        <div className="flex items-center gap-2">
+        {/* Stepper: barra por tramos; los pasos hechos se tocan para volver
+            (antes eran circulitos con número y sin título del paso). */}
+        <div className="wiz-steps" role="list" aria-label="Pasos">
           {STEPS.map((label, i) => (
-            <div key={label} className="flex flex-1 items-center gap-2">
-              <div
-                className={cn(
-                  "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold",
-                  i === step
-                    ? "bg-[var(--gold)] text-black"
-                    : i < step
-                      ? "bg-[rgba(var(--gold-rgb),.2)] text-[var(--gold-bright)]"
-                      : "text-dim bg-[var(--surface-2)]",
-                )}
-              >
-                {i < step ? "✓" : i + 1}
-              </div>
-              <span
-                className={cn(
-                  "hidden text-[12.5px] sm:inline",
-                  i === step ? "text-fg font-medium" : "text-faint",
-                )}
-              >
+            <button
+              key={label}
+              type="button"
+              role="listitem"
+              aria-current={i === step ? "step" : undefined}
+              className={cn(
+                "wiz-step",
+                i < step && "is-done",
+                i === step && "is-current",
+              )}
+              disabled={busy || i >= step}
+              onClick={() => {
+                if (i < step) {
+                  setErr(null);
+                  setStep(i);
+                }
+              }}
+            >
+              <span className="wiz-step-bar" />
+              <span className="wiz-step-label">
+                {i < step ? "✓ " : ""}
                 {label}
               </span>
-            </div>
+            </button>
           ))}
+        </div>
+        <div className="wiz-title">
+          <div>
+            <h2>{STEPS[step]}</h2>
+            <div className="text-faint text-[12.5px]">
+              {STEP_SUBTITLES[step]}
+            </div>
+          </div>
+          <small>
+            Paso {step + 1} de {STEPS.length}
+          </small>
         </div>
 
         {err ? (
@@ -804,16 +826,118 @@ export function ProductWizard({
                 colors,
                 description,
               }}
-              useLabel="Usar como imagen principal"
+              useLabel="Usar como portada"
               fallbackSource={originalPhoto ? null : imageFile}
               onUse={(file, source) => {
                 if (!originalPhoto) setOriginalPhoto(imageFile ?? source);
                 pickImage(file);
               }}
+              onUseExtra={
+                extraFiles.length < 4
+                  ? (file) =>
+                      setExtraFiles((prev) => [...prev, file].slice(0, 4))
+                  : null
+              }
             />
 
-            {/* FOTO POR COLOR / COMBINACIÓN: una fila por cada uno con su
-                "Elegir imagen" (la tienda salta a esa foto al elegirlo). */}
+            {/* TABLERO DE FOTOS: portada grande + hasta 4 más, como mosaico
+                (antes: dos zonas de arrastre apiladas, 2026-10-21). */}
+            <div className="field">
+              <label>
+                Fotos del producto{" "}
+                <span className="text-faint font-normal">
+                  (portada{mainImageOptional ? " opcional" : ""} + hasta 4 más)
+                </span>
+              </label>
+              <MediaBoard
+                main={
+                  imageUrl
+                    ? { key: "main", url: imageUrl, name: imageFile?.name }
+                    : null
+                }
+                mainRequired={!mainImageOptional}
+                mainBadge={originalPhoto ? "Generada con IA" : null}
+                extras={extraFiles.map((f, i) => ({
+                  key: `${i}-${f.name}-${f.size}`,
+                  url: extraUrls[i] ?? "",
+                  name: f.name,
+                }))}
+                onAdd={(files) => {
+                  let rest = files;
+                  if (!imageFile && rest.length > 0) {
+                    pickImage(rest[0]!);
+                    setOriginalPhoto(null);
+                    rest = rest.slice(1);
+                  }
+                  if (rest.length > 0)
+                    setExtraFiles((prev) => [...prev, ...rest].slice(0, 4));
+                }}
+                onRemoveMain={() => {
+                  pickImage(null);
+                  setOriginalPhoto(null);
+                }}
+                onRemoveExtra={(key) =>
+                  setExtraFiles((prev) =>
+                    prev.filter((f, i) => `${i}-${f.name}-${f.size}` !== key),
+                  )
+                }
+                onMakeMain={(key) => {
+                  // Intercambia: la extra pasa a portada y la portada actual
+                  // baja a extra (no se pierde ninguna).
+                  const idx = extraFiles.findIndex(
+                    (f, i) => `${i}-${f.name}-${f.size}` === key,
+                  );
+                  const picked = extraFiles[idx];
+                  if (!picked) return;
+                  const prevMain = imageFile;
+                  setExtraFiles((prev) => {
+                    const next = prev.filter((_, i) => i !== idx);
+                    return prevMain ? [prevMain, ...next].slice(0, 4) : next;
+                  });
+                  setOriginalPhoto(null);
+                  pickImage(picked);
+                }}
+                mainActions={
+                  imageUrl ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={autoFrame}
+                      >
+                        ✨ Auto-encuadre
+                      </Button>
+                      {originalPhoto ? (
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => {
+                            pickImage(originalPhoto);
+                            setOriginalPhoto(null);
+                          }}
+                        >
+                          Volver a la foto original
+                        </button>
+                      ) : null}
+                      <span className="text-faint text-[11.5px]">
+                        Arrastrá la imagen en la vista previa para acomodar el
+                        encuadre.
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-faint text-[11.5px]">
+                      {mainImageOptional
+                        ? "Sin portada, se usa la primera foto de color."
+                        : "Podés arrastrar varias fotos de una: la primera queda de portada."}
+                    </span>
+                  )
+                }
+              />
+            </div>
+
+            {/* FOTO POR COLOR / COMBINACIÓN: una casilla por cada uno (la
+                tienda salta a esa foto al elegirlo). */}
             {photoColorOptions.length > 0 ? (
               <div className="field">
                 <label>
@@ -826,190 +950,25 @@ export function ProductWizard({
                   Al elegir{" "}
                   {colorMode === "multi" ? "la combinación" : "el color"} en la
                   tienda, la galería muestra su foto. Sin foto propia, se ve la
-                  principal.
+                  portada.
                 </p>
-                <div className="mt-2 flex flex-col gap-2">
-                  {photoColorOptions.map((opt) => (
-                    <div
-                      key={opt}
-                      className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--border)] p-2.5"
-                    >
-                      <span className="flex flex-1 items-center gap-2 text-sm">
-                        {colorMode === "single" ? (
-                          <span
-                            style={{
-                              width: 13,
-                              height: 13,
-                              borderRadius: "50%",
-                              background: hexOf(opt),
-                              border: "1px solid var(--border)",
-                              flexShrink: 0,
-                            }}
-                          />
-                        ) : null}
-                        {opt}
-                      </span>
-                      {colorImageUrls[opt] ? (
-                        <>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={colorImageUrls[opt]}
-                            alt={opt}
-                            className="h-12 w-12 rounded-md object-cover"
-                          />
-                          <button
-                            type="button"
-                            className="btn-icon btn-ghost"
-                            aria-label={`Quitar foto de ${opt}`}
-                            onClick={() =>
-                              setColorImages((prev) => {
-                                const next = { ...prev };
-                                delete next[opt];
-                                return next;
-                              })
-                            }
-                          >
-                            ✕
-                          </button>
-                        </>
-                      ) : (
-                        <label className="btn btn-secondary btn-sm cursor-pointer">
-                          Elegir imagen
-                          <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            className="hidden"
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f)
-                                setColorImages((prev) => ({
-                                  ...prev,
-                                  [opt]: f,
-                                }));
-                              e.currentTarget.value = "";
-                            }}
-                          />
-                        </label>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <ColorPhotoRow
+                  options={photoColorOptions}
+                  urls={colorImageUrls}
+                  hexOf={colorMode === "single" ? hexOf : null}
+                  onPick={(opt, f) =>
+                    setColorImages((prev) => ({ ...prev, [opt]: f }))
+                  }
+                  onRemove={(opt) =>
+                    setColorImages((prev) => {
+                      const next = { ...prev };
+                      delete next[opt];
+                      return next;
+                    })
+                  }
+                />
               </div>
             ) : null}
-
-            <div className="field">
-              <label>
-                Imagen principal{" "}
-                {mainImageOptional ? (
-                  <span className="text-faint font-normal">
-                    (opcional, es la portada)
-                  </span>
-                ) : (
-                  <span className="text-danger">*</span>
-                )}
-              </label>
-              <PhotoPicker
-                previewUrl={imageUrl}
-                fileName={imageFile?.name}
-                title="Arrastrá la foto de portada"
-                hint={
-                  imageUrl
-                    ? originalPhoto
-                      ? "Generada con IA a partir de tu foto."
-                      : "Cuadrada y de 1000 px o más queda mejor."
-                    : "O generala arriba con IA a partir de una foto de la pieza."
-                }
-                onPick={(files) => pickImage(files[0] ?? null)}
-                onClear={() => {
-                  pickImage(null);
-                  setOriginalPhoto(null);
-                }}
-              />
-              {originalPhoto ? (
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-sm self-start"
-                  onClick={() => {
-                    pickImage(originalPhoto);
-                    setOriginalPhoto(null);
-                  }}
-                >
-                  Volver a la foto original
-                </button>
-              ) : null}
-              {imageUrl ? (
-                <div className="mt-2 flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={autoFrame}
-                    >
-                      ✨ Auto-encuadre
-                    </Button>
-                    <span className="text-faint text-[11.5px]">
-                      Centra el objeto para que quede prolijo en la publicación.
-                    </span>
-                  </div>
-                  <div className="text-faint text-[11.5px]">
-                    Arrastrá la imagen en la vista previa para acomodar el
-                    encuadre.
-                  </div>
-                </div>
-              ) : (
-                <div className="text-faint text-[11.5px]">
-                  {mainImageOptional
-                    ? "No hace falta: si no subís una, la portada es la primera foto de color."
-                    : "Obligatoria. Abajo podés sumar más (hasta 5 en total)."}
-                </div>
-              )}
-            </div>
-
-            <div className="field">
-              <label>
-                Más fotos generales{" "}
-                <span className="text-faint font-normal">
-                  (opcional, hasta 4)
-                </span>
-              </label>
-              <PhotoPicker
-                multiple
-                title="Arrastrá más fotos"
-                hint="Ambiente o detalle, sin color asignado."
-                cta="Elegir fotos"
-                disabled={extraFiles.length >= 4}
-                onPick={(picked) =>
-                  setExtraFiles((prev) => [...prev, ...picked].slice(0, 4))
-                }
-              />
-              {extraUrls.length > 0 ? (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {extraUrls.map((u, i) => (
-                    <div key={i} className="relative">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={u}
-                        alt=""
-                        className="h-16 w-16 rounded-md object-cover"
-                      />
-                      <button
-                        type="button"
-                        aria-label="Quitar foto"
-                        onClick={() =>
-                          setExtraFiles((prev) =>
-                            prev.filter((_, j) => j !== i),
-                          )
-                        }
-                        className="bg-surface-1 border-surface-3 text-fg absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border text-xs"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
           </div>
         ) : null}
 
@@ -1795,7 +1754,7 @@ export function ProductWizard({
         ) : null}
 
         {/* Navegación */}
-        <div className="flex justify-between gap-2 border-t border-[var(--border)] pt-4">
+        <div className="wiz-nav">
           <Button
             type="button"
             variant="secondary"
@@ -1896,6 +1855,20 @@ export function ProductWizard({
             ) : null}
           </div>
         </div>
+        {extraUrls.length > 0 || Object.keys(colorImageUrls).length > 0 ? (
+          /* Galería que va a tener la ficha: portada + extras + por color. */
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {[...extraUrls, ...Object.values(colorImageUrls)].map((u, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={`${i}-${u}`}
+                src={u}
+                alt=""
+                className="h-11 w-11 rounded-md border border-[var(--border)] object-cover"
+              />
+            ))}
+          </div>
+        ) : null}
         <div className="text-faint mt-2 text-[11px]">
           {status === "published" ? "Se publicará" : "Quedará en borrador"} ·{" "}
           {colorMode === "multi" ? "Multicolor" : "Un color a elección"}

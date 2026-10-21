@@ -5754,6 +5754,13 @@ td[role="checkbox"]:focus-visible .check {
    re feo"; también en el celular). Clases usadas en photo-picker.tsx y
    ai-image-panel.tsx.
    ============================================================ */
+/* Las vistas del admin son `view grid gap-*`: sin columna explícita, la
+   implícita mide el contenido más ancho (el kanban de producción con scroll
+   propio) y la página entera se iba a 1560 px en celular (2026-10-21). */
+.view.grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .photo-drop {
   cursor: pointer;
   border: 1.5px dashed var(--border-strong);
@@ -5967,5 +5974,415 @@ td[role="checkbox"]:focus-visible .check {
 @media (prefers-reduced-motion: reduce) {
   .ai-slot.is-busy .ai-slot-empty {
     animation: none;
+  }
+}
+
+/* ===== Alta de producto: tablero de fotos, tarjeta de IA (v2) y stepper
+   (pedido de Ale, 2026-10-21: "mejorá todo mil veces"). ===== */
+
+/* Botón que solo tiene sentido con dedo (abre la cámara del teléfono). */
+.only-touch {
+  display: none;
+}
+@media (hover: none) and (pointer: coarse) {
+  .only-touch {
+    display: inline-flex;
+  }
+}
+.photo-drop-compact .photo-drop-ic {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+/* Tablero: portada 2×2 + casilleros chicos. Mide la tarjeta, no la pantalla
+   (el contenedor de la query es el envoltorio: un container query no puede
+   mirar su propio elemento). */
+.media-board-wrap {
+  container: media-board / inline-size;
+}
+.media-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-flow: dense;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  border: 1.5px dashed transparent;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.media-board.is-over {
+  border-color: var(--gold);
+  background: rgba(var(--gold-rgb), 0.06);
+}
+@container media-board (max-width: 420px) {
+  .media-board {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.media-tile {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  min-width: 0;
+}
+.media-tile.is-main {
+  grid-column: span 2;
+  grid-row: span 2;
+  border-radius: 14px;
+}
+.media-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.media-tile.is-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  text-align: center;
+  cursor: pointer;
+  border: 1.5px dashed var(--border-strong);
+  color: var(--text-dim);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.media-tile.is-empty:hover,
+.media-tile.is-empty:focus-visible {
+  outline: none;
+  border-color: var(--gold);
+  background: rgba(var(--gold-rgb), 0.06);
+  color: var(--text);
+}
+.media-tile.is-empty:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.media-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  color: var(--gold);
+  background: rgba(var(--gold-rgb), 0.12);
+}
+.media-plus svg {
+  width: 16px;
+  height: 16px;
+}
+.media-tile.is-main .media-plus {
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+}
+.media-tile.is-main .media-plus svg {
+  width: 22px;
+  height: 22px;
+}
+.media-badge {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  color: var(--gold-fg);
+  background: var(--gold);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.media-badge.is-secondary {
+  top: auto;
+  bottom: 6px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+.media-badge.is-dim {
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 2px 7px;
+}
+/* Acciones sobre la foto: aparecen al pasar el mouse; con dedo, siempre. */
+.media-actions {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  justify-content: flex-end;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.65), transparent);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.media-tile:hover .media-actions,
+.media-tile:focus-within .media-actions {
+  opacity: 1;
+}
+@media (hover: none) {
+  .media-actions {
+    opacity: 1;
+  }
+}
+.media-act {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 7px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.media-act:hover {
+  background: rgba(0, 0, 0, 0.8);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.media-act.is-danger:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+/* Foto por color: casilla cuadrada + punto de color y nombre. */
+.color-photo-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.color-photo {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.color-photo-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-dim);
+  min-width: 0;
+}
+
+/* Tarjeta de IA v2: foto clickeable, progreso, tira de generadas, lightbox. */
+.ai-slot-img {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.ai-slot-img img {
+  transition: transform 0.25s ease;
+}
+.ai-slot-img:hover img {
+  transform: scale(1.03);
+}
+.ai-slot.is-busy .ai-slot-empty {
+  flex-direction: column;
+  gap: 8px;
+}
+.ai-progress {
+  display: block;
+  width: 70%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(var(--gold-rgb), 0.18);
+  overflow: hidden;
+}
+.ai-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--gold-deep), var(--gold-bright));
+  transition: width 0.5s linear;
+}
+.ai-history {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.ai-history-item {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid var(--border);
+  background: var(--surface-2);
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+.ai-history-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ai-history-item:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+}
+.ai-history-item.active {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(var(--gold-rgb), 0.2);
+}
+.ai-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(6px);
+  cursor: zoom-out;
+  animation: hef-pop-in 0.15s ease;
+}
+.ai-lightbox img {
+  max-width: min(92vw, 900px);
+  max-height: 88vh;
+  border-radius: 14px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+.ai-lightbox-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* Stepper del alta: barra de progreso por tramos + nombre; los pasos ya
+   hechos se pueden tocar para volver. */
+.wiz-steps {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+.wiz-step {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  min-width: 0;
+  cursor: default;
+  color: var(--text-faint);
+}
+.wiz-step.is-done {
+  cursor: pointer;
+}
+.wiz-step-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  transition: background 0.2s ease;
+}
+.wiz-step.is-done .wiz-step-bar {
+  background: rgba(var(--gold-rgb), 0.55);
+}
+.wiz-step.is-current .wiz-step-bar {
+  background: linear-gradient(90deg, var(--gold-deep), var(--gold-bright));
+  box-shadow: 0 0 10px rgba(var(--gold-rgb), 0.45);
+}
+.wiz-step.is-done:hover .wiz-step-bar {
+  background: var(--gold);
+}
+.wiz-step-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wiz-step.is-current .wiz-step-label {
+  color: var(--text);
+}
+.wiz-step.is-done .wiz-step-label {
+  color: var(--gold-bright);
+}
+@media (max-width: 639px) {
+  .wiz-step:not(.is-current) .wiz-step-label {
+    display: none;
+  }
+}
+.wiz-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.wiz-title h2 {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+}
+.wiz-title small {
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+/* Navegación: abajo, pegada al borde en celular para no perderla. */
+.wiz-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 639px) {
+  .wiz-nav {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    padding-bottom: 12px;
+    background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+    backdrop-filter: blur(8px);
+  }
+  .wiz-nav .btn {
+    flex: 1;
+    justify-content: center;
+  }
+  /* Deja lugar al botón flotante de Hefi (abajo a la derecha). */
+  .wiz-nav {
+    padding-right: 64px;
   }
 }

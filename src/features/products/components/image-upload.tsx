@@ -2,8 +2,6 @@
 
 import Image from "next/image";
 import { useState, useTransition } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { compressImageToWebp } from "@/lib/image-compress";
 import {
@@ -151,82 +149,74 @@ export function ImageUpload({
       {images.length === 0 ? (
         <p className="text-faint text-sm">Todavía no hay imágenes.</p>
       ) : (
+        /* Mosaico igual al del alta (media-tile): la principal lleva el
+           cartel "Portada"; acciones sobre la foto; el color debajo
+           (2026-10-21). */
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
           {images.map((img) => (
-            <div
-              key={img.id}
-              className="border-surface-2 bg-surface-2 overflow-hidden rounded-md border"
-            >
-              <div className="relative aspect-square">
+            <div key={img.id} className="flex min-w-0 flex-col gap-1.5">
+              <figure className="media-tile">
                 <Image
                   src={img.url}
                   alt={img.alt ?? ""}
                   fill
-                  sizes="160px"
+                  sizes="180px"
                   className="object-cover"
                 />
                 {img.isPrimary ? (
-                  <Badge className="absolute top-1 left-1" variant="primary">
-                    Principal
-                  </Badge>
+                  <span className="media-badge">Portada</span>
                 ) : null}
                 {img.color ? (
-                  <Badge
-                    className="absolute right-1 bottom-1"
-                    variant="neutral"
-                  >
-                    {img.color}
-                  </Badge>
+                  <span className="media-badge is-secondary">{img.color}</span>
                 ) : null}
-              </div>
-              <div className="flex flex-col gap-1 p-2">
-                {/* A qué color/combinación corresponde ESTA foto. Es lo que la
-                    tienda busca al elegir el color; sin esto la galería no
-                    salta (bug 2026-08-09). */}
-                {colorOptions.length > 0 ? (
-                  <select
-                    className="select"
-                    style={{ height: 30, fontSize: 12 }}
-                    disabled={isPending}
-                    value={img.color ?? ""}
-                    aria-label="Color de esta foto"
-                    onChange={(e) => handleColor(img.id, e.target.value)}
-                  >
-                    <option value="">— Sin color —</option>
-                    {/* El color guardado puede ya no estar en la lista (se
-                        renombró o se sacó): se muestra igual para no perderlo
-                        en silencio. */}
-                    {(img.color && !colorOptions.includes(img.color)
-                      ? [img.color, ...colorOptions]
-                      : colorOptions
-                    ).map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
-                ) : null}
-                {!img.isPrimary ? (
-                  <Button
+                <div className="media-actions">
+                  {!img.isPrimary ? (
+                    <button
+                      type="button"
+                      className="media-act"
+                      disabled={isPending}
+                      onClick={() => handlePrimary(img.id)}
+                    >
+                      Hacer portada
+                    </button>
+                  ) : null}
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
+                    className="media-act is-danger"
+                    aria-label="Borrar foto"
                     disabled={isPending}
-                    onClick={() => handlePrimary(img.id)}
+                    onClick={() => handleDelete(img.id)}
                   >
-                    Principal
-                  </Button>
-                ) : null}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
+                    ✕
+                  </button>
+                </div>
+              </figure>
+              {/* A qué color/combinación corresponde ESTA foto. Es lo que la
+                  tienda busca al elegir el color; sin esto la galería no
+                  salta (bug 2026-08-09). */}
+              {colorOptions.length > 0 ? (
+                <select
+                  className="select"
+                  style={{ height: 30, fontSize: 12, padding: "0 28px 0 9px" }}
                   disabled={isPending}
-                  onClick={() => handleDelete(img.id)}
+                  value={img.color ?? ""}
+                  aria-label="Color de esta foto"
+                  onChange={(e) => handleColor(img.id, e.target.value)}
                 >
-                  Borrar
-                </Button>
-              </div>
+                  <option value="">— Sin color —</option>
+                  {/* El color guardado puede ya no estar en la lista (se
+                      renombró o se sacó): se muestra igual para no perderlo
+                      en silencio. */}
+                  {(img.color && !colorOptions.includes(img.color)
+                    ? [img.color, ...colorOptions]
+                    : colorOptions
+                  ).map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              ) : null}
             </div>
           ))}
         </div>

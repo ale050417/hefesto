@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyState } from "@/components/shared/empty-state";
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -140,9 +141,32 @@ export function CouponsAdmin({
       </div>
 
       {coupons.length === 0 ? (
-        <div className="ui-card section-card flex flex-col items-center gap-2 p-10 text-center">
-          <div className="text-dim">Todavía no creaste cupones.</div>
-        </div>
+        <EmptyState
+          eyebrow="Descuentos"
+          title="Todavía no hay cupones"
+          description="Un cupón es un código que el cliente escribe al pagar: porcentaje o monto fijo, con tope de usos y vencimiento."
+          icon={
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              width="24"
+              height="24"
+              aria-hidden
+            >
+              <path d="M3 9a2 2 0 0 0 2-2V5h14v2a2 2 0 0 0 2 2v6a2 2 0 0 0-2 2v2H5v-2a2 2 0 0 0-2-2z" />
+              <path d="M9 9l6 6M9 15l6-6" />
+            </svg>
+          }
+          action={
+            <button type="button" className="btn btn-primary" onClick={openNew}>
+              Crear el primer cupón
+            </button>
+          }
+        />
       ) : (
         <div className="grid-2">
           {coupons.map((c) => {

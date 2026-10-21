@@ -308,7 +308,9 @@ export function CategoriesAdmin({
                             )}
                           </div>
                           <div className="min-w-0">
-                            <div className="truncate text-[16.5px] font-bold">
+                            {/* line-clamp-2 (antes truncate): "Decoraci…"
+                                y "Monume…" no se entendían (2026-10-21). */}
+                            <div className="line-clamp-2 text-[15.5px] leading-tight font-bold">
                               {c.name}
                             </div>
                             <div className="text-faint text-[12px]">

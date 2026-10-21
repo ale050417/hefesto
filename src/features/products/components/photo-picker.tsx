@@ -9,10 +9,13 @@ import { cn } from "@/lib/utils";
  * Ningún archivo seleccionado") en el alta y la edición de productos.
  *
  * - Zona punteada: arrastrar, tocar para elegir o, en el celular, sacar la
- *   foto con la cámara (el selector del teléfono ya lo ofrece).
+ *   foto con la cámara (`cameraCta` agrega un botón que abre la cámara
+ *   directo; solo se ve en pantallas táctiles).
  * - Con foto elegida muestra la miniatura, el nombre y "Cambiar / Quitar".
  * - `multiple` para las fotos extra: no muestra miniatura (las dibuja el
  *   padre) y siempre queda listo para sumar más.
+ * - `compact`: versión horizontal y baja para cuando va dentro de otra
+ *   tarjeta (la de IA).
  */
 export function PhotoPicker({
   previewUrl,
@@ -24,6 +27,8 @@ export function PhotoPicker({
   title,
   hint,
   cta = "Elegir foto",
+  cameraCta,
+  compact = false,
   icon,
   className,
 }: {
@@ -39,10 +44,14 @@ export function PhotoPicker({
   /** Texto chico debajo del título. */
   hint?: ReactNode;
   cta?: string;
+  /** Botón "Sacar foto" que abre la cámara (solo en pantallas táctiles). */
+  cameraCta?: string;
+  compact?: boolean;
   icon?: ReactNode;
   className?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
   function take(list: FileList | File[] | null | undefined) {
@@ -53,19 +62,37 @@ export function PhotoPicker({
     onPick(multiple ? files : files.slice(0, 1));
   }
 
-  const input = (
-    <input
-      ref={inputRef}
-      type="file"
-      accept="image/jpeg,image/png,image/webp"
-      multiple={multiple}
-      disabled={disabled}
-      className="hidden"
-      onChange={(e) => {
-        take(e.target.files);
-        e.currentTarget.value = "";
-      }}
-    />
+  const inputs = (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        multiple={multiple}
+        disabled={disabled}
+        className="hidden"
+        onChange={(e) => {
+          take(e.target.files);
+          e.currentTarget.value = "";
+        }}
+      />
+      {cameraCta ? (
+        // `capture` abre la cámara trasera directo en el teléfono (sin pasar
+        // por la galería). En escritorio el navegador lo ignora.
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          disabled={disabled}
+          className="hidden"
+          onChange={(e) => {
+            take(e.target.files);
+            e.currentTarget.value = "";
+          }}
+        />
+      ) : null}
+    </>
   );
 
   // Con foto elegida (modo simple): miniatura + acciones.
@@ -113,7 +140,7 @@ export function PhotoPicker({
             </button>
           ) : null}
         </div>
-        {input}
+        {inputs}
       </div>
     );
   }
@@ -124,7 +151,10 @@ export function PhotoPicker({
       tabIndex={disabled ? -1 : 0}
       aria-disabled={disabled}
       className={cn(
-        "photo-drop flex flex-col items-center gap-2 rounded-xl px-4 py-5 text-center",
+        "photo-drop flex rounded-xl text-center",
+        compact
+          ? "photo-drop-compact items-center gap-3 px-3 py-3 text-left"
+          : "flex-col items-center gap-2 px-4 py-5",
         dragOver && "is-over",
         disabled && "pointer-events-none opacity-60",
         className,
@@ -147,7 +177,7 @@ export function PhotoPicker({
         take(e.dataTransfer.files);
       }}
     >
-      <span className="photo-drop-ic" aria-hidden>
+      <span className="photo-drop-ic shrink-0" aria-hidden>
         {icon ?? (
           <svg
             width="22"
@@ -164,16 +194,55 @@ export function PhotoPicker({
           </svg>
         )}
       </span>
-      <div className="text-[13.5px] font-semibold">
-        {title ?? (multiple ? "Arrastrá fotos acá" : "Arrastrá la foto acá")}
-      </div>
-      {hint ? (
-        <div className="text-faint max-w-[34ch] text-[11.5px] leading-snug">
-          {hint}
+      <div className={cn("min-w-0", compact && "flex-1")}>
+        <div className="text-[13.5px] font-semibold">
+          {title ?? (multiple ? "Arrastrá fotos acá" : "Arrastrá la foto acá")}
         </div>
-      ) : null}
-      <span className="btn btn-secondary btn-sm mt-1">{cta}</span>
-      {input}
+        {hint ? (
+          <div
+            className={cn(
+              "text-faint text-[11.5px] leading-snug",
+              !compact && "mx-auto max-w-[34ch]",
+            )}
+          >
+            {hint}
+          </div>
+        ) : null}
+      </div>
+      <div
+        className={cn(
+          "flex shrink-0 flex-wrap items-center justify-center gap-1.5",
+          !compact && "mt-1",
+        )}
+      >
+        <span className="btn btn-secondary btn-sm">{cta}</span>
+        {cameraCta ? (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm only-touch"
+            disabled={disabled}
+            onClick={(e) => {
+              e.stopPropagation();
+              cameraRef.current?.click();
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+            >
+              <path d="M4 7h3l2-3h6l2 3h3v12H4z" />
+              <circle cx="12" cy="13" r="3.5" />
+            </svg>
+            {cameraCta}
+          </button>
+        ) : null}
+      </div>
+      {inputs}
     </div>
   );
 }

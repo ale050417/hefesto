@@ -64,7 +64,7 @@ export default async function GananciasPage({
               : `Amortización por pedido y reparto de la ganancia pura · ${rows.length} ventas cobradas`}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <EarningsMonthFilter months={months} selected={selectedMonth} />
           {canEdit ? <CostSettingsButton settings={settings} /> : null}
         </div>
