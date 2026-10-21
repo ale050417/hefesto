@@ -5410,15 +5410,28 @@ td[role="checkbox"]:focus-visible .check {
   gap: 16px;
   align-items: center;
 }
-/* Logo entero, sin recorte ni esquinas: alto fijo y ancho según su
-   proporción (un isotipo cuadrado queda 96×96; un logo apaisado, más ancho).
-   Es PNG/WebP con fondo transparente sobre papel blanco. */
-.rcp-logo {
+/* Logo sobre placa oscura (la marca es dorada sobre fondo oscuro, como en
+   la tienda; suelta sobre el papel blanco se veía lavada). Entero, sin
+   recorte: alto fijo y ancho según su proporción (un isotipo cuadrado queda
+   96×96; un logo apaisado ensancha la placa). */
+.rcp-logo-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
   height: 96px;
-  width: auto;
-  max-width: 200px;
-  object-fit: contain;
+  padding: 8px;
+  border-radius: 18px;
+  background: #0a0a0f;
   flex-shrink: 0;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.rcp-logo {
+  height: 80px;
+  width: auto;
+  max-width: 184px;
+  object-fit: contain;
 }
 .rcp-brand-name {
   font-family: var(--font-orbitron), system-ui, sans-serif;

@@ -41,17 +41,20 @@ export function ReceiptDocument({
         <div className="rcp-brand">
           {b.logoUrl ? (
             // Grande y entero (2026-10-21, pedido de Ale): el logo del taller
-            // es un dibujo con detalle y lleva el nombre adentro; a 56px
-            // recortado y con esquinas redondas quedaba una mancha. Va a
-            // 96px de alto, con su proporción real y sin recorte (.rcp-logo).
-            <Image
-              src={b.logoUrl}
-              alt={b.name}
-              width={96}
-              height={96}
-              className="rcp-logo"
-              priority
-            />
+            // es un dibujo dorado con detalle y lleva el nombre adentro; a
+            // 56px recortado quedaba una mancha, y suelto sobre el papel
+            // blanco se veía lavado. Va entero, con su proporción, sobre una
+            // placa oscura como la de la tienda (.rcp-logo-tile).
+            <span className="rcp-logo-tile">
+              <Image
+                src={b.logoUrl}
+                alt={b.name}
+                width={80}
+                height={80}
+                className="rcp-logo"
+                priority
+              />
+            </span>
           ) : (
             <BrandMark size={64} />
           )}

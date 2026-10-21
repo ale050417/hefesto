@@ -97,11 +97,14 @@ async function registerFonts(): Promise<void> {
 
 type Logo = { data: Buffer; format: "png"; width: number; height: number };
 
-// Alto del logo en la hoja PDF (en puntos). Mismo criterio que .rcp-logo en
-// la hoja HTML (96px a escala 0.75 = 72pt): entero, sin recorte, con su
-// proporción. Un logo muy apaisado se achica hasta entrar en LOGO_MAX_W.
-const LOGO_H = 72;
-const LOGO_MAX_W = 150;
+// Logo en la hoja PDF (en puntos), mismo criterio que .rcp-logo-tile en la
+// hoja HTML a escala 0.75: placa oscura de 72pt de alto con el logo entero
+// adentro (60pt de alto, sin recorte, con su proporción). Un logo muy
+// apaisado se achica hasta entrar en LOGO_MAX_W.
+const TILE_H = 72;
+const TILE_PAD = 6;
+const LOGO_H = TILE_H - TILE_PAD * 2;
+const LOGO_MAX_W = 138;
 
 /** Caja del logo en el PDF: proporción real, dentro de LOGO_H × LOGO_MAX_W. */
 function logoBox(logo: Logo): { width: number; height: number } {
@@ -186,6 +189,15 @@ const s = StyleSheet.create({
     borderBottomColor: C.gold,
   },
   brand: { flexDirection: "row", gap: 12, alignItems: "center", flex: 1 },
+  logoTile: {
+    minWidth: TILE_H,
+    height: TILE_H,
+    padding: TILE_PAD,
+    borderRadius: 13,
+    backgroundColor: C.ink,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   brandName: {
     fontFamily: "Orbitron",
     fontWeight: 800,
@@ -451,9 +463,11 @@ function ReceiptPdf({
         <View style={[s.head, { borderBottomColor: gold }]}>
           <View style={s.brand}>
             {logo ? (
-              // Image de react-pdf, no la etiqueta HTML: no lleva alt.
-              // eslint-disable-next-line jsx-a11y/alt-text
-              <Image src={logo} style={logoBox(logo)} />
+              <View style={s.logoTile}>
+                {/* Image de react-pdf, no la etiqueta HTML: no lleva alt. */}
+                {/* eslint-disable-next-line jsx-a11y/alt-text */}
+                <Image src={logo} style={logoBox(logo)} />
+              </View>
             ) : (
               <Mark />
             )}
