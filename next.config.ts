@@ -27,16 +27,15 @@ const nextConfig: NextConfig = {
   // react-pdf (comprobante en PDF) se carga desde node_modules, sin empaquetar:
   // es la forma soportada en el App Router.
   // @cwasm/webp (logo del PDF sin sharp) lee su .wasm con fs desde su
-  // carpeta: externo, y su carpeta incluida en el trazado (abajo).
+  // carpeta: va externo y el trazado automático incluye el .wasm por su ruta
+  // real. OJO: NO agregarlo a outputFileTracingIncludes con un glob sobre
+  // node_modules: con pnpm esa carpeta es un symlink y Vercel rechaza el
+  // paquete de la función ("invalid deployment package", 2026-10-21).
   serverExternalPackages: ["sharp", "@react-pdf/renderer", "@cwasm/webp"],
   // Las fuentes del PDF (public/fonts) se leen con fs en el servidor: hay que
   // incluirlas en el trazado de la función, si no en Vercel no existen.
   outputFileTracingIncludes: {
-    "/comprobante/**": [
-      "./public/fonts/*.ttf",
-      "./node_modules/@cwasm/webp/**",
-      "./node_modules/.pnpm/@cwasm+webp*/node_modules/@cwasm/webp/**",
-    ],
+    "/comprobante/**": ["./public/fonts/*.ttf"],
   },
   // Subir imágenes (logo/hero/banner/productos) por Server Actions: el límite
   // por defecto es 1 MB. Lo subimos a 8 MB (igual al tope que valida el server).
