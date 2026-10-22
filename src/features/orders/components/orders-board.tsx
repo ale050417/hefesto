@@ -21,6 +21,9 @@ import { OrderStatusSelect } from "./order-status-select";
 import { saleMatches } from "../sale-search";
 import { ManualSaleEditButton } from "./manual-sale-edit-modal";
 import { ReceiptButton } from "./receipt-button";
+import { QuoteButton } from "@/features/quotes/components/quote-modal";
+import { draftFromSale } from "@/features/quotes/drafts";
+import type { QuoteDefaults } from "@/features/quotes/build-quote";
 import { manualSaleCode } from "../receipt";
 
 export type UnifiedSale = {
@@ -68,10 +71,13 @@ export function OrdersBoard({
   items,
   isAdmin,
   canEdit,
+  quoteDefaults,
 }: {
   items: UnifiedSale[];
   isAdmin: boolean;
   canEdit: boolean;
+  /** Textos por defecto del botón "Cotización" (WhatsApp). */
+  quoteDefaults: QuoteDefaults;
 }) {
   const [tipo, setTipo] = useState<Tipo>("todo");
   const [status, setStatus] = useState<OrderStatus | "all">("all");
@@ -474,6 +480,11 @@ export function OrdersBoard({
                         <div className="flex items-center justify-end gap-1">
                           {/* Comprobante para el cliente (2026-10-20): abre
                               el modal con vista previa, Imprimir y Descargar. */}
+                          {/* Cotización para WhatsApp (2026-10-21), al lado del comprobante. */}
+                          <QuoteButton
+                            initial={draftFromSale(o, quoteDefaults)}
+                            defaults={quoteDefaults}
+                          />
                           <ReceiptButton
                             kind={o.source}
                             id={o.id}
@@ -541,6 +552,11 @@ export function OrdersBoard({
                   </div>
                   <div className="flex items-center gap-2">
                     <DeleteCell o={o} />
+                    {/* Cotización para WhatsApp (2026-10-21), al lado del comprobante. */}
+                    <QuoteButton
+                      initial={draftFromSale(o, quoteDefaults)}
+                      defaults={quoteDefaults}
+                    />
                     <ReceiptButton
                       kind={o.source}
                       id={o.id}

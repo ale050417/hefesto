@@ -9,6 +9,7 @@ import {
   listProductsAdmin,
 } from "@/features/products/services/catalogService";
 import { loadOrThrow } from "@/lib/safe-load";
+import { getQuoteDefaults } from "@/features/quotes/service";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Productos" };
@@ -33,8 +34,10 @@ export default async function ProductosAdminPage() {
     destacados: true,
   };
 
+  const quoteDefaults = await getQuoteDefaults();
   return (
     <ProductsAdmin
+      quoteDefaults={quoteDefaults}
       products={result.items}
       categories={categories}
       estimator={estimator}

@@ -526,6 +526,13 @@
       "when": 1783307900000,
       "tag": "0074_manual_sale_item_product",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1792627680263,
+      "tag": "0075_quote_defaults",
+      "breakpoints": true
     }
   ]
 }

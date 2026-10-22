@@ -26,6 +26,16 @@ import { ImageUpload } from "./image-upload";
 import { photoColorOptions } from "../photo-colors";
 import { subtreeIds } from "../category-tree";
 import { ProductStatusActions } from "./product-status-actions";
+import {
+  QuoteButton,
+  QuoteModal,
+} from "@/features/quotes/components/quote-modal";
+import { draftFromProduct } from "@/features/quotes/drafts";
+import {
+  emptyDraft,
+  type QuoteDefaults,
+  type QuoteDraft,
+} from "@/features/quotes/build-quote";
 import { runAction } from "@/lib/run-action";
 import { useDeleteResource } from "@/hooks/use-delete-resource";
 
@@ -128,14 +138,20 @@ export function ProductsAdmin({
   estimator,
   colorCatalog,
   sections,
+  quoteDefaults,
 }: {
   products: AdminProductRow[];
   categories: Category[];
   estimator: EstimatorContext;
   colorCatalog: Array<{ name: string; hex: string | null }>;
   sections: { nuevos: boolean; destacados: boolean };
+  /** Textos por defecto del botón "Cotización" (WhatsApp). */
+  quoteDefaults: QuoteDefaults;
 }) {
   const router = useRouter();
+  // Al crear un producto desde el modal, se abre su cotización lista para
+  // mandar (pedido de Ale, 2026-10-21).
+  const [createdQuote, setCreatedQuote] = useState<QuoteDraft | null>(null);
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("all");
   const [view, setView] = useState<View>("grid");
@@ -545,18 +561,40 @@ export function ProductsAdmin({
             estimator={estimator}
             colorCatalog={colorCatalog}
             sections={sections}
-            onCreated={() => {
+            quoteDefaults={quoteDefaults}
+            onCreated={(_id, quote) => {
               setModal({ open: false });
               toast("Producto creado", "success");
               router.refresh();
+              setCreatedQuote(quote);
             }}
           />
         ) : modal.open && modal.mode === "edit" ? (
           <div className="flex flex-col gap-5">
-            <div className="ui-card p-4">
+            <div className="ui-card flex flex-wrap items-center justify-between gap-3 p-4">
               <ProductStatusActions
                 productId={modal.productId}
                 status={modal.status}
+              />
+              {/* Cotización para WhatsApp con los datos del producto. */}
+              <QuoteButton
+                variant="button"
+                defaults={quoteDefaults}
+                initial={draftFromProduct(
+                  {
+                    name: modal.defaults.name,
+                    dimensions: modal.defaults.dimensions,
+                    price: modal.defaults.price,
+                    salePrice: modal.defaults.salePrice || null,
+                    colors: modal.defaults.colors,
+                    colorPrices: modal.defaults.colorPrices,
+                    variants: modal.defaults.variants.map((v) => ({
+                      label: v.label,
+                      price: v.price,
+                    })),
+                  },
+                  quoteDefaults,
+                )}
               />
             </div>
             <ProductForm
@@ -605,6 +643,14 @@ export function ProductsAdmin({
           </div>
         ) : null}
       </Modal>
+
+      <QuoteModal
+        open={!!createdQuote}
+        onClose={() => setCreatedQuote(null)}
+        initial={createdQuote ?? emptyDraft(quoteDefaults)}
+        defaults={quoteDefaults}
+        title="Producto creado · Cotización lista"
+      />
 
       <ConfirmDialog
         open={!!archiving}

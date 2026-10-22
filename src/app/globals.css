@@ -6840,3 +6840,58 @@ td[role="checkbox"]:focus-visible .check {
 .kpi-link:has(.kpi-spark) {
   padding-bottom: 44px;
 }
+
+/* ===== Cotización para WhatsApp (2026-10-21) ===== */
+.quote-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+@media (min-width: 820px) {
+  .quote-grid {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  }
+}
+.quote-price-row {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.6fr) auto minmax(80px, 0.8fr) minmax(56px, 0.5fr)
+    auto;
+  gap: 6px;
+  align-items: center;
+}
+.quote-price-row .input {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+.quote-preview {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 14px 14px 14px 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  font-family: var(--font-body), sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text);
+  max-height: 420px;
+  overflow: auto;
+}
+.quote-defaults {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-strong);
+  background: var(--surface-2);
+}
+
+/* Fuentes autoalojadas (fontsource): antes las ponía next/font/google como
+   clases en <html>. Mismos nombres de variable que usa todo el CSS. */
+:root {
+  --font-sora: "Sora Variable", system-ui, sans-serif;
+  --font-orbitron: "Orbitron Variable", system-ui, sans-serif;
+}

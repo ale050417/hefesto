@@ -63,6 +63,15 @@ export const businessSettings = pgTable(
         afternoon: { on: boolean; from: string; to: string };
       }>
     >(),
+    // Textos por defecto de la cotización por WhatsApp (encabezado, seña y
+    // aclaraciones) que arma el botón "Cotización" (2026-10-21). Null = los
+    // del código (DEFAULT_QUOTE_DEFAULTS).
+    quoteDefaults: jsonb("quote_defaults").$type<{
+      title: string;
+      depositPct: number;
+      depositText: string;
+      notes: string[];
+    }>(),
     pickupEnabled: boolean("pickup_enabled").notNull().default(true),
     deliveryEnabled: boolean("delivery_enabled").notNull().default(true),
     updatedAt: timestamp("updated_at", { withTimezone: true })

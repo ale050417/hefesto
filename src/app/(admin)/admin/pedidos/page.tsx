@@ -16,15 +16,17 @@ import {
 import { listColorCatalog, listSaleColors } from "@/features/inventory/queries";
 import { listProductsForSale } from "@/features/products/services/catalogService";
 import { safeLoad } from "@/lib/safe-load";
+import { getQuoteDefaults } from "@/features/quotes/service";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pedidos" };
 
 export default async function PedidosAdminPage() {
   await requirePermissionPage("pedidos", "ver");
-  const [admin, canEdit] = await Promise.all([
+  const [admin, canEdit, quoteDefaults] = await Promise.all([
     isAdmin(),
     can("pedidos", "editar"),
+    getQuoteDefaults(),
   ]);
 
   // Se cargan todas las ventas (online + manuales) para una tabla unificada con
@@ -158,7 +160,12 @@ export default async function PedidosAdminPage() {
         </div>
       </div>
 
-      <OrdersBoard items={items} isAdmin={admin} canEdit={canEdit} />
+      <OrdersBoard
+        items={items}
+        isAdmin={admin}
+        canEdit={canEdit}
+        quoteDefaults={quoteDefaults}
+      />
     </div>
   );
 }

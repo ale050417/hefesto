@@ -16,6 +16,9 @@ import { getEstimatorContext } from "@/features/calculator/service";
 import { listColorCatalog } from "@/features/inventory/queries";
 import { isUuid } from "@/lib/ids";
 import { loadOrThrow } from "@/lib/safe-load";
+import { QuoteButton } from "@/features/quotes/components/quote-modal";
+import { draftFromProduct } from "@/features/quotes/drafts";
+import { getQuoteDefaults } from "@/features/quotes/service";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +44,7 @@ export default async function EditarProductoPage({
   );
   if (!data) notFound();
   const { product, images, variants } = data;
+  const quoteDefaults = await getQuoteDefaults();
 
   const defaults: ProductFormValues = {
     name: product.name,
@@ -83,6 +87,26 @@ export default async function EditarProductoPage({
           <h1 className="page-title">Editar producto</h1>
           <div className="page-sub">{product.name}</div>
         </div>
+        {/* Cotización para WhatsApp con los datos del producto (2026-10-21). */}
+        <QuoteButton
+          variant="button"
+          defaults={quoteDefaults}
+          initial={draftFromProduct(
+            {
+              name: product.name,
+              dimensions: product.dimensions,
+              price: product.price,
+              salePrice: product.salePrice,
+              colors: product.colors ?? [],
+              colorPrices: product.colorPrices ?? {},
+              variants: variants.map((v) => ({
+                label: v.label,
+                price: v.priceOverride,
+              })),
+            },
+            quoteDefaults,
+          )}
+        />
       </div>
 
       <div className="ui-card p-4">

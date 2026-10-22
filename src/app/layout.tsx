@@ -1,24 +1,15 @@
 import type { Metadata } from "next";
-import { Orbitron, Sora } from "next/font/google";
 import { siteName, siteUrl } from "@/lib/site";
 import { Toaster } from "@/components/ui/toaster";
 import { ActionOverlay } from "@/components/shared/action-overlay";
 import { ThemeApplier } from "@/features/settings/components/theme-applier";
+// Fuentes AUTOALOJADAS (2026-10-21): con next/font/google el build de Vercel
+// fallaba al azar ("Can't resolve '@vercel/turbopack-next/internal/font/
+// google/font'") cuando no podía bajar las fuentes de Google. Fontsource
+// las trae por npm: el build no depende de la red.
+import "@fontsource-variable/sora";
+import "@fontsource-variable/orbitron";
 import "./globals.css";
-
-const orbitron = Orbitron({
-  subsets: ["latin"],
-  weight: ["600", "700", "800", "900"],
-  variable: "--font-orbitron",
-  display: "swap",
-});
-
-const sora = Sora({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-sora",
-  display: "swap",
-});
 
 const description =
   "Tienda de productos impresos en 3D, hechos a pedido en el color que elijas.";
@@ -50,7 +41,6 @@ export default function RootLayout({
     <html
       lang="es"
       data-theme="light"
-      className={`${orbitron.variable} ${sora.variable}`}
       // El script inline ajusta data-theme desde localStorage antes de hidratar;
       // suprimimos el warning de mismatch SOLO en <html> (patrón estándar de tema).
       suppressHydrationWarning

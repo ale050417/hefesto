@@ -22,6 +22,12 @@ import { useDragReframe } from "@/hooks/use-drag-reframe";
 import { useFormErrors } from "@/hooks/use-form-errors";
 import { AiImagePanel } from "./ai-image-panel";
 import { ColorPhotoRow, MediaBoard } from "./media-board";
+import { draftFromProduct } from "@/features/quotes/drafts";
+import {
+  DEFAULT_QUOTE_DEFAULTS,
+  type QuoteDefaults,
+  type QuoteDraft,
+} from "@/features/quotes/build-quote";
 
 function slugify(text: string): string {
   return text
@@ -52,8 +58,11 @@ type Props = {
   colorCatalog: Array<{ name: string; hex: string | null }>;
   /** Secciones del home activas: para habilitar los checks y marcar automáticas. */
   sections: { nuevos: boolean; destacados: boolean };
-  /** En el modal: en vez de navegar, avisa al contenedor con el id creado. */
-  onCreated?: (id: string) => void;
+  /** En el modal: en vez de navegar, avisa al contenedor con el id creado y
+   *  la cotización lista para WhatsApp (2026-10-21). */
+  onCreated?: (id: string, quote: QuoteDraft) => void;
+  /** Textos por defecto de la cotización. */
+  quoteDefaults?: QuoteDefaults;
 };
 
 export function ProductWizard({
@@ -62,6 +71,7 @@ export function ProductWizard({
   colorCatalog,
   sections,
   onCreated,
+  quoteDefaults = DEFAULT_QUOTE_DEFAULTS,
 }: Props) {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -665,7 +675,30 @@ export function ProductWizard({
       overlay.end();
       setBusy(false);
       if (onCreated) {
-        onCreated(id);
+        onCreated(
+          id,
+          draftFromProduct(
+            {
+              name,
+              dimensions,
+              price: priceN,
+              colors: effectiveColors,
+              colorPrices:
+                distinctColorPrice && !hasSizes ? colorPricesSingle : {},
+              variants: isCombos
+                ? combos.map((v) => ({
+                    label: v.comboColors.join(" + "),
+                    price: v.price,
+                  }))
+                : hasSizes
+                  ? variants
+                      .filter((v) => v.label.trim())
+                      .map((v) => ({ label: v.label, price: v.price }))
+                  : [],
+            },
+            quoteDefaults,
+          ),
+        );
       } else {
         router.push(`/admin/productos/${id}/editar`);
       }

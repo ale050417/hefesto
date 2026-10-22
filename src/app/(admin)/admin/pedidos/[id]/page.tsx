@@ -10,6 +10,9 @@ import { OrderStatusManager } from "@/features/orders/components/order-status-ma
 import { DeleteOrderButton } from "@/features/orders/components/order-actions";
 import { OrderSummary } from "@/features/orders/components/order-summary";
 import { ReceiptButton } from "@/features/orders/components/receipt-button";
+import { QuoteButton } from "@/features/quotes/components/quote-modal";
+import { draftFromSale } from "@/features/quotes/drafts";
+import { getQuoteDefaults } from "@/features/quotes/service";
 import { getOrderAdmin } from "@/features/orders/services/orderAdminService";
 import { getOrderMessages } from "@/features/orders/services/orderChat";
 import { OrderChat } from "@/features/orders/components/order-chat";
@@ -44,6 +47,7 @@ export default async function OrderDetailAdminPage({
   // Cancelar/reembolsar es solo admin (Cap. 11); la UI oculta lo que la
   // action ya rechaza en el servidor.
   const canCancelRefund = await isAdmin();
+  const quoteDefaults = await getQuoteDefaults();
 
   return (
     <div>
@@ -63,14 +67,37 @@ export default async function OrderDetailAdminPage({
         </div>
         {/* Comprobante para el cliente: modal con vista previa, Imprimir y
             Descargar PDF. */}
-        <ReceiptButton
-          kind="online"
-          id={order.id}
-          code={order.orderNumber}
-          customerName={order.customer?.fullName ?? null}
-          total={Number(order.total)}
-          variant="button"
-        />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Cotización para WhatsApp (2026-10-21), al lado del comprobante. */}
+          <QuoteButton
+            variant="button"
+            phone={order.customer?.phone ?? null}
+            defaults={quoteDefaults}
+            initial={draftFromSale(
+              {
+                label: order.items.map((i) => i.productName).join(" + "),
+                total: Number(order.total),
+                colors: [],
+                items: order.items.map((i) => ({
+                  productName: i.productName,
+                  variantLabel: null,
+                  color: null,
+                  quantity: i.quantity,
+                  unitPrice: Number(i.unitPrice),
+                })),
+              },
+              quoteDefaults,
+            )}
+          />
+          <ReceiptButton
+            kind="online"
+            id={order.id}
+            code={order.orderNumber}
+            customerName={order.customer?.fullName ?? null}
+            total={Number(order.total)}
+            variant="button"
+          />
+        </div>
       </div>
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[1fr_320px]">
