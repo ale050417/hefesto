@@ -896,3 +896,33 @@ export async function removeTeamMemberAction(
     return { ok: false, error: toActionError(error) };
   }
 }
+
+/* ---------- Banners con IA (2026-10-21) ---------- */
+
+/**
+ * Renueva los banners del hero con IA ahora mismo (botón de Config → Tienda).
+ * Mismo trabajo que el cron, sin esperar los 10 días.
+ */
+export async function refreshAutoBannersAction(): Promise<
+  ActionResult<{ created: number }>
+> {
+  if (!(await can("config", "editar"))) return UNAUTH;
+  try {
+    const { refreshAutoBanners } = await import("./auto-banners");
+    const result = await refreshAutoBanners({ force: true });
+    if (!result.ok) {
+      const message =
+        result.skipped === "not_configured"
+          ? "Falta ANTHROPIC_API_KEY en las variables de entorno de Vercel."
+          : result.skipped === "no_products"
+            ? "No hay productos publicados con foto para armar banners."
+            : "La IA no devolvió banners válidos. Probá de nuevo.";
+      return { ok: false, error: { code: "VALIDATION", message } };
+    }
+    revalidatePath("/", "layout");
+    revalidatePath("/admin/configuracion");
+    return { ok: true, data: { created: result.created } };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}

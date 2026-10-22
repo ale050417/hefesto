@@ -72,6 +72,14 @@ export const businessSettings = pgTable(
       depositText: string;
       notes: string[];
     }>(),
+    // Banners del hero que generó la IA (ids + última corrida), para
+    // reemplazarlos en la próxima corrida sin tocar los que cargó el dueño
+    // (2026-10-21).
+    autoBanners: jsonb("auto_banners").$type<{
+      ids: string[];
+      lastRunAt: string;
+      model?: string;
+    }>(),
     pickupEnabled: boolean("pickup_enabled").notNull().default(true),
     deliveryEnabled: boolean("delivery_enabled").notNull().default(true),
     updatedAt: timestamp("updated_at", { withTimezone: true })

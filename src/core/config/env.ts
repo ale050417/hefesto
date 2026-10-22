@@ -59,6 +59,10 @@ const envSchema = z.object({
   CLOUDFLARE_ACCOUNT_ID: z.string().optional(),
   CLOUDFLARE_AI_TOKEN: z.string().optional(),
   CLOUDFLARE_AI_IMAGE_MODEL: z.string().optional(),
+  // Cron de Vercel (banners con IA cada ~10 días, 2026-10-21): Vercel manda
+  // `Authorization: Bearer <CRON_SECRET>` y la ruta lo verifica. Sin esto la
+  // ruta del cron rechaza todo (solo queda el botón manual del panel).
+  CRON_SECRET: z.string().optional(),
 });
 
 type Env = z.infer<typeof envSchema>;

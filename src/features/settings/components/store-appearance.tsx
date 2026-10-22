@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
+import { useRouter } from "next/navigation";
 import { cropCoverToWebp } from "@/lib/image-compress";
 import {
   createBannerAction,
@@ -13,6 +14,7 @@ import {
   saveBusinessInfoAction,
   updateBannerAction,
   uploadBannerImageAction,
+  refreshAutoBannersAction,
 } from "../actions";
 import { SEASONS, type SeasonKey } from "../seasons";
 import { HOME_SECTIONS, sectionOn } from "../home-sections";
@@ -219,6 +221,7 @@ export function StoreAppearance({
   settings: BusinessSettings | null;
   banners: StoreBanner[];
 }) {
+  const router = useRouter();
   // Fase 7: el iframe de la vista previa se recarga con cada guardado.
   const [previewVersion, setPreviewVersion] = useState(0);
   const bumpPreview = () => setPreviewVersion((v) => v + 1);
@@ -304,6 +307,20 @@ export function StoreAppearance({
     if (!a.ok || !b.ok) return toast("No se pudo guardar", "danger");
     toast("Apariencia guardada y publicada", "success");
     bumpPreview();
+  }
+
+  const [aiBusy, setAiBusy] = useState(false);
+  async function renewWithAi() {
+    setAiBusy(true);
+    const res = await runAction(() => refreshAutoBannersAction(), {
+      silent: true,
+      overlay: false,
+    });
+    setAiBusy(false);
+    if (!res.ok) return toast(res.error.message, "danger");
+    toast(`Listo: ${res.data.created} banners nuevos con IA`, "success");
+    bumpPreview();
+    router.refresh();
   }
 
   function openNewBanner() {
@@ -614,14 +631,43 @@ export function StoreAppearance({
                 Slides rotativos arriba de la tienda.
               </div>
             </div>
-            <button
-              type="button"
-              className="btn btn-primary btn-sm"
-              onClick={openNewBanner}
-            >
-              {sIc(I.plus)} Agregar
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Banners con IA (2026-10-21): copy de Claude + foto del
+                  producto; el cron los renueva cada 10 días. */}
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={aiBusy}
+                title="Elige 3 productos (nuevos / más vendidos) y escribe los banners con IA"
+                onClick={renewWithAi}
+              >
+                {aiBusy ? "Generando…" : "✨ Renovar con IA"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={openNewBanner}
+              >
+                {sIc(I.plus)} Agregar
+              </button>
+            </div>
           </div>
+          {settings?.autoBanners?.lastRunAt ? (
+            <div className="text-faint -mt-1 text-[12px]">
+              Última renovación con IA:{" "}
+              {new Date(settings.autoBanners.lastRunAt).toLocaleDateString(
+                "es-AR",
+                { day: "numeric", month: "long" },
+              )}
+              . El cron los renueva solo cada 10 días; los que agregás a mano no
+              se tocan.
+            </div>
+          ) : (
+            <div className="text-faint -mt-1 text-[12px]">
+              “Renovar con IA” arma 3 banners con tus productos nuevos y más
+              vendidos; después se renuevan solos cada 10 días.
+            </div>
+          )}
           <div className="flex flex-col gap-2">
             {banners.length === 0 ? (
               <div className="text-faint p-2 text-[13px]">

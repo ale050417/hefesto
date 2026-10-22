@@ -533,6 +533,13 @@
       "when": 1792627680263,
       "tag": "0075_quote_defaults",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1792628291150,
+      "tag": "0076_auto_banners",
+      "breakpoints": true
     }
   ]
 }
