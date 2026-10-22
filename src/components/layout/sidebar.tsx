@@ -3,8 +3,10 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "./brand-mark";
+import { openPalette } from "./command-palette";
 
 const icons: Record<string, React.ReactNode> = {
   panel: (
@@ -129,7 +131,7 @@ const icons: Record<string, React.ReactNode> = {
   ),
 };
 
-type NavLink = {
+export type NavLink = {
   href: string;
   label: string;
   icon: React.ReactNode;
@@ -137,9 +139,12 @@ type NavLink = {
   exact?: boolean;
   /** Módulo con permiso fino. Si el usuario no lo puede ver, se oculta. */
   module?: string;
+  /** Qué contador del menú muestra (ver /api/admin/nav-counts). */
+  count?: "pendingOrders" | "inProduction" | "lowStock";
 };
 
-const links: NavLink[] = [
+/** También los usa el buscador global (Ctrl+K). */
+export const NAV_LINKS: NavLink[] = [
   {
     href: "/admin",
     label: "Panel",
@@ -153,6 +158,7 @@ const links: NavLink[] = [
     icon: icons.pedidos,
     group: "Ventas",
     module: "pedidos",
+    count: "pendingOrders",
   },
   // A medida oculto (2026-07): el flujo pasó a WhatsApp (/a-medida público).
   // Para reactivar el panel, restaurar este item y poner CUSTOM_ORDERS_ENABLED=true.
@@ -176,6 +182,7 @@ const links: NavLink[] = [
     icon: icons.produccion,
     group: "Producción",
     module: "produccion",
+    count: "inProduction",
   },
   {
     href: "/admin/filamentos",
@@ -183,6 +190,7 @@ const links: NavLink[] = [
     icon: icons.filamentos,
     group: "Producción",
     module: "filamentos",
+    count: "lowStock",
   },
   {
     href: "/admin/fallas",
@@ -264,11 +272,46 @@ const links: NavLink[] = [
   },
 ];
 
+type NavCounts = {
+  pendingOrders: number;
+  inProduction: number;
+  lowStock: number;
+};
+
+/**
+ * Contadores del menú (pendientes de pago, en producción, stock bajo). Se
+ * piden una vez al montar y cada 60 s; si falla, simplemente no se muestran.
+ */
+function useNavCounts(): NavCounts | null {
+  const [counts, setCounts] = useState<NavCounts | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/admin/nav-counts");
+        if (!res.ok) return;
+        const data = (await res.json()) as NavCounts;
+        if (alive) setCounts(data);
+      } catch {
+        /* sin contadores */
+      }
+    };
+    void load();
+    const id = window.setInterval(load, 60_000);
+    return () => {
+      alive = false;
+      window.clearInterval(id);
+    };
+  }, []);
+  return counts;
+}
+
 export function Sidebar({
   perms,
   open,
   onNavigate,
   logoUrl,
+  user,
 }: {
   perms?: Record<string, boolean>;
   /** Drawer abierto (móvil). En desktop se ignora (CSS lo fija). */
@@ -277,14 +320,25 @@ export function Sidebar({
   onNavigate?: () => void;
   /** Logo del negocio (el mismo de la tienda), redondeado. */
   logoUrl?: string | null;
+  /** Quién está usando el panel (pie del menú). */
+  user?: { name: string; role: string } | null;
 }) {
   const pathname = usePathname();
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname.startsWith(href);
+  const counts = useNavCounts();
 
   // Oculta los ítems de módulos con permiso fino que el usuario no puede ver.
-  const visible = links.filter((l) => !l.module || perms?.[l.module] !== false);
+  const visible = NAV_LINKS.filter(
+    (l) => !l.module || perms?.[l.module] !== false,
+  );
   const groups = [...new Set(visible.map((l) => l.group))];
+  const initials = (user?.name ?? "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join("");
 
   return (
     <aside className={cn("admin-sidebar", open && "open")}>
@@ -309,6 +363,30 @@ export function Sidebar({
         </Link>
       </div>
 
+      {/* Buscador global: abre la paleta Ctrl+K (2026-10-21). */}
+      <button
+        type="button"
+        className="nav-search"
+        onClick={() => {
+          onNavigate?.();
+          openPalette();
+        }}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          aria-hidden
+        >
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+        <span>Buscar…</span>
+        <kbd>Ctrl K</kbd>
+      </button>
+
       <nav className="admin-nav">
         {groups.map((g) => (
           <div key={g}>
@@ -331,12 +409,45 @@ export function Sidebar({
                   )}
                 >
                   {l.icon}
-                  <span>{l.label}</span>
+                  <span className="min-w-0 flex-1 truncate">{l.label}</span>
+                  {l.count && counts && counts[l.count] > 0 ? (
+                    <span
+                      className={cn(
+                        "nav-badge",
+                        l.count === "lowStock" && "is-warn",
+                      )}
+                      title={
+                        l.count === "pendingOrders"
+                          ? "Pendientes de pago"
+                          : l.count === "inProduction"
+                            ? "Confirmados o en producción"
+                            : "Con stock bajo"
+                      }
+                    >
+                      {counts[l.count]}
+                    </span>
+                  ) : null}
                 </Link>
               ))}
           </div>
         ))}
       </nav>
+
+      {user ? (
+        <div className="nav-user" title={user.name}>
+          <span className="nav-user-avatar" aria-hidden>
+            {initials || "H"}
+          </span>
+          <span className="min-w-0">
+            <span className="block truncate text-[12.5px] font-semibold">
+              {user.name}
+            </span>
+            <span className="text-faint block text-[11px]">
+              {user.role === "admin" ? "Administrador" : "Operador"}
+            </span>
+          </span>
+        </div>
+      ) : null}
     </aside>
   );
 }

@@ -4,6 +4,7 @@ import {
   listFilamentsView,
 } from "@/features/inventory/queries";
 import { listOrdersAdmin } from "@/features/orders/services/orderAdminService";
+import { countAllSalesByStatus } from "@/features/orders/repository";
 import { safeLoad } from "@/lib/safe-load";
 import * as repo from "./repository";
 
@@ -142,6 +143,7 @@ async function getDashboardDataUncached(days: number) {
     filamentsR,
     monthUsageR,
     colorsR,
+    statusR,
   ] = await Promise.all([
     safeLoad("kpis", repo.getKpiRows(), {
       revenue: 0,
@@ -164,6 +166,12 @@ async function getDashboardDataUncached(days: number) {
       [],
     ),
     safeLoad("colorCatalog", listColorCatalog(), []),
+    // Pedidos por estado para "En producción" del inicio (2026-10-21).
+    safeLoad(
+      "statusCounts",
+      countAllSalesByStatus(),
+      {} as Record<string, number>,
+    ),
   ]);
   const kpis = kpisR.value;
   const manualKpis = manualKpisR.value;
@@ -235,6 +243,7 @@ async function getDashboardDataUncached(days: number) {
       days,
     ),
     recentOrders: recentItems,
+    statusCounts: statusR.value,
     // Con el tono real del color para la barra de la alerta (widget gráfico).
     lowStock: filaments
       .filter((f) => f.lowStock)

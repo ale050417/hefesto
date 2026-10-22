@@ -8,6 +8,7 @@ import { BrandMark } from "./brand-mark";
 import { ThemeSwitcher } from "./theme-switcher";
 import { AdminNotificationBell } from "@/features/notifications/components/admin-notification-bell";
 import { AssistantWidget } from "@/features/assistant/components/assistant-widget";
+import { CommandPalette, openPalette } from "./command-palette";
 
 /**
  * Estructura del panel: topbar SIEMPRE visible (2026-07-11) con las acciones
@@ -29,11 +30,14 @@ function readNavCollapsed(): boolean {
 export function AdminShell({
   perms,
   logoUrl,
+  user,
   children,
 }: {
   perms?: Record<string, boolean>;
   /** Logo del negocio (Config → Negocio): el MISMO que la tienda. */
   logoUrl?: string | null;
+  /** Quién está usando el panel (pie del menú lateral). */
+  user?: { name: string; role: string } | null;
   children: ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -119,6 +123,29 @@ export function AdminShell({
             HEFESTO<b> Admin</b>
           </span>
         </Link>
+        {/* Buscador global (Ctrl+K), al centro en escritorio. */}
+        <button
+          type="button"
+          className="topbar-search"
+          onClick={openPalette}
+          aria-label="Buscar en el panel"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            aria-hidden
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <span className="topbar-search-text">
+            Buscar producto, cliente o sección…
+          </span>
+          <kbd>Ctrl K</kbd>
+        </button>
         {/* Acciones globales: tienda + tema + notificaciones (única campana) */}
         <span className="ml-auto flex items-center gap-2">
           <Link
@@ -153,6 +180,7 @@ export function AdminShell({
           open={menuOpen}
           onNavigate={() => setMenuOpen(false)}
           logoUrl={logoUrl}
+          user={user}
         />
 
         {menuOpen ? (
@@ -167,6 +195,9 @@ export function AdminShell({
           {children}
         </main>
       </div>
+
+      {/* Buscador global Ctrl+K */}
+      <CommandPalette perms={perms} />
 
       {/* Asistente IA del negocio (burbuja flotante, solo en el admin) */}
       <AssistantWidget />

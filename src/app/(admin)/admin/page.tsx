@@ -12,6 +12,8 @@ import {
 } from "@/features/reports/service";
 import { getStaffUser } from "@/core/auth/session";
 import { getBrandSettings } from "@/features/settings/service";
+import { compactPrice } from "@/lib/format";
+import { Sparkline } from "@/components/shared/sparkline";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Panel" };
@@ -49,13 +51,17 @@ export default async function AdminDashboard({
     ? (rawMes as string)
     : currentKey;
 
-  const [{ recentOrders, lowStock, degraded }, monthUsage, user, brand] =
-    await Promise.all([
-      getDashboardData(30),
-      getMonthFilamentUsage(monthKey).catch(() => []),
-      getStaffUser(),
-      getBrandSettings(),
-    ]);
+  const [
+    { recentOrders, lowStock, degraded, kpis, revenueSeries, statusCounts },
+    monthUsage,
+    user,
+    brand,
+  ] = await Promise.all([
+    getDashboardData(30),
+    getMonthFilamentUsage(monthKey).catch(() => []),
+    getStaffUser(),
+    getBrandSettings(),
+  ]);
   const firstName =
     user?.profile?.fullName?.trim().split(/\s+/)[0] || "Hefesto";
   // Vidriera digital: "Últimos pedidos" es SIEMPRE de venta online (nunca
@@ -64,10 +70,58 @@ export default async function AdminDashboard({
   // de filamento, ventas manuales) sigue funcionando igual (Ale, 2026-08-09).
   const isVidriera = brand.businessMode === "vidriera";
 
+  // Resumen de arriba (2026-10-21, rediseño del inicio): ventas de los
+  // últimos 30 días con su curva, pendientes de pago, en producción y stock
+  // bajo. Cada tarjeta lleva a su sección.
+  const last30 = revenueSeries.reduce((acc, p) => acc + p.total, 0);
+  const last7 = revenueSeries.slice(-7).reduce((acc, p) => acc + p.total, 0);
+  const inProduction =
+    (statusCounts.confirmed ?? 0) + (statusCounts.in_production ?? 0);
+  const ready = statusCounts.ready ?? 0;
+  const quick: Array<{
+    href: string;
+    label: string;
+    hint: string;
+    icon: string;
+    primary?: boolean;
+  }> = [
+    {
+      href: "/admin/productos/nuevo",
+      label: "Nuevo producto",
+      hint: "Con foto con IA",
+      icon: "M12 5v14M5 12h14",
+      primary: true,
+    },
+    {
+      href: "/admin/pedidos",
+      label: "Cargar venta",
+      hint: "Venta manual",
+      icon: "M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0",
+    },
+    {
+      href: "/admin/produccion",
+      label: "Cola de impresión",
+      hint: inProduction > 0 ? `${inProduction} en curso` : "Tablero por etapa",
+      icon: "M6 9V3h12v6M6 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1M7 14h10v7H7z",
+    },
+    {
+      href: "/admin/fallas",
+      label: "Registrar falla",
+      hint: "Descuenta filamento",
+      icon: "M10.3 3.8 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.8a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01",
+    },
+    {
+      href: "/admin/calculadora",
+      label: "Calculadora 3D",
+      hint: "Presupuestar",
+      icon: "M4 2h16v20H4zM8 6h8M8 10h2M12 10h2M8 14h2M12 14h2M8 18h2M12 18h2",
+    },
+  ];
+
   return (
     <div>
       {SHOW_DEGRADED_NOTICE && <DegradedNotice sources={degraded} />}
-      <div className="page-head">
+      <div className="page-head dash-head">
         <div>
           <div className="eyebrow">Panel de gestión</div>
           <h1 className="page-title">
@@ -75,12 +129,150 @@ export default async function AdminDashboard({
           </h1>
           <div className="page-sub">{longDateFmt.format(new Date())}</div>
         </div>
+        {/* Accesos rápidos: lo que se hace todos los días, a un toque. */}
+        <nav className="quick-actions" aria-label="Accesos rápidos">
+          {quick.map((a) => (
+            <Link
+              key={a.href}
+              href={a.href}
+              prefetch={false}
+              className={a.primary ? "qa is-primary" : "qa"}
+            >
+              <span className="qa-ic" aria-hidden>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d={a.icon} />
+                </svg>
+              </span>
+              <span className="min-w-0">
+                <span className="qa-label">{a.label}</span>
+                <span className="qa-hint">{a.hint}</span>
+              </span>
+            </Link>
+          ))}
+        </nav>
       </div>
 
-      {/* Últimos pedidos PRIMERO (2026-07-24); el consumo del mes es una
-          tarjeta chica más, del tamaño de las alertas. En vidriera esta
-          tarjeta es SIEMPRE de venta online: se esconde y "Alertas de stock"
-          pasa a ancho completo (no queda un hueco al lado). */}
+      {/* Resumen: cuatro números que dicen cómo viene el negocio hoy. */}
+      <div className="kpi-grid dash-kpis">
+        <Link
+          href="/admin/reportes"
+          prefetch={false}
+          className="ui-card kpi kpi-link"
+        >
+          <div className="kpi-top">
+            <div className="kpi-ic">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="12" y1="1" x2="12" y2="23" />
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+            </div>
+            <span className="kpi-delta">últimos 30 días</span>
+          </div>
+          <div className="kpi-val">{compactPrice(last30)}</div>
+          <div className="kpi-label">
+            Vendido · {compactPrice(last7)} esta semana
+          </div>
+          <Sparkline
+            values={revenueSeries.map((p) => p.total)}
+            className="kpi-spark"
+          />
+        </Link>
+        <Link
+          href="/admin/pedidos"
+          prefetch={false}
+          className="ui-card kpi kpi-link"
+        >
+          <div className="kpi-top">
+            <div className="kpi-ic is-warn">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 7v5l3 2" />
+              </svg>
+            </div>
+            <span className="kpi-delta">a cobrar</span>
+          </div>
+          <div className="kpi-val">{statusCounts.pending_payment ?? 0}</div>
+          <div className="kpi-label">Pedidos pendientes de pago</div>
+        </Link>
+        <Link
+          href="/admin/produccion"
+          prefetch={false}
+          className="ui-card kpi kpi-link"
+        >
+          <div className="kpi-top">
+            <div className="kpi-ic is-info">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M6 9V3h12v6M6 18H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-1" />
+                <rect x="7" y="14" width="10" height="7" rx="1" />
+              </svg>
+            </div>
+            <span className="kpi-delta">
+              {ready > 0 ? `${ready} para entregar` : "en el tablero"}
+            </span>
+          </div>
+          <div className="kpi-val">{inProduction}</div>
+          <div className="kpi-label">Confirmados o en producción</div>
+        </Link>
+        <Link
+          href="/admin/filamentos"
+          prefetch={false}
+          className="ui-card kpi kpi-link"
+        >
+          <div className="kpi-top">
+            <div
+              className={
+                kpis.lowStockCount > 0 ? "kpi-ic is-danger" : "kpi-ic is-ok"
+              }
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="9" />
+                <circle cx="12" cy="12" r="3.2" />
+              </svg>
+            </div>
+            <span className="kpi-delta">
+              {kpis.lowStockCount > 0 ? "reponer" : "todo en orden"}
+            </span>
+          </div>
+          <div className="kpi-val">{kpis.lowStockCount}</div>
+          <div className="kpi-label">Filamentos con stock bajo</div>
+        </Link>
+      </div>
+
       <div className={isVidriera ? undefined : "dash-grid"}>
         {!isVidriera ? (
           <div className="ui-card section-card">

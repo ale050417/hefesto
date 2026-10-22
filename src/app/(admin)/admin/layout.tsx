@@ -18,7 +18,7 @@ export default async function AdminLayout({
   children: ReactNode;
 }) {
   // Candado 2: autorización por rol (admin/operador) en el servidor.
-  await requireStaff();
+  const user = await requireStaff();
   // Permisos completos (ver/crear/editar/eliminar por módulo), en UNA pasada.
   // Para el sidebar (filtra por "ver") y para el contexto de la UI.
   // El logo del negocio (Config → Negocio) es el MISMO que muestra la tienda.
@@ -37,7 +37,14 @@ export default async function AdminLayout({
       </Suspense>
       {/* Lo que carga un empleado aparece solo, sin recargar la página. */}
       <AdminLiveRefresh />
-      <AdminShell perms={verMap} logoUrl={brand?.logoUrl ?? null}>
+      <AdminShell
+        perms={verMap}
+        logoUrl={brand?.logoUrl ?? null}
+        user={{
+          name: user.profile?.fullName?.trim() || user.email || "Equipo",
+          role: user.profile?.role ?? "operator",
+        }}
+      >
         {children}
       </AdminShell>
     </PermsProvider>

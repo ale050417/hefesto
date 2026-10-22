@@ -4,6 +4,7 @@ import { db } from "@/core/db";
 import {
   couponRedemptions,
   coupons,
+  manualSales,
   orderItems,
   orderStatusHistory,
   orders,
@@ -326,5 +327,28 @@ export async function countOrdersByStatus(
     .groupBy(orders.status);
   const map: Record<string, number> = {};
   for (const r of rows) map[r.status] = r.count;
+  return map;
+}
+
+/**
+ * Pedidos online + ventas manuales por estado, sumados (2026-10-21): el
+ * inicio y el menú muestran "pendientes de pago" y "en producción" contando
+ * las dos cosas, igual que la pantalla de Pedidos y la cola.
+ */
+export async function countAllSalesByStatus(
+  database: Database = db,
+): Promise<Record<string, number>> {
+  const [online, manual] = await Promise.all([
+    countOrdersByStatus(database),
+    database
+      .select({
+        status: manualSales.status,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(manualSales)
+      .groupBy(manualSales.status),
+  ]);
+  const map: Record<string, number> = { ...online };
+  for (const r of manual) map[r.status] = (map[r.status] ?? 0) + r.count;
   return map;
 }
