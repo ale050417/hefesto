@@ -8,6 +8,7 @@ import { buildWhatsappUrl } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import {
   buildQuoteText,
+  parseColorList,
   type QuoteDefaults,
   type QuoteDraft,
   type QuotePrice,
@@ -172,10 +173,7 @@ function QuoteForm({
           suffix: r.suffix.trim() || undefined,
         }))
         .filter((p) => p.amount > 0),
-      colors: colors
-        .split(/[,\n]/)
-        .map((c) => c.trim())
-        .filter(Boolean),
+      colors: parseColorList(colors),
       depositPct: depositOn ? Number(depositPct) || 0 : null,
       depositText,
       notes: defaults.notes.filter((_, i) => notesOn[i]),

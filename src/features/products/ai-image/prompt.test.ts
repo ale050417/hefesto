@@ -45,14 +45,26 @@ describe("buildProductImagePrompt", () => {
       category: "Tazas",
       colors: ["Rojo", "Blanco"],
     });
-    expect(p).toContain('product: "Taza Mario"');
-    expect(p).toContain("category: Tazas");
-    // Los colores de venta recoloreaban la pieza: el prompt pide respetar
-    // los de la foto.
+    expect(p).toContain('Producto: "Taza Mario" (categoría: Tazas).');
+    expect(p).toContain("Escenario: on a wooden bar counter");
+    // Los colores de venta recoloreaban la pieza: no van al prompt.
     expect(p).not.toContain("Rojo");
-    expect(p).toMatch(/exact colors seen in the photo/);
-    expect(p).toMatch(/Scene: on a wooden bar counter/);
-    expect(p).toMatch(/Keep the exact same object/);
+  });
+
+  it("usa el prompt base de Ale: 1000 × 1000, fidelidad y encuadre 50–65 %", () => {
+    const p = buildProductImagePrompt({ name: "Pieza" });
+    expect(p).toContain("1000 × 1000 píxeles");
+    expect(p).toContain("exacto de 1000 × 1000");
+    expect(p).toContain("réplica exacta del original");
+    expect(p).toContain("entre el 50% y el 65%");
+  });
+
+  it("pieza y escenario van al principio, antes de las instrucciones", () => {
+    const p = buildProductImagePrompt({ name: "Taza Mario" });
+    expect(p.startsWith('Producto: "Taza Mario"')).toBe(true);
+    expect(p.indexOf("Escenario:")).toBeLessThan(
+      p.indexOf("Utiliza la imagen"),
+    );
   });
 
   it("la pista del usuario pisa la escena automática", () => {
@@ -60,13 +72,13 @@ describe("buildProductImagePrompt", () => {
       name: "Taza Mario",
       scene: '  en una "biblioteca"\n antigua ',
     });
-    expect(p).toMatch(/Scene: en una biblioteca antigua\./);
+    expect(p).toMatch(/Escenario: en una biblioteca antigua\./);
     expect(p).not.toMatch(/bar counter/);
   });
 
   it("omite la categoría cuando no hay", () => {
     const p = buildProductImagePrompt({ name: "Pieza" });
-    expect(p).toContain('(product: "Pieza")');
+    expect(p.startsWith('Producto: "Pieza". Escenario:')).toBe(true);
   });
 });
 

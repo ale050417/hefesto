@@ -9,6 +9,7 @@ import { addSpoolAction, deleteFilamentAction } from "../actions";
 import { filColor } from "../constants";
 import type { FilamentView } from "../types";
 import { FilamentForm, type CatalogItem } from "./filament-form";
+import { FilamentReportButton } from "./filament-report-button";
 import { runAction } from "@/lib/run-action";
 import { useDeleteResource } from "@/hooks/use-delete-resource";
 
@@ -243,6 +244,7 @@ export function FilamentsBoard({
         >
           Copiar colores
         </button>
+        <FilamentReportButton filaments={filaments} />
         <div className="mode-switch">
           <button
             className={view === "grilla" ? "active" : ""}

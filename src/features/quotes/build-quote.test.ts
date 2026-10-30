@@ -3,8 +3,29 @@ import {
   DEFAULT_QUOTE_DEFAULTS,
   buildQuoteText,
   dimensionLines,
+  parseColorList,
   pricesFromProduct,
 } from "./build-quote";
+
+describe("parseColorList", () => {
+  it("separa por coma, punto y coma y salto de línea", () => {
+    expect(parseColorList("Blanco, Verde Olivo; Negro\nRojo")).toEqual([
+      "Blanco",
+      "Verde Olivo",
+      "Negro",
+      "Rojo",
+    ]);
+  });
+
+  it("ignora separadores sobrantes y espacios", () => {
+    expect(parseColorList("  Blanco ;; , Negro ;  ")).toEqual([
+      "Blanco",
+      "Negro",
+    ]);
+    expect(parseColorList("")).toEqual([]);
+    expect(parseColorList(null)).toEqual([]);
+  });
+});
 
 describe("buildQuoteText", () => {
   it("arma el formato de referencia completo (llavero con escalón por cantidad)", () => {

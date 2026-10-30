@@ -1,16 +1,17 @@
 /**
- * Prompt para la foto de producto con IA (pedido de Ale, 2026-10-21).
+ * Prompt para la foto de producto con IA (pedido de Ale, 2026-10-21; las
+ * instrucciones base se reemplazaron el 2026-10-30 por el prompt que Ale
+ * pidió textual).
  *
  * El empleado saca una foto de la pieza con el celular y la IA devuelve una
- * foto de catálogo: la MISMA pieza, en una escena acorde a lo que es (un vaso
+ * foto de catálogo: la MISMA pieza, en un escenario acorde a lo que es (un vaso
  * en la barra de un bar, un Pokémon en un ambiente de ese mundo, una maceta
- * entre plantas), con el estilo de las fotos que ya tiene la tienda: fondo
- * oscuro con clima, luz de estudio, la pieza protagonista.
+ * entre plantas), con fondo premium y la pieza al 50–65 % del encuadre.
  *
- * Puro (sin red): la escena se elige acá por palabras clave del nombre, la
- * categoría y la descripción, y el que carga puede pisarla con una pista
- * ("en una barra de bar"). El prompt va en inglés porque el modelo de imagen
- * (FLUX.2 klein) lo sigue mucho mejor que en castellano.
+ * Puro (sin red): el escenario se elige acá por palabras clave del nombre, la
+ * categoría y la descripción, y el que carga puede pisarlo con una pista
+ * ("en una barra de bar"). Las instrucciones base van en castellano, tal cual
+ * las pidió Ale; las escenas siguen en inglés, como antes.
  */
 
 export type ProductImageContext = {
@@ -128,23 +129,29 @@ export function cleanSceneHint(hint: string | null | undefined): string | null {
   return t ? t.slice(0, 200) : null;
 }
 
+/**
+ * Instrucciones base que pidió Ale (2026-10-30), tal cual: fidelidad absoluta
+ * a la pieza, 1000 × 1000, producto al 50–65 % del encuadre y fondo premium.
+ */
+const BASE_INSTRUCTIONS = [
+  "Utiliza la imagen proporcionada únicamente como referencia del producto. Genera una fotografía publicitaria hiperrealista y de calidad comercial del mismo producto, manteniendo exactamente el 100% del diseño original. No modifiques, rediseñes, reemplaces, corrijas, simplifiques, estilices, agregues ni elimines ningún detalle del producto.",
+  "La imagen final debe tener un tamaño exacto de 1000 × 1000 píxeles (formato cuadrado). El producto no debe ocupar todo el encuadre; debe aparecer ligeramente más pequeño, centrado y con suficiente espacio libre alrededor (aire visual) para lograr una composición publicitaria elegante, equilibrada y profesional.",
+  "Respeta de forma absoluta: forma y proporciones; dimensiones y grosor; colores originales; tipografía; bordes y contornos; relieves, grabados y cortes; texturas reales del material (líneas de impresión 3D); acabado superficial; microdetalles visibles; identidad visual completa del producto.",
+  "El producto debe ser una réplica exacta del original. La única mejora permitida es la calidad fotográfica y la presentación visual.",
+  "Convierte el producto en una fotografía comercial de nivel premium con: calidad hiperrealista; resolución equivalente a 8K; nivel de detalle extremo; nitidez profesional de estudio; materiales físicamente correctos (PBR); texturas completamente fotorrealistas de líneas de impresión 3D; bordes perfectamente definidos; excelente rango dinámico (HDR); reflejos naturales y controlados; sombras suaves y realistas; iluminación profesional de estudio mediante softboxes; balance de blancos perfecto; colores fieles al producto original; profundidad de campo cinematográfica sin perder detalles importantes; calidad comparable a una fotografía realizada con una cámara de formato medio y un objetivo macro profesional.",
+  "Fondo y composición: genera un fondo profesional, elegante y completamente relacionado con el producto, como si hubiera sido realizado para una campaña publicitaria de una marca reconocida. El escenario debe complementar el producto sin robar protagonismo y puede incluir superficies, texturas, elementos decorativos o ambientaciones acordes a su uso o categoría, siempre con un estilo premium y comercial. El fondo debe ser coherente con el tipo de producto, moderno y minimalista, elegante y limpio, visualmente atractivo, con iluminación integrada de forma natural, sin objetos innecesarios que distraigan, con profundidad y sensación tridimensional, con colores que resalten el producto sin alterar sus tonos reales, y con apariencia de una sesión fotográfica profesional para publicidad. El escenario puede recrear un ambiente realista de alta calidad (por ejemplo, una mesa de madera premium, una superficie de mármol, un escritorio moderno, un ambiente infantil, un taller, una cocina, una oficina, una sala de estar, una vitrina o cualquier contexto relacionado con el producto), siempre que sea coherente con su finalidad y aporte valor visual.",
+  "Encuadre: el producto debe ser el protagonista, pero no debe llenar el lienzo. Debe ocupar aproximadamente entre el 50% y el 65% del área visible de la imagen, dejando márgenes amplios y una composición limpia, equilibrada y apta para e-commerce y publicidad premium.",
+  "Resultado esperado: la imagen final debe parecer una fotografía tomada por un fotógrafo profesional especializado en publicidad y e-commerce de lujo. El producto debe conservar exactamente su diseño original. El fondo, la iluminación y la composición deben transmitir una sensación de calidad premium, confianza y alto valor comercial, dejando la imagen lista para utilizar en tiendas online, Mercado Libre, Amazon, Shopify, catálogos impresos, redes sociales y campañas publicitarias. No generes un render con apariencia artificial. El resultado debe ser indistinguible de una fotografía profesional real de estudio, manteniendo una fidelidad absoluta al producto original y modificando únicamente el entorno, la iluminación, el encuadre y la calidad visual.",
+].join("\n\n");
+
 /** El prompt completo que se manda al modelo de imagen. */
 export function buildProductImagePrompt(ctx: ProductImageContext): string {
   const name = ctx.name.replace(/\s+/g, " ").trim().slice(0, 120);
-  const hint = cleanSceneHint(ctx.scene);
-  const scene = hint ?? pickScene(ctx);
-  const product = [
-    `product: "${name}"`,
-    ctx.category ? `category: ${ctx.category.trim()}` : null,
-  ]
-    .filter(Boolean)
-    .join("; ");
+  const category = ctx.category?.replace(/\s+/g, " ").trim();
+  const scene = cleanSceneHint(ctx.scene) ?? pickScene(ctx);
+  // Pieza y escenario van PRIMERO: si el modelo corta un prompt largo, se
+  // pierde el final de las instrucciones, no la pieza ni el escenario.
+  const product = `Producto: "${name}"${category ? ` (categoría: ${category})` : ""}. Escenario: ${scene}.`;
 
-  return [
-    `Professional square product photograph of the 3D-printed object shown in image 0 (${product}).`,
-    "Keep the exact same object: same shape, proportions, details and the exact colors seen in the photo. Do not redesign or recolor it.",
-    "Do not add text, logos, watermarks, people or hands.",
-    "Premium catalog style: dramatic studio lighting, shallow depth of field, dark moody background, photorealistic, the object centered as the hero filling about 70% of the frame.",
-    `Scene: ${scene}.`,
-  ].join(" ");
+  return `${product}\n\n${BASE_INSTRUCTIONS}`;
 }

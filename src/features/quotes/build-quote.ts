@@ -168,6 +168,18 @@ export function dimensionLines(
   return /:/.test(t) ? [t] : [`Medidas: ${t}`];
 }
 
+/**
+ * "Blanco, Verde Olivo; Negro" → un color por elemento. Acepta coma, punto y
+ * coma o salto de línea (pedido de Ale, 2026-10-30: con punto y coma no
+ * separaba y quedaba todo como un solo color).
+ */
+export function parseColorList(text: string | null | undefined): string[] {
+  return (text ?? "")
+    .split(/[,;\n]/)
+    .map(clean)
+    .filter(Boolean);
+}
+
 /** Precio del producto → líneas de precio (base, por tamaño, por color). */
 export function pricesFromProduct(p: {
   price: number;
