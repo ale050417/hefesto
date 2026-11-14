@@ -1,0 +1,10 @@
+# Clave de subida a Play Store. Copiá este archivo como `key.properties` (al
+# lado de este) y completá los datos. `key.properties` y los `.jks` están en
+# .gitignore: NUNCA se suben al repositorio.
+#
+# Si se pierde el archivo .jks o su contraseña no se puede subir una
+# actualización: guardá una copia fuera de la PC (Drive, pendrive).
+storePassword=CONTRASEÑA_DEL_ARCHIVO
+keyPassword=CONTRASEÑA_DE_LA_CLAVE
+keyAlias=upload
+storeFile=C:/Users/TU_USUARIO/hefesto-upload.jks
