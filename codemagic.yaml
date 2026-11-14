@@ -170,7 +170,7 @@ workflows:
 
           print("== 2. Sign In with Apple")
           caps = [c["attributes"]["capabilityType"]
-                  for c in call("GET", f"/bundleIds/{bid}/bundleIdCapabilities?limit=200")["data"]]
+                  for c in call("GET", f"/bundleIds/{bid}/bundleIdCapabilities")["data"]]
           print("Capacidades:", caps)
           changed = False
           if "APPLE_ID_AUTH" in caps:
@@ -185,7 +185,7 @@ workflows:
               print("Habilitada (app principal).")
 
           print("== 3. Perfil de App Store")
-          store = [p for p in call("GET", f"/bundleIds/{bid}/profiles?limit=200")["data"]
+          store = [p for p in call("GET", f"/bundleIds/{bid}/profiles")["data"]
                    if p["attributes"]["profileType"] == "IOS_APP_STORE"]
           valid = [p for p in store if p["attributes"]["profileState"] == "ACTIVE"]
           if valid and not changed:
