@@ -41,8 +41,9 @@ final fallasProvider = FutureProvider.autoDispose<FallasData>(
 
 /// Registrar o borrar una falla mueve stock: además del listado de fallas hay
 /// que refrescar el stock, el inicio y el historial de filamentos.
-void invalidateFallas(WidgetRef ref) {
-  ref.invalidate(fallasProvider);
-  invalidateFilamentos(ref);
-  ref.invalidate(adminDashboardProvider);
+/// (Con el contenedor y no con el `ref` de la pantalla: ver `invalidateFilamentos`.)
+void invalidateFallas(ProviderContainer container) {
+  container.invalidate(fallasProvider);
+  invalidateFilamentos(container);
+  container.invalidate(adminDashboardProvider);
 }

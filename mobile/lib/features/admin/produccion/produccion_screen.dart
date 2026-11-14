@@ -433,12 +433,13 @@ class _MoveSheetState extends ConsumerState<MoveSheet> {
       _loading = true;
       _error = null;
     });
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final api = ref.read(produccionApiProvider);
       final code = _tracking.text.trim();
       if (_askTracking && code.isNotEmpty) await api.setTracking(widget.card.id, code);
       await api.move(widget.card, widget.target);
-      invalidateBoard(ref);
+      invalidateBoard(container);
       if (mounted) popIfCurrent(context, true);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -515,12 +516,15 @@ class _MoveSheetState extends ConsumerState<MoveSheet> {
             textCapitalization: TextCapitalization.characters,
             autocorrect: false,
             textInputAction: TextInputAction.done,
+            // Mismo tope que el servidor (más largo lo rechaza con "Datos inválidos.").
+            maxLength: 120,
             onChanged: (_) {
               if (_error != null) setState(() => _error = null);
             },
             decoration: const InputDecoration(
               labelText: 'Código de seguimiento',
               helperText: 'Si ya lo cargaste en la venta, dejalo vacío.',
+              counterText: '',
             ),
           ),
         ],

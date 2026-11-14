@@ -44,7 +44,11 @@ class _FilamentMovementsScreenState extends ConsumerState<FilamentMovementsScree
 
     return Scaffold(
       appBar: AppBar(title: const Text('Historial de stock')),
-      body: denied
+      // La app dibuja de borde a borde: sin `SafeArea` el final del historial
+      // quedaba debajo de la barra de gestos / de los tres botones del sistema.
+      body: SafeArea(
+        top: false,
+        child: denied
           ? const AccessDenied(what: 'el historial de filamentos')
           : movs.when(
               loading: () => const ListSkeleton(rows: 7, height: 64),
@@ -112,6 +116,7 @@ class _FilamentMovementsScreenState extends ConsumerState<FilamentMovementsScree
                 );
               },
             ),
+      ),
     );
   }
 }

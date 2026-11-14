@@ -52,7 +52,7 @@ class MovementTile extends StatelessWidget {
               children: [
                 Text(
                   m.reasonLabel,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
                 ),

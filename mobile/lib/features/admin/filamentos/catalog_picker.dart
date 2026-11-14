@@ -141,13 +141,14 @@ class _CatalogSheetState extends ConsumerState<_CatalogSheet> {
       _busy = true;
       _error = null;
     });
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(filamentosApiProvider).addCatalog(
             widget.kind.api,
             result.name,
             hex: result.hex,
           );
-      ref.invalidate(filamentCatalogProvider);
+      container.invalidate(filamentCatalogProvider);
       if (mounted) popIfCurrent(context, result.name);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -171,9 +172,10 @@ class _CatalogSheetState extends ConsumerState<_CatalogSheet> {
       _busy = true;
       _error = null;
     });
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(filamentosApiProvider).removeCatalog(widget.kind.api, o.name);
-      ref.invalidate(filamentCatalogProvider);
+      container.invalidate(filamentCatalogProvider);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {

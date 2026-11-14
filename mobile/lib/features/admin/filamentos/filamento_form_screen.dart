@@ -76,8 +76,13 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
   late final TextEditingController _cost;
   late final TextEditingController _threshold;
 
+  static const _fixFieldsMessage = 'Revisá los datos marcados en rojo.';
+
   bool _saving = false;
   bool _submitted = false;
+
+  /// Aviso sobre el botón de guardar: el rechazo del servidor o, si no pasó la
+  /// validación, que hay campos para corregir.
   String? _serverError;
 
   bool get _isEdit => widget.filament != null;
@@ -95,6 +100,27 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
     _spool = TextEditingController(text: gramsField(f?.spoolGrams ?? 1000));
     _cost = TextEditingController(text: gramsField(f?.costPerKg ?? 18000));
     _threshold = TextEditingController(text: gramsField(f?.alertThresholdGrams ?? 1000));
+    _initial = _snapshot();
+  }
+
+  /// Lo cargado en el formulario, para saber si se tocó algo.
+  late final String _initial;
+  String _snapshot() =>
+      [_material, _color, _brand, _diameter, _stock.text, _spool.text, _cost.text, _threshold.text].join('|');
+
+  /// ¿Hay algo cambiado que se perdería al salir?
+  bool get _hasUnsaved => !_saving && _snapshot() != _initial;
+
+  Future<void> _confirmLeave() async {
+    final leave = await confirmDialog(
+      context,
+      title: '¿Descartar los cambios?',
+      message: 'Lo que cargaste no se guardó.',
+      confirmLabel: 'Descartar',
+      cancelLabel: 'Seguir editando',
+      destructive: true,
+    );
+    if (leave && mounted) Navigator.of(context).pop();
   }
 
   @override
@@ -164,12 +190,16 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     setState(() {
       _submitted = true;
-      _serverError = null;
+      // Si falta algo, se avisa también sobre el botón: el campo marcado en
+      // rojo puede haber quedado fuera de la pantalla.
+      _serverError = _errors.isEmpty ? null : _fixFieldsMessage;
     });
     if (_errors.isNotEmpty) return;
     setState(() => _saving = true);
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final api = ref.read(filamentosApiProvider);
       if (_isEdit) {
@@ -177,8 +207,8 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
       } else {
         await api.create(_draft());
       }
-      invalidateFilamentos(ref);
-      if (mounted) Navigator.of(context).pop(true);
+      invalidateFilamentos(container);
+      if (mounted) popIfCurrent(context, true);
     } on ApiException catch (e) {
       if (mounted) setState(() => _serverError = e.message);
     } catch (_) {
@@ -222,7 +252,7 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
     final diaOptions = {...diameters, if (_diameter.isNotEmpty) _diameter}.toList();
     final canSave = _dirty && !_saving;
 
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(title: Text(_isEdit ? 'Editar filamento' : 'Nuevo filamento')),
       body: SafeArea(
         child: Column(
@@ -314,25 +344,42 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
                     prefix: r'$ ',
                     helper: 'Sirve para valorizar el stock y calcular lo que cuestan las fallas.',
                   ),
-                  if (_serverError != null) ...[
-                    const SizedBox(height: 16),
-                    InlineError(_serverError!),
-                  ],
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: GoldButton(
-                label: _isEdit ? 'Guardar cambios' : 'Agregar filamento',
-                icon: Icons.check_rounded,
-                loading: _saving,
-                onPressed: canSave ? _save : null,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // El aviso va pegado al botón (fijo): al final de la lista, con
+                  // el teclado abierto, quedaba fuera de la pantalla y parecía
+                  // que "Guardar" no hacía nada.
+                  if (_serverError != null) ...[
+                    InlineError(_serverError!),
+                    const SizedBox(height: 10),
+                  ],
+                  GoldButton(
+                    label: _isEdit ? 'Guardar cambios' : 'Agregar filamento',
+                    icon: Icons.check_rounded,
+                    loading: _saving,
+                    onPressed: canSave ? _save : null,
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
+    );
+    // "Atrás" con datos sin guardar pregunta antes de perderlos, igual que
+    // los demás formularios del panel (2026-11-14, pedido de Ale).
+    return PopScope(
+      canPop: !_hasUnsaved,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmLeave();
+      },
+      child: scaffold,
     );
   }
 }

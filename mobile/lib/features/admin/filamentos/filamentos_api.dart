@@ -108,9 +108,15 @@ final filamentCatalogProvider = FutureProvider.autoDispose<FilamentCatalog>(
 /// Tras cualquier cambio de stock o de datos: el listado (pestaña Stock), el
 /// inicio (que muestra los carretes con stock bajo), el detalle y el historial
 /// quedan viejos y se vuelven a pedir.
-void invalidateFilamentos(WidgetRef ref) {
-  ref.invalidate(adminStockProvider);
-  ref.invalidate(adminDashboardProvider);
-  ref.invalidate(filamentoProvider);
-  ref.invalidate(filamentMovementsProvider);
+///
+/// Recibe el CONTENEDOR (`ProviderScope.containerOf(context, listen: false)`,
+/// tomado antes del `await`) y no el `ref` de la pantalla: si el usuario cerró
+/// la hoja o volvió atrás mientras el servidor respondía, ese `ref` ya no se
+/// puede usar (lanza) y las listas quedaban sin refrescar aunque el cambio se
+/// había guardado.
+void invalidateFilamentos(ProviderContainer container) {
+  container.invalidate(adminStockProvider);
+  container.invalidate(adminDashboardProvider);
+  container.invalidate(filamentoProvider);
+  container.invalidate(filamentMovementsProvider);
 }

@@ -86,6 +86,7 @@ class FilamentTile extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -240,7 +241,11 @@ class _AdminStockScreenState extends ConsumerState<AdminStockScreen> {
             tooltip: 'Más opciones',
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (v) {
-              if (v == 'report') showStockReportSheet(context);
+              // Sobre el navegador raíz: así la hoja cubre también la barra
+              // inferior del panel (como las demás pantallas de esta pestaña).
+              if (v == 'report') {
+                showStockReportSheet(Navigator.of(context, rootNavigator: true).context);
+              }
               if (v == 'colors') _copyColors(stock.value?.items ?? const []);
             },
             itemBuilder: (_) => const [
@@ -254,10 +259,8 @@ class _AdminStockScreenState extends ConsumerState<AdminStockScreen> {
           ? FloatingActionButton.extended(
               heroTag: 'nuevo-filamento',
               onPressed: _add,
-              backgroundColor: Brand.gold,
-              foregroundColor: Brand.goldFg,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Agregar', style: TextStyle(fontWeight: FontWeight.w700)),
+              label: const Text('Agregar'),
             )
           : null,
       body: stock.when(
@@ -284,7 +287,9 @@ class _AdminStockScreenState extends ConsumerState<AdminStockScreen> {
             color: Brand.gold,
             onRefresh: _refresh,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+              // 96 = lugar para el botón flotante; más la barra del sistema si
+              // la pantalla no está dentro del panel (que ya la descuenta).
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 96 + MediaQuery.paddingOf(context).bottom),
               children: [
                 Row(
                   children: [
@@ -404,7 +409,18 @@ class _Counter extends StatelessWidget {
               color: color,
             ),
           ),
-          Text(label, style: TextStyle(fontSize: 12, color: c.textDim, fontWeight: FontWeight.w600)),
+          // Una sola línea: con letra grande "Agotados" se partía en dos
+          // ("Agotado" / "s"); si no entra, se achica.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              label,
+              maxLines: 1,
+              softWrap: false,
+              style: TextStyle(fontSize: 12, color: c.textDim, fontWeight: FontWeight.w600),
+            ),
+          ),
         ],
       ),
     );

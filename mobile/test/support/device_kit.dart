@@ -315,13 +315,25 @@ Future<void> scrollToEnd(WidgetTester tester, {Finder? scrollable}) async {
   final target = scrollable ?? find.byType(Scrollable).first;
   if (target.evaluate().isEmpty) return;
   final state = tester.state<ScrollableState>(target);
-  for (var i = 0; i < 40; i++) {
+  // Tiene que quedar EN REPOSO exactamente en el final. No alcanza con "llegó":
+  // en una lista larga el final estimado cambia a medida que se arman las
+  // filas, y con el rebote de iOS la lista puede quedar pasada de largo unos
+  // cuadros (ahí lo último se ve más arriba de donde queda de verdad y un
+  // "queda a la vista" daría bien sin serlo). Se exige el final exacto durante
+  // tres cuadros seguidos.
+  var stable = 0;
+  for (var i = 0; i < 80 && stable < 3; i++) {
     final pos = state.position;
-    if (pos.pixels >= pos.maxScrollExtent - 0.5) break;
-    pos.jumpTo(pos.maxScrollExtent);
-    await tester.pump(const Duration(milliseconds: 50));
+    final end = pos.maxScrollExtent;
+    if ((pos.pixels - end).abs() <= 0.5) {
+      stable++;
+    } else {
+      stable = 0;
+      pos.jumpTo(end);
+    }
+    await tester.pump(const Duration(milliseconds: 100));
   }
-  await settle(tester, 3);
+  await settle(tester, 4);
   expectNoLayoutErrors(tester, 'al desplazar hasta el final en ${_phone.name}');
 }
 

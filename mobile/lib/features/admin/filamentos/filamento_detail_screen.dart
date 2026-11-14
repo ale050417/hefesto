@@ -46,6 +46,16 @@ class FilamentoDetailScreen extends ConsumerWidget {
   /// "+1 carrete": suma el tamaño del carrete con un toque (con confirmación).
   Future<void> _addSpool(BuildContext context, WidgetRef ref, Filamento f) async {
     if (f.spoolGrams <= 0) return;
+    // Un carrete que debe MÁS que un carrete entero seguiría en negativo y el
+    // servidor rechaza ese ajuste (con un mensaje que confunde: "No hay stock
+    // para restar."): se explica acá qué hacer.
+    if (f.stockGrams + f.spoolGrams < 0) {
+      showToast(
+        context,
+        'Este carrete debe ${formatGrams(f.debtGrams)}: usá «Ajustar stock» y sumá al menos eso.',
+      );
+      return;
+    }
     final ok = await confirmDialog(
       context,
       title: 'Sumar un carrete',
@@ -53,13 +63,14 @@ class FilamentoDetailScreen extends ConsumerWidget {
       confirmLabel: 'Sumar',
     );
     if (!ok || !context.mounted) return;
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final res = await ref.read(filamentosApiProvider).adjust(
             f.id,
             deltaGrams: f.spoolGrams,
             reason: 'Carrete sumado',
           );
-      invalidateFilamentos(ref);
+      invalidateFilamentos(container);
       if (context.mounted) _toastResult(context, res);
     } on ApiException catch (e) {
       if (context.mounted) showToast(context, e.message);
@@ -83,12 +94,13 @@ class FilamentoDetailScreen extends ConsumerWidget {
       destructive: true,
     );
     if (!ok || !context.mounted) return;
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       await ref.read(filamentosApiProvider).delete(f.id);
-      invalidateFilamentos(ref);
+      invalidateFilamentos(container);
       if (context.mounted) {
         showToast(context, 'Filamento eliminado');
-        Navigator.of(context).pop();
+        popIfCurrent(context);
       }
     } on ApiException catch (e) {
       if (context.mounted) showToast(context, e.message);
@@ -389,11 +401,13 @@ class _InfoCard extends StatelessWidget {
     final c = context.hc;
     Widget row(String k, String v) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
+          // El valor ocupa todo el resto de la fila y va pegado al borde
+          // derecho (antes quedaba flotando en el medio de la tarjeta).
           child: Row(
             children: [
-              Expanded(child: Text(k, style: TextStyle(color: c.textDim, fontSize: 13))),
+              Text(k, style: TextStyle(color: c.textDim, fontSize: 13)),
               const SizedBox(width: 12),
-              Flexible(
+              Expanded(
                 child: Text(
                   v,
                   textAlign: TextAlign.right,

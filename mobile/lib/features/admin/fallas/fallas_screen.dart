@@ -375,13 +375,14 @@ class _FallaSheetState extends ConsumerState<_FallaSheet> {
     );
     if (!ok || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
+    final container = ProviderScope.containerOf(context, listen: false);
     setState(() {
       _deleting = true;
       _error = null;
     });
     try {
       final restored = await ref.read(fallasApiProvider).delete(f.id);
-      invalidateFallas(ref);
+      invalidateFallas(container);
       if (mounted) popIfCurrent(context);
       messenger
         ..hideCurrentSnackBar()
@@ -414,7 +415,9 @@ class _FallaSheetState extends ConsumerState<_FallaSheet> {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SizedBox(width: 110, child: Text(k, style: TextStyle(color: c.textDim, fontSize: 13))),
+              SizedBox(width: 104, child: Text(k, style: TextStyle(color: c.textDim, fontSize: 13))),
+              // Separación fija: "Costo estimado" quedaba pegado al valor.
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   v,

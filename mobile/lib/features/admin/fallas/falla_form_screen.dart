@@ -77,8 +77,13 @@ class _FallaFormScreenState extends ConsumerState<FallaFormScreen> {
   // todavía está montado cuando se hace el setState.
   final List<FallaLineInput> _removed = [];
 
+  static const _fixFieldsMessage = 'Revisá los datos marcados en rojo.';
+
   bool _saving = false;
   bool _submitted = false;
+
+  /// Aviso sobre el botón de guardar: el rechazo del servidor o, si no pasó la
+  /// validación, que hay campos para corregir.
   String? _serverError;
 
   bool get _isEdit => widget.falla != null;
@@ -134,6 +139,27 @@ class _FallaFormScreenState extends ConsumerState<FallaFormScreen> {
 
   double get _totalGrams => _lines.fold(0.0, (a, l) => a + (parseNumber(l.grams.text) ?? 0));
 
+  /// ¿Hay algo cargado que se perdería al salir?
+  bool get _hasUnsaved {
+    if (_saving) return false;
+    if (_isEdit) return _dirty;
+    return _piece.text.trim().isNotEmpty ||
+        _notes.text.trim().isNotEmpty ||
+        _lines.any((l) => l.filamentId.isNotEmpty || l.grams.text.trim().isNotEmpty);
+  }
+
+  Future<void> _confirmLeave() async {
+    final leave = await confirmDialog(
+      context,
+      title: '¿Descartar los cambios?',
+      message: 'Lo que cargaste no se guardó.',
+      confirmLabel: 'Descartar',
+      cancelLabel: 'Seguir editando',
+      destructive: true,
+    );
+    if (leave && mounted) Navigator.of(context).pop();
+  }
+
   FallaCarrete? _carrete(String id) {
     for (final c in widget.data.filaments) {
       if (c.id == id) return c;
@@ -155,12 +181,16 @@ class _FallaFormScreenState extends ConsumerState<FallaFormScreen> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     setState(() {
       _submitted = true;
-      _serverError = null;
+      // Si falta algo, se avisa también sobre el botón: el campo marcado en
+      // rojo puede haber quedado fuera de la pantalla.
+      _serverError = _errors.isEmpty ? null : _fixFieldsMessage;
     });
     if (_errors.isNotEmpty) return;
     setState(() => _saving = true);
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final api = ref.read(fallasApiProvider);
       final notes = _notes.text.trim();
@@ -176,8 +206,8 @@ class _FallaFormScreenState extends ConsumerState<FallaFormScreen> {
             notes: notes,
           ),
         );
-        invalidateFallas(ref);
-        if (mounted) Navigator.of(context).pop(true);
+        invalidateFallas(container);
+        if (mounted) popIfCurrent(context, true);
       } else {
         final lines = [
           for (final l in _lines)
@@ -197,8 +227,8 @@ class _FallaFormScreenState extends ConsumerState<FallaFormScreen> {
             lines: lines,
           ),
         );
-        invalidateFallas(ref);
-        if (mounted) Navigator.of(context).pop(res);
+        invalidateFallas(container);
+        if (mounted) popIfCurrent(context, res);
       }
     } on ApiException catch (e) {
       if (mounted) setState(() => _serverError = e.message);
@@ -234,7 +264,7 @@ class _FallaFormScreenState extends ConsumerState<FallaFormScreen> {
     final reasons = {...widget.data.reasons, _reason}.toList();
     final colorOptions = {for (final f in widget.data.filaments) f.color}.toList()..sort();
 
-    return Scaffold(
+    final scaffold = Scaffold(
       appBar: AppBar(title: Text(_isEdit ? 'Editar falla' : 'Registrar falla')),
       body: SafeArea(
         child: Column(
@@ -377,25 +407,42 @@ class _FallaFormScreenState extends ConsumerState<FallaFormScreen> {
                       errorText: errors['notes'],
                     ),
                   ),
-                  if (_serverError != null) ...[
-                    const SizedBox(height: 8),
-                    InlineError(_serverError!),
-                  ],
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: GoldButton(
-                label: _isEdit ? 'Guardar cambios' : 'Registrar falla',
-                icon: Icons.check_rounded,
-                loading: _saving,
-                onPressed: (_dirty && !_saving) ? _save : null,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // El aviso va pegado al botón (fijo): al final de la lista, con
+                  // el teclado abierto, quedaba fuera de la pantalla y parecía
+                  // que "Guardar" no hacía nada.
+                  if (_serverError != null) ...[
+                    InlineError(_serverError!),
+                    const SizedBox(height: 10),
+                  ],
+                  GoldButton(
+                    label: _isEdit ? 'Guardar cambios' : 'Registrar falla',
+                    icon: Icons.check_rounded,
+                    loading: _saving,
+                    onPressed: (_dirty && !_saving) ? _save : null,
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
+    );
+    // "Atrás" con datos sin guardar pregunta antes de perderlos, igual que
+    // los demás formularios del panel (2026-11-14, pedido de Ale).
+    return PopScope(
+      canPop: !_hasUnsaved,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _confirmLeave();
+      },
+      child: scaffold,
     );
   }
 }

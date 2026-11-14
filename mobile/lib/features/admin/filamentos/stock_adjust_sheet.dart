@@ -125,13 +125,14 @@ class _StockAdjustSheetState extends ConsumerState<StockAdjustSheet> {
       _loading = true;
       _error = null;
     });
+    final container = ProviderScope.containerOf(context, listen: false);
     try {
       final api = ref.read(filamentosApiProvider);
       final reason = _reason.text;
       final result = _mode == AdjustMode.count
           ? await api.adjust(widget.filament.id, newStockGrams: plan.newStock, reason: reason)
           : await api.adjust(widget.filament.id, deltaGrams: plan.delta, reason: reason);
-      invalidateFilamentos(ref);
+      invalidateFilamentos(container);
       if (mounted) popIfCurrent(context, result);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);

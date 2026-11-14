@@ -41,8 +41,15 @@ final produccionProvider = FutureProvider.autoDispose<BoardData>(
 
 /// Mover una tarjeta cambia el estado de una venta: queda viejo el tablero, el
 /// listado de ventas, el detalle y los contadores del inicio.
-void invalidateBoard(WidgetRef ref) {
-  ref.invalidate(produccionProvider);
-  invalidateSales(ref);
-  ref.invalidate(adminStockProvider); // confirmar el pago descuenta filamento
+///
+/// Recibe el CONTENEDOR (tomado antes del `await`) y no el `ref` de la hoja: si
+/// el usuario la cerró mientras el servidor respondía, ese `ref` ya no se puede
+/// usar y la cola quedaba mostrando la etapa vieja.
+void invalidateBoard(ProviderContainer container) {
+  container.invalidate(produccionProvider);
+  // Lo mismo que `invalidateSales`: inicio, listado y detalle de ventas.
+  container.invalidate(adminDashboardProvider);
+  container.invalidate(adminSalesProvider);
+  container.invalidate(adminSaleProvider);
+  container.invalidate(adminStockProvider); // confirmar el pago descuenta filamento
 }

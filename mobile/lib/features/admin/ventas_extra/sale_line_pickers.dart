@@ -120,7 +120,9 @@ class _CatalogPickerScreenState extends ConsumerState<CatalogPickerScreen> {
                           : 'Probá con otra palabra, o cargalo como texto libre.',
                     )
                   : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      // El final de la lista ("Mostrando N de M") queda arriba de
+                      // la barra del sistema, no debajo.
+                      padding: EdgeInsets.fromLTRB(16, 4, 16, 24 + MediaQuery.paddingOf(context).bottom),
                       itemCount: data.items.length + 1,
                       separatorBuilder: (_, _) => const SizedBox(height: 10),
                       itemBuilder: (_, i) {
