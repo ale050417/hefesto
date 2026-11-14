@@ -189,7 +189,9 @@ export async function Footer() {
             <Link href="/#faq" className="hover:text-fg">
               Políticas
             </Link>
-            <Link href="/#faq" className="hover:text-fg">
+            {/* Página propia (antes iba a las preguntas frecuentes): la exigen
+                App Store y Play Store para publicar la app (2026-11-14). */}
+            <Link href="/privacidad" className="hover:text-fg">
               Privacidad
             </Link>
             <Link
