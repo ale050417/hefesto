@@ -3,29 +3,27 @@
 import { revalidatePath, updateTag } from "next/cache";
 import { getStaffUser } from "@/core/auth/session";
 import { can } from "@/core/auth/permissions";
-import { recordAudit } from "@/core/audit";
 import { z, type ZodError } from "zod";
-import { getAmortization } from "@/features/calculator/service";
+import { categoryInputSchema, productInputSchema } from "./schemas";
 import {
-  categoryInputSchema,
-  productInputSchema,
-  type ProductInput,
-} from "./schemas";
+  archiveProductFlow,
+  createCategoryFlow,
+  createProductFlow,
+  deleteCategoryFlow,
+  deleteProductFlow,
+  isUniqueViolation,
+  publishProductFlow,
+  updateCategoryFlow,
+  updateProductFlow,
+  withCosts,
+} from "./admin-flow";
 import {
   addProductImage,
-  archiveProduct,
-  createCategory,
-  createProduct,
-  deleteCategory,
-  deleteProduct,
   getProductAdmin,
   makeImagePrimary,
-  publishProduct,
   removeProductImage,
   setCategoryImage,
   setProductImageColor,
-  updateCategory,
-  updateProduct,
 } from "./services/catalogService";
 import type { ProductImage, ProductStatus } from "./types";
 import type { ProductFormValues } from "./components/product-form";
@@ -51,17 +49,6 @@ function fieldErrors(error: ZodError): Record<string, string> {
   return out;
 }
 
-function isUniqueViolation(e: unknown): boolean {
-  return (
-    typeof e === "object" &&
-    e !== null &&
-    "code" in e &&
-    (e as { code?: unknown }).code === "23505"
-  );
-}
-
-const round2 = (n: number) => Math.round(n * 100) / 100;
-
 const NO_AMORT = {
   ok: false as const,
   error: {
@@ -71,25 +58,6 @@ const NO_AMORT = {
     fields: { price: "Falta calcular la amortización" },
   },
 };
-
-/**
- * Calcula amortización (costo) en el servidor y la ganancia (precio − amort) y
- * las inyecta. Devuelve null si no se puede calcular (sin gramos/horas) → la
- * amortización es obligatoria.
- */
-async function withCosts(data: ProductInput): Promise<ProductInput | null> {
-  const amort = await getAmortization({
-    material: data.material ?? null,
-    grams: data.weightGrams ?? 0,
-    hours: (data.printTimeMinutes ?? 0) / 60,
-  });
-  if (!(amort > 0)) return null;
-  return {
-    ...data,
-    amortization: round2(amort),
-    profit: round2(Math.max(0, data.price - amort)),
-  };
-}
 
 const SLUG_TAKEN = {
   ok: false as const,
@@ -223,14 +191,8 @@ export async function createProductAction(
   const data = await withCosts(parsed.data);
   if (!data) return NO_AMORT;
   try {
-    const product = await createProduct(data);
-    await recordAudit({
-      actorId: actor.id,
-      action: "product.created",
-      entityType: "product",
-      entityId: product.id,
-      metadata: { name: parsed.data.name, slug: parsed.data.slug },
-    });
+    // Alta + auditoría: compartido con la API de la app (admin-flow.ts).
+    const product = await createProductFlow(actor.id, data);
     revalidatePath("/admin/productos");
     return { ok: true, data: { id: product.id } };
   } catch (e) {
@@ -263,14 +225,7 @@ export async function updateProductAction(
   const data = await withCosts(parsed.data);
   if (!data) return NO_AMORT;
   try {
-    const product = await updateProduct(id, data);
-    await recordAudit({
-      actorId: actor.id,
-      action: "product.updated",
-      entityType: "product",
-      entityId: product.id,
-      metadata: { name: parsed.data.name, slug: parsed.data.slug },
-    });
+    const product = await updateProductFlow(actor.id, id, data);
     revalidatePath("/admin/productos");
     revalidatePath(`/producto/${product.slug}`);
     return { ok: true, data: { id: product.id } };
@@ -288,13 +243,7 @@ export async function publishProductAction(id: string): Promise<ActionResult> {
   if (!actor) return UNAUTHORIZED;
   if (!(await can("productos", "editar"))) return UNAUTHORIZED;
   try {
-    await publishProduct(id);
-    await recordAudit({
-      actorId: actor.id,
-      action: "product.published",
-      entityType: "product",
-      entityId: id,
-    });
+    await publishProductFlow(actor.id, id);
     revalidatePath("/admin/productos");
     return { ok: true, data: undefined };
   } catch (e) {
@@ -313,13 +262,7 @@ export async function archiveProductAction(id: string): Promise<ActionResult> {
   if (!actor) return UNAUTHORIZED;
   if (!(await can("productos", "eliminar"))) return UNAUTHORIZED;
   try {
-    await archiveProduct(id);
-    await recordAudit({
-      actorId: actor.id,
-      action: "product.archived",
-      entityType: "product",
-      entityId: id,
-    });
+    await archiveProductFlow(actor.id, id);
     revalidatePath("/admin/productos");
     return { ok: true, data: undefined };
   } catch (e) {
@@ -343,13 +286,7 @@ export async function deleteProductAction(id: string): Promise<ActionResult> {
   if (!actor) return UNAUTHORIZED;
   if (!(await can("productos", "eliminar"))) return UNAUTHORIZED;
   try {
-    await deleteProduct(id);
-    await recordAudit({
-      actorId: actor.id,
-      action: "product.deleted",
-      entityType: "product",
-      entityId: id,
-    });
+    await deleteProductFlow(actor.id, id);
     revalidatePath("/admin/productos");
     return { ok: true, data: undefined };
   } catch (e) {
@@ -574,14 +511,7 @@ export async function createCategoryAction(
     };
   }
   try {
-    const category = await createCategory(parsed.data);
-    await recordAudit({
-      actorId: actor.id,
-      action: "category.created",
-      entityType: "category",
-      entityId: category.id,
-      metadata: { name: parsed.data.name },
-    });
+    const category = await createCategoryFlow(actor.id, parsed.data);
     revalidatePath("/admin/categorias");
     updateTag("categories");
     return { ok: true, data: { id: category.id } };
@@ -613,14 +543,7 @@ export async function updateCategoryAction(
     };
   }
   try {
-    const category = await updateCategory(id, parsed.data);
-    await recordAudit({
-      actorId: actor.id,
-      action: "category.updated",
-      entityType: "category",
-      entityId: category.id,
-      metadata: { name: parsed.data.name },
-    });
+    const category = await updateCategoryFlow(actor.id, id, parsed.data);
     revalidatePath("/admin/categorias");
     updateTag("categories");
     return { ok: true, data: { id: category.id } };
@@ -644,13 +567,7 @@ export async function deleteCategoryAction(id: string): Promise<ActionResult> {
     return validationError("Categoría inválida");
   }
   try {
-    await deleteCategory(id);
-    await recordAudit({
-      actorId: actor.id,
-      action: "category.deleted",
-      entityType: "category",
-      entityId: id,
-    });
+    await deleteCategoryFlow(actor.id, id);
     revalidatePath("/admin/categorias");
     updateTag("categories");
     return { ok: true, data: undefined };

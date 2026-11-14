@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq, max } from "drizzle-orm";
 import { db } from "@/core/db";
 import { manualSaleItems, manualSales } from "@/core/db/schema";
 import { recordAudit } from "@/core/audit";
@@ -520,6 +520,24 @@ export async function listManualSales(): Promise<ManualSaleWithItems[]> {
     with: { items: true },
     orderBy: (m, { desc }) => [desc(m.saleDate)],
   });
+}
+
+/**
+ * Nombres de los clientes de ventas manuales anteriores (el más reciente
+ * primero), sin repetir. Es lo que la app ofrece para autocompletar el cliente
+ * al cargar una venta: la web guarda al cliente como texto libre.
+ */
+export async function listRecentManualCustomers(limit = 60): Promise<string[]> {
+  const rows = await db
+    .select({
+      name: manualSales.customerName,
+      last: max(manualSales.saleDate),
+    })
+    .from(manualSales)
+    .groupBy(manualSales.customerName)
+    .orderBy(desc(max(manualSales.saleDate)))
+    .limit(limit);
+  return rows.map((r) => r.name);
 }
 
 /**

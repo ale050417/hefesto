@@ -62,6 +62,11 @@ export async function getRewardsStats() {
   return repo.getPointsStats();
 }
 
+/** Últimos canjes de todos los clientes (panel móvil). */
+export async function listRecentRedemptions(limit = 30) {
+  return repo.listRecentRedemptions(limit);
+}
+
 export async function createReward(input: RewardInput): Promise<Reward> {
   return repo.insertReward(toRewardValues(input));
 }

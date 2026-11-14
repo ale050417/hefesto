@@ -1,5 +1,6 @@
 import * as repo from "./repository";
 import { isAdmin } from "@/core/auth/permissions";
+import { ValidationError } from "@/core/errors";
 import { listFilamentsView } from "@/features/inventory/queries";
 import {
   computeQuote,
@@ -62,7 +63,9 @@ export async function createCalc(
   const presets = (await repo.listMarginPresets()).map(toPreset);
   const marginPct = selectActiveMargin(presets, input.presetId);
   if (marginPct == null) {
-    throw new Error("El tipo de producto no está disponible.");
+    // ValidationError (antes un Error genérico): la web y la app muestran el
+    // mensaje real en vez de "Ocurrió un error".
+    throw new ValidationError("El tipo de producto no está disponible.");
   }
   const cfg = await getCalcConfig();
   const q = computeQuote({

@@ -597,11 +597,27 @@ export async function setPrimaryImage(
     .where(eq(productImages.id, imageId));
 }
 
+/** Orden del listado de productos del admin (la app móvil elige; la web usa "updated"). */
+export type AdminProductSort =
+  | "updated"
+  | "newest"
+  | "name"
+  | "price_asc"
+  | "price_desc";
+
 /** Todos los productos (cualquier estado) para el admin, con búsqueda y filtro. */
 export async function findAllForAdmin(
   opts: {
     search?: string;
     status?: ProductStatus;
+    /** Productos de ESTAS categorías (el caller arma el subárbol). */
+    categoryIds?: string[];
+    featured?: boolean;
+    /** Con oferta vigente (precio de oferta menor al precio). */
+    onSale?: boolean;
+    /** Sin ninguna foto cargada (no se pueden publicar). */
+    noImages?: boolean;
+    sort?: AdminProductSort;
     page: number;
     pageSize: number;
   },
@@ -610,8 +626,29 @@ export async function findAllForAdmin(
   const conditions: SQL[] = [];
   if (opts.search) conditions.push(ilike(products.name, `%${opts.search}%`));
   if (opts.status) conditions.push(eq(products.status, opts.status));
+  if (opts.categoryIds && opts.categoryIds.length > 0) {
+    conditions.push(inArray(products.categoryId, opts.categoryIds));
+  }
+  if (opts.featured) conditions.push(eq(products.isFeatured, true));
+  if (opts.onSale) {
+    conditions.push(
+      sql`${products.salePrice} IS NOT NULL AND ${products.salePrice} < ${products.price}`,
+    );
+  }
+  if (opts.noImages) {
+    conditions.push(
+      sql`NOT EXISTS (SELECT 1 FROM product_images pi WHERE pi.product_id = ${products.id})`,
+    );
+  }
   const where = conditions.length ? and(...conditions) : undefined;
   const offset = (opts.page - 1) * opts.pageSize;
+  const orderBy = {
+    updated: [desc(products.updatedAt)],
+    newest: [desc(products.createdAt)],
+    name: [asc(products.name)],
+    price_asc: [asc(products.price), asc(products.name)],
+    price_desc: [desc(products.price), asc(products.name)],
+  }[opts.sort ?? "updated"];
 
   const [items, totalRows] = await Promise.all([
     database.query.products.findMany({
@@ -621,7 +658,7 @@ export async function findAllForAdmin(
         images: { orderBy: (img, { asc }) => [asc(img.sortOrder)] },
         variants: true,
       },
-      orderBy: [desc(products.updatedAt)],
+      orderBy,
       limit: opts.pageSize,
       offset,
     }),
@@ -632,6 +669,38 @@ export async function findAllForAdmin(
   ]);
 
   return { items, total: totalRows[0]?.count ?? 0 };
+}
+
+/**
+ * Totales del catálogo para los contadores del listado de la app: SIEMPRE sobre
+ * todo el catálogo (no dependen de los filtros de la pantalla).
+ */
+export async function countProductsForAdmin(database: Database = db): Promise<{
+  total: number;
+  published: number;
+  draft: number;
+  archived: number;
+  featured: number;
+  onSale: number;
+}> {
+  const [row] = await database
+    .select({
+      total: sql<number>`count(*)::int`,
+      published: sql<number>`(count(*) filter (where ${products.status} = 'published'))::int`,
+      draft: sql<number>`(count(*) filter (where ${products.status} = 'draft'))::int`,
+      archived: sql<number>`(count(*) filter (where ${products.status} = 'archived'))::int`,
+      featured: sql<number>`(count(*) filter (where ${products.isFeatured}))::int`,
+      onSale: sql<number>`(count(*) filter (where ${products.salePrice} is not null and ${products.salePrice} < ${products.price}))::int`,
+    })
+    .from(products);
+  return {
+    total: row?.total ?? 0,
+    published: row?.published ?? 0,
+    draft: row?.draft ?? 0,
+    archived: row?.archived ?? 0,
+    featured: row?.featured ?? 0,
+    onSale: row?.onSale ?? 0,
+  };
 }
 
 // --- Categorías (admin) ---

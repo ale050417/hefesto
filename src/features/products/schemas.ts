@@ -33,113 +33,114 @@ export type ProductFilterInput = z.input<typeof productFilterSchema>;
 // en null para los campos opcionales.
 const emptyToNull = (v: unknown) => (v === "" ? null : v);
 
-export const productInputSchema = z
-  .object({
-    name: z.string().min(1, "El nombre es obligatorio").max(120),
-    slug: z
-      .string()
-      .min(1, "El slug es obligatorio")
-      .max(140)
-      .regex(
-        /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-        "Slug inválido (minúsculas, números y guiones)",
-      ),
-    description: z
-      .preprocess(emptyToNull, z.string().max(2000).nullable())
-      .optional(),
-    categoryId: z.uuid("Elegí una categoría"),
-    price: z.coerce.number().positive("El precio debe ser mayor a 0"),
-    salePrice: z
-      .preprocess(emptyToNull, z.coerce.number().positive().nullable())
-      .optional(),
-    material: z
-      .preprocess(emptyToNull, z.string().max(60).nullable())
-      .optional(),
-    printTimeMinutes: z
-      .preprocess(emptyToNull, z.coerce.number().int().nonnegative().nullable())
-      .optional(),
-    weightGrams: z
-      .preprocess(emptyToNull, z.coerce.number().int().nonnegative().nullable())
-      .optional(),
-    dimensions: z
-      .preprocess(emptyToNull, z.string().max(120).nullable())
-      .optional(),
-    colorMode: z.enum(["single", "multi"]).default("single"),
-    colors: z.array(z.string().max(40)).max(24).default([]),
-    colorPrices: z.record(z.string(), z.coerce.number()).default({}),
-    layerHeight: z
-      .preprocess(emptyToNull, z.string().max(60).nullable())
-      .optional(),
-    infillPercent: z
-      .preprocess(
-        emptyToNull,
-        z.coerce.number().int().min(0).max(100).nullable(),
-      )
-      .optional(),
-    productionTime: z
-      .preprocess(emptyToNull, z.string().max(120).nullable())
-      .optional(),
-    // Costos (los completa el servidor con la calculadora, no el cliente).
-    amortization: z
-      .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
-      .optional(),
-    profit: z.preprocess(emptyToNull, z.coerce.number().nullable()).optional(),
-    // Costo de insumos del producto (va aparte del precio; baja la ganancia).
-    extrasCost: z
-      .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
-      .optional(),
-    // Estado elegible al CREAR (borrador/publicado). En edición se maneja aparte.
-    status: z.enum(["draft", "published", "archived"]).optional(),
-    isFeatured: z.boolean().default(false),
-    // Variantes por TAMAÑO, cada una con su precio (opcional; vacío = precio
-    // base). Se guardan en product_variants; el checkout cobra el precio del
-    // tamaño elegido. Los labels no se pueden repetir dentro del producto.
-    variants: z
-      .array(
-        z.object({
-          label: z.string().trim().min(1, "Poné el nombre del tamaño").max(60),
-          price: z.preprocess(
-            emptyToNull,
-            z.coerce
-              .number()
-              .positive("El precio del tamaño debe ser mayor a 0")
-              .nullable(),
-          ),
-          // Gramos por color de este tamaño (multicolor). Vacío = usa los del
-          // producto. Se usa para descontar stock según el tamaño vendido.
-          colorGrams: z
-            .record(z.string().max(40), z.coerce.number().nonnegative())
-            .default({}),
-          // Peso de este tamaño en color único (gramos). Vacío = usa el peso
-          // del producto. Descuenta stock según el tamaño sobre el color elegido.
-          weightGrams: z
-            .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
-            .optional(),
-          // Matriz tamaño × color: precio POR color de este tamaño (el filamento
-          // morado cuesta más que el azul). Vacío = precio del tamaño.
-          colorPrices: z
-            .record(z.string().max(40), z.coerce.number().positive())
-            .default({}),
-          // Costo del insumo de ESTE tamaño (el vaso de 1L ≠ el de 500cc).
-          // Vacío = usa el extras_cost del producto; 0 = este tamaño no lleva.
-          extrasCost: z
-            .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
-            .optional(),
-        }),
-      )
-      .max(20, "Demasiados tamaños")
-      .default([])
-      .refine(
-        (arr) =>
-          new Set(arr.map((v) => v.label.trim().toLowerCase())).size ===
-          arr.length,
-        { message: "Hay dos tamaños con el mismo nombre" },
-      ),
-  })
-  .refine((d) => d.salePrice == null || d.salePrice < d.price, {
+// Base SIN refinamientos: la API de la app arma su PATCH con `.pick().partial()`
+// (un schema con `.refine` no admite `.pick`). `productInputSchema` es esta base
+// más la regla de la oferta, y sigue exactamente igual para la web.
+export const productInputBase = z.object({
+  name: z.string().min(1, "El nombre es obligatorio").max(120),
+  slug: z
+    .string()
+    .min(1, "El slug es obligatorio")
+    .max(140)
+    .regex(
+      /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+      "Slug inválido (minúsculas, números y guiones)",
+    ),
+  description: z
+    .preprocess(emptyToNull, z.string().max(2000).nullable())
+    .optional(),
+  categoryId: z.uuid("Elegí una categoría"),
+  price: z.coerce.number().positive("El precio debe ser mayor a 0"),
+  salePrice: z
+    .preprocess(emptyToNull, z.coerce.number().positive().nullable())
+    .optional(),
+  material: z.preprocess(emptyToNull, z.string().max(60).nullable()).optional(),
+  printTimeMinutes: z
+    .preprocess(emptyToNull, z.coerce.number().int().nonnegative().nullable())
+    .optional(),
+  weightGrams: z
+    .preprocess(emptyToNull, z.coerce.number().int().nonnegative().nullable())
+    .optional(),
+  dimensions: z
+    .preprocess(emptyToNull, z.string().max(120).nullable())
+    .optional(),
+  colorMode: z.enum(["single", "multi"]).default("single"),
+  colors: z.array(z.string().max(40)).max(24).default([]),
+  colorPrices: z.record(z.string(), z.coerce.number()).default({}),
+  layerHeight: z
+    .preprocess(emptyToNull, z.string().max(60).nullable())
+    .optional(),
+  infillPercent: z
+    .preprocess(emptyToNull, z.coerce.number().int().min(0).max(100).nullable())
+    .optional(),
+  productionTime: z
+    .preprocess(emptyToNull, z.string().max(120).nullable())
+    .optional(),
+  // Costos (los completa el servidor con la calculadora, no el cliente).
+  amortization: z
+    .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
+    .optional(),
+  profit: z.preprocess(emptyToNull, z.coerce.number().nullable()).optional(),
+  // Costo de insumos del producto (va aparte del precio; baja la ganancia).
+  extrasCost: z
+    .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
+    .optional(),
+  // Estado elegible al CREAR (borrador/publicado). En edición se maneja aparte.
+  status: z.enum(["draft", "published", "archived"]).optional(),
+  isFeatured: z.boolean().default(false),
+  // Variantes por TAMAÑO, cada una con su precio (opcional; vacío = precio
+  // base). Se guardan en product_variants; el checkout cobra el precio del
+  // tamaño elegido. Los labels no se pueden repetir dentro del producto.
+  variants: z
+    .array(
+      z.object({
+        label: z.string().trim().min(1, "Poné el nombre del tamaño").max(60),
+        price: z.preprocess(
+          emptyToNull,
+          z.coerce
+            .number()
+            .positive("El precio del tamaño debe ser mayor a 0")
+            .nullable(),
+        ),
+        // Gramos por color de este tamaño (multicolor). Vacío = usa los del
+        // producto. Se usa para descontar stock según el tamaño vendido.
+        colorGrams: z
+          .record(z.string().max(40), z.coerce.number().nonnegative())
+          .default({}),
+        // Peso de este tamaño en color único (gramos). Vacío = usa el peso
+        // del producto. Descuenta stock según el tamaño sobre el color elegido.
+        weightGrams: z
+          .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
+          .optional(),
+        // Matriz tamaño × color: precio POR color de este tamaño (el filamento
+        // morado cuesta más que el azul). Vacío = precio del tamaño.
+        colorPrices: z
+          .record(z.string().max(40), z.coerce.number().positive())
+          .default({}),
+        // Costo del insumo de ESTE tamaño (el vaso de 1L ≠ el de 500cc).
+        // Vacío = usa el extras_cost del producto; 0 = este tamaño no lleva.
+        extrasCost: z
+          .preprocess(emptyToNull, z.coerce.number().nonnegative().nullable())
+          .optional(),
+      }),
+    )
+    .max(20, "Demasiados tamaños")
+    .default([])
+    .refine(
+      (arr) =>
+        new Set(arr.map((v) => v.label.trim().toLowerCase())).size ===
+        arr.length,
+      { message: "Hay dos tamaños con el mismo nombre" },
+    ),
+});
+
+export const productInputSchema = productInputBase.refine(
+  (d) => d.salePrice == null || d.salePrice < d.price,
+  {
     message: "El precio de oferta debe ser menor al precio",
     path: ["salePrice"],
-  });
+  },
+);
 
 export type ProductInput = z.infer<typeof productInputSchema>;
 

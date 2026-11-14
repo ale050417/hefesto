@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { recordAudit } from "@/core/audit";
 import { getCurrentUser } from "@/core/auth/session";
 import { can } from "@/core/auth/permissions";
 import { type ActionResult, toActionError } from "@/core/errors";
+import { deleteFailureFlow, registerFailureFlow } from "./failure-flow";
 import * as queries from "./queries";
 import {
   brandSchema,
@@ -92,23 +92,9 @@ export async function registerFailureAction(
     };
   }
   try {
-    const res = await queries.recordFailure(parsed.data);
-    await recordAudit({
-      actorId: user?.id ?? null,
-      action: "inventory.failure_registered",
-      entityType: "filament",
-      entityId: null,
-      metadata: {
-        material: parsed.data.material,
-        color: parsed.data.color,
-        gramsLost: parsed.data.gramsLost,
-        deducted: res.deducted,
-      },
-    });
-    revalidatePath("/admin/fallas");
-    revalidatePath("/admin/filamentos");
-    // El aviso de stock bajo / faltante lo dispara recordFailure (ledger),
-    // que distingue "quedó bajo el umbral" de "faltó" (shortfall) por color.
+    // Stock por el ledger + aviso + auditoría + revalidación: compartido con la
+    // API de la app (ver failure-flow.ts).
+    const res = await registerFailureFlow(parsed.data, user?.id ?? null);
     return { ok: true, data: res };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
@@ -144,17 +130,9 @@ export async function deleteFailureAction(id: string): Promise<ActionResult> {
   if (!(await can("fallas", "eliminar"))) return NOT_STAFF;
   const user = await getCurrentUser();
   try {
-    // Borrar una falla DEVUELVE al stock los gramos que había descontado.
-    const { restored } = await queries.deleteFailure(id);
-    await recordAudit({
-      actorId: user?.id ?? null,
-      action: "inventory.failure_deleted",
-      entityType: "filament",
-      entityId: null,
-      metadata: { restoredGrams: restored },
-    });
-    revalidatePath("/admin/fallas");
-    revalidatePath("/admin/filamentos");
+    // Borrar una falla DEVUELVE al stock los gramos que había descontado
+    // (+ auditoría + revalidación, compartido con la API de la app).
+    await deleteFailureFlow(id, user?.id ?? null);
     return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };

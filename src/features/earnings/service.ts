@@ -60,6 +60,13 @@ export async function deleteProfitShare(id: string) {
   return repo.deleteProfitShareRow(id);
 }
 
+/** Guarda el reparto completo (API de la app) en una sola transacción. */
+export async function applyProfitSharesPlan(
+  plan: Parameters<typeof repo.applyProfitSharesPlanTx>[0],
+) {
+  return repo.applyProfitSharesPlanTx(plan);
+}
+
 export type EarningsOrderRow = {
   id: string;
   orderNumber: string;

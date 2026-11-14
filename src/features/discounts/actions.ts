@@ -8,22 +8,13 @@ import { type ActionResult, toActionError } from "@/core/errors";
 import { rateLimit } from "@/core/security/rate-limit";
 import { getClientIp } from "@/core/security/request";
 import * as queries from "./queries";
-import { couponSchema } from "./schemas";
+import { saveCoupon } from "./save-coupon";
 import { validateCoupon } from "./service";
 
 const NOT_STAFF = {
   ok: false as const,
   error: { code: "UNAUTHORIZED", message: "No autorizado" },
 };
-
-function fieldErrors(error: import("zod").ZodError): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (const issue of error.issues) {
-    const key = issue.path.map(String).join(".") || "_";
-    if (!out[key]) out[key] = issue.message;
-  }
-  return out;
-}
 
 /** Público (🌐): valida un código contra el subtotal. Rate-limited por IP. */
 export async function validateCouponAction(
@@ -56,54 +47,10 @@ export async function saveCouponAction(
 ): Promise<ActionResult> {
   if (!(await can("descuentos", id ? "editar" : "crear"))) return NOT_STAFF;
   const user = await getCurrentUser();
-  const parsed = couponSchema.safeParse(input);
-  if (!parsed.success) {
-    return {
-      ok: false,
-      error: {
-        code: "VALIDATION",
-        message: "Revisá los datos.",
-        fields: fieldErrors(parsed.error),
-      },
-    };
-  }
-  // Si el cupón apunta a un producto/categoría, validamos que exista (Cap. 11).
-  const d = parsed.data;
-  if (d.scope && d.scope !== "all") {
-    if (!d.targetId) {
-      return {
-        ok: false,
-        error: {
-          code: "VALIDATION",
-          message: "Elegí el producto o la categoría.",
-        },
-      };
-    }
-    const cat = await import("@/features/products/services/catalogService");
-    const exists =
-      d.scope === "product"
-        ? (await cat.getProductAdmin(d.targetId)) != null
-        : (await cat.listCategoriesAdmin()).some((c) => c.id === d.targetId);
-    if (!exists) {
-      return {
-        ok: false,
-        error: {
-          code: "VALIDATION",
-          message: "El producto o categoría elegido no existe.",
-        },
-      };
-    }
-  }
   try {
-    if (id) await queries.updateCoupon(id, parsed.data);
-    else await queries.addCoupon(parsed.data);
-    await recordAudit({
-      actorId: user?.id ?? null,
-      action: id ? "coupon.updated" : "coupon.created",
-      entityType: "coupon",
-      entityId: id ?? null,
-      metadata: { code: parsed.data.code },
-    });
+    // Validación + existencia de producto/categoría + persistencia + auditoría
+    // compartidas con la API de la app: ver save-coupon.ts.
+    await saveCoupon({ input, id, actorId: user?.id ?? null });
     revalidatePath("/admin/descuentos");
     return { ok: true };
   } catch (error) {

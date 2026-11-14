@@ -38,6 +38,21 @@ export async function getSettings(
   }
 }
 
+/**
+ * Igual que `getSettings` pero SIN tragarse el error: si la base no responde
+ * lanza. La API de la app lo necesita para no mostrar un formulario vacío (que
+ * el dueño podría guardar encima de los datos reales) cuando en realidad falló
+ * la lectura.
+ */
+export async function getSettingsStrict(
+  database: Database = db,
+): Promise<BusinessSettings | null> {
+  const row = await database.query.businessSettings.findFirst({
+    where: eq(businessSettings.id, SINGLETON_ID),
+  });
+  return row ?? null;
+}
+
 export async function upsertSettings(
   patch: Partial<Omit<typeof businessSettings.$inferInsert, "id">>,
   database: Database = db,

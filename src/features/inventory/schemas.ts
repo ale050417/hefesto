@@ -48,7 +48,42 @@ export const brandSchema = z.object({
   name: z.string().trim().min(1, "Ingresá el nombre de la marca.").max(40),
 });
 
+// Edición de los datos del carrete desde la app (2026-10-31): SIN stock. El
+// stock se mueve solo por el ajuste (queda en el ledger con su historial).
+export const filamentDetailsSchema = filamentSchema.omit({ stockGrams: true });
+
+// Ajuste manual de stock (app, 2026-10-31): o se suma/resta una cantidad
+// (`deltaGrams`, con signo) o se fija el stock contado (`newStockGrams`).
+// Exactamente uno de los dos. `reason` es el motivo (queda en auditoría).
+export const stockAdjustSchema = z
+  .object({
+    deltaGrams: z.number().optional(),
+    newStockGrams: z
+      .number()
+      .min(0, "El stock no puede ser negativo.")
+      .optional(),
+    reason: z.string().trim().max(200).optional(),
+  })
+  .refine(
+    (v) => (v.deltaGrams === undefined) !== (v.newStockGrams === undefined),
+    { message: "Indicá cuántos gramos sumar o restar, o el stock contado." },
+  );
+
+// Alta/baja de un color, marca o material del catálogo (selectores del form).
+export const catalogKindSchema = z.enum(["color", "brand", "material"]);
+export const catalogItemSchema = z.object({
+  kind: catalogKindSchema,
+  name: z.string().trim().min(1, "Ingresá el nombre.").max(40),
+  hex: z
+    .string()
+    .trim()
+    .regex(/^#[0-9a-fA-F]{6}$/, "Elegí un color válido.")
+    .optional(),
+});
+
 export type FilamentInput = z.infer<typeof filamentSchema>;
+export type FilamentDetailsInput = z.infer<typeof filamentDetailsSchema>;
+export type StockAdjustInput = z.infer<typeof stockAdjustSchema>;
 export type ColorInput = z.infer<typeof colorSchema>;
 export type BrandInput = z.infer<typeof brandSchema>;
 export type FailureInput = z.infer<typeof failureSchema>;

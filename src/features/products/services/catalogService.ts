@@ -1,5 +1,6 @@
 import {
   countImages,
+  countProductsForAdmin,
   countProductsInCategory,
   countChildCategories,
   deleteCategoryRow,
@@ -33,6 +34,7 @@ import {
   updateProductRow,
 } from "../repository";
 import { isDescendantOf } from "../category-tree";
+import { NotFoundError, ValidationError } from "@/core/errors";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { randomUUID } from "node:crypto";
@@ -52,6 +54,7 @@ import type {
   Category,
   CategoryWithCount,
   HomeData,
+  NewProduct,
   Product,
   ProductDetailView,
   ProductImage,
@@ -402,7 +405,7 @@ export async function updateProduct(
         }
       : {}),
   });
-  if (!row) throw new Error("Producto no encontrado");
+  if (!row) throw new NotFoundError("Producto no encontrado");
   // Reemplaza el set de tamaños (borra + reinserta; seguro por snapshot de label).
   await replaceProductVariants(id, toVariantRows(input.variants));
   return row;
@@ -411,20 +414,20 @@ export async function updateProduct(
 /** Publica un producto. Regla: no se puede publicar sin imágenes (Cap. 11). */
 export async function publishProduct(id: string): Promise<Product> {
   const product = await findProductById(id);
-  if (!product) throw new Error("Producto no encontrado");
+  if (!product) throw new NotFoundError("Producto no encontrado");
   const images = await countImages(id);
   if (images === 0) {
-    throw new Error("No se puede publicar un producto sin imágenes");
+    throw new ValidationError("No se puede publicar un producto sin imágenes");
   }
   const row = await setProductStatus(id, "published");
-  if (!row) throw new Error("Producto no encontrado");
+  if (!row) throw new NotFoundError("Producto no encontrado");
   return row;
 }
 
 /** Archiva un producto (borrado lógico: lo esconde de la tienda, se conserva). */
 export async function archiveProduct(id: string): Promise<Product> {
   const row = await setProductStatus(id, "archived");
-  if (!row) throw new Error("Producto no encontrado");
+  if (!row) throw new NotFoundError("Producto no encontrado");
   return row;
 }
 
@@ -436,10 +439,10 @@ export async function archiveProduct(id: string): Promise<Product> {
  */
 export async function deleteProduct(id: string): Promise<string> {
   const product = await findProductById(id);
-  if (!product) throw new Error("Producto no encontrado");
+  if (!product) throw new NotFoundError("Producto no encontrado");
   await removeAllProductImageFiles(id);
   const deletedId = await deleteProductRow(id);
-  if (!deletedId) throw new Error("Producto no encontrado");
+  if (!deletedId) throw new NotFoundError("Producto no encontrado");
   return deletedId;
 }
 
@@ -662,6 +665,40 @@ export async function listProductsAdmin(opts: {
   };
 }
 
+/**
+ * Listado del admin con las relaciones completas (imágenes y tamaños) y todos
+ * los filtros que usa la app móvil. `listProductsAdmin` (la web) queda igual.
+ */
+export async function listProductsAdminFull(
+  opts: Parameters<typeof findAllForAdmin>[0],
+): Promise<{ items: ProductWithRelations[]; total: number }> {
+  return findAllForAdmin(opts);
+}
+
+/** Fila del producto (cualquier estado), sin imágenes ni tamaños. */
+export async function getProductRow(id: string): Promise<Product | null> {
+  return findProductById(id);
+}
+
+/** Contadores del catálogo completo (publicados / borradores / archivados…). */
+export async function countProductsAdmin() {
+  return countProductsForAdmin();
+}
+
+/**
+ * Cambia SOLO los campos que se mandan (edición rápida de la app: precio,
+ * destacado, nombre…). No toca tamaños, colores ni fotos, a diferencia de
+ * `updateProduct`, que reemplaza todo el set de tamaños.
+ */
+export async function patchProductFields(
+  id: string,
+  fields: Partial<NewProduct>,
+): Promise<Product> {
+  const row = await updateProductRow(id, fields);
+  if (!row) throw new NotFoundError("Producto no encontrado");
+  return row;
+}
+
 // --- Categorías (admin) ---
 
 export async function listCategoriesAdmin(): Promise<CategoryWithCount[]> {
@@ -685,14 +722,14 @@ async function assertValidParent(
 ): Promise<void> {
   if (!parentId) return;
   if (selfId && parentId === selfId) {
-    throw new Error("Una categoría no puede ser su propio padre.");
+    throw new ValidationError("Una categoría no puede ser su propio padre.");
   }
   const parent = await findCategoryById(parentId);
-  if (!parent) throw new Error("La categoría padre no existe.");
+  if (!parent) throw new ValidationError("La categoría padre no existe.");
   if (selfId) {
     const all = await findCategories();
     if (isDescendantOf(all, parentId, selfId)) {
-      throw new Error(
+      throw new ValidationError(
         "Esa categoría está dentro de esta: elegí otra como padre (se armaría un ciclo).",
       );
     }
@@ -724,7 +761,7 @@ export async function updateCategory(
     sortOrder: input.sortOrder,
     parentId: input.parentId ?? null,
   });
-  if (!row) throw new Error("Categoría no encontrada");
+  if (!row) throw new NotFoundError("Categoría no encontrada");
   return row;
 }
 
@@ -732,13 +769,13 @@ export async function updateCategory(
 export async function deleteCategory(id: string): Promise<void> {
   const count = await countProductsInCategory(id);
   if (count > 0) {
-    throw new Error(
+    throw new ValidationError(
       `No se puede borrar: la categoría tiene ${count} producto(s). Reasignalos primero.`,
     );
   }
   const children = await countChildCategories(id);
   if (children > 0) {
-    throw new Error(
+    throw new ValidationError(
       `No se puede borrar: tiene ${children} subcategoría(s). Borralas o reasignalas primero.`,
     );
   }

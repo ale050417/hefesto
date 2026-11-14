@@ -5,36 +5,11 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { runAction } from "@/lib/run-action";
 import { saveTrustBarAction } from "../actions";
-
-type TrustItem = { ic: string; t: string; d: string };
-
-// Mismos 4 puntos que muestra el home por defecto (el ícono queda fijo por punto;
-// solo se editan los textos). Si nunca se guardó nada, se arranca con estos.
-const DEFAULTS: TrustItem[] = [
-  {
-    ic: "truck",
-    t: "Producción en 48 h",
-    d: "Imprimimos y despachamos rápido",
-  },
-  {
-    ic: "shield",
-    t: "Pago 100% seguro",
-    d: "MercadoPago, transferencia y efectivo",
-  },
-  { ic: "layers", t: "Materiales premium", d: "PLA de primera calidad" },
-  {
-    ic: "refresh",
-    t: "Reimpresión garantizada",
-    d: "Si algo sale mal, lo rehacemos",
-  },
-];
-
-const LABELS: Record<string, string> = {
-  truck: "Envío / producción",
-  shield: "Pago / seguridad",
-  layers: "Materiales",
-  refresh: "Garantía",
-};
+import {
+  DEFAULT_TRUST_BAR as DEFAULTS,
+  TRUST_ICON_LABEL as LABELS,
+  type TrustItem,
+} from "../trust-defaults";
 
 export function TrustBarEditor({
   initial,

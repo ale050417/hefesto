@@ -1,11 +1,14 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/core/db";
 import {
   filamentCatalog,
   filamentMovements,
   filaments,
+  manualSales,
+  orders,
   printFailures,
 } from "@/core/db/schema";
+import type { MovementRow } from "./movements";
 import type {
   Filament,
   FilamentMovement,
@@ -155,6 +158,67 @@ export async function findMovementsByRef(
       eq(filamentMovements.reason, reason),
       eq(filamentMovements.refId, refId),
     ),
+  });
+}
+
+/**
+ * Historial del ledger (más nuevo primero), opcionalmente de UN carrete. Trae
+ * el origen de cada movimiento (nº de pedido, cliente de la venta manual o
+ * pieza de la falla) con LEFT JOIN: si el origen se borró, el movimiento queda
+ * igual (el ledger no tiene FK al pedido a propósito).
+ */
+export async function listMovementRows(
+  opts: { filamentId?: string; limit: number },
+  database: Database = db,
+): Promise<MovementRow[]> {
+  return database
+    .select({
+      id: filamentMovements.id,
+      filamentId: filamentMovements.filamentId,
+      material: filamentMovements.material,
+      color: filamentMovements.color,
+      deltaGrams: filamentMovements.deltaGrams,
+      reason: filamentMovements.reason,
+      refId: filamentMovements.refId,
+      createdAt: filamentMovements.createdAt,
+      orderNumber: orders.orderNumber,
+      saleCustomer: manualSales.customerName,
+      pieceName: printFailures.pieceName,
+    })
+    .from(filamentMovements)
+    .leftJoin(orders, eq(filamentMovements.refId, orders.id))
+    .leftJoin(manualSales, eq(filamentMovements.refId, manualSales.id))
+    .leftJoin(printFailures, eq(filamentMovements.refId, printFailures.id))
+    .where(
+      opts.filamentId
+        ? eq(filamentMovements.filamentId, opts.filamentId)
+        : undefined,
+    )
+    .orderBy(desc(filamentMovements.createdAt))
+    .limit(opts.limit);
+}
+
+/**
+ * Deja constancia en el ledger SIN mover el stock (stock inicial al dar de alta
+ * un carrete desde la app: el carrete ya se creó con ese stock). Un 'adjust'
+ * no entra en el consumo de los reportes (solo cuentan order/manual_sale/restore).
+ */
+export async function insertAdjustMovement(
+  m: {
+    filamentId: string;
+    material: string;
+    color: string;
+    deltaGrams: number;
+  },
+  database: Database = db,
+): Promise<void> {
+  await database.insert(filamentMovements).values({
+    filamentId: m.filamentId,
+    material: m.material,
+    color: m.color,
+    deltaGrams: m.deltaGrams.toFixed(2),
+    reason: "adjust",
+    refId: null,
   });
 }
 

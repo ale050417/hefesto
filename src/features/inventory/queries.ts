@@ -1,6 +1,8 @@
+import { recordAudit } from "@/core/audit";
 import { NotFoundError } from "@/core/errors";
 import * as repo from "./repository";
 import { notifyLowStockAfterSale } from "./lowStockNotify";
+import { toMovementView, type MovementView } from "./movements";
 import {
   buildFailureMovements,
   deleteFailure as runDeleteFailure,
@@ -8,32 +10,126 @@ import {
   isLowStock,
   registerFailure,
 } from "./service";
-import type { FailureInput, FilamentInput } from "./schemas";
+import { adjustFilamentStock, type AdjustStockResult } from "./stock-adjust";
+import type {
+  FailureInput,
+  FilamentDetailsInput,
+  FilamentInput,
+} from "./schemas";
 import type { Filament, FilamentView, PrintFailure } from "./types";
+
+/** Fila de la base → vista (números ya convertidos, estado de 3 niveles). */
+export function toFilamentView(f: Filament): FilamentView {
+  const stock = Number(f.stockGrams);
+  const threshold = Number(f.alertThresholdGrams);
+  return {
+    id: f.id,
+    material: f.material,
+    color: f.color,
+    brand: f.brand,
+    diameter: f.diameter,
+    stockGrams: stock,
+    spoolGrams: Number(f.spoolGrams),
+    costPerKg: Number(f.costPerKg),
+    alertThresholdGrams: threshold,
+    lowStock: isLowStock(stock, threshold),
+    status: filamentStatus(stock, threshold),
+  };
+}
 
 export async function listFilamentsView(): Promise<FilamentView[]> {
   const rows = await repo.listFilaments();
-  return rows.map((f) => {
-    const stock = Number(f.stockGrams);
-    const threshold = Number(f.alertThresholdGrams);
-    return {
-      id: f.id,
-      material: f.material,
-      color: f.color,
-      brand: f.brand,
-      diameter: f.diameter,
-      stockGrams: stock,
-      spoolGrams: Number(f.spoolGrams),
-      costPerKg: Number(f.costPerKg),
-      alertThresholdGrams: threshold,
-      lowStock: isLowStock(stock, threshold),
-      status: filamentStatus(stock, threshold),
-    };
-  });
+  return rows.map(toFilamentView);
 }
 
 export async function getFilament(id: string): Promise<Filament | null> {
   return repo.findFilamentById(id);
+}
+
+export async function getFilamentView(
+  id: string,
+): Promise<FilamentView | null> {
+  const f = await repo.findFilamentById(id);
+  return f ? toFilamentView(f) : null;
+}
+
+/**
+ * Alta desde la app: igual que la web (el carrete nace con su stock) y, si
+ * arranca con stock, deja el "stock inicial" en el historial del ledger. Ese
+ * registro es solo constancia (best-effort): el stock ya quedó guardado.
+ */
+export async function createFilamentWithHistory(
+  input: FilamentInput,
+): Promise<Filament> {
+  const created = await addFilament(input);
+  const initial = Number(created.stockGrams);
+  if (initial > 0) {
+    await repo
+      .insertAdjustMovement({
+        filamentId: created.id,
+        material: created.material,
+        color: created.color,
+        deltaGrams: initial,
+      })
+      .catch((error) =>
+        console.error(
+          "[inventory] no se pudo registrar el stock inicial:",
+          error,
+        ),
+      );
+  }
+  return created;
+}
+
+/** Edita los datos del carrete SIN tocar el stock (eso va por el ajuste). */
+export async function updateFilamentDetails(
+  id: string,
+  input: FilamentDetailsInput,
+): Promise<Filament> {
+  const current = await repo.findFilamentById(id);
+  if (!current) throw new NotFoundError("No encontramos el filamento.");
+  return repo.updateFilamentRow(id, {
+    material: input.material,
+    color: input.color,
+    brand: input.brand,
+    diameter: input.diameter,
+    spoolGrams: String(input.spoolGrams),
+    costPerKg: String(input.costPerKg),
+    alertThresholdGrams: String(input.alertThresholdGrams),
+  });
+}
+
+/** Ajuste manual de stock por el ledger (ver stock-adjust.ts). */
+export async function adjustStock(
+  id: string,
+  input: { deltaGrams?: number; newStockGrams?: number },
+  opts: { reason?: string | null; actorId: string | null },
+): Promise<AdjustStockResult> {
+  return adjustFilamentStock(
+    { id, input, reason: opts.reason, actorId: opts.actorId },
+    {
+      findFilament: repo.findFilamentById,
+      applyDeltas: (m) => repo.applyFilamentDeltasTx(m),
+      notifyLow: (low) => notifyLowStockAfterSale(low, "ajuste"),
+      audit: recordAudit,
+    },
+  );
+}
+
+/** Historial del ledger (más nuevo primero), de un carrete o de todos. */
+export async function listMovements(opts: {
+  filamentId?: string;
+  limit?: number;
+}): Promise<MovementView[]> {
+  const rows = await repo.listMovementRows({
+    filamentId: opts.filamentId,
+    limit: opts.limit ?? 50,
+  });
+  return rows.map(toMovementView);
+}
+
+export async function getFailure(id: string): Promise<PrintFailure | null> {
+  return repo.findFailureById(id);
 }
 
 function toRow(input: FilamentInput) {

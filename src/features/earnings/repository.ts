@@ -95,6 +95,43 @@ export async function deleteProfitShareRow(
   await database.delete(profitShares).where(eq(profitShares.id, id));
 }
 
+/**
+ * Aplica un cambio de reparto COMPLETO en una sola transacción (API de la app,
+ * 2026-10-31): o se guarda todo el reparto o no se toca nada. La web guarda
+ * socio por socio en paralelo; acá el reparto no puede quedar a medias porque
+ * la ganancia pura se divide con estos porcentajes.
+ */
+export async function applyProfitSharesPlanTx(
+  plan: {
+    deletes: string[];
+    updates: Array<{
+      id: string;
+      name: string;
+      role: string | null;
+      pct: number;
+    }>;
+    creates: Array<{ name: string; role: string | null; pct: number }>;
+  },
+  database: Database = db,
+): Promise<void> {
+  await database.transaction(async (tx) => {
+    for (const id of plan.deletes) {
+      await tx.delete(profitShares).where(eq(profitShares.id, id));
+    }
+    for (const u of plan.updates) {
+      await tx
+        .update(profitShares)
+        .set({ name: u.name, role: u.role, pct: String(u.pct) })
+        .where(eq(profitShares.id, u.id));
+    }
+    for (const c of plan.creates) {
+      await tx
+        .insert(profitShares)
+        .values({ name: c.name, role: c.role, pct: String(c.pct) });
+    }
+  });
+}
+
 /* ---------- Pedidos entregados + costos ---------- */
 
 export type DeliveredOrder = {

@@ -1,6 +1,6 @@
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { asc, desc, eq, lt, sql } from "drizzle-orm";
 import { db } from "@/core/db";
-import { pointTransactions, rewards } from "@/core/db/schema";
+import { pointTransactions, profiles, rewards } from "@/core/db/schema";
 
 type Database = typeof db;
 export type PointTransaction = typeof pointTransactions.$inferSelect;
@@ -112,4 +112,39 @@ export async function getPointsStats(database: Database = db): Promise<{
     })
     .from(pointTransactions);
   return rows[0] ?? { inCirculation: 0, redemptions: 0, pointsRedeemed: 0 };
+}
+
+/**
+ * Últimos canjes de puntos de TODOS los clientes (movimientos negativos), más
+ * recientes primero, con el nombre del cliente. Para la app móvil
+ * (/api/v1/admin/recompensas): la web muestra los canjes por cliente.
+ */
+export async function listRecentRedemptions(
+  limit = 30,
+  database: Database = db,
+): Promise<
+  {
+    id: string;
+    customerId: string;
+    customerName: string | null;
+    reason: string;
+    points: number;
+    createdAt: Date;
+  }[]
+> {
+  const rows = await database
+    .select({
+      id: pointTransactions.id,
+      customerId: pointTransactions.customerId,
+      customerName: profiles.fullName,
+      reason: pointTransactions.reason,
+      delta: pointTransactions.delta,
+      createdAt: pointTransactions.createdAt,
+    })
+    .from(pointTransactions)
+    .leftJoin(profiles, eq(profiles.id, pointTransactions.customerId))
+    .where(lt(pointTransactions.delta, 0))
+    .orderBy(desc(pointTransactions.createdAt))
+    .limit(limit);
+  return rows.map(({ delta, ...r }) => ({ ...r, points: -delta }));
 }

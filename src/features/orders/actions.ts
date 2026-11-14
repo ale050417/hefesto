@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { after } from "next/server";
 
 import { z, type ZodError } from "zod";
 import { getCurrentUser, isStaff } from "@/core/auth/session";
@@ -23,29 +22,25 @@ import {
 } from "./schemas";
 import { createOrder } from "./services/orderService";
 import {
-  applyManualSaleLines,
   computeManualSaleCosts,
   createManualSale,
-  deductQuantityFor,
   deleteManualSale,
-  updateManualSale,
   updateManualSaleStatus,
 } from "./services/manualSaleService";
+import {
+  editManualSale,
+  registerManualSale,
+  removeManualSale,
+  removeOnlineOrder,
+} from "./manual-sale-flow";
 import { getOrderCustomerId, sendOrderMessage } from "./services/orderChat";
-import { notifyCustomer, notifyAdmins } from "@/features/notifications/service";
-import { awardForOrder } from "@/features/rewards/service";
-import { ORDER_STATUS_LABEL } from "./constants";
+import { notifyAdmins } from "@/features/notifications/service";
 import {
   cancelPendingOrder,
   startMercadoPagoPayment,
 } from "./services/paymentService";
-import {
-  deleteOrderAdmin,
-  deleteOrdersAdmin,
-  setOrderMeta,
-  transitionOrder,
-} from "./services/orderAdminService";
-import { notifyOrderStatus } from "./services/orderEmails";
+import { deleteOrdersAdmin, setOrderMeta } from "./services/orderAdminService";
+import { changeOrderStatus } from "./status-flow";
 import type { OrderStatus } from "./types";
 import {
   parseImportRow,
@@ -172,59 +167,12 @@ export async function createManualSaleAction(
       },
     };
   }
-  // Venta con VARIAS combinaciones de colores (2026-08-09): el total, la
-  // cantidad y los gramos se recalculan acá desde las líneas ANTES de costear.
-  // Sin líneas, `data` es la entrada tal cual (venta simple de siempre).
-  const data = applyManualSaleLines(parsed.data);
-  const hasItems = (parsed.data.items?.length ?? 0) > 0;
-  // Amortización (costo) obligatoria: se calcula en el servidor desde
-  // gramos/horas y el FILAMENTO elegido (por id; `material` queda de fallback
-  // para cargas viejas). La calculadora cotiza UNA pieza: acá se escala por la
-  // cantidad. La ganancia (total − amort total) es lo que se reparte.
-  const unitAmort = await getAmortization({
-    filamentId: data.filamentId ?? null,
-    material: data.material ?? null,
-    grams: data.grams ?? 0,
-    hours: (data.printMinutes ?? 0) / 60,
-  });
-  if (!(unitAmort > 0)) {
-    return {
-      ok: false,
-      error: {
-        code: "VALIDATION",
-        message:
-          "Cargá la amortización con la calculadora (gramos/horas y filamento).",
-      },
-    };
-  }
-  const costs = computeManualSaleCosts({
-    unitAmortization: unitAmort,
-    total: data.total,
-    // Con líneas, los gramos YA son los de toda la venta (se sumaron las
-    // combinaciones): volver a multiplicar por la cantidad costearía de más.
-    quantity: deductQuantityFor({ hasItems, quantity: data.quantity }),
-  });
-  // Insumos: son un COSTO real (vaso, argollas, etc.), NO se cobran aparte. Van a
-  // la amortización y BAJAN la ganancia; el total no los incluye (fix 2026-07).
-  const extrasCost = data.extrasCost ?? 0;
-  const amortization = costs.amortization + extrasCost;
-  const withCosts = {
-    ...data,
-    amortization,
-    profit: data.total - amortization,
-  };
   try {
-    const sale = await createManualSale(withCosts, user?.id ?? null);
-    revalidatePath("/admin/pedidos");
-    // La venta manual cobrada suma al reparto de ganancias y a reportes.
-    revalidatePath("/admin/ganancias");
-    revalidatePath("/admin/reportes");
-    await recordAudit({
+    // Costos, alta, stock, revalidación y auditoría: compartidos con la API de
+    // la app (ver manual-sale-flow.ts).
+    const sale = await registerManualSale({
+      input: parsed.data,
       actorId: user?.id ?? null,
-      action: "manual_sale.created",
-      entityType: "manual_sale",
-      entityId: sale.id,
-      metadata: { total: sale.total, customer: sale.customerName },
     });
     return { ok: true, orderNumber: sale.id };
   } catch (error) {
@@ -257,54 +205,16 @@ export async function transitionOrderAction(
   }
   const user = await getCurrentUser();
   try {
-    const updated = await transitionOrder(orderId, toStatus, {
-      changedBy: user?.id ?? null,
-      note: note ?? null,
+    // Estado + efectos (email, notificación, puntos, auditoría) compartidos con
+    // la API de la app: ver status-flow.ts.
+    await changeOrderStatus({
+      orderId,
+      toStatus,
+      note,
+      actorId: user?.id ?? null,
     });
     revalidatePath(`/admin/pedidos/${orderId}`);
     revalidatePath("/admin/pedidos");
-    // Efectos secundarios NO críticos (email, notificación, puntos, auditoría):
-    // se corren DESPUÉS de responder (after()) para que "guardar" no espere
-    // viajes de red que no cambian lo que ve el admin. Cada uno atrapa su error.
-    after(async () => {
-      try {
-        await notifyOrderStatus(updated);
-      } catch (mailError) {
-        console.error("[email] no se pudo notificar el estado:", mailError);
-      }
-      try {
-        await notifyCustomer({
-          customerId: updated.customerId,
-          title: `Tu pedido ${updated.orderNumber} cambió de estado`,
-          body: `Ahora está: ${ORDER_STATUS_LABEL[updated.status]}.`,
-          link: `/cuenta/pedidos/${updated.orderNumber}`,
-        });
-      } catch (notifError) {
-        console.error("[notif] no se pudo crear la notificación:", notifError);
-      }
-      if (updated.status === "confirmed") {
-        try {
-          await awardForOrder({
-            customerId: updated.customerId,
-            orderId: updated.id,
-            orderTotal: Number(updated.total),
-          });
-        } catch (rwErr) {
-          console.error("[rewards] no se pudieron otorgar puntos:", rwErr);
-        }
-      }
-      try {
-        await recordAudit({
-          actorId: user?.id ?? null,
-          action: "order.status_changed",
-          entityType: "order",
-          entityId: orderId,
-          metadata: { toStatus, ...(note ? { note } : {}) },
-        });
-      } catch (auditError) {
-        console.error("[audit] no se pudo registrar el cambio:", auditError);
-      }
-    });
     return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
@@ -350,16 +260,7 @@ export async function deleteOrderAction(
   }
   const user = await getCurrentUser();
   try {
-    await deleteOrderAdmin(orderId);
-    await recordAudit({
-      actorId: user?.id ?? null,
-      action: "order.deleted",
-      entityType: "order",
-      entityId: orderId,
-    });
-    revalidatePath("/admin/pedidos");
-    revalidatePath("/admin/ganancias");
-    revalidatePath("/admin/reportes");
+    await removeOnlineOrder({ orderId, actorId: user?.id ?? null });
     return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
@@ -506,16 +407,7 @@ export async function deleteManualSaleAction(
   }
   const user = await getCurrentUser();
   try {
-    await deleteManualSale(saleId);
-    await recordAudit({
-      actorId: user?.id ?? null,
-      action: "manual_sale.deleted",
-      entityType: "manual_sale",
-      entityId: saleId,
-    });
-    revalidatePath("/admin/pedidos");
-    revalidatePath("/admin/ganancias");
-    revalidatePath("/admin/reportes");
+    await removeManualSale({ saleId, actorId: user?.id ?? null });
     return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
@@ -558,16 +450,10 @@ export async function updateManualSaleAction(
   }
   const user = await getCurrentUser();
   try {
-    await updateManualSale(idOk.data, parsed.data);
-    revalidatePath("/admin/pedidos");
-    revalidatePath("/admin/ganancias");
-    revalidatePath("/admin/reportes");
-    await recordAudit({
+    await editManualSale({
+      saleId: idOk.data,
+      input: parsed.data,
       actorId: user?.id ?? null,
-      action: "manual_sale.updated",
-      entityType: "manual_sale",
-      entityId: saleId,
-      metadata: { total: parsed.data.total },
     });
     return { ok: true };
   } catch (error) {

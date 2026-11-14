@@ -2,76 +2,16 @@ import { requirePermissionPage } from "@/core/auth/permissions";
 import { DegradedNotice } from "@/components/shared/degraded-notice";
 import { listOrdersAdmin } from "@/features/orders/services/orderAdminService";
 import { listManualSales } from "@/features/orders/services/manualSaleService";
-import {
-  OrdersKanban,
-  type KanbanOrder,
-} from "@/features/production/components/production-kanban";
-import type { OrderListItem, OrderStatus } from "@/features/orders/types";
+import { OrdersKanban } from "@/features/production/components/production-kanban";
+import { buildBoardOrders } from "@/features/production/board";
 import { safeLoad } from "@/lib/safe-load";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Cola de producción" };
 
-// Estados del tablero (flujo de trabajo). Se excluyen cancelado/reembolsado:
-// son salidas terminales, no etapas del taller.
-const BOARD_STATES = [
-  "pending_payment",
-  "confirmed",
-  "in_production",
-  "ready",
-  "shipped",
-  "delivered",
-];
-
-const DELIVERED_HIDE_MS = 24 * 60 * 60 * 1000;
-
-type BoardManualSale = {
-  id: string;
-  status: OrderStatus;
-  detail: string | null;
-  customerName: string;
-  total: string;
-  saleDate: Date;
-};
-
-// Arma las cards del tablero (online + manual) y oculta las entregadas hace más
-// de un día. Va en un helper y no en el cuerpo del componente porque usa
-// Date.now(): la regla de pureza de React no permite llamar funciones impuras
-// durante el render de un Server Component.
-function buildBoardOrders(
-  items: OrderListItem[],
-  sales: BoardManualSale[],
-): KanbanOrder[] {
-  const now = Date.now();
-  const stillOnBoard = (status: string, deliveredSince: Date) =>
-    BOARD_STATES.includes(status) &&
-    (status !== "delivered" ||
-      now - deliveredSince.getTime() < DELIVERED_HIDE_MS);
-
-  const online: KanbanOrder[] = items
-    .filter((o) => stillOnBoard(o.status, o.updatedAt))
-    .map((o) => ({
-      id: o.id,
-      source: "online",
-      label: o.itemsSummary || o.orderNumber,
-      customerName: o.customerName,
-      total: o.total,
-      status: o.status,
-      createdAt: o.createdAt,
-    }));
-  const manual: KanbanOrder[] = sales
-    .filter((s) => stillOnBoard(s.status, s.saleDate))
-    .map((s) => ({
-      id: s.id,
-      source: "manual",
-      label: s.detail ?? "Venta manual",
-      customerName: s.customerName,
-      total: Number(s.total),
-      status: s.status,
-      createdAt: s.saleDate,
-    }));
-  return [...online, ...manual];
-}
+// Las tarjetas se arman en features/production/board.ts (la comparte la API de
+// la app móvil): online + manual, sin cancelados y con las entregadas ocultas
+// un día después.
 
 export default async function ProductionPage() {
   await requirePermissionPage("produccion", "ver");

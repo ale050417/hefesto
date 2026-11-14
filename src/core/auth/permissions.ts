@@ -147,6 +147,40 @@ export async function getAllPerms(): Promise<AllPerms> {
 }
 
 /**
+ * Variantes para la API móvil (`/api/v1`, 2026-10-31): el usuario NO sale de la
+ * cookie sino del Bearer token (ver api-auth.ts). Misma resolución de permisos
+ * que el panel web — la app nunca decide qué puede hacer cada rol.
+ */
+export async function canForUser(
+  user: CurrentUser,
+  module: PermModule,
+  action: PermAction,
+): Promise<boolean> {
+  const input = await loadResolveInput(user);
+  return resolveAllowed(input, module, action);
+}
+
+/** ¿Es admin (dueño)? Igual que `isAdmin()` pero para el usuario del Bearer token. */
+export async function isAdminForUser(user: CurrentUser): Promise<boolean> {
+  const input = await loadResolveInput(user);
+  return input.enumRole === "admin" || input.role?.isAdmin === true;
+}
+
+export async function getAllPermsForUser(user: CurrentUser): Promise<AllPerms> {
+  const input = await loadResolveInput(user);
+  const out: AllPerms = {};
+  for (const m of PERM_MODULE_KEYS) {
+    out[m] = {
+      ver: resolveAllowed(input, m, "ver"),
+      crear: resolveAllowed(input, m, "crear"),
+      editar: resolveAllowed(input, m, "editar"),
+      eliminar: resolveAllowed(input, m, "eliminar"),
+    };
+  }
+  return out;
+}
+
+/**
  * Exige el permiso en una página (server component). Sin sesión → login;
  * sin permiso → home. Para guards de navegación.
  */

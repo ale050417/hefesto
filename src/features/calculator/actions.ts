@@ -4,13 +4,13 @@ import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/core/auth/session";
 import { can, isAdmin } from "@/core/auth/permissions";
 import { type ActionResult, toActionError } from "@/core/errors";
-import { listFilamentsView } from "@/features/inventory/queries";
 import {
   calcConfigSchema,
   calcSaveSchema,
   marginPresetSchema,
   quotePriceSchema,
 } from "./schemas";
+import { quoteFinalPriceFlow, saveCalcFlow } from "./flows";
 import * as service from "./service";
 
 const NOT_STAFF = {
@@ -36,25 +36,9 @@ export async function saveCalcAction(
     };
   }
   try {
-    // Costo/kg y snapshot material/color resueltos en el servidor desde el
-    // FILAMENTO elegido (por id): dos filamentos del mismo material pueden
-    // costar distinto (fix auditoría 2026-07).
-    const filaments = await listFilamentsView();
-    const filament = filaments.find((f) => f.id === parsed.data.filamentId);
-    if (!filament) {
-      return {
-        ok: false,
-        error: {
-          code: "VALIDATION",
-          message: "El filamento elegido ya no existe. Elegí otro.",
-        },
-      };
-    }
-    const row = await service.createCalc(
-      { ...parsed.data, material: filament.material, color: filament.color },
-      filament.costPerKg,
-      user.id,
-    );
+    // Costo/kg y snapshot material/color se resuelven en el servidor desde el
+    // FILAMENTO elegido (flujo compartido con la API de la app).
+    const row = await saveCalcFlow(parsed.data, user.id);
     revalidatePath("/admin/calculadora");
     return { ok: true, data: { id: row.id } };
   } catch (error) {
@@ -135,31 +119,9 @@ export async function quotePriceAction(
     };
   }
   try {
-    // Costo/kg resuelto en el servidor desde el filamento elegido.
-    const filaments = await listFilamentsView();
-    const filament = filaments.find((f) => f.id === parsed.data.filamentId);
-    if (!filament) {
-      return {
-        ok: false,
-        error: {
-          code: "VALIDATION",
-          message: "El filamento elegido ya no existe. Elegí otro.",
-        },
-      };
-    }
-    const result = await service.quoteFinalPriceByPreset({
-      presetId: parsed.data.presetId,
-      grams: parsed.data.grams,
-      hours: parsed.data.hours,
-      costPerKg: filament.costPerKg,
-    });
-    if (!result) {
-      return {
-        ok: false,
-        error: { code: "NOT_FOUND", message: "El tipo no está disponible." },
-      };
-    }
-    return { ok: true, data: result };
+    // Costo/kg resuelto en el servidor desde el filamento elegido (flujo
+    // compartido con la API de la app).
+    return { ok: true, data: await quoteFinalPriceFlow(parsed.data) };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
   }

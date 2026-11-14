@@ -5,9 +5,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/core/auth/session";
 import { can } from "@/core/auth/permissions";
-import { PERM_MODULE_KEYS } from "@/core/auth/perm-defs";
 import { type ActionResult, toActionError } from "@/core/errors";
-import { recordAudit } from "@/core/audit";
 import { optimizeImage, uploadObject } from "@/core/storage";
 import {
   createBanner,
@@ -18,15 +16,32 @@ import {
   saveMpAccessToken,
   saveShippingSettings,
   setBrandImage,
-  inviteTeamMember,
   assignMemberRole,
   removeTeamMember,
-  resendTeamInvite,
   createRole,
   updateRole,
   deleteRole,
   updateBanner,
 } from "./service";
+import {
+  appearanceSchema,
+  assignRoleSchema,
+  bannerIntervalSchema,
+  bannerSchema,
+  businessInfoSchema,
+  createRoleSchema,
+  deleteRoleSchema,
+  faqSchema,
+  inviteSchema,
+  mpTokenSchema,
+  paymentSchema,
+  removeSchema,
+  resendSchema,
+  shippingSchema,
+  trustBarSchema,
+  updateRoleSchema,
+} from "./schemas";
+import { inviteMemberAudited, resendInviteAudited } from "./team-flow";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -175,37 +190,6 @@ export async function saveGalleryAction(input: unknown): Promise<ActionResult> {
   }
 }
 
-const businessInfoSchema = z.object({
-  storeName: z.string().trim().max(120).optional().or(z.literal("")),
-  slogan: z.string().trim().max(120).optional().or(z.literal("")),
-  description: z.string().trim().max(500).optional().or(z.literal("")),
-  whatsapp: z.string().trim().max(40).optional().or(z.literal("")),
-  contactEmail: z.string().trim().max(160).optional().or(z.literal("")),
-  addressText: z.string().trim().max(200).optional().or(z.literal("")),
-  instagram: z.string().trim().max(160).optional().or(z.literal("")),
-  facebook: z.string().trim().max(160).optional().or(z.literal("")),
-  cuit: z.string().trim().max(20).optional().or(z.literal("")),
-  pickupEnabled: z.boolean().optional(),
-  deliveryEnabled: z.boolean().optional(),
-  hours: z
-    .array(
-      z.object({
-        label: z.string().trim().max(40),
-        morning: z.object({
-          on: z.boolean(),
-          from: z.string().trim().max(10),
-          to: z.string().trim().max(10),
-        }),
-        afternoon: z.object({
-          on: z.boolean(),
-          from: z.string().trim().max(10),
-          to: z.string().trim().max(10),
-        }),
-      }),
-    )
-    .optional(),
-});
-
 export async function saveBusinessInfoAction(
   input: unknown,
 ): Promise<ActionResult> {
@@ -253,21 +237,6 @@ const UNAUTH = {
   error: { code: "UNAUTHORIZED", message: "No autorizado" },
 };
 
-const appearanceSchema = z.object({
-  businessMode: z.enum(["checkout", "vidriera"]).optional(),
-  accentColor: z
-    .string()
-    .trim()
-    .regex(/^#[0-9a-fA-F]{6}$/, "Color inválido")
-    .optional()
-    .or(z.literal("")),
-  season: z.string().trim().max(40).optional(),
-  seasonDeco: z.boolean().optional(),
-  seasonIntensity: z.coerce.number().int().min(0).max(100).optional(),
-  seasonDurationSec: z.coerce.number().int().min(0).max(120).optional(),
-  homeSections: z.record(z.string(), z.boolean()).optional(),
-});
-
 export async function saveAppearanceAction(
   input: unknown,
 ): Promise<ActionResult> {
@@ -301,20 +270,6 @@ export async function saveAppearanceAction(
   }
 }
 
-// Banda de confianza del home (H25): 4 ítems con ícono fijo + título/texto
-// editables. Se guarda en business_settings.trust_bar.
-const trustBarSchema = z.object({
-  items: z
-    .array(
-      z.object({
-        ic: z.string().trim().max(24),
-        t: z.string().trim().max(60),
-        d: z.string().trim().max(140),
-      }),
-    )
-    .max(6),
-});
-
 export async function saveTrustBarAction(
   input: unknown,
 ): Promise<ActionResult> {
@@ -335,19 +290,6 @@ export async function saveTrustBarAction(
     return { ok: false, error: toActionError(error) };
   }
 }
-
-// FAQ del home editable: lista de preguntas/respuestas. Vacío = usa las
-// preguntas por defecto del home. Se guarda en business_settings.faq.
-const faqSchema = z.object({
-  items: z
-    .array(
-      z.object({
-        q: z.string().trim().min(1).max(140),
-        a: z.string().trim().min(1).max(600),
-      }),
-    )
-    .max(12),
-});
 
 export async function saveFaqAction(input: unknown): Promise<ActionResult> {
   if (!(await can("config", "editar"))) return UNAUTH;
@@ -370,12 +312,6 @@ export async function saveFaqAction(input: unknown): Promise<ActionResult> {
     return { ok: false, error: toActionError(error) };
   }
 }
-
-// Duración entre banners (H28): segundos de autoplay del carrusel, acotado a un
-// rango razonable (3 a 12 s) para que no quede ni muy rápido ni muy lento.
-const bannerIntervalSchema = z.object({
-  seconds: z.coerce.number().int().min(3).max(12),
-});
 
 export async function saveBannerIntervalAction(
   input: unknown,
@@ -400,18 +336,6 @@ export async function saveBannerIntervalAction(
     return { ok: false, error: toActionError(error) };
   }
 }
-
-const bannerSchema = z.object({
-  title: z.string().trim().min(1, "Ingresá un título."),
-  subtitle: z.string().trim().max(200).optional().or(z.literal("")),
-  imageUrl: z.string().trim().url().optional().or(z.literal("")),
-  position: z.string().trim().max(20).optional().or(z.literal("")),
-  align: z.enum(["left", "center", "right"]).optional(),
-  ctaText: z.string().trim().max(60).optional().or(z.literal("")),
-  ctaHref: z.string().trim().max(200).optional().or(z.literal("")),
-  isActive: z.boolean().optional(),
-  sortOrder: z.coerce.number().int().optional(),
-});
 
 const normStr = (v?: string) => (v && v.length > 0 ? v : null);
 
@@ -491,16 +415,6 @@ export async function deleteBannerAction(id: string): Promise<ActionResult> {
 
 /* ---------- Métodos de pago ---------- */
 
-const paymentSchema = z.object({
-  transferEnabled: z.boolean().optional(),
-  transferAlias: z.string().trim().max(120).optional().or(z.literal("")),
-  transferCbu: z.string().trim().max(40).optional().or(z.literal("")),
-  mpEnabled: z.boolean().optional(),
-  mpNote: z.string().trim().max(200).optional().or(z.literal("")),
-  cashEnabled: z.boolean().optional(),
-  cashNote: z.string().trim().max(200).optional().or(z.literal("")),
-});
-
 export async function savePaymentSettingsAction(
   input: unknown,
 ): Promise<ActionResult> {
@@ -529,12 +443,6 @@ export async function savePaymentSettingsAction(
     return { ok: false, error: toActionError(error) };
   }
 }
-
-// MercadoPago conectable: el vendedor pega/borra su Access Token (server-only,
-// nunca vuelve al cliente).
-const mpTokenSchema = z.object({
-  token: z.string().trim().min(10).max(500),
-});
 
 export async function saveMpTokenAction(input: unknown): Promise<ActionResult> {
   if (!(await can("config", "editar"))) return UNAUTH;
@@ -572,20 +480,6 @@ export async function disconnectMpAction(): Promise<ActionResult> {
 
 /* ---------- Envíos ---------- */
 
-const shippingSchema = z.object({
-  city: z.string().trim().max(80).optional().or(z.literal("")),
-  freeOver: z.coerce.number().min(0).optional(),
-  outMsg: z.string().trim().max(500).optional().or(z.literal("")),
-  zones: z
-    .array(
-      z.object({
-        name: z.string().trim().max(80),
-        price: z.coerce.number().min(0),
-      }),
-    )
-    .optional(),
-});
-
 export async function saveShippingSettingsAction(
   input: unknown,
 ): Promise<ActionResult> {
@@ -621,12 +515,6 @@ async function requireAdminActor() {
   return actor;
 }
 
-/** Asigna un rol (custom o de sistema) a un miembro existente. */
-const assignRoleSchema = z.object({
-  userId: z.string().uuid(),
-  roleId: z.string().uuid(),
-});
-
 export async function assignMemberRoleAction(
   input: unknown,
 ): Promise<ActionResult> {
@@ -656,14 +544,6 @@ export async function assignMemberRoleAction(
   }
 }
 
-const inviteSchema = z.object({
-  fullName: z.string().trim().max(120).optional().or(z.literal("")),
-  email: z.string().trim().email(),
-  roleId: z.string().uuid(),
-  /** Mensaje personal del admin: viaja en el correo de invitación. */
-  message: z.string().trim().max(600).optional().or(z.literal("")),
-});
-
 export async function inviteTeamMemberAction(
   input: unknown,
 ): Promise<ActionResult<{ email: string; promoted: boolean }>> {
@@ -685,29 +565,13 @@ export async function inviteTeamMemberAction(
     };
   }
   try {
-    const result = await inviteTeamMember({
-      email: p.data.email,
-      roleId: p.data.roleId,
-      fullName:
-        p.data.fullName && p.data.fullName.length > 0 ? p.data.fullName : null,
-      message:
-        p.data.message && p.data.message.length > 0 ? p.data.message : null,
-    });
-    await recordAudit({
-      actorId: actor.id,
-      action: result.promoted ? "team.member_promoted" : "team.member_invited",
-      entityType: "team",
-      entityId: result.email,
-      metadata: { roleId: p.data.roleId },
-    });
-    revalidatePath("/admin/configuracion");
+    // Invitación + auditoría + revalidación: compartido con la API de la app.
+    const result = await inviteMemberAudited(actor.id, p.data);
     return { ok: true, data: result };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
   }
 }
-
-const resendSchema = z.object({ userId: z.string().uuid() });
 
 export async function resendInviteAction(
   input: unknown,
@@ -730,15 +594,7 @@ export async function resendInviteAction(
     };
   }
   try {
-    const result = await resendTeamInvite(p.data.userId);
-    await recordAudit({
-      actorId: actor.id,
-      action: "team.invite_resent",
-      entityType: "team",
-      entityId: result.email,
-      metadata: {},
-    });
-    revalidatePath("/admin/configuracion");
+    const result = await resendInviteAudited(actor.id, p.data.userId);
     return { ok: true, data: result };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
@@ -746,38 +602,6 @@ export async function resendInviteAction(
 }
 
 /* ---------- Roles personalizados ---------- */
-
-const PERM_ACTION_KEYS = ["ver", "crear", "editar", "eliminar"] as const;
-const MODULE_SET = new Set<string>(PERM_MODULE_KEYS);
-const ACTION_SET = new Set<string>(PERM_ACTION_KEYS);
-
-/**
- * Permisos por módulo: acepta cualquier { módulo: acción[] } y lo sanea contra
- * los módulos/acciones CONOCIDOS (PERM_MODULE_KEYS). Queda en sync automático con
- * la matriz: agregar un módulo no requiere tocar este schema. Antes esto era un
- * z.object con 6 claves fijas y descartaba los módulos nuevos (bug: los ticks de
- * Ganancias/A medida/etc. no se guardaban).
- */
-const permissionsSchema = z.unknown().transform((raw) => {
-  const out: Record<string, string[]> = {};
-  if (raw && typeof raw === "object") {
-    for (const [m, arr] of Object.entries(raw as Record<string, unknown>)) {
-      if (!MODULE_SET.has(m) || !Array.isArray(arr)) continue;
-      const acts = [
-        ...new Set(arr.filter((a): a is string => typeof a === "string")),
-      ].filter((a) => ACTION_SET.has(a));
-      if (acts.length) out[m] = acts;
-    }
-  }
-  return out;
-});
-
-const createRoleSchema = z.object({
-  name: z.string().trim().min(1, "Ingresá un nombre.").max(60),
-  permissions: permissionsSchema,
-});
-const updateRoleSchema = createRoleSchema.extend({ id: z.string().uuid() });
-const deleteRoleSchema = z.object({ id: z.string().uuid() });
 
 export async function createRoleAction(input: unknown): Promise<ActionResult> {
   if (!(await requireAdminActor())) {
@@ -865,8 +689,6 @@ export async function deleteRoleAction(input: unknown): Promise<ActionResult> {
     return { ok: false, error: toActionError(error) };
   }
 }
-
-const removeSchema = z.object({ userId: z.string().uuid() });
 
 export async function removeTeamMemberAction(
   input: unknown,
