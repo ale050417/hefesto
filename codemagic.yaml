@@ -102,15 +102,46 @@ workflows:
           import json, os, sys, time
           import jwt, requests
 
-          env = {n: os.environ.get(n, "") for n in (
+          import re
+
+          def resolve(name):
+              # La integración puede dejar el valor en texto o como referencia
+              # "@env:OTRA_VARIABLE" / "@file:/ruta" (el formato que entiende la
+              # herramienta de Codemagic). Se informa solo el TIPO, nunca el valor.
+              v, kind = os.environ.get(name, ""), "texto"
+              for _ in range(3):
+                  if v.startswith("@env:"):
+                      v, kind = os.environ.get(v[5:], ""), "@env"
+                  elif v.startswith("@file:"):
+                      with open(os.path.expanduser(v[6:]), encoding="utf-8") as fh:
+                          v, kind = fh.read(), "@file"
+                  else:
+                      break
+              print(f"{name}: {kind}, {len(v)} caracteres")
+              return v.strip()
+
+          env = {n: resolve(n) for n in (
               "APP_STORE_CONNECT_ISSUER_ID", "APP_STORE_CONNECT_KEY_IDENTIFIER", "APP_STORE_CONNECT_PRIVATE_KEY")}
           faltan = [n for n, v in env.items() if not v]
           if faltan:
               sys.exit(f"Faltan variables de la integración: {faltan}")
           key = env["APP_STORE_CONNECT_PRIVATE_KEY"]
-          # Por si la clave llega con los saltos de línea escritos como "\n".
+          # Saltos de línea escritos como "\n" o reemplazados por espacios: se
+          # rearma el PEM (cabecera, cuerpo en líneas de 64, pie).
           if "\\n" in key and "\n" not in key:
               key = key.replace("\\n", "\n")
+          m = re.search(r"-----BEGIN ([A-Z ]+)-----(.*?)-----END \1-----", key, re.S)
+          if m:
+              body = re.sub(r"\s+", "", m.group(2))
+              key = (f"-----BEGIN {m.group(1)}-----\n"
+                     + "\n".join(body[i:i + 64] for i in range(0, len(body), 64))
+                     + f"\n-----END {m.group(1)}-----\n")
+          elif re.fullmatch(r"[A-Za-z0-9+/=\s]+", key):
+              body = re.sub(r"\s+", "", key)
+              key = ("-----BEGIN PRIVATE KEY-----\n"
+                     + "\n".join(body[i:i + 64] for i in range(0, len(body), 64))
+                     + "\n-----END PRIVATE KEY-----\n")
+          print("Formato de la clave:", "PEM" if key.startswith("-----BEGIN") else "desconocido")
           now = int(time.time())
           token = jwt.encode(
               {"iss": env["APP_STORE_CONNECT_ISSUER_ID"], "iat": now, "exp": now + 900, "aud": "appstoreconnect-v1"},
