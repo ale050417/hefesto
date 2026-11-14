@@ -9,8 +9,8 @@
 #     Codemagic (la clave es de la cuenta de Apple, sirve para cualquier app);
 #   - el certificado de distribución que ya está en Codemagic → Code signing
 #     identities. Lo único nuevo es el perfil de aprovisionamiento de ESTA app
-#     (`ar.com.hefesto3d.hefesto`): el paso a paso está en `mobile/README.md`,
-#     sección "iPhone".
+#     (`ar.com.hefesto3d.hefesto`), que crea el workflow `hefesto-ios-alta`
+#     de más abajo. El paso a paso está en `mobile/README.md`, sección "iPhone".
 #
 # Disparo MANUAL (como Fadely): la mayoría de los commits son de la web y no
 # tocan `mobile/`; compilar iOS en cada uno gastaría minutos sin necesidad.
@@ -72,11 +72,15 @@ workflows:
         submit_to_testflight: true
 
   # --- Alta de la firma de iOS: se corre UNA sola vez --------------------------
-  # Registra en la cuenta de Apple el identificador de la app (con la capacidad
-  # "Sign In with Apple") y crea su perfil de App Store con los certificados de
-  # distribución que ya existen. Después hay que traer ese perfil a Codemagic:
+  # Registra en la cuenta de Apple el identificador de la app con la capacidad
+  # "Sign In with Apple" y crea su perfil de App Store con el certificado de
+  # distribución que ya existe. Después hay que traer ese perfil a Codemagic:
   # Teams → Code signing identities → iOS provisioning profiles → Fetch profiles.
-  # Se puede volver a correr sin problema: lo que ya existe no se toca.
+  #
+  # Habla directo con la API de App Store Connect: la herramienta de Codemagic
+  # no manda la configuración que Apple exige para "Sign In with Apple"
+  # (409 "Please select at least one configuration", 2026-11-14).
+  # Se puede volver a correr: lo que ya está bien no se toca.
   hefesto-ios-alta:
     name: Hefesto 3D · iOS · alta de la firma (una sola vez)
     max_build_duration: 15
@@ -88,40 +92,90 @@ workflows:
     environment:
       vars:
         BUNDLE_ID: ar.com.hefesto3d.hefesto
+        APP_NAME: Hefesto 3D
         PROFILE_NAME: Hefesto 3D App Store
     scripts:
-      - name: Identificador de la app, capacidad y perfil de App Store
+      - name: Identificador, Sign In with Apple y perfil de App Store
         script: |
-          set -e
-          first_id() { python3 -c "import json,sys; d=json.load(sys.stdin); d=d if isinstance(d,list) else [d]; print(d[0].get('id','') if d else '')"; }
-          all_ids() { python3 -c "import json,sys; d=json.load(sys.stdin); d=d if isinstance(d,list) else [d]; print(' '.join(x.get('id','') for x in d))"; }
+          pip3 install --quiet --disable-pip-version-check "pyjwt[crypto]" requests
+          python3 - <<'PY'
+          import json, os, sys, time
+          import jwt, requests
 
-          echo "== 1. Identificador $BUNDLE_ID"
-          BID=$(app-store-connect bundle-ids list --bundle-id-identifier "$BUNDLE_ID" --strict-match-identifier --json | first_id)
-          if [ -z "$BID" ]; then
-            BID=$(app-store-connect bundle-ids create "$BUNDLE_ID" --name "Hefesto 3D" --platform IOS --json | first_id)
-            echo "Creado: $BID"
-          else
-            echo "Ya existía: $BID"
-          fi
-          [ -n "$BID" ] || { echo "No se pudo obtener el identificador."; exit 1; }
+          env = {n: os.environ.get(n, "") for n in (
+              "APP_STORE_CONNECT_ISSUER_ID", "APP_STORE_CONNECT_KEY_IDENTIFIER", "APP_STORE_CONNECT_PRIVATE_KEY")}
+          faltan = [n for n, v in env.items() if not v]
+          if faltan:
+              sys.exit(f"Faltan variables de la integración: {faltan}")
+          key = env["APP_STORE_CONNECT_PRIVATE_KEY"]
+          # Por si la clave llega con los saltos de línea escritos como "\n".
+          if "\\n" in key and "\n" not in key:
+              key = key.replace("\\n", "\n")
+          now = int(time.time())
+          token = jwt.encode(
+              {"iss": env["APP_STORE_CONNECT_ISSUER_ID"], "iat": now, "exp": now + 900, "aud": "appstoreconnect-v1"},
+              key, algorithm="ES256", headers={"kid": env["APP_STORE_CONNECT_KEY_IDENTIFIER"], "typ": "JWT"})
+          API = "https://api.appstoreconnect.apple.com/v1"
+          H = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
 
-          echo "== 2. Capacidad Sign In with Apple"
-          app-store-connect bundle-ids enable-capabilities "$BID" --capability "Sign In with Apple"             || echo "(ya estaba habilitada, o no se pudo: revisar arriba)"
+          def call(method, path, body=None):
+              r = requests.request(method, API + path, headers=H, data=json.dumps(body) if body else None, timeout=60)
+              if r.status_code >= 300:
+                  sys.exit(f"{method} {path} -> {r.status_code}: {r.text[:1000]}")
+              return r.json() if r.text else {}
 
-          echo "== 3. Certificados de distribución de la cuenta"
-          CERTS=$(app-store-connect certificates list --type DISTRIBUTION --json | all_ids)
-          if [ -z "$CERTS" ]; then
-            CERTS=$(app-store-connect certificates list --type IOS_DISTRIBUTION --json | all_ids)
-          fi
-          [ -n "$CERTS" ] || { echo "La cuenta no tiene certificados de distribución."; exit 1; }
-          echo "Certificados: $CERTS"
+          bundle, app_name, profile_name = os.environ["BUNDLE_ID"], os.environ["APP_NAME"], os.environ["PROFILE_NAME"]
 
-          echo "== 4. Perfil de App Store"
-          EXISTING=$(app-store-connect bundle-ids profiles "$BID" --json 2>/dev/null | all_ids || true)
-          if [ -n "$EXISTING" ]; then
-            echo "El identificador ya tiene perfil(es): $EXISTING — no se crea otro."
-          else
-            app-store-connect profiles create "$BID" --certificate-ids $CERTS --type IOS_APP_STORE --name "$PROFILE_NAME" --save
-          fi
-          echo "Listo. Falta traer el perfil a Codemagic (Fetch profiles)."
+          print("== 1. Identificador", bundle)
+          found = [b for b in call("GET", f"/bundleIds?filter[identifier]={bundle}&limit=200")["data"]
+                   if b["attributes"]["identifier"] == bundle]
+          if found:
+              bid = found[0]["id"]
+              print("Ya existía:", bid)
+          else:
+              bid = call("POST", "/bundleIds", {"data": {"type": "bundleIds", "attributes": {
+                  "identifier": bundle, "name": app_name, "platform": "IOS"}}})["data"]["id"]
+              print("Creado:", bid)
+
+          print("== 2. Sign In with Apple")
+          caps = [c["attributes"]["capabilityType"]
+                  for c in call("GET", f"/bundleIds/{bid}/bundleIdCapabilities?limit=200")["data"]]
+          print("Capacidades:", caps)
+          changed = False
+          if "APPLE_ID_AUTH" in caps:
+              print("Ya estaba habilitada.")
+          else:
+              call("POST", "/bundleIdCapabilities", {"data": {
+                  "type": "bundleIdCapabilities",
+                  "attributes": {"capabilityType": "APPLE_ID_AUTH", "settings": [
+                      {"key": "APPLE_ID_AUTH_APP_CONSENT", "options": [{"key": "PRIMARY_APP_CONSENT"}]}]},
+                  "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": bid}}}}})
+              changed = True
+              print("Habilitada (app principal).")
+
+          print("== 3. Perfil de App Store")
+          store = [p for p in call("GET", f"/bundleIds/{bid}/profiles?limit=200")["data"]
+                   if p["attributes"]["profileType"] == "IOS_APP_STORE"]
+          valid = [p for p in store if p["attributes"]["profileState"] == "ACTIVE"]
+          if valid and not changed:
+              print("Ya hay un perfil válido:", [p["attributes"]["name"] for p in valid])
+          else:
+              # Un perfil creado antes de habilitar la capacidad no la incluye:
+              # se borra y se vuelve a crear (son de ESTA app, no de Fadely).
+              for p in store:
+                  call("DELETE", f"/profiles/{p['id']}")
+                  print("Perfil viejo borrado:", p["attributes"]["name"], p["id"])
+              certs = [c["id"] for c in call(
+                  "GET", "/certificates?filter[certificateType]=DISTRIBUTION,IOS_DISTRIBUTION&limit=200")["data"]]
+              if not certs:
+                  sys.exit("La cuenta no tiene certificados de distribución.")
+              print("Certificados:", certs)
+              prof = call("POST", "/profiles", {"data": {
+                  "type": "profiles",
+                  "attributes": {"name": profile_name, "profileType": "IOS_APP_STORE"},
+                  "relationships": {
+                      "bundleId": {"data": {"type": "bundleIds", "id": bid}},
+                      "certificates": {"data": [{"type": "certificates", "id": c} for c in certs]}}}})["data"]
+              print("Perfil creado:", prof["attributes"]["name"], prof["id"], prof["attributes"]["profileState"])
+          print("Listo. Falta traer el perfil a Codemagic (Fetch profiles).")
+          PY
