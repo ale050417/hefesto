@@ -150,6 +150,8 @@ class _CouponFormScreenState extends ConsumerState<CouponFormScreen> {
       _errors
         ..clear()
         ..addAll(errors);
+      // También arriba del botón: el campo marcado puede estar fuera de la vista.
+      _error = errors.isEmpty ? null : errors.values.first;
     });
     return errors.isEmpty;
   }
@@ -373,15 +375,12 @@ class _CouponFormScreenState extends ConsumerState<CouponFormScreen> {
                 ),
               ],
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 16),
-              FormErrorBanner(_error!),
-            ],
           ],
         ),
         bottomNavigationBar: SaveBar(
           label: _edit ? 'Guardar cambios' : 'Crear cupón',
           loading: _busy,
+          error: _error,
           onPressed: _dirty ? _save : null,
         ),
       ),

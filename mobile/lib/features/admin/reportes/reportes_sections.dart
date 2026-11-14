@@ -210,9 +210,12 @@ class _DailyCardState extends ConsumerState<DailyCard> {
                 RevenueChart(points: s.points, height: 150),
                 const SizedBox(height: 12),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(child: _MiniStat('Total', formatPrice(s.total))),
-                    Expanded(child: _MiniStat('Promedio por día', formatPrice(s.average))),
+                    // "Promedio por día" no entraba en un tercio de 360 dp
+                    // (se cortaba en "Promedio por …"): el "por día" va abajo.
+                    Expanded(child: _MiniStat('Promedio', formatPrice(s.average), sub: 'por día')),
                     Expanded(
                       child: _MiniStat(
                         'Mejor día',

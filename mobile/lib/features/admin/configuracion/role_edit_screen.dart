@@ -227,23 +227,34 @@ class _RoleEditScreenState extends ConfigFormState<RoleEditScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: AdminCard(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(m.label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        for (final (action, label) in permActions)
-                          FilterChip(
-                            label: Text(label),
-                            selected: _perms[m.key]?.contains(action) ?? false,
-                            showCheckmark: true,
-                            onSelected: editable ? (_) => _toggle(m.key, action) : null,
-                          ),
-                      ],
+                    const SizedBox(height: 8),
+                    // Los cuatro permisos en UNA fila de columnas parejas
+                    // (2026-11-14, pedido de Ale): con chips sueltos, en un
+                    // teléfono de 360 dp "Eliminar" caía solo a un segundo
+                    // renglón y las columnas no coincidían entre módulos.
+                    // IntrinsicHeight: las cuatro casillas miden lo mismo
+                    // aunque a alguna se le achique el rótulo.
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (final (i, (action, label)) in permActions.indexed) ...[
+                            if (i > 0) const SizedBox(width: 6),
+                            Expanded(
+                              child: PermToggle(
+                                label: label,
+                                selected: _perms[m.key]?.contains(action) ?? false,
+                                onChanged: editable ? (_) => _toggle(m.key, action) : null,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -264,6 +275,72 @@ class _RoleEditScreenState extends ConfigFormState<RoleEditScreen> {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Un permiso de la matriz (Ver / Crear / Editar / Eliminar): casilla que se
+/// prende y se apaga. Ancho parejo, 52 dp de alto como mínimo y el rótulo
+/// siempre en una línea (si con letra grande no entra, se achica en vez de
+/// partirse). Con [onChanged] nulo queda en solo lectura.
+class PermToggle extends StatelessWidget {
+  const PermToggle({super.key, required this.label, required this.selected, this.onChanged});
+  final String label;
+  final bool selected;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.hc;
+    final radius = BorderRadius.circular(12);
+    final toggle = onChanged == null ? null : () => onChanged!(!selected);
+    return Semantics(
+      button: true,
+      checked: selected,
+      enabled: onChanged != null,
+      label: label,
+      onTap: toggle,
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? Brand.gold.withValues(alpha: 0.16) : c.surface2,
+        borderRadius: radius,
+        child: InkWell(
+          borderRadius: radius,
+          onTap: toggle,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 52),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              border: Border.all(color: selected ? Brand.gold : c.border),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+                  size: 18,
+                  color: selected ? Brand.gold : c.textFaint,
+                ),
+                const SizedBox(height: 3),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      color: selected ? c.text : c.textDim,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

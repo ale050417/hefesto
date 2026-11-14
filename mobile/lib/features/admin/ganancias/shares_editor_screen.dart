@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/format.dart';
+import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../admin_widgets.dart';
@@ -79,6 +80,18 @@ class _SharesEditorScreenState extends ConsumerState<SharesEditorScreen> {
   bool get _dirty =>
       sharesChanged(_original, [for (final r in _rows) r.values], removed: _removed.length);
   bool get _canSave => _dirty && _valid && isBalanced(_total) && !_saving;
+
+  /// Por qué todavía no se puede guardar. Va pegado al botón: con el teclado
+  /// abierto, la suma (arriba de todo) y el aviso de los nombres (al final de
+  /// la lista) quedan fuera de la vista y el botón apagado no explicaba nada.
+  String? get _blockReason {
+    if (_saving) return null;
+    if (_rows.any((r) => !r.pctOk)) return 'Revisá los porcentajes marcados.';
+    final total = _total;
+    if (!isBalanced(total)) return '${sharesTotalLabel(total)}: tiene que dar 100% para guardar.';
+    if (_rows.any((r) => !r.nameOk)) return 'Falta el nombre de un socio.';
+    return null;
+  }
 
   void _touch() => setState(() => _error = null);
 
@@ -167,7 +180,14 @@ class _SharesEditorScreenState extends ConsumerState<SharesEditorScreen> {
     final total = _total;
     final balanced = isBalanced(total);
     final profit = widget.overview.totals.profit;
-    final period = widget.overview.isAll ? 'acumulada' : (widget.overview.selectedLabel ?? 'del período');
+    final phrase = widget.overview.periodPhrase;
+    final period = phrase.isEmpty ? 'del período' : phrase;
+    // El servidor exige, además de `editar`, el permiso `crear` para sumar un
+    // socio y `eliminar` para quitar uno: sin ese permiso no se ofrece (antes
+    // se armaba todo el reparto y recién al guardar lo rechazaba).
+    final me = ref.watch(meProvider).value;
+    final canAdd = me?.can('ganancias', 'crear') ?? false;
+    final canDelete = me?.can('ganancias', 'eliminar') ?? false;
 
     return PopScope(
       canPop: !_dirty || _saving,
@@ -176,8 +196,19 @@ class _SharesEditorScreenState extends ConsumerState<SharesEditorScreen> {
       },
       child: Scaffold(
         appBar: AppBar(title: const Text('Reparto entre socios')),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+        // "Guardar" va DENTRO del cuerpo (2026-11-14, pedido de Ale: que todo
+        // funcione en el teléfono): como barra inferior del Scaffold quedaba
+        // tapado por el teclado y no había forma de guardar sin cerrarlo. El
+        // SafeArea deja todo arriba de la barra del sistema.
+        body: SafeArea(
+          top: false,
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          // Desplazar cierra el teclado (el numérico del iPhone no trae "listo").
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
             AdminCard(
               accent: balanced ? Brand.success : Brand.warning,
@@ -223,6 +254,7 @@ class _SharesEditorScreenState extends ConsumerState<SharesEditorScreen> {
                 row: _rows[i],
                 color: palette[i % palette.length],
                 profit: profit,
+                showRemove: canDelete,
                 canRemove: _rows.length > 1 && !_saving,
                 onRemove: () => _remove(_rows[i]),
                 onChanged: _touch,
@@ -233,11 +265,12 @@ class _SharesEditorScreenState extends ConsumerState<SharesEditorScreen> {
               spacing: 10,
               runSpacing: 8,
               children: [
-                OutlinedButton.icon(
-                  onPressed: _rows.length >= kMaxShares || _saving ? null : _add,
-                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                  label: const Text('Agregar socio'),
-                ),
+                if (canAdd)
+                  OutlinedButton.icon(
+                    onPressed: _rows.length >= kMaxShares || _saving ? null : _add,
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                    label: const Text('Agregar socio'),
+                  ),
                 OutlinedButton.icon(
                   onPressed: _saving ? null : _equalize,
                   icon: const Icon(Icons.balance_rounded, size: 18),
@@ -255,19 +288,47 @@ class _SharesEditorScreenState extends ConsumerState<SharesEditorScreen> {
               const NoticeBanner('Poné un nombre a cada socio para poder guardar.',
                   icon: Icons.edit_note_rounded, color: Brand.warning),
             ],
-            if (_error != null) ...[
-              const SizedBox(height: 14),
-              NoticeBanner(_error!, icon: Icons.error_outline_rounded, color: Brand.danger),
-            ],
           ],
-        ),
-        bottomNavigationBar: SafeArea(
-          minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: GoldButton(
-            label: 'Guardar reparto',
-            icon: Icons.check_rounded,
-            loading: _saving,
-            onPressed: _canSave ? _save : null,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // El error del servidor va pegado al botón: al final de la
+                    // lista quedaba fuera de la vista y parecía que "Guardar"
+                    // no hacía nada.
+                    if (_error != null) ...[
+                      NoticeBanner(_error!, icon: Icons.error_outline_rounded, color: Brand.danger),
+                      const SizedBox(height: 8),
+                    ] else if (_blockReason != null) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.info_outline_rounded, size: 15, color: Brand.warning),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              _blockReason!,
+                              style: TextStyle(fontSize: 12, color: c.textDim, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    GoldButton(
+                      label: 'Guardar reparto',
+                      icon: Icons.check_rounded,
+                      loading: _saving,
+                      onPressed: _canSave ? _save : null,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -281,6 +342,7 @@ class _ShareCard extends StatelessWidget {
     required this.row,
     required this.color,
     required this.profit,
+    required this.showRemove,
     required this.canRemove,
     required this.onRemove,
     required this.onChanged,
@@ -289,6 +351,9 @@ class _ShareCard extends StatelessWidget {
   final _Row row;
   final Color color;
   final double profit;
+
+  /// Permiso `ganancias/eliminar`: sin él no aparece el botón de quitar.
+  final bool showRemove;
   final bool canRemove;
   final VoidCallback onRemove;
   final VoidCallback onChanged;
@@ -313,16 +378,21 @@ class _ShareCard extends StatelessWidget {
                 child: TextField(
                   controller: row.name,
                   onChanged: (_) => onChanged(),
+                  onTapOutside: closeKeyboardOnTapOutside,
                   textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
                   maxLength: 60,
                   decoration: const InputDecoration(labelText: 'Nombre', counterText: ''),
                 ),
               ),
-              IconButton(
-                tooltip: 'Quitar socio',
-                onPressed: canRemove ? onRemove : null,
-                icon: Icon(Icons.delete_outline_rounded, color: canRemove ? Brand.danger : c.textFaint),
-              ),
+              if (showRemove)
+                IconButton(
+                  tooltip: 'Quitar socio',
+                  onPressed: canRemove ? onRemove : null,
+                  icon: Icon(Icons.delete_outline_rounded, color: canRemove ? Brand.danger : c.textFaint),
+                )
+              else
+                const SizedBox(width: 8),
             ],
           ),
           Padding(
@@ -330,6 +400,9 @@ class _ShareCard extends StatelessWidget {
             child: TextField(
               controller: row.role,
               onChanged: (_) => onChanged(),
+              onTapOutside: closeKeyboardOnTapOutside,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.next,
               maxLength: 60,
               decoration: const InputDecoration(labelText: 'Rol (opcional)', counterText: ''),
             ),

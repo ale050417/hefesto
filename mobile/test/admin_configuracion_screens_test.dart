@@ -395,7 +395,8 @@ void main() {
           height: 1700, api: api);
       expect(_saveEnabled(tester), isFalse);
 
-      await tester.tap(find.text('+ Agregar'));
+      await tester.ensureVisible(find.text('Agregar barrio'));
+      await tester.tap(find.text('Agregar barrio'));
       await tester.pump();
       // Una fila vacía todavía no cuenta como cambio.
       expect(_saveEnabled(tester), isFalse);
@@ -841,7 +842,7 @@ void main() {
       expect(_saveEnabled(tester), isFalse);
       // Tilda "Ver" de Auditoría (último módulo).
       final audit = find.ancestor(of: find.text('Auditoría'), matching: find.byType(Column)).first;
-      await tester.tap(find.descendant(of: audit, matching: find.widgetWithText(FilterChip, 'Ver')));
+      await tester.tap(find.descendant(of: audit, matching: find.widgetWithText(PermToggle, 'Ver')));
       await tester.pump();
       expect(_saveEnabled(tester), isTrue);
       await tester.tap(_saveButton());
@@ -860,7 +861,7 @@ void main() {
           height: 1500, api: api);
       expect(find.text('Borrar rol'), findsNothing);
       // Habilita guardar tildando algo, pero sin nombre.
-      await tester.tap(find.widgetWithText(FilterChip, 'Ver').first);
+      await tester.tap(find.widgetWithText(PermToggle, 'Ver').first);
       await tester.pump();
       await tester.tap(find.text('Crear rol'));
       await _settle(tester);

@@ -86,8 +86,15 @@ class _CostSettingsScreenState extends ConsumerState<CostSettingsScreen> {
     final c = context.hc;
     return Scaffold(
       appBar: AppBar(title: const Text('Costos de producción')),
-      body: ListView(
+      // SafeArea (2026-11-14, pedido de Ale: que las pantallas no estén rotas):
+      // la app dibuja de borde a borde y "Guardar" quedaba debajo de la barra
+      // de gestos / de los tres botones. Desplazar cierra el teclado numérico
+      // (en iPhone no trae tecla "listo").
+      body: SafeArea(
+        top: false,
+        child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
         children: [
           Text(
             'Se usa para estimar la amortización de cada pieza (luz + desgaste de la máquina). '
@@ -145,6 +152,7 @@ class _CostSettingsScreenState extends ConsumerState<CostSettingsScreen> {
             onPressed: _canSave ? _save : null,
           ),
         ],
+        ),
       ),
     );
   }

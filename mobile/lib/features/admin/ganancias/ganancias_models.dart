@@ -188,6 +188,16 @@ class EarningsOverview {
     return null;
   }
 
+  /// El período elegido, para usar dentro de una frase: "acumulada" (todos los
+  /// meses) o "de octubre de 2026". El servidor manda el rótulo con mayúscula
+  /// ("Octubre de 2026"): pegado tal cual quedaba "ganancia pura Octubre de 2026".
+  String get periodPhrase {
+    if (isAll) return 'acumulada';
+    final label = selectedLabel;
+    if (label == null || label.isEmpty) return '';
+    return 'de ${label[0].toLowerCase()}${label.substring(1)}';
+  }
+
   factory EarningsOverview.fromJson(Map<String, dynamic> j) {
     final shares = jList(j['shares']).map(ProfitShare.fromJson).toList();
     return EarningsOverview(

@@ -243,7 +243,7 @@ void main() {
       await tester.pump();
       await tester.tap(save);
       await tester.pump();
-      expect(find.text('Ingresá un código.'), findsOneWidget);
+      expectFieldAndBarError('Ingresá un código.');
       expect(find.text('Ingresá un valor mayor a 0.'), findsOneWidget);
       expect(api.calls, isEmpty);
 
@@ -266,7 +266,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.widgetWithText(GoldButton, 'Crear cupón'));
       await tester.pump();
-      expect(find.text('El porcentaje no puede superar 100.'), findsOneWidget);
+      expectFieldAndBarError('El porcentaje no puede superar 100.');
       expect(api.calls, isEmpty);
     });
 
@@ -307,7 +307,7 @@ void main() {
       // Sin elegir el producto no deja guardar.
       await tester.tap(find.widgetWithText(GoldButton, 'Crear cupón'));
       await tester.pump();
-      expect(find.text('Elegí el producto.'), findsOneWidget);
+      expectFieldAndBarError('Elegí el producto.');
       expect(api.calls, isEmpty);
 
       await tester.tap(find.text('Elegí un producto'));

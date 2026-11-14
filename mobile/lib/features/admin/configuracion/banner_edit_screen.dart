@@ -164,20 +164,36 @@ class _BannerEditScreenState extends ConfigFormState<BannerEditScreen> {
                 child: Text('Alineación del texto',
                     style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: c.textDim)),
               ),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'left', label: Text('Izquierda'), icon: Icon(Icons.format_align_left_rounded)),
-                  ButtonSegment(value: 'center', label: Text('Centro'), icon: Icon(Icons.format_align_center_rounded)),
-                  ButtonSegment(value: 'right', label: Text('Derecha'), icon: Icon(Icons.format_align_right_rounded)),
-                ],
-                selected: {_align},
-                showSelectedIcon: false,
-                onSelectionChanged: enabled
-                    ? (s) => setState(() {
-                          error = null;
-                          _align = s.first;
-                        })
-                    : null,
+              // Sin íconos y a todo el ancho (2026-11-14, pedido de Ale): con el
+              // ícono al lado, en un teléfono de 360 dp "Izquierda" se partía
+              // en dos líneas ("Izquier/da"). Cada rótulo va en UNA línea y, si
+              // con letra grande no entra, se achica en vez de partirse.
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<String>(
+                  segments: [
+                    for (final (value, label) in const [
+                      ('left', 'Izquierda'),
+                      ('center', 'Centro'),
+                      ('right', 'Derecha'),
+                    ])
+                      ButtonSegment(
+                        value: value,
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(label, maxLines: 1, softWrap: false),
+                        ),
+                      ),
+                  ],
+                  selected: {_align},
+                  showSelectedIcon: false,
+                  onSelectionChanged: enabled
+                      ? (s) => setState(() {
+                            error = null;
+                            _align = s.first;
+                          })
+                      : null,
+                ),
               ),
             ],
           ),

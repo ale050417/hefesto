@@ -70,7 +70,9 @@ class _MonthlyChartState extends State<MonthlyChart> {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 38,
+          // Alto fijo (así el gráfico no salta al tocarlo), pero acompaña a la
+          // letra del sistema: con letra grande las dos líneas desbordaban.
+          height: MediaQuery.textScalerOf(context).scale(38),
           child: sel == null
               ? Align(
                   alignment: Alignment.centerLeft,
@@ -402,7 +404,10 @@ class _DonutChartState extends State<DonutChart> {
           InkWell(
             borderRadius: BorderRadius.circular(10),
             onTap: () => setState(() => _selected = _selected == i ? null : i),
-            child: Padding(
+            // Cada fila se toca: mínimo 44 dp de alto (medían 33).
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 44),
+              alignment: Alignment.centerLeft,
               padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
               child: Row(
                 children: [

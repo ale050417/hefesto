@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/modals.dart';
 import '../admin_widgets.dart';
 import 'config_api.dart';
 import 'config_models.dart';
@@ -38,19 +39,24 @@ class EquipoScreen extends ConsumerWidget {
             ],
           ),
         ),
-        body: team == null
-            ? (teamAsync.hasError
-                ? ErrorView(
-                    message: apiErrorText(teamAsync.error!),
-                    onRetry: () => ref.invalidate(adminTeamProvider),
-                  )
-                : const ListSkeleton(rows: 5, height: 84))
-            : TabBarView(
-                children: [
-                  TeamTab(data: team),
-                  RolesTab(data: team),
-                ],
-              ),
+        // SafeArea (2026-11-14, pedido de Ale): la app dibuja de borde a borde
+        // y el último miembro / rol quedaba debajo de la barra de gestos.
+        body: SafeArea(
+          top: false,
+          child: team == null
+              ? (teamAsync.hasError
+                  ? ErrorView(
+                      message: apiErrorText(teamAsync.error!),
+                      onRetry: () => ref.invalidate(adminTeamProvider),
+                    )
+                  : const ListSkeleton(rows: 5, height: 84))
+              : TabBarView(
+                  children: [
+                    TeamTab(data: team),
+                    RolesTab(data: team),
+                  ],
+                ),
+        ),
       ),
     );
   }
@@ -138,12 +144,9 @@ class TeamTab extends ConsumerWidget {
   }
 
   void _openMember(BuildContext context, WidgetRef ref, TeamMemberInfo m) {
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (_) => MemberSheet(member: m, roles: data.roles),
-    );
+    // Hoja estándar de la app (2026-11-14, pedido de Ale): no se mete debajo
+    // del notch y respeta la barra de gestos.
+    showAppSheet<void>(context, builder: (_) => MemberSheet(member: m, roles: data.roles));
   }
 }
 
@@ -310,66 +313,56 @@ class _MemberSheetState extends ConsumerState<MemberSheet> {
     final c = context.hc;
     final m = widget.member;
     final locked = m.isSelf || m.isLastAdmin;
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(m.displayName, style: Theme.of(context).textTheme.titleLarge),
-            if (m.email != null) Text(m.email!, style: TextStyle(color: c.textDim, fontSize: 13)),
-            const SizedBox(height: 4),
-            Text('Rol actual: ${m.roleLabel}', style: TextStyle(color: c.textDim, fontSize: 13)),
-            const SizedBox(height: 14),
-            if (locked)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: AdminCard(
-                  accent: Brand.info,
-                  padding: const EdgeInsets.all(12),
-                  child: Text(
-                    m.isSelf
-                        ? 'Sos vos: no podés cambiarte el rol ni quitarte el acceso.'
-                        : 'Es el último administrador: tiene que quedar al menos uno.',
-                    style: TextStyle(fontSize: 13, color: c.text, height: 1.35),
-                  ),
-                ),
+    return SheetBody(
+      title: m.displayName,
+      subtitle: [?m.email, 'Rol actual: ${m.roleLabel}'].join('\n'),
+      children: [
+        if (locked)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: AdminCard(
+              accent: Brand.info,
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                m.isSelf
+                    ? 'Sos vos: no podés cambiarte el rol ni quitarte el acceso.'
+                    : 'Es el último administrador: tiene que quedar al menos uno.',
+                style: TextStyle(fontSize: 13, color: c.text, height: 1.35),
               ),
-            if (m.pending)
-              _SheetAction(
-                icon: Icons.send_rounded,
-                label: 'Reenviar invitación',
-                hint: 'Manda un link nuevo (el anterior deja de servir).',
-                onTap: _busy ? null : _resend,
-              ),
-            if (!locked) ...[
-              _SheetAction(
-                icon: Icons.swap_horiz_rounded,
-                label: 'Cambiar rol',
-                hint: 'Hoy: ${m.roleLabel}',
-                onTap: _busy ? null : _changeRole,
-              ),
-              _SheetAction(
-                icon: Icons.person_remove_rounded,
-                label: 'Quitar acceso al panel',
-                color: Brand.danger,
-                onTap: _busy ? null : _remove,
-              ),
-            ],
-            if (_busy)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
-                child: Center(child: CircularProgressIndicator(color: Brand.gold)),
-              ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(_error!, style: const TextStyle(color: Brand.danger, fontSize: 13)),
-              ),
-          ],
-        ),
-      ),
+            ),
+          ),
+        if (m.pending)
+          _SheetAction(
+            icon: Icons.send_rounded,
+            label: 'Reenviar invitación',
+            hint: 'Manda un link nuevo (el anterior deja de servir).',
+            onTap: _busy ? null : _resend,
+          ),
+        if (!locked) ...[
+          _SheetAction(
+            icon: Icons.swap_horiz_rounded,
+            label: 'Cambiar rol',
+            hint: 'Hoy: ${m.roleLabel}',
+            onTap: _busy ? null : _changeRole,
+          ),
+          _SheetAction(
+            icon: Icons.person_remove_rounded,
+            label: 'Quitar acceso al panel',
+            color: Brand.danger,
+            onTap: _busy ? null : _remove,
+          ),
+        ],
+        if (_busy)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(_error!, style: const TextStyle(color: Brand.danger, fontSize: 13, height: 1.35)),
+          ),
+      ],
     );
   }
 }

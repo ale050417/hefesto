@@ -158,9 +158,13 @@ class _DescuentosBodyState extends ConsumerState<_DescuentosBody> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        // (2026-11-14, pedido de Ale: que todo se pueda tocar bien.) La fila
+        // mide 48 dp, el alto que necesita cada filtro para tocarse con el
+        // dedo (con 38 quedaba recortado). El dibujo del filtro no cambia: los
+        // márgenes de arriba y de abajo se achicaron lo mismo.
+        const SizedBox(height: 5),
         SizedBox(
-          height: 38,
+          height: 48,
           child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -182,7 +186,6 @@ class _DescuentosBodyState extends ConsumerState<_DescuentosBody> {
             ],
           ),
         ),
-        const SizedBox(height: 4),
         Expanded(
           child: coupons.when(
             loading: () => const ListSkeleton(rows: 4, height: 150),

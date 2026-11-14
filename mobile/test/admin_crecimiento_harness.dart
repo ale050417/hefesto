@@ -14,6 +14,7 @@ import 'package:hefesto/core/api/api_client.dart';
 import 'package:hefesto/core/api/models.dart';
 import 'package:hefesto/core/providers.dart';
 import 'package:hefesto/core/theme/app_theme.dart';
+import 'package:hefesto/features/admin/crecimiento/form_kit.dart';
 
 /// Con SHOT_DIR=carpeta se guarda una captura PNG de cada pantalla.
 final shotDir = Platform.environment['SHOT_DIR'];
@@ -152,4 +153,16 @@ Future<void> shot(WidgetTester tester, GlobalKey key, String name) async {
     final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
     await File('$shotDir/$name.png').writeAsBytes(bytes!.buffer.asUint8List());
   });
+}
+
+/// Un error de validación se ve debajo del campo Y fijo arriba de "Guardar"
+/// (2026-11-14: el campo marcado puede quedar fuera de la vista, y sin el aviso
+/// junto al botón "Guardar" parecía no hacer nada).
+void expectFieldAndBarError(String message) {
+  expect(
+    find.descendant(of: find.byType(SaveBar), matching: find.text(message)),
+    findsOneWidget,
+    reason: 'el aviso "$message" tiene que verse arriba de Guardar',
+  );
+  expect(find.text(message), findsNWidgets(2), reason: 'y también debajo de su campo');
 }

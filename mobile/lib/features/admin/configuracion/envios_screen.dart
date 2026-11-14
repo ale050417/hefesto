@@ -45,6 +45,9 @@ class _EnviosScreenState extends ConfigFormState<EnviosScreen> {
   late bool _delivery = widget.initial.deliveryEnabled;
   String? _freeOverError;
 
+  /// Filas de barrio cuyo precio no se entiende (se marcan al querer guardar).
+  final Set<_ZoneEdit> _badPrices = {};
+
   @override
   void initState() {
     super.initState();
@@ -84,14 +87,21 @@ class _EnviosScreenState extends ConfigFormState<EnviosScreen> {
   Future<void> _onSave() async {
     FocusScope.of(context).unfocus();
     final raw = _freeOver.text.trim();
-    if (raw.isNotEmpty && parseNumber(raw) == null) {
-      setState(() {
-        _freeOverError = 'Ingresá un monto válido.';
-        error = 'Revisá los campos marcados.';
-      });
-      return;
-    }
-    setState(() => _freeOverError = null);
+    // Un precio de barrio ilegible ("1.5.0") NO puede viajar como 0: sería
+    // envío gratis a ese barrio sin que nadie lo haya pedido (2026-11-14).
+    final bad = {
+      for (final z in _zones)
+        if (z.name.text.trim().isNotEmpty && z.price.text.trim().isNotEmpty && parseNumber(z.price.text) == null) z,
+    };
+    final freeOverBad = raw.isNotEmpty && parseNumber(raw) == null;
+    setState(() {
+      _freeOverError = freeOverBad ? 'Ingresá un monto válido.' : null;
+      _badPrices
+        ..clear()
+        ..addAll(bad);
+      if (freeOverBad || bad.isNotEmpty) error = 'Revisá los campos marcados.';
+    });
+    if (freeOverBad || bad.isNotEmpty) return;
     await save(() => ref.read(configApiProvider).saveEnvios(_body()), 'Envíos guardados');
   }
 
@@ -102,7 +112,9 @@ class _EnviosScreenState extends ConfigFormState<EnviosScreen> {
 
   void _removeZone(int i) => setState(() {
         error = null;
-        _zones.removeAt(i).dispose();
+        final gone = _zones.removeAt(i);
+        _badPrices.remove(gone);
+        gone.dispose();
       });
 
   @override
@@ -172,16 +184,12 @@ class _EnviosScreenState extends ConfigFormState<EnviosScreen> {
           prefixText: r'$ ',
           enabled: enabled,
         ),
-        AdminSectionTitle(
-          'Barrios y precios',
-          action: enabled ? '+ Agregar' : null,
-          onAction: enabled ? _addZone : null,
-        ),
+        const AdminSectionTitle('Barrios y precios'),
         if (_zones.isEmpty)
           AdminCard(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'Todavía no hay barrios. ${enabled ? 'Tocá "+ Agregar" para cargar el primero.' : ''}',
+              'Todavía no hay barrios.${enabled ? ' Tocá "Agregar barrio" para cargar el primero.' : ''}',
               style: TextStyle(color: c.textDim, fontSize: 13.5),
             ),
           )
@@ -216,7 +224,12 @@ class _EnviosScreenState extends ConfigFormState<EnviosScreen> {
                         enabled: enabled,
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: moneyFormatters,
-                        decoration: const InputDecoration(prefixText: r'$ ', hintText: '0', isDense: true),
+                        decoration: InputDecoration(
+                          prefixText: r'$ ',
+                          hintText: '0',
+                          isDense: true,
+                          errorText: _badPrices.contains(_zones[i]) ? 'Precio inválido.' : null,
+                        ),
                       ),
                     ),
                     if (enabled)
@@ -231,6 +244,19 @@ class _EnviosScreenState extends ConfigFormState<EnviosScreen> {
                 ),
               ),
             ),
+        // El botón va al FINAL de la lista (2026-11-14, pedido de Ale): antes
+        // era un "+ Agregar" chiquito en el título y, con muchos barrios, la
+        // fila nueva aparecía abajo de todo, fuera de la vista.
+        if (enabled)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: OutlinedButton.icon(
+              onPressed: _addZone,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Agregar barrio'),
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            ),
+          ),
         const AdminSectionTitle('Fuera de la ciudad'),
         ConfigField(
           controller: _outMsg,

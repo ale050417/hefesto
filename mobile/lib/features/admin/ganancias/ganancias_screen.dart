@@ -157,14 +157,14 @@ class _PayoutsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.hc;
     final palette = chartPalette();
-    final period = o.isAll ? 'acumulada' : (o.selectedLabel ?? '');
+    final period = o.periodPhrase;
     return AdminCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CardHeader(
             'A cobrar por persona',
-            subtitle: 'Sobre ${formatPrice(o.totals.profit)} de ganancia pura ${period.isEmpty ? '' : period}.'.trim(),
+            subtitle: '${['Sobre ${formatPrice(o.totals.profit)} de ganancia pura', if (period.isNotEmpty) period].join(' ')}.',
           ),
           if (o.payouts.isEmpty)
             Padding(

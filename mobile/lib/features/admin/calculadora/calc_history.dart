@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/modals.dart';
 import '../admin_widgets.dart';
 import '../analisis/analysis_widgets.dart';
 import '../analisis/ar_number.dart';
+import '../analisis/number_field.dart' show closeKeyboardOnTapOutside;
 import '../reportes/reportes_sections.dart' show formatGrams;
 import 'calc_logic.dart';
 import 'calculadora_api.dart';
@@ -41,10 +43,8 @@ class _CalcHistoryTabState extends ConsumerState<CalcHistoryTab> {
   }
 
   Future<void> _open(CalcHistoryItem h) async {
-    final deleted = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
+    final deleted = await showAppSheet<bool>(
+      context,
       builder: (_) => _HistoryDetailSheet(item: h, canDelete: widget.canDelete),
     );
     if (deleted == true) {
@@ -80,6 +80,8 @@ class _CalcHistoryTabState extends ConsumerState<CalcHistoryTab> {
           TextField(
             controller: _search,
             onChanged: (_) => setState(() {}),
+            onTapOutside: closeKeyboardOnTapOutside,
+            textInputAction: TextInputAction.search,
             decoration: InputDecoration(
               hintText: 'Buscar pieza o cliente…',
               prefixIcon: const Icon(Icons.search_rounded),
@@ -220,57 +222,58 @@ class _HistoryDetailSheetState extends ConsumerState<_HistoryDetailSheet> {
             ],
           ),
         );
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(h.name, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 4),
-            Text(formatArMoney(h.precioFinal),
-                style: const TextStyle(fontFamily: 'Orbitron', fontWeight: FontWeight.w800, fontSize: 28, color: Brand.gold)),
-            const SizedBox(height: 10),
-            if (h.customer != null) line('Cliente', h.customer!),
-            if (h.materialLabel.isNotEmpty) line('Filamento', h.materialLabel),
-            line('Gramos', formatGrams(h.grams)),
-            line('Tiempo de impresión', formatDuration(h.hours)),
-            line('Fecha', formatDateTime(h.createdAt)),
-            if (h.hasCosts) ...[
-              Divider(color: c.border, height: 20),
-              if (h.costPerKg != null) line('Costo del filamento', '${formatArMoney(h.costPerKg!, decimals: 0)}/kg'),
-              line('Costo total de producción', formatArMoney(h.costoTotal!)),
-              if (h.marginPct != null) line('Margen', '${formatArNumber(h.marginPct!, maxDecimals: 2)}%'),
-              if (h.ganancia != null) line('Ganancia', formatArMoney(h.ganancia!), color: Brand.success),
-            ],
-            if (h.notes != null) ...[
-              Divider(color: c.border, height: 20),
-              Text('Observaciones', style: TextStyle(fontSize: 12, color: c.textFaint)),
-              const SizedBox(height: 4),
-              Text(h.notes!, style: const TextStyle(fontSize: 13.5, height: 1.4)),
-            ],
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              NoticeBanner(_error!, icon: Icons.error_outline_rounded, color: Brand.danger),
-            ],
-            if (widget.canDelete) ...[
-              const SizedBox(height: 16),
-              OutlinedButton.icon(
-                onPressed: _deleting ? null : _delete,
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Brand.danger,
-                  side: const BorderSide(color: Brand.danger),
-                ),
-                icon: _deleting
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Brand.danger))
-                    : const Icon(Icons.delete_outline_rounded, size: 18),
-                label: const Text('Eliminar del historial'),
+    // Hoja estándar (2026-11-14, pedido de Ale: que los modales se vean bien):
+    // un cálculo con nombre y observaciones largas se desplaza sin meterse
+    // debajo del notch, y "Eliminar" queda fijo arriba de la barra del sistema.
+    return SheetBody(
+      title: h.name,
+      footer: widget.canDelete
+          ? OutlinedButton.icon(
+              onPressed: _deleting ? null : _delete,
+              // Acción destructiva: rojo a propósito (no es el dorado del tema).
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Brand.danger,
+                side: const BorderSide(color: Brand.danger),
+                minimumSize: const Size.fromHeight(48),
               ),
-            ],
-          ],
+              icon: _deleting
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Brand.danger))
+                  : const Icon(Icons.delete_outline_rounded, size: 18),
+              label: const Text('Eliminar del historial'),
+            )
+          : null,
+      children: [
+        // El precio achica si no entra (montos de 9 cifras, letra grande).
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(formatArMoney(h.precioFinal),
+              style: const TextStyle(fontFamily: 'Orbitron', fontWeight: FontWeight.w800, fontSize: 28, color: Brand.gold)),
         ),
-      ),
+        const SizedBox(height: 10),
+        if (h.customer != null) line('Cliente', h.customer!),
+        if (h.materialLabel.isNotEmpty) line('Filamento', h.materialLabel),
+        line('Gramos', formatGrams(h.grams)),
+        line('Tiempo de impresión', formatDuration(h.hours)),
+        line('Fecha', formatDateTime(h.createdAt)),
+        if (h.hasCosts) ...[
+          Divider(color: c.border, height: 20),
+          if (h.costPerKg != null) line('Costo del filamento', '${formatArMoney(h.costPerKg!, decimals: 0)}/kg'),
+          line('Costo total de producción', formatArMoney(h.costoTotal!)),
+          if (h.marginPct != null) line('Margen', '${formatArNumber(h.marginPct!, maxDecimals: 2)}%'),
+          if (h.ganancia != null) line('Ganancia', formatArMoney(h.ganancia!), color: Brand.success),
+        ],
+        if (h.notes != null) ...[
+          Divider(color: c.border, height: 20),
+          Text('Observaciones', style: TextStyle(fontSize: 12, color: c.textFaint)),
+          const SizedBox(height: 4),
+          Text(h.notes!, style: const TextStyle(fontSize: 13.5, height: 1.4)),
+        ],
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          NoticeBanner(_error!, icon: Icons.error_outline_rounded, color: Brand.danger),
+        ],
+      ],
     );
   }
 }

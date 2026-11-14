@@ -81,14 +81,17 @@ class _PresetsScreenState extends ConsumerState<PresetsScreen> {
       appBar: AppBar(title: const Text('Tipos y márgenes')),
       floatingActionButton: data.hasValue
           ? FloatingActionButton.extended(
-              backgroundColor: Brand.gold,
-              foregroundColor: Brand.goldFg,
               onPressed: () => _edit(data.requireValue.presets),
               icon: const Icon(Icons.add_rounded),
               label: const Text('Agregar tipo'),
             )
           : null,
-      body: data.when(
+      // SafeArea (2026-11-14, pedido de Ale: que las pantallas no estén rotas):
+      // sin esto, al final de la lista el último tipo quedaba debajo del botón
+      // flotante y de la barra del sistema.
+      body: SafeArea(
+        top: false,
+        child: data.when(
         loading: () => const ListSkeleton(rows: 4, height: 76),
         error: (e, _) => ErrorView(message: errorMessage(e, fallback: '$e'), onRetry: () => ref.invalidate(calculadoraProvider)),
         data: (o) {
@@ -155,6 +158,7 @@ class _PresetsScreenState extends ConsumerState<PresetsScreen> {
             ],
           );
         },
+        ),
       ),
     );
   }
@@ -230,6 +234,7 @@ class _PresetSheetState extends ConsumerState<PresetSheet> {
         TextField(
           controller: _name,
           onChanged: (_) => setState(() => _error = null),
+          onTapOutside: closeKeyboardOnTapOutside,
           textCapitalization: TextCapitalization.sentences,
           textInputAction: TextInputAction.next,
           maxLength: 120,

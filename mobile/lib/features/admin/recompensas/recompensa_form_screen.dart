@@ -113,6 +113,8 @@ class _RewardFormScreenState extends ConsumerState<RewardFormScreen> {
       _errors
         ..clear()
         ..addAll(errors);
+      // También arriba del botón: el campo marcado puede estar fuera de la vista.
+      _error = errors.isEmpty ? null : errors.values.first;
     });
     return errors.isEmpty;
   }
@@ -307,15 +309,12 @@ class _RewardFormScreenState extends ConsumerState<RewardFormScreen> {
                 ),
               ],
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 16),
-              FormErrorBanner(_error!),
-            ],
           ],
         ),
         bottomNavigationBar: SaveBar(
           label: _edit ? 'Guardar cambios' : 'Crear recompensa',
           loading: _busy,
+          error: _error,
           onPressed: _dirty ? _save : null,
         ),
       ),

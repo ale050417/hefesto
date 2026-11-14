@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/modals.dart';
 import '../admin_widgets.dart';
 
 // El selector de día vive en `core/widgets/modals.dart` (lo usan varios
@@ -36,6 +37,11 @@ Future<bool> confirmAction(
   final ok = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
+      // (2026-11-14, pedido de Ale: que los modales se vean bien.) El título
+      // lleva el nombre de lo que se borra (un cupón, una recompensa) y el
+      // servidor no le pone tope de largo: si no entra, la pregunta se
+      // desplaza y los botones quedan siempre a la vista.
+      scrollable: true,
       title: Text(title),
       content: message == null ? null : Text(message),
       actions: [
@@ -185,10 +191,21 @@ class FormSection extends StatelessWidget {
 /// Barra fija de abajo con el botón "Guardar". Deshabilitado (`onPressed` nulo)
 /// mientras no haya nada para guardar.
 class SaveBar extends StatelessWidget {
-  const SaveBar({super.key, required this.label, required this.onPressed, this.loading = false});
+  const SaveBar({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.loading = false,
+    this.error,
+  });
   final String label;
   final VoidCallback? onPressed;
   final bool loading;
+
+  /// Aviso de validación o error del servidor. Va fijo arriba del botón: al
+  /// final del formulario quedaba fuera de la vista y "Guardar" parecía no
+  /// hacer nada.
+  final String? error;
 
   @override
   Widget build(BuildContext context) {
@@ -198,10 +215,23 @@ class SaveBar extends StatelessWidget {
         color: c.bg,
         border: Border(top: BorderSide(color: c.border)),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      // (2026-11-14, pedido de Ale: que todo funcione en el celular.) La barra
+      // sube con el teclado: como `bottomNavigationBar` quedaba tapada por él
+      // y no se podía guardar sin cerrarlo antes (en iPhone el teclado
+      // numérico ni siquiera tiene tecla para cerrarse).
+      padding: EdgeInsets.fromLTRB(16, 10, 16, 10 + MediaQuery.viewInsetsOf(context).bottom),
       child: SafeArea(
         top: false,
-        child: GoldButton(label: label, onPressed: onPressed, loading: loading),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (error != null) ...[
+              FormErrorBanner(error!),
+              const SizedBox(height: 10),
+            ],
+            GoldButton(label: label, onPressed: onPressed, loading: loading),
+          ],
+        ),
       ),
     );
   }
@@ -376,10 +406,8 @@ Future<IdName?> showOptionPicker(
   String searchHint = 'Buscar…',
   String emptyText = 'No hay nada para elegir.',
 }) =>
-    showModalBottomSheet<IdName>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
+    showAppSheet<IdName>(
+      context,
       builder: (_) => _OptionSheet(
         title: title,
         options: options,
@@ -423,16 +451,39 @@ class _OptionSheetState extends State<_OptionSheet> {
     final shown = q.isEmpty
         ? widget.options
         : widget.options.where((o) => o.name.toLowerCase().contains(q)).toList();
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      // (2026-11-14, pedido de Ale: que los modales se vean bien.) Con el
+      // teclado abierto todo sube con él; cerrado, la lista termina arriba de
+      // la barra de gestos (antes las últimas opciones quedaban debajo).
+      padding: EdgeInsets.only(bottom: sheetBottomInset(context)),
       child: FractionallySizedBox(
-        heightFactor: 0.85,
+        // Con el teclado abierto queda poco alto: la hoja lo usa entero.
+        heightFactor: keyboardOpen ? 1 : 0.85,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
-              child: Text(widget.title, style: Theme.of(context).textTheme.titleLarge),
+              padding: const EdgeInsets.fromLTRB(20, 0, 8, 6),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  // Con el teclado abierto la hoja ocupa toda la pantalla y no
+                  // queda dónde tocar afuera: la cruz es la forma de cerrarla.
+                  IconButton(
+                    tooltip: 'Cerrar',
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),

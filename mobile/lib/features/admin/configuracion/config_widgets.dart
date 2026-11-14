@@ -20,18 +20,27 @@ void showOk(BuildContext context, String message) {
     ..showSnackBar(SnackBar(content: Text(message)));
 }
 
+/// Botón principal de una acción que no se deshace: mismo formato que el resto
+/// de la app (el tema pone la forma y la letra; acá solo va el rojo).
+final ButtonStyle _dangerButton =
+    FilledButton.styleFrom(backgroundColor: Brand.danger, foregroundColor: Colors.white);
+
 /// "Hay cambios sin guardar" → true si el usuario elige salir igual.
 Future<bool> confirmDiscard(BuildContext context) async {
   final out = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
+      // Con letra grande en un teléfono chico, la pregunta se desplaza y los
+      // botones quedan siempre a la vista (2026-11-14).
+      scrollable: true,
       title: const Text('Cambios sin guardar'),
       content: const Text('Si salís ahora, vas a perder lo que cambiaste en esta sección.'),
       actions: [
         TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Seguir editando')),
-        TextButton(
+        FilledButton(
+          style: _dangerButton,
           onPressed: () => Navigator.of(ctx).pop(true),
-          child: const Text('Salir sin guardar', style: TextStyle(color: Brand.danger)),
+          child: const Text('Salir sin guardar'),
         ),
       ],
     ),
@@ -50,16 +59,17 @@ Future<bool> confirmAction(
   final out = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
+      // Con letra grande en un teléfono chico, la pregunta se desplaza y los
+      // botones quedan siempre a la vista (2026-11-14).
+      scrollable: true,
       title: Text(title),
       content: Text(message),
       actions: [
         TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancelar')),
-        TextButton(
+        FilledButton(
+          style: destructive ? _dangerButton : null,
           onPressed: () => Navigator.of(ctx).pop(true),
-          child: Text(
-            confirmLabel,
-            style: TextStyle(color: destructive ? Brand.danger : Brand.gold, fontWeight: FontWeight.w700),
-          ),
+          child: Text(confirmLabel),
         ),
       ],
     ),
@@ -146,6 +156,10 @@ class ConfigSectionScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.hc;
+    // Alto del teclado: la barra de "Guardar" se apoya arriba del teclado
+    // (2026-11-14, pedido de Ale): antes quedaba tapada por el teclado y no
+    // había forma de guardar sin cerrarlo primero.
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
     return PopScope(
       canPop: !dirty || saving,
       onPopInvokedWithResult: (didPop, _) async {
@@ -157,67 +171,76 @@ class ConfigSectionScaffold extends StatelessWidget {
         appBar: AppBar(title: Text(title)),
         // Columna dentro de un scroll (no un ListView perezoso): los formularios
         // son cortos y así un campo con error siempre existe y se puede mostrar.
-        body: Form(
-          onChanged: onChanged,
-          child: SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (!canEdit)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: AdminCard(
-                      accent: Brand.info,
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.visibility_rounded, size: 18, color: Brand.info),
-                          const SizedBox(width: 10),
-                          Expanded(child: Text(readOnlyNote, style: const TextStyle(fontSize: 13))),
-                        ],
+        // SafeArea: en solo lectura no hay barra de "Guardar" y lo último de la
+        // pantalla quedaba debajo de la barra de gestos / de los tres botones.
+        body: SafeArea(
+          top: false,
+          child: Form(
+            onChanged: onChanged,
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (!canEdit)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: AdminCard(
+                        accent: Brand.info,
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.visibility_rounded, size: 18, color: Brand.info),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(readOnlyNote, style: const TextStyle(fontSize: 13))),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ...children,
-              ],
+                  ...children,
+                ],
+              ),
             ),
           ),
         ),
         bottomNavigationBar: canEdit
-            ? Material(
-                color: c.bg,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    border: Border(top: BorderSide(color: c.border)),
-                  ),
-                  child: SafeArea(
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (error != null)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Icon(Icons.error_outline_rounded, size: 18, color: Brand.danger),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      error!,
-                                      style: const TextStyle(color: Brand.danger, fontSize: 13, height: 1.3),
+            ? Padding(
+                // Sube con el teclado: "Guardar" queda siempre a la vista.
+                padding: EdgeInsets.only(bottom: keyboard),
+                child: Material(
+                  color: c.bg,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(top: BorderSide(color: c.border)),
+                    ),
+                    child: SafeArea(
+                      top: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (error != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Icon(Icons.error_outline_rounded, size: 18, color: Brand.danger),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        error!,
+                                        style: const TextStyle(color: Brand.danger, fontSize: 13, height: 1.3),
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          GoldButton(label: saveLabel, loading: saving, onPressed: dirty ? onSave : null),
-                        ],
+                            GoldButton(label: saveLabel, loading: saving, onPressed: dirty ? onSave : null),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -387,12 +410,8 @@ class ConfigSwitchRow extends StatelessWidget {
           const SizedBox(width: 8),
           Semantics(
             label: title,
-            child: Switch(
-              value: value,
-              onChanged: enabled ? onChanged : null,
-              activeTrackColor: Brand.gold,
-              activeThumbColor: Brand.goldFg,
-            ),
+            // Sin colores a mano: manda el tema (`switchTheme`).
+            child: Switch(value: value, onChanged: enabled ? onChanged : null),
           ),
         ],
       ),

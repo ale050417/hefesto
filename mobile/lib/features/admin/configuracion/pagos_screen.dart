@@ -278,13 +278,18 @@ class _TokenDialogState extends State<_TokenDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+        // Con un campo adentro va `scrollable` (2026-11-14, pedido de Ale): en
+        // un teléfono chico con el teclado abierto el diálogo no entra entero
+        // y se desbordaba; así se desplaza y los botones quedan a la vista.
+        scrollable: true,
         title: const Text('Access Token de MercadoPago'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Pegalo acá. Queda guardado en el servidor y no se vuelve a mostrar.'),
-            const SizedBox(height: 12),
+            // El campo va PRIMERO y la explicación después: en un teléfono
+            // chico con el teclado abierto y letra grande, lo que queda a la
+            // vista sin desplazar es justo donde se pega el token.
             TextField(
               controller: _ctl,
               obscureText: !_show,
@@ -304,14 +309,13 @@ class _TokenDialogState extends State<_TokenDialog> {
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+            const Text('Pegalo acá. Queda guardado en el servidor y no se vuelve a mostrar.'),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancelar')),
-          TextButton(
-            onPressed: _ok,
-            child: const Text('Conectar', style: TextStyle(color: Brand.gold, fontWeight: FontWeight.w700)),
-          ),
+          FilledButton(onPressed: _ok, child: const Text('Conectar')),
         ],
       );
 }

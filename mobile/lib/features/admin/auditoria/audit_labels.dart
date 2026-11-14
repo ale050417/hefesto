@@ -89,7 +89,26 @@ const Map<String, String> auditEntityLabels = {
   'inventory': 'Stock',
   'team': 'Equipo',
   'settings': 'Configuración',
+  // `account.deleted` (baja de cuenta desde la app) viene con este tipo.
+  'customer': 'Cliente',
 };
+
+/// La baja de una cuenta no tiene autor en el registro (la cuenta ya no
+/// existe), pero no la hizo "el sistema": la pidió el propio cliente.
+bool _bySelf(String action) => action == 'account.deleted';
+
+/// Cómo se nombra a quien hizo un evento SIN autor.
+String auditNoActorName(String action) => _bySelf(action) ? 'El propio cliente' : 'Sistema';
+
+/// Aclaración debajo del nombre, en el detalle de un evento sin autor.
+String auditNoActorHint(String action) => _bySelf(action)
+    ? 'Dio de baja su cuenta desde la app. La cuenta ya no existe.'
+    : 'Lo hizo la tienda sola, sin una persona del equipo.';
+
+/// Ícono de quien hizo un evento sin autor (robot = sistema).
+IconData auditNoActorIcon(String action, {bool filled = false}) => _bySelf(action)
+    ? (filled ? Icons.person_off_rounded : Icons.person_off_outlined)
+    : Icons.smart_toy_outlined;
 
 String auditEntityLabel(String? type) {
   if (type == null || type.isEmpty) return 'General';
@@ -155,6 +174,8 @@ const Map<String, String> _keyLabels = {
   'email': 'Email',
   'roleId': 'Rol',
   'note': 'Nota',
+  // Baja de cuenta: si tenía compras, se conservan sin sus datos personales.
+  'ordersKept': 'Se conservaron sus pedidos',
 };
 
 /// "camelCase" / "snake_case" → "Camel case" para claves que no conocemos.

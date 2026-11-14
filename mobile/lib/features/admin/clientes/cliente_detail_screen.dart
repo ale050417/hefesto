@@ -54,64 +54,70 @@ class CustomerDetailScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: detail.when(
-        loading: () => const ListSkeleton(rows: 4, height: 120),
-        error: (e, _) => ErrorView(
-          message: errorMessage(e),
-          onRetry: () => ref.invalidate(adminCustomerProvider(customerId)),
-        ),
-        data: (d) => RefreshIndicator(
-          color: Brand.gold,
-          onRefresh: () async {
-            ref.invalidate(adminCustomerProvider(customerId));
-            try {
-              await ref.read(adminCustomerProvider(customerId).future);
-            } catch (_) {
-              // El error ya lo muestra la pantalla.
-            }
-          },
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
-            children: [
-              _HeaderCard(customer: d.customer),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: StatBox(
-                      label: 'Pedidos',
-                      value: '${d.customer.orders}',
-                      color: Brand.info,
-                      icon: Icons.shopping_bag_outlined,
+      // (2026-11-14, pedido de Ale: que las pantallas no estén rotas.) La app
+      // dibuja de borde a borde: sin esto el final de la ficha (la nota y su
+      // botón "Guardar nota") quedaba debajo de la barra de gestos del sistema.
+      body: SafeArea(
+        top: false,
+        child: detail.when(
+          loading: () => const ListSkeleton(rows: 4, height: 120),
+          error: (e, _) => ErrorView(
+            message: errorMessage(e),
+            onRetry: () => ref.invalidate(adminCustomerProvider(customerId)),
+          ),
+          data: (d) => RefreshIndicator(
+            color: Brand.gold,
+            onRefresh: () async {
+              ref.invalidate(adminCustomerProvider(customerId));
+              try {
+                await ref.read(adminCustomerProvider(customerId).future);
+              } catch (_) {
+                // El error ya lo muestra la pantalla.
+              }
+            },
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+              children: [
+                _HeaderCard(customer: d.customer),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: StatBox(
+                        label: 'Pedidos',
+                        value: '${d.customer.orders}',
+                        color: Brand.info,
+                        icon: Icons.shopping_bag_outlined,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: StatBox(
-                      label: 'Total gastado',
-                      value: formatPrice(d.customer.spent),
-                      icon: Icons.payments_rounded,
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: StatBox(
+                        label: 'Total gastado',
+                        value: formatPrice(d.customer.spent),
+                        icon: Icons.payments_rounded,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const AdminSectionTitle('Historial de pedidos'),
-              _OrdersList(detail: d, canOpen: me?.can('pedidos', 'ver') ?? false),
-              if (!d.customer.isManual) ...[
-                const AdminSectionTitle('Puntos Hefesto'),
-                _PointsCard(points: d.points),
-              ],
-              const AdminSectionTitle('Nota interna'),
-              _NoteEditor(customer: d.customer, canEdit: canEdit),
-              if (!d.customer.isManual)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 18, 4, 0),
-                  child: Text(
-                    'Este cliente tiene cuenta: sus datos de contacto los edita él desde la tienda. Acá podés cargarle una nota.',
-                    style: TextStyle(fontSize: 11.5, color: context.hc.textFaint, height: 1.4),
-                  ),
+                  ],
                 ),
-            ],
+                const AdminSectionTitle('Historial de pedidos'),
+                _OrdersList(detail: d, canOpen: me?.can('pedidos', 'ver') ?? false),
+                if (!d.customer.isManual) ...[
+                  const AdminSectionTitle('Puntos Hefesto'),
+                  _PointsCard(points: d.points),
+                ],
+                const AdminSectionTitle('Nota interna'),
+                _NoteEditor(customer: d.customer, canEdit: canEdit),
+                if (!d.customer.isManual)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 18, 4, 0),
+                    child: Text(
+                      'Este cliente tiene cuenta: sus datos de contacto los edita él desde la tienda. Acá podés cargarle una nota.',
+                      style: TextStyle(fontSize: 11.5, color: context.hc.textFaint, height: 1.4),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -179,16 +185,22 @@ class _HeaderCard extends StatelessWidget {
             const SizedBox(height: 6),
             Row(
               children: [
+                // (2026-11-14, pedido de Ale: que las pantallas no estén rotas.)
+                // En un teléfono de 360 dp "WhatsApp" no entraba y se partía en
+                // dos renglones ("WhatsAp / p"): menos margen lateral y, si aun
+                // así no entra (letra grande), el rótulo se achica en vez de
+                // partirse. La forma y el borde salen del tema; el verde es el
+                // de WhatsApp.
                 Expanded(
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
                       backgroundColor: Brand.whatsapp,
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(44),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
                     icon: const Icon(Icons.chat_rounded, size: 18),
-                    label: const Text('WhatsApp'),
+                    label: const FittedBox(fit: BoxFit.scaleDown, child: Text('WhatsApp')),
                     onPressed: () => openWhatsapp(
                       customerWaNumber(x.phone!),
                       '¡Hola $firstName! Te escribimos de Hefesto 3D.',
@@ -199,13 +211,11 @@ class _HeaderCard extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: c.text,
                       minimumSize: const Size.fromHeight(44),
-                      side: BorderSide(color: c.border),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
                     icon: const Icon(Icons.call_rounded, size: 18),
-                    label: const Text('Llamar'),
+                    label: const FittedBox(fit: BoxFit.scaleDown, child: Text('Llamar')),
                     onPressed: () => openUrl('tel:${x.phone!.replaceAll(RegExp(r'[^\d+]'), '')}'),
                   ),
                 ),
@@ -479,6 +489,10 @@ class _NoteEditorState extends ConsumerState<_NoteEditor> {
             maxLines: 6,
             maxLength: 1000,
             textCapitalization: TextCapitalization.sentences,
+            // Al abrirse el teclado se lleva a la vista el campo entero y el
+            // botón "Guardar nota" de abajo (por defecto solo sube el renglón
+            // del cursor y el resto quedaba tapado por el teclado).
+            scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 140),
             onChanged: (_) => setState(() => _error = null),
             decoration: const InputDecoration(
               hintText: 'Preferencias, observaciones…',

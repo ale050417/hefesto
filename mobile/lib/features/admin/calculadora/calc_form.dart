@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/modals.dart';
 import '../admin_widgets.dart';
 import '../analisis/analysis_widgets.dart';
 import '../analisis/ar_number.dart';
@@ -116,12 +117,15 @@ class _CalcFormState extends ConsumerState<CalcForm> {
         _quote = null;
         _quoting = false;
         _quoteError = null;
+        _saveError = null;
       });
       return;
     }
     setState(() {
       _quoting = true;
       _quoteError = null;
+      // Al cambiar los datos, el error del guardado anterior ya no aplica.
+      _saveError = null;
     });
     _timer = Timer(_debounce, () async {
       final seq = ++_seq;
@@ -191,12 +195,11 @@ class _CalcFormState extends ConsumerState<CalcForm> {
   }
 
   Future<void> _pickFilament() async {
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
+    final picked = await showAppSheet<String>(
+      context,
       builder: (_) => FilamentPickerSheet(filaments: _o.filaments, selectedId: _filamentId),
     );
+    if (!mounted) return;
     if (picked != null && picked != _filamentId) {
       setState(() => _filamentId = picked);
       _scheduleQuote();
@@ -221,7 +224,8 @@ class _CalcFormState extends ConsumerState<CalcForm> {
                     const CardHeader('Nuevo presupuesto', subtitle: 'El precio se actualiza solo mientras cargás los datos.'),
                     TextField(
                       controller: _name,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) => setState(() => _saveError = null),
+                      onTapOutside: closeKeyboardOnTapOutside,
                       textCapitalization: TextCapitalization.sentences,
                       maxLength: 120,
                       textInputAction: TextInputAction.next,
@@ -234,6 +238,7 @@ class _CalcFormState extends ConsumerState<CalcForm> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: _customer,
+                      onTapOutside: closeKeyboardOnTapOutside,
                       textCapitalization: TextCapitalization.words,
                       maxLength: 120,
                       textInputAction: TextInputAction.next,
@@ -320,6 +325,8 @@ class _CalcFormState extends ConsumerState<CalcForm> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: _notes,
+                      // Campo de varias líneas: su teclado no trae "listo".
+                      onTapOutside: closeKeyboardOnTapOutside,
                       minLines: 2,
                       maxLines: 4,
                       maxLength: 500,
@@ -358,6 +365,10 @@ class _CalcFormState extends ConsumerState<CalcForm> {
           saving: _saving,
           onSave: _canSaveNow ? _save : null,
           hint: _hintForBar(),
+          // El error (no se pudo cotizar / guardar) también se ve acá: el cartel
+          // de la lista puede quedar fuera de la vista mientras se tipea, y la
+          // barra decía "Completá los datos." aunque estuviera todo cargado.
+          error: _saveError ?? _quoteError,
         ),
       ],
     );
@@ -463,7 +474,21 @@ class FilamentPickerSheet extends StatefulWidget {
 }
 
 class _FilamentPickerSheetState extends State<FilamentPickerSheet> {
+  final _scroll = ScrollController();
   String _q = '';
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _search(String value) {
+    setState(() => _q = value);
+    // Cada búsqueda arranca desde arriba: si la lista había quedado desplazada,
+    // los primeros resultados aparecían cortados o fuera de la vista.
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -471,16 +496,26 @@ class _FilamentPickerSheetState extends State<FilamentPickerSheet> {
     final term = _q.trim().toLowerCase();
     final list = widget.filaments.where((f) => term.isEmpty || f.label.toLowerCase().contains(term)).toList();
     final height = MediaQuery.sizeOf(context).height * 0.7;
+    // Lista con buscador (2026-11-14, pedido de Ale: que los modales se vean
+    // bien): abajo deja el teclado o la barra del sistema (`sheetBottomInset`)
+    // y, si con el teclado abierto el 70 % no entra, la hoja se achica sola.
     return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      padding: EdgeInsets.only(bottom: sheetBottomInset(context)),
       child: SizedBox(
         height: height,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text('Elegí el filamento', style: Theme.of(context).textTheme.titleLarge),
+            ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
               child: TextField(
-                onChanged: (v) => setState(() => _q = v),
+                onChanged: _search,
+                onTapOutside: closeKeyboardOnTapOutside,
+                textInputAction: TextInputAction.search,
                 decoration: const InputDecoration(hintText: 'Buscar material, color o marca…', prefixIcon: Icon(Icons.search_rounded)),
               ),
             ),
@@ -488,14 +523,21 @@ class _FilamentPickerSheetState extends State<FilamentPickerSheet> {
               child: list.isEmpty
                   ? Center(child: Text('Sin resultados', style: TextStyle(color: c.textDim)))
                   : ListView.builder(
+                      controller: _scroll,
                       padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+                      // Al recorrer los resultados se cierra el teclado (con él
+                      // abierto en un teléfono chico se ven dos filas).
+                      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                       itemCount: list.length,
                       itemBuilder: (_, i) {
                         final f = list[i];
                         final sel = f.id == widget.selectedId;
                         return ListTile(
                           leading: _Swatch(f.hex),
-                          title: Text(f.label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                          // Dos líneas: con una sola, dos filamentos del mismo
+                          // material con nombre largo se veían iguales (el color
+                          // y la marca van al final).
+                          title: Text(f.label, maxLines: 2, overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
                           subtitle: Text(f.costPerKg > 0 ? '${formatArMoney(f.costPerKg, decimals: 0)} por kg' : 'Sin costo por kg'),
                           trailing: sel ? const Icon(Icons.check_circle_rounded, color: Brand.gold) : null,
@@ -607,6 +649,7 @@ class _PriceBar extends StatelessWidget {
     required this.saving,
     required this.onSave,
     required this.hint,
+    this.error,
   });
 
   final CalcQuote? quote;
@@ -617,13 +660,17 @@ class _PriceBar extends StatelessWidget {
   final VoidCallback? onSave;
   final String? hint;
 
+  /// Error del servidor al cotizar o al guardar (va en rojo en lugar del estado).
+  final String? error;
+
   @override
   Widget build(BuildContext context) {
     final c = context.hc;
     final q = quote;
+    final showError = error != null && !quoting;
     final status = quoting
         ? 'Calculando…'
-        : (hint ?? (q != null ? 'Precio listo para cotizar al cliente.' : 'Completá los datos.'));
+        : (error ?? hint ?? (q != null ? 'Precio listo para cotizar al cliente.' : 'Completá los datos.'));
     return Material(
       color: c.surface1,
       child: Container(
@@ -656,7 +703,12 @@ class _PriceBar extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Text(status, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, color: c.textFaint)),
+                      Text(
+                        status,
+                        maxLines: showError ? 3 : 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 11.5, color: showError ? Brand.danger : c.textFaint),
+                      ),
                     ],
                   ),
                 ),

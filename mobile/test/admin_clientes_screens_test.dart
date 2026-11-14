@@ -12,6 +12,8 @@ import 'package:hefesto/features/admin/clientes/clientes_providers.dart';
 import 'package:hefesto/features/admin/clientes/clientes_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'package:hefesto/features/admin/crecimiento/form_kit.dart';
+
 import 'admin_crecimiento_harness.dart';
 import 'admin_crecimiento_samples.dart';
 
@@ -264,7 +266,7 @@ void main() {
       await tester.pump();
       await tester.tap(save);
       await tester.pump();
-      expect(find.text('Ingresá el nombre del cliente.'), findsOneWidget);
+      expectFieldAndBarError('Ingresá el nombre del cliente.');
       expect(find.text('El email no es válido.'), findsOneWidget);
       expect(api.calls, isEmpty);
     });
@@ -304,7 +306,8 @@ void main() {
       await tester.pump();
       await tester.tap(find.widgetWithText(GoldButton, 'Crear cliente'));
       await settle(tester, 3);
-      expect(find.text('Ingresá el nombre del cliente.'), findsOneWidget);
+      // Un error que viene del SERVIDOR no tiene campo propio: se ve solo arriba de Guardar.
+      expect(find.descendant(of: find.byType(SaveBar), matching: find.text('Ingresá el nombre del cliente.')), findsOneWidget);
       expect(tester.widget<GoldButton>(find.widgetWithText(GoldButton, 'Crear cliente')).onPressed, isNotNull,
           reason: 'sigue habilitado para corregir y reintentar');
     });

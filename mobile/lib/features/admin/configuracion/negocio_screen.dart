@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/modals.dart';
 import '../admin_widgets.dart';
 import 'config_api.dart';
 import 'config_models.dart';
@@ -269,13 +270,12 @@ class _ShiftRow extends StatelessWidget {
 
   Future<void> _pick(BuildContext context, bool isFrom) async {
     final initial = _parseTime(isFrom ? shift.from : shift.to) ?? const TimeOfDay(hour: 9, minute: 0);
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initial,
-      builder: (ctx, child) => MediaQuery(
-        data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
-        child: child!,
-      ),
+    // El reloj de la app (2026-11-14, pedido de Ale: que los modales se vean
+    // bien): en castellano, de 24 h y con los colores del tema.
+    final picked = await pickTime(
+      context,
+      initial: initial,
+      title: '$label: ${isFrom ? 'abre a las' : 'cierra a las'}',
     );
     if (picked == null) return;
     onChanged(isFrom ? shift.copyWith(from: _fmtTime(picked)) : shift.copyWith(to: _fmtTime(picked)));
@@ -303,14 +303,17 @@ class _ShiftRow extends StatelessWidget {
       children: [
         Semantics(
           label: label,
+          // Sin colores a mano: manda el tema (`switchTheme`).
           child: Switch(
             value: shift.on,
             onChanged: enabled ? (v) => onChanged(shift.copyWith(on: v)) : null,
-            activeTrackColor: Brand.gold,
-            activeThumbColor: Brand.goldFg,
           ),
         ),
-        SizedBox(width: 56, child: Text(label, style: TextStyle(fontSize: 13, color: c.textDim))),
+        // Ancho mínimo (no fijo): con letra grande "Mañana" se partía en dos.
+        ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 56),
+          child: Text(label, style: TextStyle(fontSize: 13, color: c.textDim)),
+        ),
         if (shift.on) ...[
           timeButton(shift.from, true),
           Text('a', style: TextStyle(color: c.textFaint)),

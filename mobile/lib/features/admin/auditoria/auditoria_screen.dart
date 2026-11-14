@@ -6,6 +6,7 @@ import 'package:intl/intl.dart' show DateFormat;
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/modals.dart';
 import '../admin_module.dart';
 import '../admin_widgets.dart';
 import 'audit_detail_screen.dart';
@@ -76,13 +77,13 @@ class _AuditBodyState extends ConsumerState<AuditBody> {
   void _setFilters(AuditFilters f) => ref.read(auditListProvider.notifier).setFilters(f);
 
   Future<void> _openFilters(AuditListState st) async {
-    final result = await showModalBottomSheet<AuditFilters>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
+    // Hoja estándar de la app (2026-11-14, pedido de Ale): no se mete debajo
+    // del notch, se desplaza si no entra y deja "Aplicar" fijo y a la vista.
+    final result = await showAppSheet<AuditFilters>(
+      context,
       builder: (_) => AuditFilterSheet(initial: st.filters, facets: st.facets),
     );
-    if (result != null) _setFilters(result);
+    if (result != null && mounted) _setFilters(result);
   }
 
   @override
@@ -336,7 +337,7 @@ class AuditTile extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          entry.actor == null ? Icons.smart_toy_outlined : Icons.person_outline_rounded,
+                          entry.actor == null ? auditNoActorIcon(entry.action) : Icons.person_outline_rounded,
                           size: 13,
                           color: c.textFaint,
                         ),
@@ -344,7 +345,7 @@ class AuditTile extends StatelessWidget {
                         ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 150),
                           child: Text(
-                            entry.actor == null ? 'Sistema' : entry.actor!.displayName,
+                            entry.actor == null ? auditNoActorName(entry.action) : entry.actor!.displayName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(fontSize: 12, color: c.textDim, fontWeight: FontWeight.w600),
@@ -507,12 +508,15 @@ class _ActiveFilters extends StatelessWidget {
               ),
             if (filters.actor != null)
               InputChip(
-                label: Text(actorName),
+                label: Text(actorName, overflow: TextOverflow.ellipsis),
                 onDeleted: () => onChanged(filters.copyWith(actor: null)),
               ),
             if (filters.action != null)
               InputChip(
-                label: Text(auditActionLabel(filters.action!, serverLabel: _actionServerLabel(facets, filters.action))),
+                label: Text(
+                  auditActionLabel(filters.action!, serverLabel: _actionServerLabel(facets, filters.action)),
+                  overflow: TextOverflow.ellipsis,
+                ),
                 onDeleted: () => onChanged(filters.copyWith(action: null)),
               ),
           ],
@@ -551,11 +555,11 @@ class AuditFilterSheet extends StatefulWidget {
 class _AuditFilterSheetState extends State<AuditFilterSheet> {
   late AuditFilters _f = widget.initial;
 
-  Widget _group(String title, List<Widget> chips) => Column(
+  Widget _group(String title, List<Widget> chips, {bool first = false}) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(2, 14, 0, 8),
+            padding: EdgeInsets.fromLTRB(2, first ? 0 : 14, 0, 8),
             child: Text(
               title.toUpperCase(),
               style: TextStyle(
@@ -576,93 +580,70 @@ class _AuditFilterSheetState extends State<AuditFilterSheet> {
     final facets = widget.facets;
     final actors = facets?.actors ?? const <AuditFacetActor>[];
     final actions = facets?.actions ?? const <AuditFacetAction>[];
-    final maxHeight = MediaQuery.sizeOf(context).height * 0.85;
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: maxHeight),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    return SheetBody(
+      title: 'Filtros',
+      footer: Row(
         children: [
-          Flexible(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Filtros', style: Theme.of(context).textTheme.titleLarge),
-                  _group('Período', [
-                    for (final p in AuditPeriod.values)
-                      ChoiceChip(
-                        label: Text(p.label),
-                        selected: _f.period == p,
-                        onSelected: (_) => setState(() => _f = _f.copyWith(period: p)),
-                      ),
-                  ]),
-                  if (actors.isNotEmpty)
-                    _group('Persona', [
-                      ChoiceChip(
-                        label: const Text('Cualquiera'),
-                        selected: _f.actor == null,
-                        onSelected: (_) => setState(() => _f = _f.copyWith(actor: null)),
-                      ),
-                      for (final a in actors)
-                        ChoiceChip(
-                          label: Text(a.isSystem ? 'Sistema' : (a.name ?? 'Sin nombre')),
-                          selected: _f.actor == a.id,
-                          onSelected: (_) => setState(() => _f = _f.copyWith(actor: _f.actor == a.id ? null : a.id)),
-                        ),
-                    ]),
-                  if (actions.isNotEmpty)
-                    _group('Acción', [
-                      ChoiceChip(
-                        label: const Text('Cualquiera'),
-                        selected: _f.action == null,
-                        onSelected: (_) => setState(() => _f = _f.copyWith(action: null)),
-                      ),
-                      for (final a in actions)
-                        ChoiceChip(
-                          label: Text(auditActionLabel(a.value, serverLabel: a.label)),
-                          selected: _f.action == a.value,
-                          onSelected: (_) =>
-                              setState(() => _f = _f.copyWith(action: _f.action == a.value ? null : a.value)),
-                        ),
-                    ]),
-                  if (actors.isEmpty && actions.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16),
-                      child: Text(
-                        'Las opciones de persona y acción aparecen cuando carga el registro.',
-                        style: TextStyle(color: context.hc.textDim, fontSize: 13),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+          TextButton(
+            onPressed: () => setState(() => _f = AuditFilters(q: _f.q)),
+            child: const Text('Limpiar'),
           ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-              child: Row(
-                children: [
-                  TextButton(
-                    onPressed: () => setState(
-                      () => _f = AuditFilters(q: _f.q),
-                    ),
-                    child: const Text('Limpiar'),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: GoldButton(
-                      label: 'Aplicar',
-                      onPressed: () => Navigator.of(context).pop(_f),
-                    ),
-                  ),
-                ],
-              ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: GoldButton(
+              label: 'Aplicar',
+              onPressed: () => Navigator.of(context).pop(_f),
             ),
           ),
         ],
       ),
+      children: [
+        _group('Período', [
+          for (final p in AuditPeriod.values)
+            ChoiceChip(
+              label: Text(p.label),
+              selected: _f.period == p,
+              onSelected: (_) => setState(() => _f = _f.copyWith(period: p)),
+            ),
+        ], first: true),
+        if (actors.isNotEmpty)
+          _group('Persona', [
+            ChoiceChip(
+              label: const Text('Cualquiera'),
+              selected: _f.actor == null,
+              onSelected: (_) => setState(() => _f = _f.copyWith(actor: null)),
+            ),
+            for (final a in actors)
+              ChoiceChip(
+                label: Text(a.isSystem ? 'Sistema' : (a.name ?? 'Sin nombre'), overflow: TextOverflow.ellipsis),
+                selected: _f.actor == a.id,
+                onSelected: (_) => setState(() => _f = _f.copyWith(actor: _f.actor == a.id ? null : a.id)),
+              ),
+          ]),
+        if (actions.isNotEmpty)
+          _group('Acción', [
+            ChoiceChip(
+              label: const Text('Cualquiera'),
+              selected: _f.action == null,
+              onSelected: (_) => setState(() => _f = _f.copyWith(action: null)),
+            ),
+            for (final a in actions)
+              ChoiceChip(
+                label: Text(auditActionLabel(a.value, serverLabel: a.label), overflow: TextOverflow.ellipsis),
+                selected: _f.action == a.value,
+                onSelected: (_) =>
+                    setState(() => _f = _f.copyWith(action: _f.action == a.value ? null : a.value)),
+              ),
+          ]),
+        if (actors.isEmpty && actions.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 16),
+            child: Text(
+              'Las opciones de persona y acción aparecen cuando carga el registro.',
+              style: TextStyle(color: context.hc.textDim, fontSize: 13),
+            ),
+          ),
+      ],
     );
   }
 }

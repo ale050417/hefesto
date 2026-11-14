@@ -55,6 +55,8 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
     setState(() {
       _nameError = name.length < 2 ? 'Ingresá el nombre del cliente.' : null;
       _emailError = email.isNotEmpty && !_emailRe.hasMatch(email) ? 'El email no es válido.' : null;
+      // También arriba del botón: el campo marcado puede estar fuera de la vista.
+      _error = _nameError ?? _emailError;
     });
     return _nameError == null && _emailError == null;
   }
@@ -184,6 +186,9 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
                   maxLines: 6,
                   maxLength: 1000,
                   textCapitalization: TextCapitalization.sentences,
+                  // Al abrirse el teclado se ve el campo entero (por defecto
+                  // solo sube el renglón del cursor).
+                  scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 80),
                   onChanged: touch,
                   decoration: const InputDecoration(
                     labelText: 'Nota (opcional)',
@@ -194,15 +199,12 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
                 ),
               ],
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 16),
-              FormErrorBanner(_error!),
-            ],
           ],
         ),
         bottomNavigationBar: SaveBar(
           label: _edit ? 'Guardar cambios' : 'Crear cliente',
           loading: _busy,
+          error: _error,
           onPressed: _dirty ? _save : null,
         ),
       ),

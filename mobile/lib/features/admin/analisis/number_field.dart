@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'ar_number.dart';
 
+/// Cierra el teclado al tocar fuera de un campo (2026-11-14, pedido de Ale: que
+/// todo funcione en el teléfono). El teclado numérico del iPhone no trae tecla
+/// "listo" y, en el teléfono, Flutter no lo cierra solo: sin esto quedaba
+/// abierto tapando media pantalla. Va en `onTapOutside` de los campos de
+/// Reportes, Ganancias y Calculadora (tocar OTRO campo no lo cierra).
+void closeKeyboardOnTapOutside(PointerDownEvent _) => FocusManager.instance.primaryFocus?.unfocus();
+
 /// Campo numérico con teclado numérico, formato argentino y validación en línea.
 /// Al salir del campo normaliza lo escrito ("1234,5" -> "1.234,5"), así se ve
 /// cómo lo interpretó la app. `onChanged` recibe el número ya parseado (o null
@@ -78,6 +85,7 @@ class _ArNumberFieldState extends State<ArNumberField> {
       enabled: widget.enabled,
       textInputAction: widget.textInputAction,
       keyboardType: TextInputType.numberWithOptions(decimal: widget.maxDecimals > 0),
+      onTapOutside: closeKeyboardOnTapOutside,
       inputFormatters: [ArNumberInputFormatter(maxDecimals: widget.maxDecimals)],
       autovalidateMode: AutovalidateMode.onUserInteraction,
       validator: (t) => validateArNumber(

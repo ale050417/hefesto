@@ -213,7 +213,7 @@ void main() {
       await tester.pump();
       await tester.tap(save);
       await tester.pump();
-      expect(find.text('Ingresá un título.'), findsOneWidget);
+      expectFieldAndBarError('Ingresá un título.');
       expect(find.text('Ingresá el costo en puntos.'), findsOneWidget);
       expect(find.text('Ingresá el valor del descuento.'), findsOneWidget);
       expect(api.calls, isEmpty);
@@ -252,7 +252,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.widgetWithText(GoldButton, 'Crear recompensa'));
       await tester.pump();
-      expect(find.text('El porcentaje no puede superar 100.'), findsOneWidget);
+      expectFieldAndBarError('El porcentaje no puede superar 100.');
       expect(api.calls, isEmpty);
     });
 
@@ -266,7 +266,7 @@ void main() {
       await tester.pump();
       await tester.tap(find.widgetWithText(GoldButton, 'Crear recompensa'));
       await tester.pump();
-      expect(find.text('Elegí el producto de regalo.'), findsOneWidget);
+      expectFieldAndBarError('Elegí el producto de regalo.');
       expect(api.calls, isEmpty);
 
       await tester.tap(find.text('Elegí un producto'));

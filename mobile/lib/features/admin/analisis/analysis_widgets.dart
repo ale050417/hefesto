@@ -46,19 +46,22 @@ Future<bool> confirmDialog(
   final ok = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
+      // Desplazable (2026-11-14, pedido de Ale: que los modales se vean bien):
+      // un nombre larguísimo o la letra grande en un teléfono chico cortaban el
+      // mensaje por la mitad, sin forma de leer el resto.
+      scrollable: true,
       title: Text(title),
       content: Text(message),
+      // Mismos botones que el resto de las confirmaciones de la app: "Cancelar"
+      // de texto y la acción llena (roja si destruye algo).
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancelar')),
-        TextButton(
+        FilledButton(
+          style: destructive
+              ? FilledButton.styleFrom(backgroundColor: Brand.danger, foregroundColor: Colors.white)
+              : null,
           onPressed: () => Navigator.pop(ctx, true),
-          child: Text(
-            confirmLabel,
-            style: TextStyle(
-              color: destructive ? Brand.danger : Brand.gold,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          child: Text(confirmLabel),
         ),
       ],
     ),

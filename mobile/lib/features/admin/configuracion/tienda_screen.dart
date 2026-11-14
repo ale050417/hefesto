@@ -170,21 +170,26 @@ class _TiendaScreenState extends ConfigFormState<TiendaScreen> {
                     style: TextStyle(fontSize: 12, color: c.textDim, height: 1.35),
                   ),
                 ),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  for (final hex in accentChoices)
-                    _Swatch(
-                      color: parseHex(hex),
-                      selected: currentAccent == hex.toUpperCase(),
-                      dim: seasonActive,
-                      label: 'Color $hex',
-                      onTap: enabled ? () => _set(() => _accent.text = hex) : null,
-                    ),
-                ],
+              // Cada muestra ocupa 48 dp para tocar (la muestra en sí mide 40):
+              // el corrimiento compensa ese margen y la deja alineada al texto.
+              Transform.translate(
+                offset: const Offset(-4, 0),
+                child: Wrap(
+                  spacing: 2,
+                  runSpacing: 2,
+                  children: [
+                    for (final hex in accentChoices)
+                      _Swatch(
+                        color: parseHex(hex),
+                        selected: currentAccent == hex.toUpperCase(),
+                        dim: seasonActive,
+                        label: 'Color $hex',
+                        onTap: enabled ? () => _set(() => _accent.text = hex) : null,
+                      ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               ConfigField(
                 controller: _accent,
                 label: 'Otro color (hex)',
@@ -299,7 +304,7 @@ class _TiendaScreenState extends ConfigFormState<TiendaScreen> {
                       max: 12,
                       divisions: 9,
                       label: '$_interval s',
-                      activeColor: Brand.gold,
+                      // Sin color a mano: manda el tema (`sliderTheme`).
                       onChanged: enabled ? (v) => _set(() => _interval = v.round()) : null,
                     ),
                   ),
@@ -358,18 +363,32 @@ class _Swatch extends StatelessWidget {
       selected: selected,
       label: label,
       child: GestureDetector(
+        // Blanco de 48 dp (2026-11-14, pedido de Ale): la muestra de 40 dp
+        // sola quedaba por debajo del mínimo cómodo para el dedo.
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Opacity(
-          opacity: dim ? 0.55 : 1,
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: selected ? c.text : c.border, width: selected ? 2.4 : 1),
+        child: Padding(
+          padding: const EdgeInsets.all(4),
+          child: Opacity(
+            opacity: dim ? 0.55 : 1,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: selected ? c.text : c.border, width: selected ? 2.4 : 1),
+              ),
+              child: selected
+                  ? Icon(
+                      Icons.check_rounded,
+                      size: 20,
+                      color: ThemeData.estimateBrightnessForColor(color) == Brightness.dark
+                          ? Colors.white
+                          : Brand.goldFg,
+                    )
+                  : null,
             ),
-            child: selected ? Icon(Icons.check_rounded, size: 20, color: ThemeData.estimateBrightnessForColor(color) == Brightness.dark ? Colors.white : Brand.goldFg) : null,
           ),
         ),
       ),
@@ -393,6 +412,8 @@ class _SeasonChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(99),
         onTap: onTap,
         child: Container(
+          // Mínimo 44 dp de alto: medía 37 y costaba acertarle con el dedo.
+          constraints: const BoxConstraints(minHeight: 44),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(99),

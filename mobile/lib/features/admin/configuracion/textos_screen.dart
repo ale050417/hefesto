@@ -25,42 +25,47 @@ class TextosScreen extends StatelessWidget {
     final c = context.hc;
     return Scaffold(
       appBar: AppBar(title: const Text('Textos clave')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
-        children: [
-          const ConfigHint('Elegí qué texto querés cambiar. Cada uno se guarda por separado.'),
-          _TextTile(
-            icon: Icons.verified_user_rounded,
-            title: 'Banda de confianza',
-            summary: initial.trustBar.isEmpty
-                ? 'Los puntos que se ven bajo el banner del inicio'
-                : initial.trustBar.map((t) => t.t).where((t) => t.isNotEmpty).join(' · '),
-            tag: initial.trustBarCustom ? null : 'De fábrica',
-            onTap: () => _open(context, TrustBarScreen(initial: initial.trustBar, canEdit: canEdit)),
-          ),
-          const SizedBox(height: 10),
-          _TextTile(
-            icon: Icons.help_outline_rounded,
-            title: 'Preguntas frecuentes',
-            summary: '${initial.faq.length} pregunta${initial.faq.length == 1 ? '' : 's'} en el inicio',
-            tag: initial.faqCustom ? null : 'De fábrica',
-            onTap: () => _open(context, FaqScreen(initial: initial.faq, canEdit: canEdit)),
-          ),
-          const SizedBox(height: 10),
-          _TextTile(
-            icon: Icons.request_quote_rounded,
-            title: 'Cotización por WhatsApp',
-            summary: 'Encabezado, seña y aclaraciones del mensaje',
-            onTap: () => _open(context, QuoteScreen(initial: initial.quote, canEdit: canEditQuote)),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: Text(
-              'Lo marcado "De fábrica" es el texto que trae la tienda: al guardar pasa a ser el tuyo.',
-              style: TextStyle(fontSize: 12, color: c.textFaint, height: 1.4),
+      // SafeArea (2026-11-14, pedido de Ale): con letra grande la nota del
+      // final quedaba debajo de la barra del sistema.
+      body: SafeArea(
+        top: false,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+          children: [
+            const ConfigHint('Elegí qué texto querés cambiar. Cada uno se guarda por separado.'),
+            _TextTile(
+              icon: Icons.verified_user_rounded,
+              title: 'Banda de confianza',
+              summary: initial.trustBar.isEmpty
+                  ? 'Los puntos que se ven bajo el banner del inicio'
+                  : initial.trustBar.map((t) => t.t).where((t) => t.isNotEmpty).join(' · '),
+              tag: initial.trustBarCustom ? null : 'De fábrica',
+              onTap: () => _open(context, TrustBarScreen(initial: initial.trustBar, canEdit: canEdit)),
             ),
-          ),
-        ],
+            const SizedBox(height: 10),
+            _TextTile(
+              icon: Icons.help_outline_rounded,
+              title: 'Preguntas frecuentes',
+              summary: '${initial.faq.length} pregunta${initial.faq.length == 1 ? '' : 's'} en el inicio',
+              tag: initial.faqCustom ? null : 'De fábrica',
+              onTap: () => _open(context, FaqScreen(initial: initial.faq, canEdit: canEdit)),
+            ),
+            const SizedBox(height: 10),
+            _TextTile(
+              icon: Icons.request_quote_rounded,
+              title: 'Cotización por WhatsApp',
+              summary: 'Encabezado, seña y aclaraciones del mensaje',
+              onTap: () => _open(context, QuoteScreen(initial: initial.quote, canEdit: canEditQuote)),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Text(
+                'Lo marcado "De fábrica" es el texto que trae la tienda: al guardar pasa a ser el tuyo.',
+                style: TextStyle(fontSize: 12, color: c.textFaint, height: 1.4),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -5,6 +5,7 @@ import '../../../core/format.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/modals.dart';
 import '../admin_module.dart';
 import '../admin_widgets.dart';
 import '../crecimiento/form_kit.dart';
@@ -55,63 +56,64 @@ class AdminClientesScreen extends ConsumerWidget {
 }
 
 void _showTierRules(BuildContext context, CustomersPage? page) {
-  showModalBottomSheet<void>(
-    context: context,
-    useSafeArea: true,
+  // (2026-11-14, pedido de Ale: que los modales se vean bien.) Hoja estándar:
+  // con manija, se desplaza si no entra (letra grande en un teléfono chico) y
+  // termina arriba de la barra de gestos.
+  showAppSheet<void>(
+    context,
     builder: (ctx) {
       final c = ctx.hc;
       String rule(CustomerTier t) {
         final r = page?.tiers[t];
-        if (r == null || (r.minSpent <= 0 && r.minOrders <= 0)) return 'Clientes recién llegados';
+        // Sin los umbrales del servidor (la lista todavía carga o falló) se
+        // describe el nivel sin números: antes los tres decían "recién llegados".
+        if (r == null) {
+          return switch (t) {
+            CustomerTier.gold => 'Los que más compraron',
+            CustomerTier.silver => 'Los que ya compraron varias veces',
+            CustomerTier.bronze => 'Clientes recién llegados',
+          };
+        }
+        if (r.minSpent <= 0 && r.minOrders <= 0) return 'Clientes recién llegados';
         return 'Desde ${formatPrice(r.minSpent)} en compras o ${r.minOrders} pedidos';
       }
 
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Niveles de cliente', style: Theme.of(ctx).textTheme.titleLarge),
-            const SizedBox(height: 4),
-            Text(
-              'Se calculan solos con lo que compró cada cliente (pedidos de la tienda, sin cancelados).',
-              style: TextStyle(color: c.textDim, fontSize: 13, height: 1.4),
-            ),
-            const SizedBox(height: 16),
-            for (final t in CustomerTier.values)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: t.color.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(11),
-                      ),
-                      child: Icon(t.icon, size: 18, color: t.color),
+      return SheetBody(
+        title: 'Niveles de cliente',
+        subtitle: 'Se calculan solos con lo que compró cada cliente (pedidos de la tienda, sin cancelados).',
+        children: [
+          for (final t in CustomerTier.values)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: t.color.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(11),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            page?.tiers[t]?.label.isNotEmpty == true ? page!.tiers[t]!.label : t.label,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          Text(rule(t), style: TextStyle(color: c.textDim, fontSize: 12.5)),
-                        ],
-                      ),
+                    child: Icon(t.icon, size: 18, color: t.color),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          page?.tiers[t]?.label.isNotEmpty == true ? page!.tiers[t]!.label : t.label,
+                          style: TextStyle(fontWeight: FontWeight.w700, color: c.text),
+                        ),
+                        Text(rule(t), style: TextStyle(color: c.textDim, fontSize: 12.5)),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-          ],
-        ),
+            ),
+        ],
       );
     },
   );
@@ -170,9 +172,13 @@ class _ClientesBodyState extends ConsumerState<_ClientesBody> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        // (2026-11-14, pedido de Ale: que todo se pueda tocar bien.) La fila
+        // mide 48 dp, el alto que necesita cada filtro para tocarse con el
+        // dedo (con 38 quedaba recortado). El dibujo del filtro no cambia: los
+        // márgenes de arriba y de abajo se achicaron lo mismo.
+        const SizedBox(height: 5),
         SizedBox(
-          height: 38,
+          height: 48,
           child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -194,7 +200,6 @@ class _ClientesBodyState extends ConsumerState<_ClientesBody> {
             ],
           ),
         ),
-        const SizedBox(height: 4),
         Expanded(
           child: customers.when(
             loading: () => const ListSkeleton(rows: 6, height: 96),
