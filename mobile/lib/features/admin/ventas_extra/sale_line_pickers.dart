@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/format.dart';
@@ -85,6 +86,8 @@ class _CatalogPickerScreenState extends ConsumerState<CatalogPickerScreen> {
               controller: _ctl,
               onChanged: _onSearch,
               textInputAction: TextInputAction.search,
+              // El servidor acepta búsquedas de hasta 80 caracteres.
+              inputFormatters: [LengthLimitingTextInputFormatter(80)],
               decoration: InputDecoration(
                 hintText: 'Buscar producto o categoría…',
                 prefixIcon: const Icon(Icons.search_rounded),

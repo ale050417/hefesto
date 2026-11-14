@@ -391,6 +391,7 @@ class MeInfo {
     this.fullName,
     required this.role,
     required this.isStaff,
+    this.adminFlag,
     this.permissions = const {},
   });
   final String id;
@@ -399,12 +400,20 @@ class MeInfo {
   final String role;
   final bool isStaff;
 
+  /// "Es administrador" según el servidor. Null si el servidor no lo informa
+  /// (versión vieja de la web): en ese caso se deduce del rol.
+  final bool? adminFlag;
+
   /// módulo → acciones permitidas (`ver`, `crear`, `editar`, `eliminar`).
   /// Vienen del servidor; sirven para mostrar u ocultar botones, pero cada
   /// endpoint del panel vuelve a verificarlos por su cuenta.
   final Map<String, Set<String>> permissions;
 
-  bool get isAdmin => role == 'admin';
+  /// Administrador = rol "admin" O un rol propio marcado como administrador en
+  /// Configuración → Roles. Antes la app miraba solo el rol fijo, y a una
+  /// persona con rol propio de administrador le escondía cancelar, reembolsar
+  /// y eliminar aunque el servidor se lo permitía (2026-11-14).
+  bool get isAdmin => adminFlag ?? role == 'admin';
 
   bool can(String module, String action) =>
       isStaff && (permissions[module]?.contains(action) ?? false);
@@ -417,6 +426,7 @@ class MeInfo {
       fullName: j['fullName'] as String?,
       role: (j['role'] as String?) ?? 'customer',
       isStaff: j['isStaff'] == true,
+      adminFlag: j['isAdmin'] is bool ? j['isAdmin'] as bool : null,
       permissions: {
         for (final e in raw.entries)
           '${e.key}': {

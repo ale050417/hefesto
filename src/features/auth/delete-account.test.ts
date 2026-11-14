@@ -17,6 +17,7 @@ vi.mock("@/core/auth/api-auth", () => ({
 vi.mock("@/core/auth/permissions", () => ({
   canForUser: vi.fn(),
   getAllPermsForUser: vi.fn(async () => ({})),
+  isAdminForUser: vi.fn(async () => false),
 }));
 const recordAudit = vi.fn();
 vi.mock("@/core/audit", () => ({

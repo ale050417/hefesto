@@ -25,6 +25,13 @@ String _waNumber(String phone) {
   return '549$d';
 }
 
+/// Rótulo de botón que nunca se parte en dos renglones: si no entra (botones
+/// lado a lado en un teléfono chico, letra grande) se achica.
+Widget _oneLine(String text, {TextStyle? style}) => FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Text(text, maxLines: 1, softWrap: false, style: style),
+    );
+
 void _toast(BuildContext context, String message) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
@@ -112,10 +119,18 @@ class _HeaderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
+          // Si el número y el estado no entran lado a lado (teléfono chico,
+          // letra grande, "Venta manual"), el estado baja de renglón: antes el
+          // número quedaba partido ("HF-0 / 042").
+          SizedBox(
+            width: double.infinity,
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 10,
+              runSpacing: 8,
+              children: [
+                GestureDetector(
                   onLongPress: () {
                     Clipboard.setData(ClipboardData(text: d.title));
                     _toast(context, 'Copiado: ${d.title}');
@@ -125,18 +140,24 @@ class _HeaderCard extends StatelessWidget {
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                 ),
-              ),
-              StatusChip(d.status, large: true),
-            ],
+                StatusChip(d.status, large: true),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
-          Text(
-            formatPrice(d.total),
-            style: const TextStyle(
-              fontFamily: 'Orbitron',
-              fontWeight: FontWeight.w800,
-              fontSize: 34,
-              color: Brand.gold,
+          // Un total de 9 cifras se achica en vez de partirse en dos renglones.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              formatPrice(d.total),
+              maxLines: 1,
+              style: const TextStyle(
+                fontFamily: 'Orbitron',
+                fontWeight: FontWeight.w800,
+                fontSize: 34,
+                color: Brand.gold,
+              ),
             ),
           ),
           const SizedBox(height: 10),
@@ -334,12 +355,7 @@ class _ActionsCard extends ConsumerWidget {
               height: 46,
               child: OutlinedButton.icon(
                 icon: Icon(s.icon, size: 18, color: s.color),
-                label: Text(s.actionLabel),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: c.text,
-                  side: BorderSide(color: c.border),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
+                label: _oneLine(s.actionLabel),
                 onPressed: () => _go(context, ref, s),
               ),
             ),
@@ -352,7 +368,7 @@ class _ActionsCard extends ConsumerWidget {
                   Expanded(
                     child: TextButton.icon(
                       icon: Icon(s.icon, size: 17, color: Brand.danger),
-                      label: Text(
+                      label: _oneLine(
                         s.actionLabel,
                         style: const TextStyle(color: Brand.danger, fontWeight: FontWeight.w700),
                       ),
@@ -662,14 +678,15 @@ class _CustomerCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: FilledButton.icon(
+                    // Verde de WhatsApp (el resto lo pone el tema).
                     style: FilledButton.styleFrom(
                       backgroundColor: Brand.whatsapp,
                       foregroundColor: Colors.white,
                       minimumSize: const Size.fromHeight(44),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
                     icon: const Icon(Icons.chat_rounded, size: 18),
-                    label: const Text('WhatsApp'),
+                    label: _oneLine('WhatsApp'),
                     onPressed: () => openWhatsapp(
                       _waNumber(phone),
                       d.isManual
@@ -682,13 +699,11 @@ class _CustomerCard extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: c.text,
                       minimumSize: const Size.fromHeight(44),
-                      side: BorderSide(color: c.border),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                     ),
                     icon: const Icon(Icons.call_rounded, size: 18),
-                    label: const Text('Llamar'),
+                    label: _oneLine('Llamar'),
                     onPressed: () => openUrl('tel:${phone.replaceAll(RegExp(r'[^\d+]'), '')}'),
                   ),
                 ),
@@ -834,6 +849,7 @@ class _MetaCardState extends ConsumerState<_MetaCard> {
   }
 
   Future<void> _save() async {
+    if (_saving) return;
     setState(() => _saving = true);
     try {
       await ref.read(apiClientProvider).adminOrderMeta(
@@ -867,7 +883,11 @@ class _MetaCardState extends ConsumerState<_MetaCard> {
             enabled: widget.canEdit,
             onChanged: (_) => setState(() {}),
             textCapitalization: TextCapitalization.characters,
+            // El servidor acepta hasta 120 caracteres (con más respondía
+            // "Datos inválidos." sin decir por qué).
+            maxLength: 120,
             decoration: const InputDecoration(
+              counterText: '',
               hintText: 'Código de seguimiento',
               prefixIcon: Icon(Icons.local_shipping_outlined),
             ),

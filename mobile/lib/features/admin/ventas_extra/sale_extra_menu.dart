@@ -125,6 +125,7 @@ class _DeleteSaleDialogState extends ConsumerState<DeleteSaleDialog> {
   String? _error;
 
   Future<void> _delete() async {
+    if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -181,7 +182,7 @@ class _DeleteSaleDialogState extends ConsumerState<DeleteSaleDialog> {
       actions: [
         TextButton(
           onPressed: _busy ? null : () => Navigator.of(context).pop(false),
-          child: Text('Cancelar', style: TextStyle(color: c.textDim)),
+          child: const Text('Cancelar'),
         ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: Brand.danger, foregroundColor: Colors.white),

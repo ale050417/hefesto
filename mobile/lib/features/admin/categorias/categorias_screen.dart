@@ -114,18 +114,26 @@ class _AdminCategoriasScreenState extends ConsumerState<AdminCategoriasScreen> {
     final canDelete = me?.can('productos', 'eliminar') ?? false;
     final async = ref.watch(adminCategoriesProvider);
     final data = async.value;
+    // Mientras se escribe en el buscador el botón flotante se esconde: con el
+    // teclado abierto quedaba encima de los resultados.
+    // (Solo cuenta el teclado de ESTA pantalla: si lo abrió el formulario o una
+    // hoja que está encima, el botón no se toca.)
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0 &&
+        (ModalRoute.of(context)?.isCurrent ?? true);
 
     return AdminModuleScaffold(
       title: 'Categorías',
       permission: 'productos',
       what: 'las categorías',
-      floatingActionButton: canCreate && data != null
+      floatingActionButton: canCreate && data != null && !keyboardOpen
+          // Sin colores a mano: el tema ya lo pinta dorado.
           ? FloatingActionButton.extended(
+              // Sin animación "héroe" entre pantallas (no la usa y, al
+              // esconderse y volver, podía chocar con la de otra ruta).
+              heroTag: null,
               onPressed: () => _openForm(data),
-              backgroundColor: Brand.gold,
-              foregroundColor: Brand.goldFg,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Nueva', style: TextStyle(fontWeight: FontWeight.w700)),
+              label: const Text('Nueva'),
             )
           : null,
       body: async.when(
@@ -421,11 +429,16 @@ class _Counter extends StatelessWidget {
               ),
             ),
           ),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 12, color: c.textDim, fontWeight: FontWeight.w600),
+          // Se achica para entrar: con letra grande en un teléfono chico se
+          // cortaba ("Princip…", "Subniv…").
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: TextStyle(fontSize: 12, color: c.textDim, fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),

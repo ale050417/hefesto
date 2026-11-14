@@ -181,7 +181,10 @@ class _AdminProductosScreenState extends ConsumerState<AdminProductosScreen> {
     // El botón flotante se esconde mientras se escribe en el buscador (quedaba
     // encima de los resultados, que con el teclado abierto son un renglón) y
     // cuando la lista no cargó (quedaba pegado al botón "Reintentar").
-    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    // (Solo cuenta el teclado de ESTA pantalla: si lo abrió una pantalla o una
+    // hoja que está encima, el botón no se toca.)
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0 &&
+        (ModalRoute.of(context)?.isCurrent ?? true);
     final showFab = canCreate && !keyboardOpen && !products.hasError;
 
     return AdminModuleScaffold(
@@ -205,12 +208,14 @@ class _AdminProductosScreenState extends ConsumerState<AdminProductosScreen> {
         ),
       ],
       floatingActionButton: showFab
+          // Sin colores a mano: el tema ya lo pinta dorado.
           ? FloatingActionButton.extended(
+              // Sin animación "héroe" entre pantallas (no la usa y, al
+              // esconderse y volver, podía chocar con la de otra ruta).
+              heroTag: null,
               onPressed: _create,
-              backgroundColor: Brand.gold,
-              foregroundColor: Brand.goldFg,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('Nuevo', style: TextStyle(fontWeight: FontWeight.w700)),
+              label: const Text('Nuevo'),
             )
           : null,
       body: Column(
@@ -272,7 +277,9 @@ class _AdminProductosScreenState extends ConsumerState<AdminProductosScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
-                ActionChip(
+                // Filtro como los demás (sin color de fondo puesto a mano): con
+                // una categoría elegida queda "encendido" con el color del tema.
+                FilterChip(
                   avatar: _pickingCategory && options.isLoading
                       ? const SizedBox.square(
                           dimension: 14,
@@ -281,9 +288,9 @@ class _AdminProductosScreenState extends ConsumerState<AdminProductosScreen> {
                       : Icon(Icons.folder_open_rounded,
                           size: 16, color: _filter.categoryId == null ? c.textDim : Brand.gold),
                   label: Text(_categoryName ?? 'Categoría'),
-                  backgroundColor:
-                      _filter.categoryId == null ? null : Brand.gold.withValues(alpha: 0.2),
-                  onPressed: _pickCategory,
+                  showCheckmark: false,
+                  selected: _filter.categoryId != null,
+                  onSelected: (_) => _pickCategory(),
                 ),
                 const SizedBox(width: 8),
                 FilterChip(

@@ -572,6 +572,16 @@ void main() {
         await _tap(tester, find.text('Borradores (12)'));
         expectNoLayoutErrors(tester);
         await shoot(tester, 'prod_lista_filtros');
+
+        // Buscar: el campo queda a la vista con el teclado abierto y el botón
+        // flotante no tapa los resultados (que ahí son apenas un renglón).
+        await openKeyboard(tester, find.byType(TextField));
+        expectFocusedFieldVisible(tester);
+        expect(find.byType(FloatingActionButton), findsNothing,
+            reason: 'con el teclado abierto el botón flotante quedaba encima de los resultados');
+        await shoot(tester, 'prod_lista_buscar_teclado');
+        await closeKeyboard(tester);
+        expectReachable(tester, find.byType(FloatingActionButton), what: 'el botón "Nuevo" al cerrar el teclado');
       });
 
       testWidgets('menú de orden (${phone.name})', (tester) async {
@@ -974,7 +984,7 @@ void main() {
         expectReachable(tester, find.byType(GoldButton), what: 'el botón de guardar con el teclado abierto');
         await shoot(tester, 'form_alta_teclado_nombre');
 
-        for (final label in ['Descripción (opcional)', 'Precio', 'Precio de oferta (opcional)', 'Gramos', 'Tiempo (min)', 'Medidas (opcional)']) {
+        for (final label in ['Descripción (opcional)', 'Precio', 'Precio de oferta (opcional)', 'Gramos', 'Minutos', 'Medidas (opcional)']) {
           await _reveal(tester, field(label), formScroll());
           await tester.tap(field(label), warnIfMissed: false);
           await settle(tester, 4);
@@ -1055,7 +1065,7 @@ void main() {
           await type(tester, 'Precio', price);
           await type(tester, 'Precio de oferta (opcional)', sale);
           await type(tester, 'Gramos', '90');
-          await type(tester, 'Tiempo (min)', '180');
+          await type(tester, 'Minutos', '180');
           await settle(tester, 2);
           await _reveal(tester, find.text('Elegí una categoría'), formScroll());
           await _tap(tester, find.text('Elegí una categoría'));
@@ -1270,6 +1280,8 @@ void main() {
         await pumpPhone(tester, const AdminCategoriasScreen(), phone: phone, me: _admin, overrides: _catOv());
         await openKeyboard(tester, find.byType(TextField));
         expectFocusedFieldVisible(tester);
+        expect(find.byType(FloatingActionButton), findsNothing,
+            reason: 'con el teclado abierto el botón flotante quedaba encima de los resultados');
         await tester.enterText(find.byType(TextField), 'super');
         await settle(tester, 3);
         expectReachable(tester, find.text('Superhéroes'), what: 'el resultado');

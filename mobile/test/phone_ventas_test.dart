@@ -1103,6 +1103,15 @@ void main() {
         expectReachable(tester, chip, what: 'el filtro elegido ("Listo para entregar")');
         await shoot(tester, 'inicio_atajo_listos');
 
+        // "En producción" cuenta los confirmados + los que se están imprimiendo:
+        // abre la cola (donde están los dos), no una lista con menos pedidos.
+        await tester.tap(_inNavBar('Inicio'));
+        await _nav(tester);
+        await _tap(tester, find.descendant(of: find.byType(FittedBox), matching: find.text('En producción')));
+        expect(find.text('pantalla: Módulo produccion'), findsOneWidget);
+        await tester.tap(find.byTooltip('Atrás'));
+        await _nav(tester);
+
         // Volver al inicio y abrir un pedido de "Últimos pedidos".
         await tester.tap(_inNavBar('Inicio'));
         await _nav(tester);
@@ -1593,10 +1602,9 @@ void main() {
       await _tap(tester, find.text('WhatsApp'));
       await _tap(tester, find.text('Llamar'));
       expectNoLayoutErrors(tester, 'al tocar WhatsApp / Llamar');
-      if (_launched.isNotEmpty) {
-        expect(_launched.first, startsWith('https://wa.me/543757624148?text='));
-        expect(_launched.last, 'tel:+543757624148');
-      }
+      expect(_launched.length, 2, reason: 'cada botón abre su aplicación');
+      expect(_launched.first, startsWith('https://wa.me/543757624148?text='));
+      expect(_launched.last, 'tel:+543757624148');
     });
 
     testWidgets('un operador no ve cancelar ni reembolsar; solo lectura no ve acciones', (tester) async {

@@ -418,13 +418,13 @@ class _ManualSaleFormScreenState extends ConsumerState<ManualSaleFormScreen> {
             builder: (context, box) {
               final stacked = MediaQuery.textScalerOf(context).scale(14) > 15.4 || box.maxWidth < 280;
               final catalog = OutlinedButton.icon(
-                style: _outlined(c),
+                style: _outlined(),
                 icon: const Icon(Icons.inventory_2_outlined, size: 18),
                 label: const Text('Catálogo'),
                 onPressed: _openCatalog,
               );
               final free = OutlinedButton.icon(
-                style: _outlined(c),
+                style: _outlined(),
                 icon: const Icon(Icons.edit_note_rounded, size: 20),
                 label: const Text('Texto libre'),
                 onPressed: _addFree,
@@ -439,12 +439,10 @@ class _ManualSaleFormScreenState extends ConsumerState<ManualSaleFormScreen> {
     );
   }
 
-  ButtonStyle _outlined(HefestoColors c) => OutlinedButton.styleFrom(
-        foregroundColor: c.text,
+  // Solo el tamaño: color, borde y forma los pone el tema.
+  ButtonStyle _outlined() => OutlinedButton.styleFrom(
         minimumSize: const Size.fromHeight(46),
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        side: BorderSide(color: c.border),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       );
 
   Widget _extrasSection() {

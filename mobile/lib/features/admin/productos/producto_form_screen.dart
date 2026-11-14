@@ -389,8 +389,9 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
                       padding: const EdgeInsets.only(bottom: 10, left: 4),
                       child: Text(
                         _isEdit
-                            ? 'Con el material, los gramos y el tiempo se calcula el costo de producción.'
-                            : 'Con el material, los gramos y el tiempo se calcula el costo de producción '
+                            ? 'Con el material, los gramos y los minutos de impresión se calcula el costo '
+                                'de producción.'
+                            : 'Con el material, los gramos y los minutos de impresión se calcula el costo de producción '
                                 '(es obligatorio para crear el producto).',
                         style: TextStyle(fontSize: 12, color: c.textDim, height: 1.35),
                       ),
@@ -413,7 +414,8 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
                         Expanded(
                           child: _field(
                             _minutes,
-                            'Tiempo (min)',
+                            // Rótulo corto: "Tiempo (min)" se cortaba con letra grande.
+                            'Minutos',
                             id: 'minutes',
                             digits: true,
                           ),

@@ -120,7 +120,16 @@ class MiniTag extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[Icon(icon, size: 11, color: c.textDim), const SizedBox(width: 4)],
-          Text(text, style: TextStyle(fontSize: 11, color: c.textDim, fontWeight: FontWeight.w600)),
+          // Una categoría o referencia larga se corta con "…" en vez de
+          // desbordar la tarjeta que la contiene.
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 11, color: c.textDim, fontWeight: FontWeight.w600),
+            ),
+          ),
         ],
       ),
     );

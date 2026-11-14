@@ -122,7 +122,8 @@ class _AdminSalesScreenState extends ConsumerState<AdminSalesScreen> {
               // El servidor acepta búsquedas de hasta 80 caracteres.
               inputFormatters: [LengthLimitingTextInputFormatter(80)],
               decoration: InputDecoration(
-                hintText: 'Buscar cliente, producto o número…',
+                // Corto a propósito: en un teléfono de 360 dp uno más largo se cortaba.
+                hintText: 'Cliente, producto o número…',
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: _searchCtl.text.isEmpty
                     ? null

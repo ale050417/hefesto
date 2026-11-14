@@ -54,6 +54,7 @@ class AdminDashboardScreen extends ConsumerWidget {
           final c = context.hc;
           final canSales = me?.can('pedidos', 'ver') ?? true;
           final canStock = me?.can('filamentos', 'ver') ?? true;
+          final canQueue = me?.can('produccion', 'ver') ?? false;
           final name = d.greetingName ?? me?.fullName?.split(' ').first;
           final delta7 = d.last30 > 0 ? d.last7 / d.last30 : 0.0;
 
@@ -167,9 +168,13 @@ class AdminDashboardScreen extends ConsumerWidget {
                         status: SaleStatus.inProduction,
                         label: 'En producción',
                         count: d.inProduction,
-                        onTap: canSales
-                            ? () => context.go('/admin/ventas?status=in_production')
-                            : null,
+                        // El servidor cuenta acá los pagos confirmados MÁS los
+                        // que ya se están imprimiendo (igual que la web, donde
+                        // este número abre la cola). Filtrar Ventas por un
+                        // solo estado mostraba menos pedidos que el número.
+                        onTap: canQueue
+                            ? () => context.push('/admin/m/produccion')
+                            : (canSales ? () => context.go('/admin/ventas?status=in_production') : null),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -299,13 +304,18 @@ class _FlowTile extends StatelessWidget {
         children: [
           Icon(status.icon, color: status.color, size: 24),
           const SizedBox(height: 8),
-          Text(
-            '$count',
-            style: TextStyle(
-              fontFamily: 'Orbitron',
-              fontWeight: FontWeight.w800,
-              fontSize: 24,
-              color: count > 0 ? status.color : c.textFaint,
+          // Un número de 4 cifras con letra grande se partía en dos renglones.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '$count',
+              maxLines: 1,
+              style: TextStyle(
+                fontFamily: 'Orbitron',
+                fontWeight: FontWeight.w800,
+                fontSize: 24,
+                color: count > 0 ? status.color : c.textFaint,
+              ),
             ),
           ),
           const SizedBox(height: 2),

@@ -577,7 +577,7 @@ void main() {
       await tester.enterText(find.widgetWithText(TextField, 'Nombre'), 'Mate Luigi');
       await tester.enterText(find.widgetWithText(TextField, 'Precio'), '25.000');
       await tester.enterText(find.widgetWithText(TextField, 'Gramos'), '90');
-      await tester.enterText(find.widgetWithText(TextField, 'Tiempo (min)'), '180');
+      await tester.enterText(find.widgetWithText(TextField, 'Minutos'), '180');
 
       // Categoría: abre la hoja y elige la subcategoría.
       await tester.tap(find.text('Elegí una categoría'));

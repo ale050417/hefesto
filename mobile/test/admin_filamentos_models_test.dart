@@ -205,6 +205,17 @@ void main() {
       expect(planAdjust(AdjustMode.count, 500, '500').error, contains('ya es de'));
     });
 
+    test('sumar a un carrete en deuda: hay que cubrir la deuda', () {
+      // El servidor no deja que un ajuste manual termine en negativo.
+      final p = planAdjust(AdjustMode.add, -30, '20');
+      expect(p.isValid, isFalse);
+      expect(p.error, contains('debe 30 g'));
+      final ok = planAdjust(AdjustMode.add, -30, '100');
+      expect(ok.isValid, isTrue);
+      expect(ok.newStock, 70);
+      expect(planAdjust(AdjustMode.count, -30, '0').isValid, isTrue, reason: 'contar 0 salda la deuda');
+    });
+
     test('vacío no es error pero tampoco es válido', () {
       final p = planAdjust(AdjustMode.add, 500, '  ');
       expect(p.error, isNull);

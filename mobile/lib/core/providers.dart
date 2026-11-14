@@ -35,9 +35,16 @@ class ThemeModeController extends Notifier<HefestoThemeMode> {
 final themeModeProvider =
     NotifierProvider<ThemeModeController, HefestoThemeMode>(ThemeModeController.new);
 
+/// Riverpod reintenta solo los proveedores que fallan (hasta 10 veces, cada vez
+/// más espaciado) y mientras tanto la pantalla queda "cargando": sin red, la
+/// app mostraba un círculo girando casi un minuto antes de avisar. Acá no se
+/// reintenta: el error se muestra enseguida con su botón "Reintentar".
+Duration? _noRetry(int retryCount, Object error) => null;
+
 /// Vidriera de la app (marca, banners, categorías, destacados…).
 final homeProvider = FutureProvider<HomeData>(
   (ref) => ref.watch(apiClientProvider).home(),
+  retry: _noRetry,
 );
 
 /// Cambios de la sesión de Supabase (ingreso, salida, renovación del token,
@@ -68,8 +75,11 @@ final userIdProvider = Provider<String?>(
 /// Depende del USUARIO y no de la sesión (2026-11-14): antes, cada renovación
 /// del token volvía a pedir `/me` y el panel entero pasaba un instante por la
 /// pantalla de carga —perdiendo la posición de la lista— una vez por hora.
-final meProvider = FutureProvider<MeInfo?>((ref) async {
-  final userId = ref.watch(userIdProvider);
-  if (userId == null) return null;
-  return ref.watch(apiClientProvider).me();
-});
+final meProvider = FutureProvider<MeInfo?>(
+  (ref) async {
+    final userId = ref.watch(userIdProvider);
+    if (userId == null) return null;
+    return ref.watch(apiClientProvider).me();
+  },
+  retry: _noRetry,
+);

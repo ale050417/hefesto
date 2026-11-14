@@ -1,7 +1,7 @@
 import { apiError, apiOk, requireApiUser, withApi } from "@/core/api/respond";
 import { recordAudit } from "@/core/audit";
 import { isApiStaff } from "@/core/auth/api-auth";
-import { getAllPermsForUser } from "@/core/auth/permissions";
+import { getAllPermsForUser, isAdminForUser } from "@/core/auth/permissions";
 import { deleteOwnAccount } from "@/features/auth/delete-account";
 
 /**
@@ -25,6 +25,11 @@ export const GET = withApi("me", async (request: Request) => {
     phone: user.profile?.phone ?? null,
     role: user.profile?.role ?? "customer",
     isStaff: staff,
+    // Administrador = rol "admin" O un rol propio marcado como administrador.
+    // La app lo usa para mostrar cancelar / reembolsar / eliminar; mirando solo
+    // `role` se lo escondía a quien tiene un rol propio de administrador
+    // (2026-11-14). Cada endpoint lo vuelve a verificar igual.
+    isAdmin: staff ? await isAdminForUser(user) : false,
     mustChangePassword: user.profile?.mustChangePassword ?? false,
     permissions: staff ? await getAllPermsForUser(user) : {},
   });

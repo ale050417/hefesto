@@ -160,6 +160,12 @@ class AppTheme {
     final c = colorsOf(mode);
     final isLight = mode == HefestoThemeMode.light;
 
+    // Dorado para TEXTO e íconos de los controles (botones de texto, pestaña
+    // elegida, acciones de diálogos). Sobre fondo blanco el dorado de la marca
+    // casi no se lee (contraste 2,3:1): en el modo claro se usa uno más oscuro
+    // (5:1). Los fondos dorados siguen con el color de siempre.
+    final accent = isLight ? const Color(0xFF8A6A1F) : Brand.gold;
+
     Color tint(Color color, double alpha, Color over) =>
         Color.alphaBlend(color.withValues(alpha: alpha), over);
 
@@ -262,7 +268,7 @@ class AppTheme {
 
     /// Botones de texto de los diálogos y selectores ("Cancelar" / "Aceptar").
     final dialogAction = TextButton.styleFrom(
-      foregroundColor: Brand.gold,
+      foregroundColor: accent,
       textStyle: buttonText,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
@@ -281,7 +287,7 @@ class AppTheme {
       labelStyle: TextStyle(color: c.textDim),
       floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) {
         if (states.contains(WidgetState.error)) return const TextStyle(color: Brand.danger);
-        if (states.contains(WidgetState.focused)) return const TextStyle(color: Brand.gold);
+        if (states.contains(WidgetState.focused)) return TextStyle(color: accent);
         return TextStyle(color: c.textDim);
       }),
       helperStyle: body(11.5, FontWeight.w400, c.textFaint),
@@ -358,7 +364,7 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: Brand.gold,
+          foregroundColor: accent,
           disabledForegroundColor: c.textFaint,
           textStyle: buttonText,
           shape: buttonShape,
@@ -367,14 +373,14 @@ class AppTheme {
             (states) => BorderSide(
               color: states.contains(WidgetState.disabled)
                   ? c.border
-                  : Brand.gold.withValues(alpha: 0.45),
+                  : accent.withValues(alpha: isLight ? 0.6 : 0.45),
             ),
           ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: Brand.gold,
+          foregroundColor: accent,
           disabledForegroundColor: c.textFaint,
           textStyle: buttonText,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -453,11 +459,11 @@ class AppTheme {
         circularTrackColor: Colors.transparent,
       ),
       tabBarTheme: TabBarThemeData(
-        labelColor: Brand.gold,
+        labelColor: accent,
         unselectedLabelColor: c.textDim,
-        indicatorColor: Brand.gold,
+        indicatorColor: accent,
         dividerColor: c.border,
-        labelStyle: body(13.5, FontWeight.w700, Brand.gold),
+        labelStyle: body(13.5, FontWeight.w700, accent),
         unselectedLabelStyle: body(13.5, FontWeight.w600, c.textDim),
       ),
       navigationBarTheme: NavigationBarThemeData(
@@ -469,13 +475,13 @@ class AppTheme {
           (s) => body(
             11,
             s.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500,
-            s.contains(WidgetState.selected) ? Brand.gold : c.textDim,
+            s.contains(WidgetState.selected) ? accent : c.textDim,
           ),
         ),
         iconTheme: WidgetStateProperty.resolveWith(
           (s) => IconThemeData(
             size: 24,
-            color: s.contains(WidgetState.selected) ? Brand.gold : c.textDim,
+            color: s.contains(WidgetState.selected) ? accent : c.textDim,
           ),
         ),
       ),
@@ -483,7 +489,7 @@ class AppTheme {
         backgroundColor: c.surface2,
         selectedColor: Brand.gold.withValues(alpha: 0.2),
         surfaceTintColor: Colors.transparent,
-        checkmarkColor: Brand.gold,
+        checkmarkColor: accent,
         deleteIconColor: c.textDim,
         side: BorderSide(color: c.border),
         labelStyle: body(12.5, FontWeight.w600, c.text),
@@ -559,7 +565,7 @@ class AppTheme {
         backgroundColor: c.surface3,
         contentTextStyle: body(13.5, FontWeight.w500, c.text),
         // Sin esto la acción ("Deshacer") salía oscura sobre fondo oscuro.
-        actionTextColor: Brand.gold,
+        actionTextColor: accent,
         disabledActionTextColor: c.textFaint,
         closeIconColor: c.textDim,
         elevation: 6,
@@ -589,7 +595,7 @@ class AppTheme {
           (states) => states.contains(WidgetState.selected) ? Brand.gold : Colors.transparent,
         ),
         todayForegroundColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected) ? Brand.goldFg : Brand.gold,
+          (states) => states.contains(WidgetState.selected) ? Brand.goldFg : accent,
         ),
         todayBackgroundColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected) ? Brand.gold : Colors.transparent,
