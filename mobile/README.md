@@ -85,35 +85,38 @@ En [Play Console](https://play.google.com/console):
 ## iPhone (App Store) con Codemagic
 
 iOS solo se compila en una Mac. [Codemagic](https://codemagic.io) presta una en
-la nube y sigue las instrucciones de `../codemagic.yaml`.
+la nube y sigue las instrucciones de `../codemagic.yaml` (workflow
+"Hefesto 3D · iOS").
 
-Hace falta una cuenta de **Apple Developer** (USD 99 por año).
+Se apoya en lo que ya está armado para Fadely: la cuenta de Apple Developer, la
+integración `fadely_asc` y el certificado de distribución que ya están en
+Codemagic. Lo nuevo es solo lo propio de esta app.
 
 Una sola vez:
 
 1. **Apple Developer** → Certificates, IDs & Profiles → Identifiers → **+** →
    App IDs → App → Bundle ID explícito `ar.com.hefesto3d.hefesto` → marcar la
    capacidad **Sign In with Apple** → guardar.
-2. **App Store Connect** → Apps → **+** → App nueva → plataforma iOS, nombre
+2. **Apple Developer** → Profiles → **+** → Distribution → **App Store
+   Connect** → elegir el App ID de recién → elegir el mismo certificado de
+   distribución que usa Fadely → nombre "Hefesto 3D App Store" → generar.
+3. **App Store Connect** → Apps → **+** → App nueva → plataforma iOS, nombre
    "Hefesto 3D", idioma español, el Bundle ID de recién, SKU `hefesto3d`.
-3. **App Store Connect** → Usuarios y acceso → Integraciones → **API de App
-   Store Connect** → generar una clave con acceso **App Manager** → descargar el
-   archivo `.p8` y anotar el **Key ID** y el **Issuer ID**.
-4. **Codemagic** → entrar con GitHub → Add application → repositorio
-   `ale050417/hefesto` → tipo Flutter.
-5. Codemagic → Teams → Integrations → **App Store Connect** → agregar la clave
-   del paso 3 con el nombre **`hefesto_asc`** (tiene que ser ese nombre).
-6. Codemagic → la app → Environment variables → variable
-   **`CERTIFICATE_PRIVATE_KEY`**, grupo **`ios_signing`**, marcada como
-   _secure_. El valor es el contenido completo del archivo
-   `C:\Users\alexe\hefesto-ios-cert-key.pem` (guardá también una copia de ese
-   archivo fuera de la PC).
+4. **Codemagic** → Teams → Personal Account → **Code signing identities** →
+   iOS provisioning profiles → **Fetch profiles** → elegir "Hefesto 3D App
+   Store" → descargar.
+5. **Codemagic** → **Add application** → repositorio `ale050417/hefesto` → tipo
+   Flutter. Codemagic lee `codemagic.yaml` solo.
 
 Cada vez que quieras publicar: Codemagic → la app → **Start new build** →
-workflow "iPhone · TestFlight" → rama `master`. Al terminar, la compilación
+workflow "Hefesto 3D · iOS" → rama `master`. Al terminar, la compilación
 aparece en App Store Connect → TestFlight. Para mandarla a la tienda: App Store
 Connect → la app → completar la ficha (`store/ficha.md`) → elegir la compilación
 → **Enviar a revisión**.
+
+Si la compilación falla en "Perfiles de firma" con _No matching profiles
+found_, falta el paso 4 (o el perfil se creó antes de marcar Sign In with
+Apple: hay que regenerarlo y volver a traerlo).
 
 ## Configuración de Supabase que la app necesita
 

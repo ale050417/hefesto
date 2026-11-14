@@ -1,67 +1,72 @@
-# Compilación de la app de iPhone en Codemagic (https://codemagic.io).
+# Compilación de la app de iPhone de Hefesto 3D en Codemagic (https://codemagic.io).
 #
 # iOS solo se compila en una Mac: Codemagic presta una en la nube. Este archivo
-# le dice qué hacer con la carpeta `mobile/` (la app Flutter): la prueba, la
+# le dice qué hacer con la carpeta `mobile/` (la app Flutter): la revisa, la
 # firma con la cuenta de Apple Developer y la sube a TestFlight.
 #
-# Lo que hay que cargar UNA vez en Codemagic (el paso a paso está en
-# `mobile/README.md`, sección "iPhone"):
-#   1. Teams → Integrations → App Store Connect: una API key llamada
-#      `hefesto_asc` (rol "App Manager").
-#   2. Environment variables, grupo `ios_signing`: la variable secreta
-#      `CERTIFICATE_PRIVATE_KEY` (el contenido del archivo
-#      `hefesto-ios-cert-key.pem`).
+# Usa el MISMO esquema que ya funciona para Fadely (2026-11-14):
+#   - la integración de App Store Connect `fadely_asc`, que ya está cargada en
+#     Codemagic (la clave es de la cuenta de Apple, sirve para cualquier app);
+#   - el certificado de distribución que ya está en Codemagic → Code signing
+#     identities. Lo único nuevo es el perfil de aprovisionamiento de ESTA app
+#     (`ar.com.hefesto3d.hefesto`): el paso a paso está en `mobile/README.md`,
+#     sección "iPhone".
+#
+# Disparo MANUAL (como Fadely): la mayoría de los commits son de la web y no
+# tocan `mobile/`; compilar iOS en cada uno gastaría minutos sin necesidad.
 #
 # La versión visible (1.0.0) sale de `mobile/pubspec.yaml`; el número de
 # compilación lo pone Codemagic y sube solo en cada corrida.
 
 workflows:
-  ios-testflight:
-    name: iPhone · TestFlight
+  hefesto-ios:
+    name: Hefesto 3D · iOS
+    max_build_duration: 60
     instance_type: mac_mini_m2
-    max_build_duration: 45
-    working_directory: mobile
+    triggering:
+      events: [] # sin disparo automático — ver el porqué arriba
     integrations:
-      app_store_connect: hefesto_asc
+      app_store_connect: fadely_asc
     environment:
-      groups:
-        - ios_signing
-      vars:
-        BUNDLE_ID: ar.com.hefesto3d.hefesto
+      # La misma versión con la que se desarrolla y se prueba la app.
       flutter: 3.44.8
       xcode: latest
       cocoapods: default
-    cache:
-      cache_paths:
-        - $HOME/.pub-cache
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: ar.com.hefesto3d.hefesto
     scripts:
-      - name: Dependencias
-        script: flutter pub get
-      - name: Análisis y pruebas
+      - name: Dependencias de Flutter
         script: |
+          cd mobile
+          flutter pub get
+
+      - name: Análisis y pruebas (frena acá si hay algo roto, antes de gastar minutos de build de iOS)
+        script: |
+          cd mobile
           flutter analyze
           flutter test
-      - name: Firma · llavero temporal
-        script: keychain initialize
-      - name: Firma · certificado y perfil de App Store
-        # Los crea en la cuenta de Apple si todavía no existen.
-        script: app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
-      - name: Firma · instalar el certificado
-        script: keychain add-certificates
-      - name: Firma · aplicar los perfiles al proyecto
-        script: xcode-project use-profiles
+
+      - name: Perfiles de firma del proyecto Xcode
+        script: |
+          xcode-project use-profiles
+
       - name: Compilar el .ipa
         script: |
+          cat "$HOME/export_options.plist"
+          cd mobile
           flutter build ipa --release \
             --build-number="$PROJECT_BUILD_NUMBER" \
-            --export-options-plist=/Users/builder/export_options.plist
+            --export-options-plist=$HOME/export_options.plist
+
     artifacts:
-      - build/ios/ipa/*.ipa
       - mobile/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
+
+    # Sube el .ipa a TestFlight con la integración fadely_asc. El envío a
+    # revisión de la App Store se hace a mano desde App Store Connect cuando la
+    # ficha esté completa.
     publishing:
       app_store_connect:
         auth: integration
-        # Queda disponible en TestFlight; el envío a revisión de la App Store
-        # se hace a mano desde App Store Connect cuando la ficha esté completa.
         submit_to_testflight: true
