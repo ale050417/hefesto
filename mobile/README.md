@@ -78,9 +78,10 @@ En [Play Console](https://play.google.com/console):
    están en `store/ficha.md`).
 4. **Producción** → crear versión con el mismo `.aab` → enviar a revisión.
 
-> Si la cuenta de desarrollador es **personal y nueva**, Google exige antes una
-> prueba cerrada con 12 personas durante 14 días. Play Console lo indica en la
-> pantalla de Producción.
+> Para esta app Google exige antes una **prueba cerrada** con 12 personas
+> durante 14 días (confirmado en el Panel de control, 2026-11-14). Después se
+> pide el acceso a producción desde el mismo panel. Lo que ya está cargado y lo
+> que falta: `store/ficha.md` → "Estado de la publicación".
 
 ## iPhone (App Store) con Codemagic
 
@@ -97,18 +98,21 @@ Ya está hecho (2026-11-14):
   "Hefesto 3D · iOS · alta de la firma (una sola vez)"; no hace falta volver a
   correrlo.
 
-Falta, una sola vez (requiere tu usuario de Apple):
-
-1. **App Store Connect** → Apps → **+** → App nueva → plataforma iOS, nombre
-   "Hefesto 3D", idioma principal Español (México) o el que prefieras, Bundle
-   ID `ar.com.hefesto3d.hefesto`, SKU `hefesto3d`. Sin esto, la compilación se
-   hace igual pero no se puede subir a TestFlight.
+- La app "Hefesto 3D" existe en App Store Connect (Apple ID 6834978841) con la
+  ficha completa; lo que falta para el primer envío está en
+  `store/ficha.md` → "Estado de la publicación".
 
 Cada vez que quieras publicar: Codemagic → `hefesto` → **Start new build** →
 workflow "Hefesto 3D · iOS" → rama `master`. Revisa la app (analizador y
-pruebas), la compila, la firma y la sube a TestFlight. Para mandarla a la
-tienda: App Store Connect → la app → completar la ficha (`store/ficha.md`) →
-elegir la compilación → **Enviar a revisión**.
+pruebas), la compila, la firma y la sube a App Store Connect (no la manda a
+la prueba de TestFlight). Para mandarla a la tienda: App Store Connect → la
+app → versión nueva → elegir la compilación → **Añadir a revisión** →
+**Enviar a revisión**.
+
+> Aviso de Apple al subir (2026-11-14): desde abril de 2027 las apps tienen
+> que apuntar a iOS 15 o más. Hoy el proyecto apunta a iOS 13: antes de esa
+> fecha hay que subir `IPHONEOS_DEPLOYMENT_TARGET` (y la plataforma del
+> Podfile) a 15.0 y probar la compilación.
 
 Si algún día la compilación falla en "Perfiles de firma" con _No matching
 profiles found_, el perfil venció o se borró: correr de nuevo el workflow de
@@ -117,7 +121,8 @@ identities → iOS provisioning profiles → Fetch profiles).
 
 ## Configuración de Supabase que la app necesita
 
-En el panel de Supabase del proyecto (Authentication):
+Ya está hecha (2026-11-14). Para referencia, en el panel de Supabase del
+proyecto (Authentication):
 
 1. **URL Configuration → Redirect URLs**: agregar
    `ar.com.hefesto3d.hefesto://login-callback`. La usan el ingreso con Google y

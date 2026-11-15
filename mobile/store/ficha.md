@@ -154,6 +154,49 @@ Las dos tiendas piden un usuario para probar lo que requiere iniciar sesión.
 | ----------------------------------- | --------------------------------------- | --------- |
 | Ícono de Play Store                 | `store/icono-512.png`                   | 512×512   |
 | Gráfico de funciones de Play Store  | `store/grafico-1024x500.png`            | 1024×500  |
-| Capturas de teléfono (Play Store)   | `store/capturas/android/*.png`          | 1080×2400 |
-| Capturas de iPhone 6,9" (App Store) | `store/capturas/iphone/*.png`           | 1320×2868 |
+| Capturas de teléfono (Play Store)   | `store/capturas/android/*.png`          | 1080×1920 |
+| Capturas de iPhone 6,3" (App Store) | `store/capturas/iphone-6.3/*.png`       | 1206×2622 |
+| Capturas de iPhone 6,9" (reserva)   | `store/capturas/iphone/*.png`           | 1320×2868 |
 | Ícono de App Store                  | va dentro de la app (no se sube aparte) | —         |
+
+App Store Connect (2026) pide las capturas del "iPhone con Dynamic Island
+(pantalla mediana)": 6,1" o 6,3", o sea 1179×2556 o 1206×2622. Las de 6,9"
+las rechaza por tamaño; las de `iphone-6.3/` son las mismas, achicadas y sin
+canal alfa (2026-11-14).
+
+## Estado de la publicación (2026-11-14)
+
+**App Store** — app creada (Apple ID 6834978841), solo Argentina, gratis,
+clasificación 4+, versión 1.0.0 con la compilación 6 de Codemagic, ficha,
+capturas, notas para la revisión y respuestas de privacidad cargadas. Para
+enviarla falta lo que solo puede hacer el titular de la cuenta:
+
+1. Información de la app → Derechos sobre el contenido → "No, no contiene,
+   muestra ni accede a contenido de terceros" → Aceptar → Guardar.
+2. Privacidad de la app → **Publicar** (las respuestas ya están cargadas).
+3. Versión 1.0.0 → Información para el equipo de revisión → nombre,
+   apellido, teléfono y correo de contacto → Guardar.
+4. **Añadir a revisión** → **Enviar a revisión**. Con "Publicar esta versión
+   automáticamente", sale en la tienda apenas Apple la aprueba.
+
+**Google Play** — Google exige una **prueba cerrada** (12 personas durante 14
+días) antes de habilitar producción en esta app; no se puede saltear. Ya están
+cargados: política de privacidad, anuncios (no), ID de publicidad (no), apps
+gubernamentales (no), funciones financieras (ninguna), salud (ninguna),
+categoría Compras, contacto (correo del taller y web), seguridad de los datos
+(borrador) y la ficha con ícono, gráfico y 5 capturas (borrador). Falta:
+
+1. Datos de inicio de sesión (decidir la cuenta para la revisión, ver abajo).
+2. Clasificación de contenido: correo de contacto, categoría "Todos los demás
+   tipos de aplicaciones" y "No" en todo. Al enviarlo se aceptan los términos
+   de la IARC.
+3. Contenido y audiencia objetivo: 18 años o más.
+4. Seguridad de los datos → Guardar (queda habilitado después del punto 3).
+5. Estado de operador (UE): declarar si sos comerciante.
+6. Ficha de Play Store → "Declaración de recursos de IA" (si el logo o las
+   fotos de productos de las capturas se hicieron con IA, etiquetarlos) →
+   Guardar.
+7. Probar y publicar → Prueba cerrada → crear la versión, subir
+   `build/app/outputs/bundle/release/app-release.aab` (pesa 63 MB: se
+   arrastra a mano), cargar al menos 12 correos de testers y publicar en
+   la prueba. A los 14 días: Panel de control → Solicitar acceso a producción.
