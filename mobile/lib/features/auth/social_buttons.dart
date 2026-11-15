@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthChangeEvent;
+import 'package:url_launcher/url_launcher.dart' show closeInAppWebView;
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
@@ -178,8 +179,16 @@ class _RoundButton extends StatelessWidget {
 /// las dos pantallas se pisarían.
 void listenForSocialLogin(BuildContext context, WidgetRef ref) {
   ref.listen(authStateProvider, (prev, next) {
-    if (next.value?.event == AuthChangeEvent.signedIn && context.mounted) {
-      context.go('/cuenta');
-    }
+    if (next.value?.event != AuthChangeEvent.signedIn) return;
+    closeAuthBrowser();
+    if (context.mounted) context.go('/cuenta');
   });
+}
+
+/// En iPhone el ingreso con Google se abre en una hoja de Safari dentro de la
+/// app; al volver la sesión por el deep link la hoja quedaría abierta encima.
+/// Si no hay ninguna abierta, no hace nada.
+void closeAuthBrowser() {
+  if (!AuthRepository.supportsApple) return;
+  closeInAppWebView().catchError((_) {});
 }

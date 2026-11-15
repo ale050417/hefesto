@@ -63,13 +63,15 @@ workflows:
       - mobile/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
 
-    # Sube el .ipa a TestFlight con la integración fadely_asc. El envío a
-    # revisión de la App Store se hace a mano desde App Store Connect cuando la
-    # ficha esté completa.
+    # Sube el .ipa a App Store Connect con la integración fadely_asc. No se
+    # manda a la prueba externa de TestFlight (pedido de Ale, 2026-11-14:
+    # "todo a producción, nada de test"): la compilación queda lista para
+    # elegirla en la versión de la App Store y enviarla a revisión desde App
+    # Store Connect.
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true
+        submit_to_testflight: false
 
   # --- Alta de la firma de iOS: se corre UNA sola vez --------------------------
   # Registra en la cuenta de Apple el identificador de la app con la capacidad

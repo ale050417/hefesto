@@ -120,12 +120,19 @@ class AuthRepository {
 
   /// Abre Google en el navegador. La sesión llega después, por el deep link, y
   /// la recibe `sessionProvider`: esta función solo dispara el flujo.
+  ///
+  /// En iPhone se abre DENTRO de la app (hoja de Safari), no en Safari aparte:
+  /// Apple rechaza las apps que mandan a otra app para iniciar sesión (regla
+  /// 4.0). La hoja se cierra sola al llegar la sesión (`closeAuthBrowser`).
+  /// En Android Google exige el navegador externo (2026-11-14, pedido de Ale:
+  /// "mandá todo a producción").
   Future<void> signInWithGoogle() async {
     try {
       final opened = await _auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: oauthRedirect,
-        authScreenLaunchMode: LaunchMode.externalApplication,
+        authScreenLaunchMode:
+            supportsApple ? LaunchMode.inAppBrowserView : LaunchMode.externalApplication,
       );
       if (!opened) throw AuthFailure('No pudimos abrir el acceso con Google. Probá de nuevo.');
     } on AuthFailure {
