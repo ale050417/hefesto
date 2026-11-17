@@ -97,7 +97,21 @@ export const cotizacionSchema = z.object({
   notes: z.array(z.string().trim().min(1).max(600)).max(10),
 });
 
-/** Edición de un banner existente (la imagen no se cambia desde el celular). */
+/**
+ * Imagen de un banner cargada desde la app: SOLO una que subió la propia app a
+ * nuestro Storage (/configuracion/imagenes, kind=banner). Así por la API no se
+ * puede dejar en la home una imagen de cualquier otro sitio.
+ */
+const ownBannerImage = z
+  .string()
+  .trim()
+  .regex(
+    /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/public\/products\/banners\/[\w.-]+$/,
+    "Subí la imagen desde la app.",
+  )
+  .or(z.literal(""));
+
+/** Edición de un banner existente (desde 2026-11-17 también su imagen). */
 export const bannerPatchSchema = bannerSchema
   .pick({
     title: true,
@@ -106,7 +120,14 @@ export const bannerPatchSchema = bannerSchema
     ctaHref: true,
     align: true,
     isActive: true,
+    position: true,
   })
+  .extend({ imageUrl: ownBannerImage })
   .partial();
+
+/** Alta de un banner desde la app (queda al final; el orden se cambia en la web). */
+export const bannerCreateSchema = bannerSchema
+  .omit({ sortOrder: true })
+  .extend({ imageUrl: ownBannerImage.optional() });
 
 export const rolAsignarSchema = z.object({ roleId: z.uuid() });

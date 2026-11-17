@@ -38,7 +38,12 @@ import { NotFoundError, ValidationError } from "@/core/errors";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { randomUUID } from "node:crypto";
-import { deleteObject, optimizeImage, uploadObject } from "@/core/storage";
+import {
+  deleteObject,
+  optimizeImage,
+  storeImage,
+  uploadObject,
+} from "@/core/storage";
 import { priceRange } from "../pricing";
 import { isNewProduct } from "../new-product";
 import {
@@ -464,9 +469,11 @@ export async function addProductImage(
   scale = "1",
   color: string | null = null,
 ): Promise<ProductImage> {
-  const webp = await optimizeImage(bytes);
-  const path = `${productId}/${randomUUID()}.webp`;
-  const url = await uploadObject(IMAGES_BUCKET, path, webp, "image/webp");
+  const { url } = await storeImage(
+    IMAGES_BUCKET,
+    `${productId}/${randomUUID()}`,
+    bytes,
+  );
   const count = await countImages(productId);
   return insertImage({
     productId,

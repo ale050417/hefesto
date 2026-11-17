@@ -18,7 +18,8 @@ import {
  *        banner del hero, su alineación o lo activa/desactiva. Parcial.
  * DELETE /api/v1/admin/configuracion/banners/:id — lo elimina.
  * Permiso config/editar (el mismo que `updateBannerAction` / `deleteBannerAction`).
- * Subir o cambiar la imagen y reordenar quedan para la web.
+ * La imagen se sube antes a /configuracion/imagenes (kind=banner) y acá se
+ * manda su `imageUrl`. Reordenar queda para la web.
  */
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,8 @@ export const PATCH = withApi(
     if (d.ctaHref !== undefined) values.ctaHref = emptyToNull(d.ctaHref);
     if (d.align !== undefined) values.align = d.align;
     if (d.isActive !== undefined) values.isActive = d.isActive;
+    if (d.imageUrl !== undefined) values.imageUrl = emptyToNull(d.imageUrl);
+    if (d.position) values.position = d.position;
     if (Object.keys(values).length === 0) {
       return apiError("invalid", "No hay nada para guardar.");
     }

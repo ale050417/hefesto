@@ -215,14 +215,28 @@ describe("cotizacionSchema", () => {
 });
 
 describe("bannerPatchSchema", () => {
-  it("es parcial y solo conoce textos, alineación y activo", () => {
-    const r = bannerPatchSchema.safeParse({
-      isActive: false,
-      imageUrl: "https://hack/x.png",
-      sortOrder: 9,
-    });
+  it("es parcial y no deja cambiar el orden", () => {
+    const r = bannerPatchSchema.safeParse({ isActive: false, sortOrder: 9 });
     expect(r.success).toBe(true);
     expect(r.data).toEqual({ isActive: false });
+  });
+
+  it("la imagen solo puede ser una subida a nuestro Storage de banners", () => {
+    expect(
+      bannerPatchSchema.safeParse({ imageUrl: "https://hack/x.png" }).success,
+    ).toBe(false);
+    expect(
+      bannerPatchSchema.safeParse({
+        imageUrl:
+          "https://abc.supabase.co/storage/v1/object/public/products/12/x.webp",
+      }).success,
+    ).toBe(false);
+    expect(
+      bannerPatchSchema.safeParse({
+        imageUrl:
+          "https://abc.supabase.co/storage/v1/object/public/products/banners/banner-1.jpg",
+      }).success,
+    ).toBe(true);
   });
 
   it("la alineación es left/center/right", () => {

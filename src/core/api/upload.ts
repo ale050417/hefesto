@@ -11,10 +11,10 @@ const MAX_BYTES = 8 * 1024 * 1024;
 
 export async function readImageUpload(
   request: Request,
-): Promise<{ bytes: Buffer } | { response: NextResponse }> {
+): Promise<{ bytes: Buffer; form: FormData } | { response: NextResponse }> {
   const form = await request.formData().catch(() => null);
   const file = form?.get("file");
-  if (!(file instanceof File)) {
+  if (!form || !(file instanceof File)) {
     return { response: apiError("invalid", "Falta la foto.") };
   }
   if (!ALLOWED_TYPES.includes(file.type)) {
@@ -25,7 +25,7 @@ export async function readImageUpload(
   if (file.size > MAX_BYTES) {
     return { response: apiError("invalid", "El archivo supera los 8 MB") };
   }
-  return { bytes: Buffer.from(await file.arrayBuffer()) };
+  return { bytes: Buffer.from(await file.arrayBuffer()), form };
 }
 
 /** Quién hace la operación, con el nombre que queda guardado como snapshot. */

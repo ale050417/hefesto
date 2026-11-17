@@ -6,7 +6,7 @@ import {
   UnauthorizedError,
   ValidationError,
 } from "@/core/errors";
-import { deleteObject, optimizeImage, uploadObject } from "@/core/storage";
+import { deleteObject, storeImage } from "@/core/storage";
 import { notifyAdmins } from "@/features/notifications/service";
 import { formatQuoteMoney } from "@/features/quotes/build-quote";
 import { getQuoteDefaults } from "@/features/quotes/service";
@@ -85,9 +85,11 @@ export async function addInquiryImage(
   if (row.createdBy !== actor.id && !canEdit) throw new UnauthorizedError();
   const full = `Máximo ${MAX_INQUIRY_IMAGES} fotos por consulta.`;
   if (row.images.length >= MAX_INQUIRY_IMAGES) throw new ValidationError(full);
-  const webp = await optimizeImage(bytes);
-  const path = `${PREFIX}/${id}/${randomUUID()}.webp`;
-  const url = await uploadObject(BUCKET, path, webp, "image/webp");
+  const { url, path } = await storeImage(
+    BUCKET,
+    `${PREFIX}/${id}/${randomUUID()}`,
+    bytes,
+  );
   if (!(await repo.appendInquiryImage(id, url, MAX_INQUIRY_IMAGES))) {
     await deleteObject(BUCKET, path).catch(() => undefined);
     throw new ValidationError(full);

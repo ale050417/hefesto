@@ -9,7 +9,7 @@ import {
   UnauthorizedError,
   ValidationError,
 } from "@/core/errors";
-import { deleteObject, optimizeImage, uploadObject } from "@/core/storage";
+import { deleteObject, storeImage } from "@/core/storage";
 import { getSupabaseAdmin } from "@/core/supabase/admin";
 import { notifyAdmins } from "@/features/notifications/service";
 import * as repo from "./repository";
@@ -131,9 +131,11 @@ export async function addFixImage(
   if (fix.images.length >= MAX_FIX_IMAGES) {
     throw new ValidationError(`Máximo ${MAX_FIX_IMAGES} fotos por arreglo.`);
   }
-  const webp = await optimizeImage(bytes);
-  const path = `${PREFIX}/${fixId}/${randomUUID()}.webp`;
-  const url = await uploadObject(BUCKET, path, webp, "image/webp");
+  const { url, path } = await storeImage(
+    BUCKET,
+    `${PREFIX}/${fixId}/${randomUUID()}`,
+    bytes,
+  );
   const added = await repo.appendFixImage(fixId, url, MAX_FIX_IMAGES);
   if (!added) {
     await deleteObject(BUCKET, path).catch(() => undefined);
