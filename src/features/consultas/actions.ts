@@ -88,6 +88,40 @@ export async function uploadInquiryImageAction(
   }
 }
 
+/**
+ * Sube UN adjunto que no es foto (audio, video corto, PDF). FormData:
+ * inquiryId + file. Lo puede sumar quien carga consultas o quien las responde.
+ */
+export async function uploadInquiryFileAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const canCreate = await can("consultas", "crear");
+  const canEdit = await can("consultas", "editar");
+  if (!canCreate && !canEdit) return NOT_STAFF;
+  const actor = await currentActor();
+  if (!actor) return NOT_STAFF;
+  const id = idSchema.safeParse(formData.get("inquiryId"));
+  const file = formData.get("file");
+  if (!id.success || !(file instanceof File)) {
+    return invalid("Falta el archivo.");
+  }
+  try {
+    await flow.addInquiryFile(
+      id.data,
+      {
+        bytes: Buffer.from(await file.arrayBuffer()),
+        name: file.name,
+        type: file.type,
+      },
+      actor,
+      canEdit,
+    );
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
 /** Respuesta del operador (precio + datos → mensaje para el cliente). */
 export async function answerInquiryAction(
   id: string,
@@ -114,15 +148,24 @@ export async function answerInquiryAction(
 export async function changeInquiryStatusAction(
   id: string,
   to: unknown,
+  paymentMethod?: unknown,
 ): Promise<ActionResult> {
   if (!(await can("consultas", "crear"))) return NOT_STAFF;
   const actor = await currentActor();
   if (!actor) return NOT_STAFF;
   const parsedId = idSchema.safeParse(id);
-  const parsed = inquiryStatusSchema.safeParse({ to });
+  const parsed = inquiryStatusSchema.safeParse({
+    to,
+    ...(paymentMethod ? { paymentMethod } : {}),
+  });
   if (!parsedId.success || !parsed.success) return invalid("Estado inválido.");
   try {
-    await flow.changeInquiryStatus(parsedId.data, parsed.data.to, actor);
+    await flow.changeInquiryStatus(
+      parsedId.data,
+      parsed.data.to,
+      actor,
+      parsed.data.paymentMethod,
+    );
     return { ok: true };
   } catch (error) {
     return { ok: false, error: toActionError(error) };

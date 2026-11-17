@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -17,11 +18,14 @@ import { toast } from "@/stores/toastStore";
 import { changeInquiryStatusAction, deleteInquiryAction } from "../actions";
 import {
   INQUIRY_STATUS_LABEL,
+  PAYMENT_METHODS,
+  PAYMENT_METHOD_LABEL,
+  type InquiryPaymentMethod,
   type InquiryStatus,
-  type InquiryStatusChange,
 } from "../schemas";
 import type { InquiryView } from "../view";
 import { AnswerForm } from "./answer-form";
+import { AttachButton } from "./attach";
 
 type Filter = "open" | InquiryStatus | "all";
 
@@ -56,7 +60,8 @@ function matches(row: InquiryView, filter: Filter): boolean {
  * Lista de consultas. Las fechas llegan ya formateadas desde la página.
  * - Quien tiene "editar" (operador) responde con el precio.
  * - Quien tiene "crear" (atención al cliente) copia el mensaje armado, lo
- *   manda y después marca Confirmado / No se hizo.
+ *   manda y después toca Confirmado: ahí se crea solo el pedido.
+ * Todo (fotos, audios, respuesta, pedido) queda en la misma consulta.
  */
 export function InquiryList({
   inquiries,
@@ -68,9 +73,11 @@ export function InquiryList({
   const canAnswer = useCan("consultas", "editar");
   const canManage = useCan("consultas", "crear");
   const canDelete = useCan("consultas", "eliminar");
+  const canSeeOrders = useCan("pedidos", "ver");
   const [filter, setFilter] = useState<Filter>("open");
   const [zoom, setZoom] = useState<string | null>(null);
   const [answering, setAnswering] = useState<InquiryView | null>(null);
+  const [deleting, setDeleting] = useState<InquiryView | null>(null);
   const [confirming, setConfirming] = useState<InquiryView | null>(null);
 
   const { deleteResource: removeInquiry } = useDeleteResource({
@@ -87,17 +94,13 @@ export function InquiryList({
     }
   }
 
-  async function setStatus(row: InquiryView, to: InquiryStatusChange) {
+  async function setStatus(row: InquiryView, to: "cancelled" | "reopen") {
     const res = await runAction(() => changeInquiryStatusAction(row.id, to), {
       label: "Guardando…",
     });
     if (!res.ok) return;
     toast(
-      to === "confirmed"
-        ? "Consulta confirmada"
-        : to === "cancelled"
-          ? "Marcada como no se hizo"
-          : "Consulta reabierta",
+      to === "cancelled" ? "Marcada como no se hizo" : "Consulta reabierta",
       "success",
     );
   }
@@ -179,6 +182,36 @@ export function InquiryList({
                   </div>
                 ) : null}
 
+                {r.files.length > 0 ? (
+                  <div className="flex flex-col gap-2">
+                    {r.files.map((f) =>
+                      f.type.startsWith("audio/") ? (
+                        <div key={f.url} className="flex flex-col gap-1">
+                          <span className="text-dim text-xs break-all">
+                            {f.name}
+                          </span>
+                          <audio
+                            controls
+                            preload="none"
+                            src={f.url}
+                            className="w-full max-w-md"
+                          />
+                        </div>
+                      ) : (
+                        <a
+                          key={f.url}
+                          href={f.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-accent text-sm break-all underline"
+                        >
+                          {f.name}
+                        </a>
+                      ),
+                    )}
+                  </div>
+                ) : null}
+
                 {r.message ? (
                   <div className="rounded-md border border-[var(--border)] p-3">
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
@@ -215,17 +248,35 @@ export function InquiryList({
                   </div>
                 ) : null}
 
+                {r.status === "confirmed" ? (
+                  <div className="text-dim text-sm">
+                    Confirmada{r.confirmedAt ? ` el ${r.confirmedAt}` : ""}
+                    {r.saleId ? " · el pedido ya está en Pedidos" : ""}
+                    {r.saleId && canSeeOrders ? (
+                      <>
+                        {" · "}
+                        <Link href="/admin/pedidos" className="underline">
+                          Ver pedidos
+                        </Link>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <div className="flex flex-wrap justify-end gap-2">
                   {canRemove ? (
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
-                      onClick={() => setConfirming(r)}
+                      onClick={() => setDeleting(r)}
                     >
                       Eliminar
                     </button>
                   ) : null}
-                  {canManage && !open ? (
+                  {open && (canManage || canAnswer) ? (
+                    <AttachButton inquiryId={r.id} />
+                  ) : null}
+                  {canManage && !open && !r.saleId ? (
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
@@ -263,7 +314,7 @@ export function InquiryList({
                     <button
                       type="button"
                       className="btn btn-primary btn-sm"
-                      onClick={() => void setStatus(r, "confirmed")}
+                      onClick={() => setConfirming(r)}
                     >
                       Confirmado
                     </button>
@@ -312,19 +363,109 @@ export function InquiryList({
         ) : null}
       </Modal>
 
-      <ConfirmDialog
+      <Modal
         open={!!confirming}
         onClose={() => setConfirming(null)}
+        title="Confirmar pedido"
+      >
+        {confirming ? (
+          <ConfirmSale
+            key={confirming.id}
+            inquiry={confirming}
+            onDone={() => setConfirming(null)}
+          />
+        ) : null}
+      </Modal>
+
+      <ConfirmDialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
         title={
-          confirming
-            ? `¿Eliminar la consulta de ${confirming.customerName}?`
+          deleting
+            ? `¿Eliminar la consulta de ${deleting.customerName}?`
             : "¿Eliminar consulta?"
         }
-        detail="Se borran también sus fotos."
+        detail="Se borran también sus fotos y audios."
         onConfirm={async () => {
-          if (confirming) await removeInquiry(confirming.id);
+          if (deleting) await removeInquiry(deleting.id);
         }}
       />
     </>
+  );
+}
+
+/**
+ * El cliente aceptó: se elige cómo paga y se crea solo el pedido en estado
+ * confirmado (aparece en Pedidos y en la cola de impresión).
+ */
+function ConfirmSale({
+  inquiry,
+  onDone,
+}: {
+  inquiry: InquiryView;
+  onDone: () => void;
+}) {
+  const [method, setMethod] = useState<InquiryPaymentMethod>("transfer");
+  const [busy, setBusy] = useState(false);
+  const total = (inquiry.unitPrice ?? 0) * inquiry.quantity;
+
+  async function confirm() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await runAction(
+        () => changeInquiryStatusAction(inquiry.id, "confirmed", method),
+        { label: "Creando el pedido…" },
+      );
+      if (!res.ok) return;
+      toast("Confirmada: el pedido ya está en Pedidos", "success");
+      onDone();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm">
+        Se va a crear el pedido de <b>{inquiry.customerName}</b>:{" "}
+        {inquiry.quantity > 1 ? `${inquiry.quantity} × ` : ""}
+        {inquiry.title}, por <b>{formatQuoteMoney(total)}</b>. Entra como{" "}
+        <b>confirmado</b> a Pedidos y a la cola de impresión.
+      </p>
+      <div className="field">
+        <label htmlFor="confirm-method">¿Cómo paga?</label>
+        <select
+          id="confirm-method"
+          className="select"
+          value={method}
+          onChange={(e) => setMethod(e.target.value as InquiryPaymentMethod)}
+        >
+          {PAYMENT_METHODS.map((m) => (
+            <option key={m} value={m}>
+              {PAYMENT_METHOD_LABEL[m]}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          className="btn btn-ghost"
+          disabled={busy}
+          onClick={onDone}
+        >
+          Todavía no
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={busy}
+          onClick={() => void confirm()}
+        >
+          Confirmar y crear pedido
+        </button>
+      </div>
+    </div>
   );
 }

@@ -4,7 +4,9 @@ import { createInquiry } from "@/features/consultas/flow";
 import { listInquiries } from "@/features/consultas/queries";
 import {
   INQUIRY_STATUS_LABEL,
+  MAX_INQUIRY_FILES,
   MAX_INQUIRY_IMAGES,
+  PAYMENT_METHOD_LABEL,
   inquiryCreateSchema,
 } from "@/features/consultas/schemas";
 import { toInquiryView } from "@/features/consultas/view";
@@ -27,6 +29,8 @@ export const GET = withApi("admin/consultas", async (request: Request) => {
     items: rows.map((r) => toInquiryView(r, auth.user.id)),
     statuses: INQUIRY_STATUS_LABEL,
     maxImages: MAX_INQUIRY_IMAGES,
+    maxFiles: MAX_INQUIRY_FILES,
+    paymentMethods: PAYMENT_METHOD_LABEL,
   });
 });
 

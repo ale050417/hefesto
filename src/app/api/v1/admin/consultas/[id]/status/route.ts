@@ -9,7 +9,10 @@ import { businessError, invalidInput } from "@/features/inventory/api-helpers";
 /**
  * POST /api/v1/admin/consultas/:id/status — body `{ to }` con
  * "confirmed" | "cancelled" | "reopen" (consultas/crear: lo hace quien carga
- * las consultas, atención al cliente). Devuelve la consulta.
+ * las consultas, atención al cliente). Con "confirmed" se crea SOLO el pedido
+ * en estado confirmado; `paymentMethod` ("transfer" | "mercadopago" | "cash",
+ * por defecto transferencia) dice cómo paga. Devuelve la consulta, con
+ * `saleId` si se creó el pedido.
  */
 export const dynamic = "force-dynamic";
 
@@ -31,6 +34,7 @@ export const POST = withApi(
         id.data,
         parsed.data.to,
         apiActor(auth.user),
+        parsed.data.paymentMethod,
       );
       return apiOk(toInquiryView(row, auth.user.id));
     } catch (error) {

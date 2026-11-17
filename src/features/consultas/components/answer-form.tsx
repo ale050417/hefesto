@@ -30,6 +30,9 @@ export function AnswerForm({
   const [unitPrice, setUnitPrice] = useState(
     inquiry.unitPrice != null ? String(inquiry.unitPrice) : "",
   );
+  const [unitCost, setUnitCost] = useState(
+    inquiry.unitCost != null ? String(inquiry.unitCost) : "",
+  );
   const [bulkPrice, setBulkPrice] = useState(
     inquiry.bulkPrice != null ? String(inquiry.bulkPrice) : "",
   );
@@ -73,6 +76,7 @@ export function AnswerForm({
         () =>
           answerInquiryAction(inquiry.id, {
             unitPrice,
+            unitCost,
             bulkPrice,
             bulkFrom,
             dimensions,
@@ -127,6 +131,31 @@ export function AnswerForm({
             <p className="field-error">{errors.unitPrice}</p>
           ) : null}
         </div>
+        <div className={`field ${errors.unitCost ? "invalid" : ""}`}>
+          <label htmlFor="ans-cost">Costo por unidad ($)</label>
+          <input
+            id="ans-cost"
+            className="input"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            value={unitCost}
+            placeholder="El de la calculadora"
+            aria-invalid={errors.unitCost ? true : undefined}
+            onChange={(e) => setUnitCost(e.target.value)}
+          />
+          {errors.unitCost ? (
+            <p className="field-error">{errors.unitCost}</p>
+          ) : (
+            <p className="text-faint text-xs">
+              No se le muestra al cliente. Con esto se registra el pedido cuando
+              se confirma.
+            </p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid-2">
         <div className="field">
           <label htmlFor="ans-delivery">Demora estimada</label>
           <input
@@ -136,6 +165,17 @@ export function AnswerForm({
             maxLength={120}
             placeholder="Ej.: 3 a 5 días hábiles"
             onChange={(e) => setDeliveryTime(e.target.value)}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="ans-dims">Medidas</label>
+          <input
+            id="ans-dims"
+            className="input"
+            value={dimensions}
+            maxLength={300}
+            placeholder="Ej.: Alto: 9 cm, Ancho: 5 cm"
+            onChange={(e) => setDimensions(e.target.value)}
           />
         </div>
       </div>
@@ -176,17 +216,6 @@ export function AnswerForm({
       </div>
 
       <div className="grid-2">
-        <div className="field">
-          <label htmlFor="ans-dims">Medidas</label>
-          <input
-            id="ans-dims"
-            className="input"
-            value={dimensions}
-            maxLength={300}
-            placeholder="Ej.: Alto: 9 cm, Ancho: 5 cm"
-            onChange={(e) => setDimensions(e.target.value)}
-          />
-        </div>
         <div className="field">
           <label htmlFor="ans-colors">Colores</label>
           <input

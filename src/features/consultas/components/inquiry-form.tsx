@@ -6,7 +6,8 @@ import { compressImageToWebp } from "@/lib/image-compress";
 import { runAction } from "@/lib/run-action";
 import { toast } from "@/stores/toastStore";
 import { createInquiryAction, uploadInquiryImageAction } from "../actions";
-import { MAX_INQUIRY_IMAGES } from "../schemas";
+import { MAX_INQUIRY_FILES, MAX_INQUIRY_IMAGES } from "../schemas";
+import { attachProblem, uploadToInquiry } from "./attach";
 
 type Picked = { key: string; file: File; url: string };
 
@@ -28,6 +29,25 @@ export function InquiryForm({
   const [quantity, setQuantity] = useState("1");
   const [description, setDescription] = useState("");
   const [photos, setPhotos] = useState<Picked[]>([]);
+  // Audios, videos cortos o PDF (lo que mandó el cliente y no es foto).
+  const [extras, setExtras] = useState<File[]>([]);
+  const extrasRef = useRef<HTMLInputElement>(null);
+
+  function addExtras(list: FileList | null) {
+    const picked = Array.from(list ?? []);
+    const bad = picked.map(attachProblem).find(Boolean);
+    if (bad) {
+      toast(bad, "danger");
+      return;
+    }
+    setExtras((prev) => {
+      const next = [...prev, ...picked];
+      if (next.length > MAX_INQUIRY_FILES) {
+        toast(`Máximo ${MAX_INQUIRY_FILES} archivos por consulta.`, "danger");
+      }
+      return next.slice(0, MAX_INQUIRY_FILES);
+    });
+  }
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -111,9 +131,10 @@ export function InquiryForm({
         });
         if (!up.ok) failed += 1;
       }
+      failed += await uploadToInquiry(res.data.id, extras);
       if (failed > 0) {
         toast(
-          `La consulta se guardó, pero ${failed} foto${failed === 1 ? " no se subió" : "s no se subieron"}.`,
+          `La consulta se guardó, pero ${failed} archivo${failed === 1 ? " no se subió" : "s no se subieron"}.`,
           "danger",
         );
       } else {
@@ -250,6 +271,59 @@ export function InquiryForm({
               </figure>
             ))}
           </div>
+        ) : null}
+      </div>
+
+      <div className="field">
+        <label>
+          Audios u otros archivos ({extras.length}/{MAX_INQUIRY_FILES})
+        </label>
+        <input
+          ref={extrasRef}
+          type="file"
+          multiple
+          accept="audio/*,video/*,application/pdf,.ogg,.opus,.m4a,.mp3,.wav"
+          className="hidden"
+          onChange={(e) => {
+            addExtras(e.target.files);
+            e.currentTarget.value = "";
+          }}
+        />
+        <div>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={busy || extras.length >= MAX_INQUIRY_FILES}
+            onClick={() => extrasRef.current?.click()}
+          >
+            Sumar audio o archivo
+          </button>
+        </div>
+        <p className="text-faint text-xs">
+          El audio que mandó el cliente, un PDF o un video corto. Hasta 4 MB
+          cada uno.
+        </p>
+        {extras.length > 0 ? (
+          <ul className="flex flex-col gap-1 text-sm">
+            {extras.map((f, i) => (
+              <li
+                key={`${f.name}-${i}`}
+                className="flex items-center justify-between gap-2"
+              >
+                <span className="min-w-0 truncate">{f.name}</span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={busy}
+                  onClick={() =>
+                    setExtras((prev) => prev.filter((_, j) => j !== i))
+                  }
+                >
+                  Quitar
+                </button>
+              </li>
+            ))}
+          </ul>
         ) : null}
       </div>
 

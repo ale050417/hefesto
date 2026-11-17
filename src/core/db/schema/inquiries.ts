@@ -10,6 +10,7 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
+import { manualSales } from "./manual-sales";
 import { profiles } from "./profiles";
 
 // Consultas (pedido de Ale, 2026-11-17): atención al cliente (Antonella) carga
@@ -29,10 +30,18 @@ export const inquiries = pgTable(
     quantity: integer("quantity").notNull().default(1),
     // Fotos de referencia (bucket de imágenes, prefijo consultas/).
     images: jsonb("images").$type<string[]>().notNull().default([]),
+    // Adjuntos que no son fotos: audios, PDF, videos cortos.
+    files: jsonb("files")
+      .$type<Array<{ url: string; name: string; type: string }>>()
+      .notNull()
+      .default([]),
     // pending | answered | confirmed | cancelled
     status: text("status").notNull().default("pending"),
     // --- Respuesta del operador ---
     unitPrice: numeric("unit_price", { precision: 12, scale: 2 }),
+    // Costo por unidad (de la calculadora): con esto se registra la venta al
+    // confirmar, sin dejarla con costo 0.
+    unitCost: numeric("unit_cost", { precision: 12, scale: 2 }),
     bulkPrice: numeric("bulk_price", { precision: 12, scale: 2 }),
     bulkFrom: integer("bulk_from"),
     dimensions: text("dimensions"),
@@ -47,6 +56,10 @@ export const inquiries = pgTable(
     answeredByName: text("answered_by_name"),
     answeredAt: timestamp("answered_at", { withTimezone: true }),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    // Venta que se creó sola al confirmar.
+    saleId: uuid("sale_id").references(() => manualSales.id, {
+      onDelete: "set null",
+    }),
     createdBy: uuid("created_by").references(() => profiles.id, {
       onDelete: "set null",
     }),

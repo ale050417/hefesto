@@ -6,16 +6,21 @@ import {
   UnauthorizedError,
   ValidationError,
 } from "@/core/errors";
-import { deleteObject, storeImage } from "@/core/storage";
+import { deleteObject, storeImage, uploadObject } from "@/core/storage";
 import { notifyAdmins } from "@/features/notifications/service";
+import { registerManualSale } from "@/features/orders/manual-sale-flow";
 import { formatQuoteMoney } from "@/features/quotes/build-quote";
 import { getQuoteDefaults } from "@/features/quotes/service";
 import { buildInquiryMessage } from "./message";
 import * as repo from "./repository";
 import {
+  MAX_INQUIRY_FILES,
+  MAX_INQUIRY_FILE_BYTES,
   MAX_INQUIRY_IMAGES,
+  isAllowedInquiryFile,
   type InquiryAnswerInput,
   type InquiryCreateInput,
+  type InquiryPaymentMethod,
   type InquiryStatusChange,
 } from "./schemas";
 
@@ -122,6 +127,7 @@ export async function answerInquiry(
     );
   const row = await repo.saveInquiryAnswer(id, {
     unitPrice: input.unitPrice,
+    unitCost: input.unitCost,
     bulkPrice: input.bulkPrice,
     bulkFrom: input.bulkFrom,
     dimensions: input.dimensions,
@@ -150,17 +156,101 @@ export async function answerInquiry(
   return row;
 }
 
+/** Hoy en Argentina, como lo manda el formulario de ventas (AAAA-MM-DD). */
+function todayAr(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date());
+}
+
+/**
+ * Confirmar: la consulta pasa a confirmada Y se crea sola la venta en estado
+ * "confirmado" (pedido de Ale, 2026-11-17: "que el pedido pase solo a pedido
+ * confirmado"), así aparece en Pedidos y en la cola de impresión sin volver a
+ * cargar nada. El precio y el costo son los que puso el operador al responder.
+ *
+ * Primero se TOMA la consulta (answered → confirmed en una sentencia) y recién
+ * después se crea la venta: dos toques seguidos no pueden crear dos pedidos.
+ * Si la venta falla, la consulta vuelve a "respondida".
+ */
+async function confirmInquiry(
+  id: string,
+  paymentMethod: InquiryPaymentMethod,
+  actor: Actor,
+): Promise<repo.Inquiry> {
+  const before = await repo.findInquiryById(id);
+  if (!before) throw new NotFoundError("La consulta ya no existe.");
+  if (before.status !== "answered") {
+    throw new ValidationError(
+      "Solo se puede confirmar una consulta que ya tiene respuesta.",
+    );
+  }
+  const unitPrice = Number(before.unitPrice);
+  const unitCost = Number(before.unitCost);
+  if (!(unitPrice > 0) || !(unitCost > 0)) {
+    throw new ValidationError(
+      "A la respuesta le falta el costo por unidad. Pedile al operador que la complete y volvé a confirmar.",
+    );
+  }
+  const claimed = await repo.claimInquiryConfirmation(id);
+  if (!claimed) {
+    throw new ValidationError("La consulta cambió. Actualizá la página.");
+  }
+  let row = claimed;
+  try {
+    const sale = await registerManualSale({
+      input: {
+        saleDate: todayAr(),
+        customerName: claimed.customerName,
+        detail: claimed.title.slice(0, 300),
+        quantity: claimed.quantity,
+        total: unitPrice * claimed.quantity,
+        paymentMethod,
+        status: "confirmed",
+      },
+      actorId: actor.id,
+      manualCost: unitCost * claimed.quantity,
+    });
+    row = (await repo.setInquirySale(id, sale.id)) ?? claimed;
+  } catch (error) {
+    await repo.setInquiryStatus(id, "answered");
+    throw error;
+  }
+  await recordAudit({
+    actorId: actor.id,
+    action: "inquiry.status_changed",
+    entityType: "inquiry",
+    entityId: id,
+    metadata: {
+      title: row.title,
+      from: "answered",
+      to: "confirmed",
+      saleId: row.saleId,
+    },
+  });
+  await notify(
+    "Consulta CONFIRMADA → pedido creado",
+    `${row.title}${times(row.quantity)} — ${row.customerName}`,
+  );
+  revalidatePath(PAGE);
+  revalidatePath("/admin/produccion");
+  return row;
+}
+
 /** Confirmar / no se hizo / reabrir (atención al cliente). */
 export async function changeInquiryStatus(
   id: string,
   to: InquiryStatusChange,
   actor: Actor,
+  paymentMethod: InquiryPaymentMethod = "transfer",
 ): Promise<repo.Inquiry> {
+  if (to === "confirmed") return confirmInquiry(id, paymentMethod, actor);
   const before = await repo.findInquiryById(id);
   if (!before) throw new NotFoundError("La consulta ya no existe.");
-  if (to === "confirmed" && before.status !== "answered") {
+  if (to === "reopen" && before.saleId) {
+    // El pedido ya existe: reabrir y volver a confirmar lo duplicaría.
     throw new ValidationError(
-      "Solo se puede confirmar una consulta que ya tiene respuesta.",
+      "Esta consulta ya generó un pedido. Si hay que cambiar algo, editá el pedido.",
     );
   }
   const next = to === "reopen" ? (before.message ? "answered" : "pending") : to;
@@ -174,14 +264,46 @@ export async function changeInquiryStatus(
     entityId: id,
     metadata: { title: row.title, from: before.status, to: next },
   });
-  if (next === "confirmed") {
-    await notify(
-      "Consulta CONFIRMADA",
-      `${row.title}${times(row.quantity)} — ${row.customerName}`,
-    );
-  }
   revalidatePath(PAGE);
   return row;
+}
+
+/**
+ * Suma un adjunto que no es foto (el audio que mandó el cliente, un PDF, un
+ * video corto). Lo puede sumar quien cargó la consulta o quien la responde,
+ * así todo queda en la misma consulta.
+ */
+export async function addInquiryFile(
+  id: string,
+  file: { bytes: Buffer; name: string; type: string },
+  actor: Actor,
+  canEdit: boolean,
+): Promise<{ url: string; name: string; type: string }> {
+  const row = await repo.findInquiryById(id);
+  if (!row) throw new NotFoundError("La consulta ya no existe.");
+  if (row.createdBy !== actor.id && !canEdit) throw new UnauthorizedError();
+  if (!isAllowedInquiryFile(file.type)) {
+    throw new ValidationError("Se pueden adjuntar audios, videos o PDF.");
+  }
+  if (file.bytes.length > MAX_INQUIRY_FILE_BYTES) {
+    throw new ValidationError("El archivo supera los 4 MB.");
+  }
+  const full = `Máximo ${MAX_INQUIRY_FILES} archivos por consulta.`;
+  if (row.files.length >= MAX_INQUIRY_FILES) throw new ValidationError(full);
+  const name = file.name
+    .replace(/[\r\n]/g, " ")
+    .trim()
+    .slice(0, 120);
+  const ext = /\.([a-z0-9]{1,5})$/i.exec(name)?.[1]?.toLowerCase() ?? "bin";
+  const path = `${PREFIX}/${id}/files/${randomUUID()}.${ext}`;
+  const url = await uploadObject(BUCKET, path, file.bytes, file.type);
+  const saved = { url, name: name || "archivo", type: file.type };
+  if (!(await repo.appendInquiryFile(id, saved, MAX_INQUIRY_FILES))) {
+    await deleteObject(BUCKET, path).catch(() => undefined);
+    throw new ValidationError(full);
+  }
+  revalidatePath(PAGE);
+  return saved;
 }
 
 /** Borra la consulta y sus fotos (permiso, o es suya y nadie respondió). */
@@ -195,7 +317,7 @@ export async function deleteInquiry(
   const ownPending = row.createdBy === actor.id && row.status === "pending";
   if (!canDelete && !ownPending) throw new UnauthorizedError();
   await repo.deleteInquiryRow(id);
-  for (const url of row.images) {
+  for (const url of [...row.images, ...row.files.map((f) => f.url)]) {
     const path = storagePath(url);
     if (path) await deleteObject(BUCKET, path).catch(() => undefined);
   }

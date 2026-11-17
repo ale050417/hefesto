@@ -18,6 +18,28 @@ export const INQUIRY_STATUS_LABEL: Record<InquiryStatus, string> = {
   cancelled: "No se hizo",
 };
 
+export const PAYMENT_METHODS = ["transfer", "mercadopago", "cash"] as const;
+export const PAYMENT_METHOD_LABEL: Record<
+  (typeof PAYMENT_METHODS)[number],
+  string
+> = {
+  transfer: "Transferencia",
+  mercadopago: "MercadoPago",
+  cash: "Efectivo",
+};
+
+/** Adjuntos que no son fotos (audios, PDF, video corto). */
+export const MAX_INQUIRY_FILES = 8;
+/** Vercel corta los pedidos de más de 4,5 MB: el tope real es este. */
+export const MAX_INQUIRY_FILE_BYTES = 4 * 1024 * 1024;
+export function isAllowedInquiryFile(type: string): boolean {
+  return (
+    type.startsWith("audio/") ||
+    type.startsWith("video/") ||
+    type === "application/pdf"
+  );
+}
+
 const optText = (max: number) =>
   z
     .string()
@@ -64,6 +86,10 @@ export const inquiryAnswerSchema = z
     unitPrice: z.coerce
       .number("Poné el precio por unidad.")
       .positive("Poné el precio por unidad."),
+    /** Costo por unidad (calculadora): con esto se registra la venta. */
+    unitCost: z.coerce
+      .number("Poné el costo por unidad (sale de la calculadora).")
+      .positive("Poné el costo por unidad (sale de la calculadora)."),
     bulkPrice: optMoney,
     bulkFrom: z.preprocess(
       (v) => (v === "" || v == null ? null : v),
@@ -85,5 +111,8 @@ export type InquiryAnswerInput = z.infer<typeof inquiryAnswerSchema>;
 /** Cambios de estado que hace atención al cliente. */
 export const inquiryStatusSchema = z.object({
   to: z.enum(["confirmed", "cancelled", "reopen"]),
+  /** Cómo paga el cliente: hace falta para crear el pedido al confirmar. */
+  paymentMethod: z.enum(PAYMENT_METHODS).default("transfer"),
 });
 export type InquiryStatusChange = z.infer<typeof inquiryStatusSchema>["to"];
+export type InquiryPaymentMethod = (typeof PAYMENT_METHODS)[number];

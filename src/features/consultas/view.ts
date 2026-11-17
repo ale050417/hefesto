@@ -10,8 +10,10 @@ export type InquiryView = {
   description: string;
   quantity: number;
   images: string[];
+  files: Array<{ url: string; name: string; type: string }>;
   status: InquiryStatus;
   unitPrice: number | null;
+  unitCost: number | null;
   bulkPrice: number | null;
   bulkFrom: number | null;
   dimensions: string | null;
@@ -26,6 +28,8 @@ export type InquiryView = {
   createdAt: string;
   answeredAt: string | null;
   confirmedAt: string | null;
+  /** Pedido que se creó al confirmar. */
+  saleId: string | null;
 };
 
 const num = (v: string | null) => (v == null ? null : Number(v));
@@ -42,8 +46,10 @@ export function toInquiryView(
     description: row.description,
     quantity: row.quantity,
     images: row.images,
+    files: row.files,
     status: row.status as InquiryStatus,
     unitPrice: num(row.unitPrice),
+    unitCost: num(row.unitCost),
     bulkPrice: num(row.bulkPrice),
     bulkFrom: row.bulkFrom,
     dimensions: row.dimensions,
@@ -57,5 +63,6 @@ export function toInquiryView(
     createdAt: row.createdAt.toISOString(),
     answeredAt: row.answeredAt?.toISOString() ?? null,
     confirmedAt: row.confirmedAt?.toISOString() ?? null,
+    saleId: row.saleId,
   };
 }
