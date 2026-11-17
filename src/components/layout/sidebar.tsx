@@ -47,6 +47,18 @@ const icons: Record<string, React.ReactNode> = {
       <rect x="7" y="14" width="10" height="7" rx="1" />
     </svg>
   ),
+  consultas: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z" />
+    </svg>
+  ),
   arreglos: (
     <svg
       viewBox="0 0 24 24"
@@ -152,7 +164,12 @@ export type NavLink = {
   /** Módulo con permiso fino. Si el usuario no lo puede ver, se oculta. */
   module?: string;
   /** Qué contador del menú muestra (ver /api/admin/nav-counts). */
-  count?: "pendingOrders" | "inProduction" | "lowStock" | "openFixes";
+  count?:
+    | "pendingOrders"
+    | "inProduction"
+    | "lowStock"
+    | "openFixes"
+    | "openInquiries";
 };
 
 /** También los usa el buscador global (Ctrl+K). */
@@ -171,6 +188,14 @@ export const NAV_LINKS: NavLink[] = [
     group: "Ventas",
     module: "pedidos",
     count: "pendingOrders",
+  },
+  {
+    href: "/admin/consultas",
+    label: "Consultas",
+    icon: icons.consultas,
+    group: "Ventas",
+    module: "consultas",
+    count: "openInquiries",
   },
   // A medida oculto (2026-07): el flujo pasó a WhatsApp (/a-medida público).
   // Para reactivar el panel, restaurar este item y poner CUSTOM_ORDERS_ENABLED=true.
@@ -297,6 +322,7 @@ type NavCounts = {
   inProduction: number;
   lowStock: number;
   openFixes: number;
+  openInquiries: number;
 };
 
 /**
@@ -442,9 +468,11 @@ export function Sidebar({
                           ? "Pendientes de pago"
                           : l.count === "inProduction"
                             ? "Confirmados o en producción"
-                            : l.count === "openFixes"
-                              ? "Arreglos por resolver"
-                              : "Con stock bajo"
+                            : l.count === "openInquiries"
+                              ? "Consultas abiertas"
+                              : l.count === "openFixes"
+                                ? "Arreglos por resolver"
+                                : "Con stock bajo"
                       }
                     >
                       {counts[l.count]}

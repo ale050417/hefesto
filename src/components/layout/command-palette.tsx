@@ -59,6 +59,14 @@ const ACTIONS: Item[] = [
     module: "fallas",
   },
   {
+    key: "a:consulta",
+    group: "Acciones",
+    label: "Cargar una consulta",
+    hint: "Lo que pide un cliente, para que el operador ponga el precio",
+    href: "/admin/consultas",
+    module: "consultas",
+  },
+  {
     key: "a:arreglo",
     group: "Acciones",
     label: "Cargar un arreglo",

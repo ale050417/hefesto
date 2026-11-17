@@ -4,6 +4,7 @@ import { getStaffUser } from "@/core/auth/session";
 import { countAllSalesByStatus } from "@/features/orders/repository";
 import { listFilamentsView } from "@/features/inventory/queries";
 import { countOpenFixes } from "@/features/arreglos/queries";
+import { countOpenInquiries } from "@/features/consultas/queries";
 import { safeLoad } from "@/lib/safe-load";
 
 /**
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 const getCounts = unstable_cache(
   async () => {
-    const [ordersR, lowR, fixesR] = await Promise.all([
+    const [ordersR, lowR, fixesR, inquiriesR] = await Promise.all([
       safeLoad(
         "nav:orders",
         countAllSalesByStatus(),
@@ -27,6 +28,7 @@ const getCounts = unstable_cache(
         0,
       ),
       safeLoad("nav:openFixes", countOpenFixes(), 0),
+      safeLoad("nav:openInquiries", countOpenInquiries(), 0),
     ]);
     const o = ordersR.value;
     return {
@@ -34,6 +36,7 @@ const getCounts = unstable_cache(
       inProduction: (o.confirmed ?? 0) + (o.in_production ?? 0),
       lowStock: lowR.value,
       openFixes: fixesR.value,
+      openInquiries: inquiriesR.value,
     };
   },
   ["admin-nav-counts"],

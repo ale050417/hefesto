@@ -17,6 +17,7 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "db:seed": "tsx src/core/db/seed-run.ts",
+    "arreglos": "tsx scripts/arreglos.mts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test"

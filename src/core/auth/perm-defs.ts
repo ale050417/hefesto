@@ -8,6 +8,7 @@
 export const PERM_MODULES = [
   ["productos", "Productos y categorías"],
   ["pedidos", "Pedidos"],
+  ["consultas", "Consultas"],
   ["medida", "Pedidos a medida"],
   ["clientes", "Clientes"],
   ["produccion", "Cola de producción"],
