@@ -1,0 +1,4 @@
+# Antes de subir: lo mismo que revisa el build de Vercel (ver docs/DEPLOY.md).
+# Si esto falla, el deploy falla: mejor enterarse acá.
+pnpm typecheck
+pnpm test
