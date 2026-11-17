@@ -50,15 +50,25 @@ function Chevron({ dir }: { dir: "left" | "right" }) {
 /**
  * Categorías padre en círculos (estilo "historias"), una al lado de la otra.
  *
- * SIN loop infinito ni auto-scroll (2026-08-03). Antes, con 5 o más categorías,
- * la lista se DUPLICABA para que el desplazamiento automático no tuviera
- * costura: en pantalla ancha se veía la misma categoría dos veces a la vez y
- * parecía un error. Ale: "tiene que aparecer una vez nomás y ya". Ahora cada
- * categoría aparece EXACTAMENTE UNA VEZ:
+ * SIN loop infinito (2026-08-03). Antes, con 5 o más categorías, la lista se
+ * DUPLICABA para que el desplazamiento automático no tuviera costura: en
+ * pantalla ancha se veía la misma categoría dos veces a la vez y parecía un
+ * error. Ale: "tiene que aparecer una vez nomás y ya". Cada categoría aparece
+ * EXACTAMENTE UNA VEZ:
  *  - si entran todas, quedan centradas;
  *  - si no entran, se desplazan con el dedo (swipe) o con las flechas ‹ › en
  *    compu, que es lo que la gente ya espera de una fila así.
+ *
+ * Se mueve solo otra vez (2026-11-17, Ale: "que se mueva y no quede
+ * estático"), pero SIN duplicar: avanza despacio hasta el final y vuelve
+ * (ida y vuelta). Mientras la persona lo toca, arrastra o usa las flechas, el
+ * movimiento automático se suelta y retoma unos segundos después: si los dos
+ * pelean por scrollLeft, se traba (incidente 2026-07-24).
  */
+const AUTO_SPEED = 28; // px por segundo
+const AUTO_RESUME_MS = 3000; // espera tras la última interacción
+const AUTO_EDGE_MS = 1200; // pausa al llegar a cada punta
+
 export function CategoryCircles({
   categories,
 }: {
@@ -70,6 +80,11 @@ export function CategoryCircles({
   const drag = useRef({ down: false, moved: false, startX: 0, startScroll: 0 });
   const [overflowing, setOverflowing] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  // Hasta cuándo queda suelto el movimiento automático (performance.now()).
+  const autoHoldUntil = useRef(0);
+  const holdAuto = (ms = AUTO_RESUME_MS) => {
+    autoHoldUntil.current = performance.now() + ms;
+  };
 
   // ¿Es una compu con mouse? (para mostrar flechas). En touch, no.
   useEffect(() => {
@@ -100,6 +115,70 @@ export function CategoryCircles({
     return () => window.removeEventListener("resize", measure);
   }, [categories.length]);
 
+  // Movimiento automático de ida y vuelta (solo si la fila desborda).
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!overflowing || !track) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let raf = 0;
+    let last = performance.now();
+    // Posición con decimales: scrollLeft redondea y a esta velocidad el
+    // avance por cuadro es menor a 1 px.
+    let pos = track.scrollLeft;
+    let dir = 1;
+    let touching = false;
+
+    const tick = (now: number) => {
+      const dt = Math.min(now - last, 100) / 1000;
+      last = now;
+      const max = track.scrollWidth - track.clientWidth;
+      const held = touching || drag.current.down || now < autoHoldUntil.current;
+      if (held || max <= 0) {
+        pos = track.scrollLeft;
+      } else {
+        // Lo movió otra cosa (teclado, lector de pantalla): seguimos desde ahí.
+        if (Math.abs(track.scrollLeft - pos) > 2) pos = track.scrollLeft;
+        pos += dir * AUTO_SPEED * dt;
+        if (pos >= max) {
+          pos = max;
+          dir = -1;
+          autoHoldUntil.current = now + AUTO_EDGE_MS;
+        } else if (pos <= 0) {
+          pos = 0;
+          dir = 1;
+          autoHoldUntil.current = now + AUTO_EDGE_MS;
+        }
+        track.scrollLeft = pos;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+
+    const onTouchStart = () => {
+      touching = true;
+    };
+    // Tras soltar, el scroll nativo sigue con inercia: no retomar enseguida.
+    const onTouchEnd = () => {
+      touching = false;
+      autoHoldUntil.current = performance.now() + AUTO_RESUME_MS;
+    };
+    const onWheel = () => {
+      autoHoldUntil.current = performance.now() + AUTO_RESUME_MS;
+    };
+    track.addEventListener("touchstart", onTouchStart, { passive: true });
+    track.addEventListener("touchend", onTouchEnd, { passive: true });
+    track.addEventListener("touchcancel", onTouchEnd, { passive: true });
+    track.addEventListener("wheel", onWheel, { passive: true });
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      track.removeEventListener("touchstart", onTouchStart);
+      track.removeEventListener("touchend", onTouchEnd);
+      track.removeEventListener("touchcancel", onTouchEnd);
+      track.removeEventListener("wheel", onWheel);
+    };
+  }, [overflowing, categories.length]);
+
   function onPointerDown(e: RPointerEvent<HTMLDivElement>) {
     const track = trackRef.current;
     if (!track) return;
@@ -121,6 +200,7 @@ export function CategoryCircles({
     track.scrollLeft = drag.current.startScroll - dx;
   }
   function endDrag() {
+    if (drag.current.down) holdAuto();
     drag.current.down = false;
   }
   // Si el click viene de un arrastre, no navegamos.
@@ -134,6 +214,7 @@ export function CategoryCircles({
   /** Flechas: desplazan ~3 círculos. Al llegar al borde, se frena (no da la
    *  vuelta): la lista tiene principio y fin, como lo que ve el cliente. */
   function nudge(dir: 1 | -1) {
+    holdAuto();
     trackRef.current?.scrollBy({ left: dir * 340, behavior: "smooth" });
   }
 
