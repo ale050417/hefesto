@@ -13,6 +13,7 @@ export const PERM_MODULES = [
   ["produccion", "Cola de producción"],
   ["filamentos", "Filamentos"],
   ["fallas", "Impresiones fallidas"],
+  ["arreglos", "Arreglos"],
   ["descuentos", "Descuentos"],
   ["recompensas", "Recompensas"],
   ["resenas", "Reseñas"],

@@ -24,6 +24,7 @@ export * from "./filaments";
 export * from "./filament-movements";
 export * from "./filament-catalog";
 export * from "./print-failures";
+export * from "./fix-requests";
 export * from "./coupons";
 export * from "./coupon-redemptions";
 export * from "./reviews";

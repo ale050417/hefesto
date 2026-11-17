@@ -540,6 +540,20 @@
       "when": 1792628291150,
       "tag": "0076_auto_banners",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1794952996224,
+      "tag": "0077_fix_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1794953700000,
+      "tag": "0078_fix_requests_reviewer_readonly",
+      "breakpoints": true
     }
   ]
 }

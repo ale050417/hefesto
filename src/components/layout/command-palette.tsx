@@ -59,6 +59,14 @@ const ACTIONS: Item[] = [
     module: "fallas",
   },
   {
+    key: "a:arreglo",
+    group: "Acciones",
+    label: "Cargar un arreglo",
+    hint: "Algo para arreglar o mejorar, con fotos",
+    href: "/admin/arreglos",
+    module: "arreglos",
+  },
+  {
     key: "a:filamento",
     group: "Acciones",
     label: "Nuevo filamento",

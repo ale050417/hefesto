@@ -3,18 +3,19 @@ import { unstable_cache } from "next/cache";
 import { getStaffUser } from "@/core/auth/session";
 import { countAllSalesByStatus } from "@/features/orders/repository";
 import { listFilamentsView } from "@/features/inventory/queries";
+import { countOpenFixes } from "@/features/arreglos/queries";
 import { safeLoad } from "@/lib/safe-load";
 
 /**
  * Contadores del menú lateral (2026-10-21): pedidos pendientes de pago, en
- * producción y filamentos con stock bajo. Cacheado 30 s para que abrir el
+ * producción, filamentos con stock bajo y arreglos por resolver. Cacheado 30 s para que abrir el
  * panel no sume queries (el pool de la DB es chico).
  */
 export const dynamic = "force-dynamic";
 
 const getCounts = unstable_cache(
   async () => {
-    const [ordersR, lowR] = await Promise.all([
+    const [ordersR, lowR, fixesR] = await Promise.all([
       safeLoad(
         "nav:orders",
         countAllSalesByStatus(),
@@ -25,12 +26,14 @@ const getCounts = unstable_cache(
         listFilamentsView().then((fs) => fs.filter((f) => f.lowStock).length),
         0,
       ),
+      safeLoad("nav:openFixes", countOpenFixes(), 0),
     ]);
     const o = ordersR.value;
     return {
       pendingOrders: o.pending_payment ?? 0,
       inProduction: (o.confirmed ?? 0) + (o.in_production ?? 0),
       lowStock: lowR.value,
+      openFixes: fixesR.value,
     };
   },
   ["admin-nav-counts"],
