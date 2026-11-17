@@ -32,6 +32,7 @@ const [role] = await sql`
   values (${ROLE}, ${sql.json(perms)}, false, false)
   on conflict (name) do update set permissions = excluded.permissions, is_admin = false
   returning id`;
+if (!role) throw new Error("No se pudo crear el rol del revisor.");
 
 const { data: list } = await sb.auth.admin.listUsers({ perPage: 1000 });
 let user = list.users.find((u) => u.email?.toLowerCase() === EMAIL);
