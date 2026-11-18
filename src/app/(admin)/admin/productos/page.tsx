@@ -1,7 +1,7 @@
 import { requirePermissionPage } from "@/core/auth/permissions";
 import { ProductsAdmin } from "@/features/products/components/products-admin";
 import { getEstimatorContext } from "@/features/calculator/service";
-import { listColorCatalog } from "@/features/inventory/queries";
+import { listProductColors } from "@/features/inventory/queries";
 import { getBrandSettings } from "@/features/settings/service";
 import { sectionOn } from "@/features/settings/home-sections";
 import {
@@ -25,7 +25,7 @@ export default async function ProductosAdminPage() {
         listProductsAdmin({ page: 1, pageSize: 500 }),
         listCategories(),
         getEstimatorContext(),
-        listColorCatalog(),
+        listProductColors(),
         getBrandSettings(),
       ]),
     );

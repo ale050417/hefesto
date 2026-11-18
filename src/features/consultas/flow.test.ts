@@ -80,6 +80,38 @@ describe("confirmar una consulta", () => {
     expect(call.actorId).toBe("u1");
   });
 
+  it("con datos de la calculadora: el costo lo resuelve el servidor desde el filamento", async () => {
+    const calc = {
+      ...answered,
+      unitCost: null,
+      estFilamentId: "f1",
+      estMaterial: "PLA",
+      estGrams: "30.00",
+      estMinutes: 90,
+    };
+    mocked(repo.findInquiryById).mockResolvedValue(calc as never);
+    mocked(repo.claimInquiryConfirmation).mockResolvedValue(calc as never);
+    mocked(registerManualSale).mockResolvedValue({ id: "v2" } as never);
+    mocked(repo.setInquirySale).mockResolvedValue({
+      ...calc,
+      saleId: "v2",
+    } as never);
+
+    await changeInquiryStatus("c1", "confirmed", actor);
+
+    const call = mocked(registerManualSale).mock.calls[0]![0];
+    expect(call.input).toMatchObject({
+      filamentId: "f1",
+      material: "PLA",
+      grams: 30,
+      printMinutes: 90,
+      quantity: 4,
+      total: 10000,
+    });
+    // Sin costo a mano: lo calcula la venta desde gramos, horas y filamento.
+    expect(call.manualCost).toBeUndefined();
+  });
+
   it("si la venta falla, la consulta vuelve a respondida y no queda confirmada", async () => {
     mocked(repo.findInquiryById).mockResolvedValue(answered as never);
     mocked(repo.claimInquiryConfirmation).mockResolvedValue(answered as never);

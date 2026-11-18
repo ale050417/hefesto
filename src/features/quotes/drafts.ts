@@ -14,6 +14,11 @@ export type ProductLike = {
   price: number | string;
   salePrice?: number | string | null;
   colors?: string[];
+  /**
+   * "multi" = combinación fija de colores. En ese modo `colorPrices` NO son
+   * precios: guarda los GRAMOS de cada color para descontar stock.
+   */
+  colorMode?: "single" | "multi";
   colorPrices?: Record<string, number>;
   variants?: Array<{ label: string; price: number | string | null }>;
 };
@@ -38,7 +43,10 @@ export function draftFromProduct(
         label: v.label,
         price: v.price == null || v.price === "" ? null : num(v.price),
       })),
-      colorPrices: p.colorPrices,
+      // Multicolor: `colorPrices` son gramos por color, no precios. Pasarlos
+      // hacía que la cotización dijera "Precio (Rojo): $ 49" con los gramos
+      // (arreglo pedido por Agustín, 2026-11-17).
+      colorPrices: p.colorMode === "multi" ? undefined : p.colorPrices,
     }),
     colors: [...(p.colors ?? [])],
   };

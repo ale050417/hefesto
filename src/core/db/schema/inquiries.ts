@@ -42,6 +42,13 @@ export const inquiries = pgTable(
     // Costo por unidad (de la calculadora): con esto se registra la venta al
     // confirmar, sin dejarla con costo 0.
     unitCost: numeric("unit_cost", { precision: 12, scale: 2 }),
+    // Lo que cargó el operador en la calculadora (por UNIDAD): con esto se
+    // costea la venta y se descuenta el filamento al confirmar. Sin FK al
+    // filamento: si el carrete se borra queda el material como referencia.
+    estFilamentId: uuid("est_filament_id"),
+    estMaterial: text("est_material"),
+    estGrams: numeric("est_grams", { precision: 10, scale: 2 }),
+    estMinutes: integer("est_minutes"),
     bulkPrice: numeric("bulk_price", { precision: 12, scale: 2 }),
     bulkFrom: integer("bulk_from"),
     dimensions: text("dimensions"),

@@ -19,6 +19,14 @@ import { DeleteManualSaleButton } from "./delete-manual-sale-button";
 import { ManualSaleStatusSelect } from "./manual-sale-status-select";
 import { OrderStatusSelect } from "./order-status-select";
 import { saleMatches } from "../sale-search";
+import {
+  SALES_TIME_ZONE,
+  isOpenStatus,
+  monthKeyOf,
+  monthLabel,
+  stepMonth,
+  type MonthKey,
+} from "../sale-month";
 import { ManualSaleEditButton } from "./manual-sale-edit-modal";
 import { ReceiptButton } from "./receipt-button";
 import { QuoteButton } from "@/features/quotes/components/quote-modal";
@@ -55,9 +63,16 @@ export type UnifiedSale = {
   }>;
 };
 
-const dateFmt = new Intl.DateTimeFormat("es-AR", { dateStyle: "medium" });
+// Zona fija: la fecha que se muestra es la misma con la que filtra el mes
+// (hora de Argentina), se abra el panel desde donde se abra.
+const dateFmt = new Intl.DateTimeFormat("es-AR", {
+  dateStyle: "medium",
+  timeZone: SALES_TIME_ZONE,
+});
 const STATUSES = Object.keys(ORDER_STATUS_LABEL) as OrderStatus[];
 type Tipo = "todo" | "online" | "manual";
+/** "open" = todo lo que sigue sin cerrar (ni entregado ni cancelado). */
+type StatusFilter = OrderStatus | "all" | "open";
 
 /**
  * Tabla UNIFICADA de ventas: pedidos online + ventas manuales en una sola
@@ -72,15 +87,22 @@ export function OrdersBoard({
   isAdmin,
   canEdit,
   quoteDefaults,
+  currentMonth,
 }: {
   items: UnifiedSale[];
   isAdmin: boolean;
   canEdit: boolean;
   /** Textos por defecto del botón "Cotización" (WhatsApp). */
   quoteDefaults: QuoteDefaults;
+  /** Mes de hoy en hora de Argentina ("2026-11"). Lo calcula la página en el
+   *  servidor para que el primer render sea igual en servidor y navegador. */
+  currentMonth: MonthKey;
 }) {
   const [tipo, setTipo] = useState<Tipo>("todo");
-  const [status, setStatus] = useState<OrderStatus | "all">("all");
+  const [status, setStatus] = useState<StatusFilter>("all");
+  /** Mes que se está mirando (pedido de Agustín, 2026-11-17). Arranca SIEMPRE
+   *  en el mes actual: el tablero no recuerda filtros entre visitas. */
+  const [month, setMonth] = useState<MonthKey | "all">(currentMonth);
   /** Buscador por texto: con muchas ventas, el filtro por estado no alcanza
    *  para llegar a UNA en particular (pedido de Ale, 2026-09). */
   const [q, setQ] = useState("");
@@ -89,9 +111,10 @@ export function OrdersBoard({
   const [elegidas, setElegidas] = useState<Set<string>>(new Set());
   const [confirmar, setConfirmar] = useState(false);
 
-  // Orden del filtrado: tipo → búsqueda → estado. La búsqueda va ANTES de los
-  // contadores de estado, así los chips muestran cuántas coinciden con lo
-  // buscado (y no un número que no se corresponde con la lista de abajo).
+  // Orden del filtrado: tipo → búsqueda → mes → estado. La búsqueda y el mes
+  // van ANTES de los contadores de estado, así los chips muestran cuántas hay
+  // con lo buscado en el mes elegido (y no un número que no se corresponde con
+  // la lista de abajo).
   const byTipo = useMemo(
     () => items.filter((o) => tipo === "todo" || o.source === tipo),
     [items, tipo],
@@ -100,15 +123,49 @@ export function OrdersBoard({
     () => byTipo.filter((o) => saleMatches(o, q)),
     [byTipo, q],
   );
+  const byMonth = useMemo(
+    () =>
+      month === "all"
+        ? byQuery
+        : byQuery.filter((o) => monthKeyOf(o.date) === month),
+    [byQuery, month],
+  );
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
-    for (const o of byQuery) c[o.status] = (c[o.status] ?? 0) + 1;
+    for (const o of byMonth) c[o.status] = (c[o.status] ?? 0) + 1;
     return c;
-  }, [byQuery]);
-  const list = useMemo(
-    () => byQuery.filter((o) => status === "all" || o.status === status),
-    [byQuery, status],
+  }, [byMonth]);
+  const abiertas = useMemo(
+    () => byMonth.filter((o) => isOpenStatus(o.status)).length,
+    [byMonth],
   );
+  const list = useMemo(
+    () =>
+      byMonth.filter((o) =>
+        status === "all"
+          ? true
+          : status === "open"
+            ? isOpenStatus(o.status)
+            : o.status === status,
+      ),
+    [byMonth, status],
+  );
+  // Al mostrar solo un mes, lo que quedó abierto de meses ANTERIORES dejaría
+  // de verse sin que nadie lo haya cerrado. Se cuenta para avisarlo arriba de
+  // la tabla.
+  const atrasadas = useMemo(() => {
+    if (month === "all") return 0;
+    return byQuery.filter((o) => {
+      if (!isOpenStatus(o.status)) return false;
+      const k = monthKeyOf(o.date);
+      return k != null && k < month;
+    }).length;
+  }, [byQuery, month]);
+  const verAtrasadas = () => {
+    setMonth("all");
+    setStatus("open");
+  };
+  const enOtrosMeses = byQuery.length - byMonth.length;
 
   // --- Selección múltiple (solo admin) ---------------------------------
   const keyOf = (o: UnifiedSale) => `${o.source}:${o.id}`;
@@ -296,6 +353,59 @@ export function OrdersBoard({
         ))}
       </div>
 
+      {/* Mes (pedido de Agustín, 2026-11-17): flechas para ir mes a mes (así
+          también se llega a otro año) y "Todos los meses" para ver todo. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="chip"
+            aria-label="Mes anterior"
+            onClick={() =>
+              setMonth((m) => stepMonth(m === "all" ? currentMonth : m, -1))
+            }
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            className={cn("chip capitalize", month !== "all" && "active")}
+            aria-pressed={month !== "all"}
+            title="Volver al mes actual"
+            onClick={() => setMonth(currentMonth)}
+          >
+            {monthLabel(month === "all" ? currentMonth : month)}
+          </button>
+          <button
+            type="button"
+            className="chip"
+            aria-label="Mes siguiente"
+            onClick={() =>
+              setMonth((m) => stepMonth(m === "all" ? currentMonth : m, 1))
+            }
+          >
+            ›
+          </button>
+        </div>
+        <button
+          type="button"
+          className={cn("chip", month === "all" && "active")}
+          aria-pressed={month === "all"}
+          onClick={() => setMonth("all")}
+        >
+          Todos los meses
+        </button>
+        {month !== "all" && month !== currentMonth ? (
+          <button
+            type="button"
+            className="text-primary text-[12.5px] hover:underline"
+            onClick={() => setMonth(currentMonth)}
+          >
+            Volver a {monthLabel(currentMonth)}
+          </button>
+        ) : null}
+      </div>
+
       {/* Buscador: mismo patrón que el board de Filamentos. Filtra del lado del
           cliente sobre el set ya cargado, así responde mientras se escribe. */}
       <div className="flex flex-wrap items-center gap-2">
@@ -324,10 +434,22 @@ export function OrdersBoard({
         </div>
         {q.trim() ? (
           <span className="text-faint text-[12.5px]">
-            {byQuery.length}{" "}
-            {byQuery.length === 1 ? "coincidencia" : "coincidencias"}
+            {byMonth.length}{" "}
+            {byMonth.length === 1 ? "coincidencia" : "coincidencias"}
+            {month !== "all" ? ` en ${monthLabel(month)}` : ""}
             {byQuery.length === 0 ? " — probá con menos palabras" : ""}
           </span>
+        ) : null}
+        {/* Buscar a alguien y que "no esté" porque compró otro mes sería una
+            trampa: se avisa y se ofrece verlas. */}
+        {q.trim() && enOtrosMeses > 0 ? (
+          <button
+            type="button"
+            className="text-primary text-[12.5px] hover:underline"
+            onClick={() => setMonth("all")}
+          >
+            +{enOtrosMeses} en otros meses · Ver
+          </button>
         ) : null}
       </div>
 
@@ -337,7 +459,14 @@ export function OrdersBoard({
           className={cn("chip", status === "all" && "active")}
           onClick={() => setStatus("all")}
         >
-          Todos <b className="opacity-60">{byQuery.length}</b>
+          Todos <b className="opacity-60">{byMonth.length}</b>
+        </button>
+        <button
+          type="button"
+          className={cn("chip", status === "open" && "active")}
+          onClick={() => setStatus("open")}
+        >
+          Sin cerrar <b className="opacity-60">{abiertas}</b>
         </button>
         {STATUSES.map((s) => (
           <button
@@ -351,6 +480,27 @@ export function OrdersBoard({
           </button>
         ))}
       </div>
+
+      {atrasadas > 0 ? (
+        <div
+          role="status"
+          className="ui-card text-dim flex flex-wrap items-center gap-x-2 gap-y-1 px-3.5 py-2.5 text-[13px]"
+        >
+          <span>
+            {atrasadas === 1
+              ? "Hay 1 pedido de meses anteriores sin cerrar"
+              : `Hay ${atrasadas} pedidos de meses anteriores sin cerrar`}
+          </span>
+          <span aria-hidden>·</span>
+          <button
+            type="button"
+            className="text-primary font-medium hover:underline"
+            onClick={verAtrasadas}
+          >
+            Ver
+          </button>
+        </div>
+      ) : null}
 
       {/* Barra de selección: aparece SOLO cuando hay algo tildado, así no
           ocupa lugar ni tienta a borrar de más en el uso normal. */}
@@ -378,7 +528,9 @@ export function OrdersBoard({
 
       {list.length === 0 ? (
         <div className="ui-card text-dim p-10 text-center text-sm">
-          No hay ventas con estos filtros.
+          {month === "all"
+            ? "No hay ventas con estos filtros."
+            : `No hay ventas en ${monthLabel(month)} con estos filtros.`}
         </div>
       ) : (
         <>

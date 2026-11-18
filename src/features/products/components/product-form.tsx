@@ -248,13 +248,23 @@ export function ProductForm({
   } = useForm<ProductFormValues>({ defaultValues });
 
   const infill = useWatch({ control, name: "infillPercent" });
-  const colorList =
+  const stockColors =
     colorCatalog.length > 0
       ? colorCatalog.map((c) => ({ n: c.name, c: c.hex ?? "#888" }))
       : [
           { n: "Negro", c: "#1a1a1f" },
           { n: "Blanco", c: "#f4f4f0" },
         ];
+  // El muestrario trae solo colores con filamento cargado. Si el producto ya
+  // tenía elegido uno que hoy no está (se sacó el filamento o era un nombre
+  // mal escrito), se muestra igual para poder destildarlo: nunca se pierde en
+  // silencio.
+  const colorList = [
+    ...stockColors,
+    ...colors
+      .filter((n) => !stockColors.some((c) => c.n === n))
+      .map((n) => ({ n, c: "#888" })),
+  ];
 
   function toggleColor(name: string) {
     setColors((prev) =>
@@ -1087,6 +1097,33 @@ export function ProductForm({
                   ? "Colores que lleva la pieza"
                   : "Colores disponibles"}
               </label>
+              {colorMode === "single" ? (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={stockColors.every((c) => colors.includes(c.n))}
+                    onClick={() =>
+                      setColors((prev) => [
+                        ...prev,
+                        ...stockColors
+                          .map((c) => c.n)
+                          .filter((n) => !prev.includes(n)),
+                      ])
+                    }
+                  >
+                    Seleccionar todos
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    disabled={colors.length === 0}
+                    onClick={() => setColors([])}
+                  >
+                    Quitar todos
+                  </button>
+                </div>
+              ) : null}
               <ColorSwatches
                 size="sm"
                 options={colorList.map((fc) => ({ name: fc.n, hex: fc.c }))}

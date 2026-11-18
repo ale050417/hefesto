@@ -1,7 +1,9 @@
 import { requirePermissionPage } from "@/core/auth/permissions";
+import { can } from "@/core/auth/permissions";
 import { getCurrentUser } from "@/core/auth/session";
 import { DegradedNotice } from "@/components/shared/degraded-notice";
 import { safeLoad } from "@/lib/safe-load";
+import { getEstimatorContext } from "@/features/calculator/service";
 import { InquiryList } from "@/features/consultas/components/inquiry-list";
 import { NuevaConsultaButton } from "@/features/consultas/components/nueva-consulta-button";
 import { listInquiries } from "@/features/consultas/queries";
@@ -32,6 +34,10 @@ export default async function ConsultasPage() {
     safeLoad("consultas", listInquiries(), []),
     safeLoad("cotización", getQuoteDefaults(), DEFAULT_QUOTE_DEFAULTS),
   ]);
+  // La calculadora solo hace falta para quien responde (el operador).
+  const estimator = (await can("consultas", "editar"))
+    ? (await safeLoad("calculadora", getEstimatorContext(), null)).value
+    : null;
 
   const rows = listR.value.map((row) => {
     const v = toInquiryView(row, user?.id ?? null);
@@ -63,7 +69,11 @@ export default async function ConsultasPage() {
           Todavía no hay consultas cargadas.
         </div>
       ) : (
-        <InquiryList inquiries={rows} defaults={defaultsR.value} />
+        <InquiryList
+          inquiries={rows}
+          defaults={defaultsR.value}
+          estimator={estimator}
+        />
       )}
     </div>
   );

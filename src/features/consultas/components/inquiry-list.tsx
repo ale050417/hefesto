@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Modal } from "@/components/ui/modal";
 import { useCan } from "@/components/auth/perms-provider";
+import type { EstimatorContext } from "@/features/calculator/service";
 import {
   formatQuoteMoney,
   type QuoteDefaults,
@@ -66,9 +67,12 @@ function matches(row: InquiryView, filter: Filter): boolean {
 export function InquiryList({
   inquiries,
   defaults,
+  estimator,
 }: {
   inquiries: InquiryView[];
   defaults: QuoteDefaults;
+  /** Calculadora del operador; null si no se pudo cargar. */
+  estimator: EstimatorContext | null;
 }) {
   const canAnswer = useCan("consultas", "editar");
   const canManage = useCan("consultas", "crear");
@@ -353,11 +357,18 @@ export function InquiryList({
         title="Responder consulta"
         size="lg"
       >
-        {answering ? (
+        {answering && !estimator ? (
+          <p className="text-dim text-sm">
+            No se pudo cargar la calculadora. Actualizá la página y probá de
+            nuevo.
+          </p>
+        ) : null}
+        {answering && estimator ? (
           <AnswerForm
             key={answering.id}
             inquiry={answering}
             defaults={defaults}
+            estimator={estimator}
             onDone={() => setAnswering(null)}
           />
         ) : null}

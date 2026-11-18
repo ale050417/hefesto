@@ -13,7 +13,7 @@ import {
   listCategories,
 } from "@/features/products/services/catalogService";
 import { getEstimatorContext } from "@/features/calculator/service";
-import { listColorCatalog } from "@/features/inventory/queries";
+import { listProductColors } from "@/features/inventory/queries";
 import { isUuid } from "@/lib/ids";
 import { loadOrThrow } from "@/lib/safe-load";
 import { QuoteButton } from "@/features/quotes/components/quote-modal";
@@ -39,7 +39,7 @@ export default async function EditarProductoPage({
       getProductAdmin(id),
       listCategories(),
       getEstimatorContext(),
-      listColorCatalog(),
+      listProductColors(),
     ]),
   );
   if (!data) notFound();
@@ -98,6 +98,7 @@ export default async function EditarProductoPage({
               price: product.price,
               salePrice: product.salePrice,
               colors: product.colors ?? [],
+              colorMode: product.colorMode === "multi" ? "multi" : "single",
               colorPrices: product.colorPrices ?? {},
               variants: variants.map((v) => ({
                 label: v.label,

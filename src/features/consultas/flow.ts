@@ -128,6 +128,10 @@ export async function answerInquiry(
   const row = await repo.saveInquiryAnswer(id, {
     unitPrice: input.unitPrice,
     unitCost: input.unitCost,
+    estFilamentId: input.filamentId,
+    estMaterial: input.material,
+    estGrams: input.grams,
+    estMinutes: input.printMinutes,
     bulkPrice: input.bulkPrice,
     bulkFrom: input.bulkFrom,
     dimensions: input.dimensions,
@@ -187,9 +191,16 @@ async function confirmInquiry(
   }
   const unitPrice = Number(before.unitPrice);
   const unitCost = Number(before.unitCost);
-  if (!(unitPrice > 0) || !(unitCost > 0)) {
+  const grams = Number(before.estGrams ?? 0);
+  const minutes = before.estMinutes ?? 0;
+  // Lo calculado por el operador: el costo lo resuelve el servidor desde el
+  // filamento (y se descuenta su stock), igual que una venta cargada a mano.
+  const fromCalc =
+    (before.estFilamentId != null || before.estMaterial != null) &&
+    (grams > 0 || minutes > 0);
+  if (!(unitPrice > 0) || (!fromCalc && !(unitCost > 0))) {
     throw new ValidationError(
-      "A la respuesta le falta el costo por unidad. Pedile al operador que la complete y volvé a confirmar.",
+      "A la respuesta le falta el cálculo del costo. Pedile al operador que calcule el precio de nuevo y volvé a confirmar.",
     );
   }
   const claimed = await repo.claimInquiryConfirmation(id);
@@ -207,9 +218,17 @@ async function confirmInquiry(
         total: unitPrice * claimed.quantity,
         paymentMethod,
         status: "confirmed",
+        ...(fromCalc
+          ? {
+              filamentId: before.estFilamentId ?? undefined,
+              material: before.estMaterial ?? undefined,
+              grams,
+              printMinutes: minutes,
+            }
+          : {}),
       },
       actorId: actor.id,
-      manualCost: unitCost * claimed.quantity,
+      ...(fromCalc ? {} : { manualCost: unitCost * claimed.quantity }),
     });
     row = (await repo.setInquirySale(id, sale.id)) ?? claimed;
   } catch (error) {

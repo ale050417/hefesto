@@ -587,6 +587,7 @@ export function ProductsAdmin({
                     price: modal.defaults.price,
                     salePrice: modal.defaults.salePrice || null,
                     colors: modal.defaults.colors,
+                    colorMode: modal.defaults.colorMode,
                     colorPrices: modal.defaults.colorPrices,
                     variants: modal.defaults.variants.map((v) => ({
                       label: v.label,

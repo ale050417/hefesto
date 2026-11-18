@@ -40,6 +40,11 @@ export const ACTION_LABEL: Record<string, string> = {
   "fix.created": "Cargó un arreglo",
   "fix.updated": "Cambió el estado de un arreglo",
   "fix.deleted": "Borró un arreglo",
+  // Pendientes del equipo, en Pedidos (2026-11-17).
+  "team_task.created": "Anotó un pendiente",
+  "team_task.done": "Tildó un pendiente como hecho",
+  "team_task.reopened": "Volvió a abrir un pendiente",
+  "team_task.deleted": "Borró un pendiente",
   "inventory.order_deduct_failed": "Falló el descuento de stock de un pedido",
   "inventory.order_deduct_partial": "Descuento de stock parcial en un pedido",
   "inventory.order_restore_failed": "Falló la reposición de stock de un pedido",

@@ -1,3 +1,4 @@
+import { colorsWithFilament } from "./product-colors";
 import { recordAudit } from "@/core/audit";
 import { NotFoundError } from "@/core/errors";
 import * as repo from "./repository";
@@ -279,6 +280,18 @@ export type CatalogItem = repo.CatalogRow;
 
 export function listColorCatalog(): Promise<CatalogItem[]> {
   return repo.listFilamentCatalog("color");
+}
+
+/** Colores para ofrecer en un producto: los del catálogo que tienen filamento. */
+export async function listProductColors(): Promise<CatalogItem[]> {
+  const [catalog, filaments] = await Promise.all([
+    listColorCatalog(),
+    repo.listFilaments(),
+  ]);
+  return colorsWithFilament(
+    catalog,
+    filaments.map((f) => f.color),
+  );
 }
 
 export function listBrandCatalog(): Promise<CatalogItem[]> {

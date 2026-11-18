@@ -71,7 +71,11 @@ export async function saveInquiryAnswer(
   id: string,
   values: {
     unitPrice: number;
-    unitCost: number;
+    unitCost: number | null;
+    estFilamentId: string | null;
+    estMaterial: string | null;
+    estGrams: number | null;
+    estMinutes: number | null;
     bulkPrice: number | null;
     bulkFrom: number | null;
     dimensions: string | null;
@@ -88,7 +92,10 @@ export async function saveInquiryAnswer(
     .set({
       ...values,
       unitPrice: values.unitPrice.toFixed(2),
-      unitCost: values.unitCost.toFixed(2),
+      unitCost: values.unitCost == null ? null : values.unitCost.toFixed(2),
+      estGrams: values.estGrams == null ? null : values.estGrams.toFixed(2),
+      estMinutes:
+        values.estMinutes == null ? null : Math.round(values.estMinutes),
       bulkPrice: values.bulkPrice == null ? null : values.bulkPrice.toFixed(2),
       status: "answered",
       answeredAt: new Date(),

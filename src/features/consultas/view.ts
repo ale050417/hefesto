@@ -14,6 +14,11 @@ export type InquiryView = {
   status: InquiryStatus;
   unitPrice: number | null;
   unitCost: number | null;
+  /** Datos de la calculadora (por unidad), para volver a abrirla cargada. */
+  estFilamentId: string | null;
+  estMaterial: string | null;
+  estGrams: number | null;
+  estMinutes: number | null;
   bulkPrice: number | null;
   bulkFrom: number | null;
   dimensions: string | null;
@@ -50,6 +55,10 @@ export function toInquiryView(
     status: row.status as InquiryStatus,
     unitPrice: num(row.unitPrice),
     unitCost: num(row.unitCost),
+    estFilamentId: row.estFilamentId,
+    estMaterial: row.estMaterial,
+    estGrams: num(row.estGrams),
+    estMinutes: row.estMinutes,
     bulkPrice: num(row.bulkPrice),
     bulkFrom: row.bulkFrom,
     dimensions: row.dimensions,

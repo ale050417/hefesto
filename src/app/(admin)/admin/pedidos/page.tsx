@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { can, isAdmin, requirePermissionPage } from "@/core/auth/permissions";
+import { getCurrentUser } from "@/core/auth/session";
 import { DegradedNotice } from "@/components/shared/degraded-notice";
 import { listOrdersAdmin } from "@/features/orders/services/orderAdminService";
 import { listManualSales } from "@/features/orders/services/manualSaleService";
@@ -17,46 +18,90 @@ import { listColorCatalog, listSaleColors } from "@/features/inventory/queries";
 import { listProductsForSale } from "@/features/products/services/catalogService";
 import { safeLoad } from "@/lib/safe-load";
 import { getQuoteDefaults } from "@/features/quotes/service";
+import { SALES_TIME_ZONE, monthKeyOf } from "@/features/orders/sale-month";
+import {
+  PendientesCard,
+  type TaskRow,
+} from "@/features/pendientes/components/pendientes-card";
+import { listTeamTasks } from "@/features/pendientes/queries";
+import type { TeamTaskLists, TeamTaskView } from "@/features/pendientes/view";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pedidos" };
 
+// Fechas de los pendientes ya formateadas en el servidor, en hora de Argentina
+// (así servidor y navegador muestran exactamente lo mismo).
+const taskDateFmt = new Intl.DateTimeFormat("es-AR", {
+  day: "2-digit",
+  month: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: SALES_TIME_ZONE,
+});
+
+function toTaskRow(t: TeamTaskView): TaskRow {
+  return {
+    id: t.id,
+    body: t.body,
+    author: t.author,
+    mine: t.mine,
+    createdAt: taskDateFmt.format(new Date(t.createdAt)),
+    doneBy: t.doneBy,
+    doneAt: t.doneAt ? taskDateFmt.format(new Date(t.doneAt)) : null,
+  };
+}
+
 export default async function PedidosAdminPage() {
   await requirePermissionPage("pedidos", "ver");
-  const [admin, canEdit, quoteDefaults] = await Promise.all([
+  const [admin, canEdit, quoteDefaults, user] = await Promise.all([
     isAdmin(),
     can("pedidos", "editar"),
     getQuoteDefaults(),
+    getCurrentUser(),
   ]);
 
   // Se cargan todas las ventas (online + manuales) para una tabla unificada con
   // filtros del lado del cliente. safeLoad: si la base se traba, renderiza con
   // datos parciales + aviso en vez de colgarse.
-  const [ordersR, manualR, sharesR, estimatorR, colorsR, productsR, catalogR] =
-    await Promise.all([
-      safeLoad("pedidos", listOrdersAdmin({ page: 1, pageSize: 500 }), {
-        items: [],
-        page: 1,
-        totalPages: 1,
-        total: 0,
-      }),
-      safeLoad("ventas manuales", listManualSales(), []),
-      safeLoad("socios", listProfitShares(), []),
-      safeLoad(
-        "calculadora",
-        getEstimatorContext(),
-        null as EstimatorContext | null,
-      ),
-      safeLoad(
-        "colores de ventas",
-        listSaleColors(),
-        {} as Record<string, string[]>,
-      ),
-      safeLoad("productos", listProductsForSale(), []),
-      // Catálogo de colores (Filamentos): da el hex REAL de cada color para el
-      // muestrario de la venta manual. Nunca un hex hardcodeado.
-      safeLoad("colores", listColorCatalog(), []),
-    ]);
+  const [
+    ordersR,
+    manualR,
+    sharesR,
+    estimatorR,
+    colorsR,
+    productsR,
+    catalogR,
+    tasksR,
+  ] = await Promise.all([
+    safeLoad("pedidos", listOrdersAdmin({ page: 1, pageSize: 500 }), {
+      items: [],
+      page: 1,
+      totalPages: 1,
+      total: 0,
+    }),
+    safeLoad("ventas manuales", listManualSales(), []),
+    safeLoad("socios", listProfitShares(), []),
+    safeLoad(
+      "calculadora",
+      getEstimatorContext(),
+      null as EstimatorContext | null,
+    ),
+    safeLoad(
+      "colores de ventas",
+      listSaleColors(),
+      {} as Record<string, string[]>,
+    ),
+    safeLoad("productos", listProductsForSale(), []),
+    // Catálogo de colores (Filamentos): da el hex REAL de cada color para el
+    // muestrario de la venta manual. Nunca un hex hardcodeado.
+    safeLoad("colores", listColorCatalog(), []),
+    // Pendientes del equipo (pedido de Agustín, 2026-11-17). Con safeLoad: si
+    // fallan, Pedidos se sigue viendo y solo falta esa tarjeta.
+    safeLoad("pendientes", listTeamTasks(user?.id ?? null), {
+      open: [],
+      done: [],
+    } as TeamTaskLists),
+  ]);
   const online = ordersR.value.items;
   const manual = manualR.value;
   const shares = sharesR.value;
@@ -77,6 +122,7 @@ export default async function PedidosAdminPage() {
   if (!manualR.ok) degraded.push("las ventas manuales");
   if (!sharesR.ok) degraded.push("los socios");
   if (!estimatorR.ok) degraded.push("la calculadora de ventas");
+  if (!tasksR.ok) degraded.push("los pendientes del equipo");
 
   const partners = shares.map((s) => ({ name: s.name, pct: Number(s.pct) }));
 
@@ -160,8 +206,19 @@ export default async function PedidosAdminPage() {
         </div>
       </div>
 
+      {/* Si no se pudieron cargar no se muestra la tarjeta vacía: parecería que
+          no hay nada pendiente (el aviso de arriba ya dice que faltan). */}
+      {tasksR.ok ? (
+        <PendientesCard
+          open={tasksR.value.open.map(toTaskRow)}
+          done={tasksR.value.done.map(toTaskRow)}
+        />
+      ) : null}
+
       <OrdersBoard
         items={items}
+        // Mes de hoy en hora de Argentina: el tablero arranca filtrado ahí.
+        currentMonth={monthKeyOf(new Date()) ?? ""}
         isAdmin={admin}
         canEdit={canEdit}
         quoteDefaults={quoteDefaults}

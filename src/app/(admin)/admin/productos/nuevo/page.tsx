@@ -3,7 +3,7 @@ import { requirePermissionPage } from "@/core/auth/permissions";
 import { ProductWizard } from "@/features/products/components/product-wizard";
 import { listCategories } from "@/features/products/services/catalogService";
 import { getEstimatorContext } from "@/features/calculator/service";
-import { listColorCatalog } from "@/features/inventory/queries";
+import { listProductColors } from "@/features/inventory/queries";
 import { getBrandSettings } from "@/features/settings/service";
 import { sectionOn } from "@/features/settings/home-sections";
 import { loadOrThrow } from "@/lib/safe-load";
@@ -19,7 +19,7 @@ export default async function NuevoProductoPage() {
     Promise.all([
       listCategories(),
       getEstimatorContext(),
-      listColorCatalog(),
+      listProductColors(),
       getBrandSettings(),
     ]),
   );

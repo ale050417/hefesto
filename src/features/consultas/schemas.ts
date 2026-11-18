@@ -53,6 +53,12 @@ const optMoney = z.preprocess(
   z.coerce.number().positive("El precio tiene que ser mayor a 0.").nullable(),
 );
 
+/** Número opcional ≥ 0 (gramos, minutos). */
+const optAmount = z.preprocess(
+  (v) => (v === "" || v == null ? null : v),
+  z.coerce.number().min(0).max(1_000_000).nullable(),
+);
+
 /** Lo que carga atención al cliente. */
 export const inquiryCreateSchema = z.object({
   customerName: z
@@ -86,10 +92,19 @@ export const inquiryAnswerSchema = z
     unitPrice: z.coerce
       .number("Poné el precio por unidad.")
       .positive("Poné el precio por unidad."),
-    /** Costo por unidad (calculadora): con esto se registra la venta. */
-    unitCost: z.coerce
-      .number("Poné el costo por unidad (sale de la calculadora).")
-      .positive("Poné el costo por unidad (sale de la calculadora)."),
+    /**
+     * Costo del pedido. Lo normal es que venga de la CALCULADORA (filamento +
+     * gramos + minutos por unidad): el operador no ve el costo ni el margen.
+     * `unitCost` queda para quien lo carga a mano (la app, o el dueño).
+     */
+    unitCost: optMoney,
+    filamentId: z.preprocess(
+      (v) => (v === "" || v == null ? null : v),
+      z.uuid().nullable(),
+    ),
+    material: optText(60),
+    grams: optAmount,
+    printMinutes: optAmount,
     bulkPrice: optMoney,
     bulkFrom: z.preprocess(
       (v) => (v === "" || v == null ? null : v),
@@ -102,6 +117,17 @@ export const inquiryAnswerSchema = z
     /** Mensaje final. Vacío = se arma solo con los datos de arriba. */
     message: optText(6000),
   })
+  .refine(
+    (v) =>
+      v.unitCost != null ||
+      ((v.filamentId != null || v.material != null) &&
+        ((v.grams ?? 0) > 0 || (v.printMinutes ?? 0) > 0)),
+    {
+      path: ["calc"],
+      message:
+        "Calculá el precio con la calculadora: así queda guardado el costo del pedido.",
+    },
+  )
   .refine((v) => (v.bulkPrice == null) === (v.bulkFrom == null), {
     path: ["bulkFrom"],
     message: "Para el precio por cantidad poné el precio y desde cuántas.",

@@ -1074,6 +1074,26 @@ export function ProductWizard({
                 </label>
                 {/* Mismo muestrario que ve el cliente en la tienda: lo que
                     elegís acá es exactamente lo que va a ver él. */}
+                {colorMode === "single" ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={colors.length === colorList.length}
+                      onClick={() => setColors(colorList.map((c) => c.n))}
+                    >
+                      Seleccionar todos
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      disabled={colors.length === 0}
+                      onClick={() => setColors([])}
+                    >
+                      Quitar todos
+                    </button>
+                  </div>
+                ) : null}
                 <ColorSwatches
                   size="sm"
                   options={colorList.map((fc) => ({ name: fc.n, hex: fc.c }))}
