@@ -13,6 +13,16 @@ import { useMounted } from "@/hooks/use-mounted";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { resizeImageToPng } from "@/lib/image-compress";
+import {
+  parseAiImageEngine,
+  type AiImageEngine,
+  type AiImageEngineInfo,
+} from "@/features/products/ai-image/engines";
+import {
+  detectPieceType,
+  PIECE_TYPES,
+  type PieceType,
+} from "@/features/products/ai-image/prompt";
 import { PhotoPicker } from "./photo-picker";
 
 /**
@@ -30,6 +40,12 @@ import { PhotoPicker } from "./photo-picker";
  *  - Tocar una foto la abre grande (lightbox) para revisar detalles.
  *  - "Descargar" (para redes) y, opcionalmente, "Agregar como foto extra".
  *  - Enter en la escena escrita genera.
+ *
+ * Tercera vuelta (pedido de Agustín, 2026-11-17): los llaveros salían mal
+ * porque el prompt daba por sentado una figura parada. Ahora se elige "¿Qué
+ * es la pieza?" (viene preseleccionado según el nombre y la categoría) y
+ * cada tipo lleva sus propias indicaciones. Además se puede elegir el motor
+ * cuando el servidor ofrece más de uno (Gemini por API es opcional y pago).
  *
  * Llama al endpoint /api/admin/products/ai-image; si Cloudflare rechaza la
  * pieza (personajes con derechos) o se agotó la cuota del día, deja el
@@ -137,6 +153,13 @@ export function AiImagePanel({
   const [source, setSource] = useState<{ file: File; url: string } | null>(
     null,
   );
+  // Tipo de pieza: mientras no lo toquen, sigue al que se deduce del nombre
+  // y la categoría (que pueden cambiar mientras se carga el producto).
+  const [pieceChoice, setPieceChoice] = useState<PieceType | null>(null);
+  // Motores que ofrece el servidor según sus claves. Hasta que contesta (o si
+  // falla la consulta) no se muestra el selector y el servidor usa el suyo.
+  const [engines, setEngines] = useState<AiImageEngineInfo[]>([]);
+  const [engineChoice, setEngineChoice] = useState<AiImageEngine | null>(null);
   const [preset, setPreset] = useState(0);
   const [custom, setCustom] = useState("");
   const [busy, setBusy] = useState(false);
@@ -161,6 +184,20 @@ export function AiImagePanel({
     },
     [],
   );
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/admin/products/ai-image")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { engines?: AiImageEngineInfo[] } | null) => {
+        if (!alive || !Array.isArray(data?.engines)) return;
+        setEngines(data.engines.filter((e) => parseAiImageEngine(e.id)));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Cronómetro mientras genera.
   useEffect(() => {
@@ -224,6 +261,11 @@ export function AiImagePanel({
     : (SCENE_PRESETS[preset]?.label ?? "Automática");
   const scene = custom.trim() || SCENE_PRESETS[preset]?.value || "";
   const result = shots[selected] ?? null;
+  const pieceType = pieceChoice ?? detectPieceType(context);
+  const pieceInfo = PIECE_TYPES.find((t) => t.id === pieceType);
+  // El primero de la lista es el motor por defecto del servidor (el gratis).
+  const engine =
+    engines.find((e) => e.id === engineChoice) ?? engines[0] ?? null;
 
   async function generate() {
     if (!source || busy || disabled) return;
@@ -250,6 +292,8 @@ export function AiImagePanel({
       fd.set("colors", JSON.stringify(context.colors));
       if (context.description) fd.set("description", context.description);
       if (scene) fd.set("scene", scene);
+      fd.set("pieceType", pieceType);
+      if (engine) fd.set("engine", engine.id);
 
       const res = await fetch("/api/admin/products/ai-image", {
         method: "POST",
@@ -336,7 +380,9 @@ export function AiImagePanel({
           <div className="min-w-0 flex-1 text-[15px] font-semibold">
             Foto de producto con IA
           </div>
-          <span className="ai-card-badge">Gratis · ~20 s</span>
+          <span className="ai-card-badge">
+            {engine?.id === "gemini" ? "Gemini · pago" : "Gratis · ~20 s"}
+          </span>
         </div>
         <p className="text-faint text-[12px] leading-snug">
           Sacale una foto a la pieza con el celular y te la devuelve como foto
@@ -373,10 +419,38 @@ export function AiImagePanel({
           ) : null}
         </div>
 
-        {/* 2. La escena */}
+        {/* 2. Qué es la pieza, y 3. la escena */}
         <div className="flex min-w-0 flex-col gap-2">
           <div className="ai-step">
-            <span className="ai-step-n">2</span> Escena{" "}
+            <span className="ai-step-n">2</span> ¿Qué es la pieza?
+          </div>
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="¿Qué es la pieza?"
+          >
+            {PIECE_TYPES.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                title={t.hint}
+                aria-pressed={t.id === pieceType}
+                className={cn("ai-chip", t.id === pieceType && "active")}
+                disabled={off}
+                onClick={() => setPieceChoice(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-faint text-[11.5px] leading-snug">
+            {pieceInfo?.hint}
+            {pieceChoice === null
+              ? " Lo elegimos por el nombre: cambialo si no es."
+              : null}
+          </p>
+          <div className="ai-step mt-1">
+            <span className="ai-step-n">3</span> Escena{" "}
             <span className="text-faint font-normal">(opcional)</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
@@ -422,9 +496,36 @@ export function AiImagePanel({
         </div>
       </div>
 
-      {/* 3. Resultado: tu foto → catálogo */}
+      {/* Motor: solo si el servidor ofrece más de uno. */}
+      {engines.length > 1 && engine ? (
+        <div className="flex flex-col gap-1.5">
+          <div className="text-[12.5px] font-semibold">Motor</div>
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="Motor"
+          >
+            {engines.map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                title={e.hint}
+                aria-pressed={e.id === engine.id}
+                className={cn("ai-chip", e.id === engine.id && "active")}
+                disabled={off}
+                onClick={() => setEngineChoice(e.id)}
+              >
+                {e.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-faint text-[11.5px] leading-snug">{engine.hint}</p>
+        </div>
+      ) : null}
+
+      {/* 4. Resultado: tu foto → catálogo */}
       <div className="ai-step">
-        <span className="ai-step-n">3</span> Resultado
+        <span className="ai-step-n">4</span> Resultado
         {shots.length > 1 ? (
           <span className="text-faint font-normal">
             · {selected + 1} de {shots.length}

@@ -7,19 +7,39 @@ import {
   generateProductImage,
   isAiImageConfigured,
 } from "@/features/products/ai-image/cloudflare";
-import { buildProductImagePrompt } from "@/features/products/ai-image/prompt";
+import {
+  availableAiImageEngines,
+  parseAiImageEngine,
+  type AiImageEngineInfo,
+} from "@/features/products/ai-image/engines";
+import {
+  generateProductImageWithGemini,
+  isGeminiImageConfigured,
+} from "@/features/products/ai-image/gemini";
+import {
+  buildProductImagePrompt,
+  detectPieceType,
+  parsePieceType,
+} from "@/features/products/ai-image/prompt";
 
 /**
  * Foto de producto con IA a partir de una foto de la pieza (botón "Generar
  * con IA" del alta y la edición de productos, 2026-10-21). Multipart:
  *  - image: la foto, ya achicada en el navegador (≤ 512 px, ≤ 2 MB);
  *  - name, category, colors (JSON), description, scene: el contexto para
- *    elegir la escena (ver ai-image/prompt.ts).
+ *    elegir la escena (ver ai-image/prompt.ts);
+ *  - pieceType: qué es la pieza (figura, llavero, chop…; 2026-11-17). Si no
+ *    viene, se deduce del nombre y la categoría;
+ *  - engine: con qué motor generar ("cloudflare" o "gemini"; 2026-11-17). Si
+ *    no viene, el primero disponible (Cloudflare, que es el gratis).
  * Devuelve la imagen como data URL. Si Cloudflare la rechaza (`flagged`,
  * `quota`), va el prompt igual: la pantalla lo deja listo para Gemini.
  *
  * Es un route handler y no una server action para tener su propio
  * maxDuration (el modelo tarda entre 5 y 35 s) y una respuesta grande.
+ *
+ * El GET le dice al panel qué motores hay (según las claves configuradas en
+ * el servidor), para que no ofrezca uno que no puede andar.
  */
 export const maxDuration = 60;
 
@@ -38,18 +58,54 @@ function fail(status: number, code: string, message: string, prompt?: string) {
   return NextResponse.json({ ok: false, code, message, prompt }, { status });
 }
 
-export async function POST(req: Request) {
+/** Motores con clave configurada; el primero es el motor por defecto. */
+function engines(): AiImageEngineInfo[] {
+  return availableAiImageEngines({
+    cloudflare: isAiImageConfigured(),
+    gemini: isGeminiImageConfigured(),
+  });
+}
+
+/** Sesión + permiso, igual para el GET y el POST. */
+async function authorize() {
   let staff;
   try {
     staff = await getStaffUser();
   } catch {
-    return fail(503, "auth", "No pudimos verificar tu sesión. Probá de nuevo.");
+    return {
+      error: fail(
+        503,
+        "auth",
+        "No pudimos verificar tu sesión. Probá de nuevo.",
+      ),
+    };
   }
-  if (!staff) return fail(401, "auth", "No autorizado.");
+  if (!staff) return { error: fail(401, "auth", "No autorizado.") };
   if (!(await can("productos", "crear"))) {
-    return fail(403, "auth", "No tenés permiso para cargar productos.");
+    return {
+      error: fail(403, "auth", "No tenés permiso para cargar productos."),
+    };
   }
-  if (!isAiImageConfigured()) {
+  return { staff };
+}
+
+export async function GET() {
+  const auth = await authorize();
+  if (auth.error) return auth.error;
+  const available = engines();
+  return NextResponse.json({
+    ok: true,
+    engines: available,
+    defaultEngine: available[0]?.id ?? null,
+  });
+}
+
+export async function POST(req: Request) {
+  const auth = await authorize();
+  if (auth.error) return auth.error;
+  const { staff } = auth;
+  const available = engines();
+  if (available.length === 0) {
     return fail(
       501,
       "not_configured",
@@ -102,12 +158,32 @@ export async function POST(req: Request) {
     );
   }
 
-  const prompt = buildProductImagePrompt(parsed.data);
-  const result = await generateProductImage({
+  // Un motor desconocido o sin clave no se cambia por otro en silencio: el
+  // que eligió Gemini tiene que enterarse de que no está disponible.
+  const engineRaw = form.get("engine");
+  const engine = engineRaw ? parseAiImageEngine(engineRaw) : available[0]?.id;
+  if (!engine || !available.some((e) => e.id === engine)) {
+    return fail(
+      501,
+      "not_configured",
+      "Ese motor de imágenes no está configurado en el servidor. Elegí otro.",
+    );
+  }
+
+  const prompt = buildProductImagePrompt({
+    ...parsed.data,
+    pieceType:
+      parsePieceType(form.get("pieceType")) ?? detectPieceType(parsed.data),
+  });
+  const input = {
     prompt,
     photo: Buffer.from(await file.arrayBuffer()),
     photoType: file.type,
-  });
+  };
+  const result =
+    engine === "gemini"
+      ? await generateProductImageWithGemini(input)
+      : await generateProductImage(input);
   if (!result.ok) {
     const status =
       result.code === "flagged"
@@ -122,6 +198,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     prompt,
+    engine,
     image: `data:${result.mimeType};base64,${result.image.toString("base64")}`,
   });
 }

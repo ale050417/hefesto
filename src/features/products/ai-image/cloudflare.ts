@@ -41,7 +41,7 @@ export function isAiImageConfigured(): boolean {
 
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
 
-function mimeOf(buf: Buffer): "image/png" | "image/jpeg" {
+export function mimeOf(buf: Buffer): "image/png" | "image/jpeg" {
   return buf.subarray(0, 4).equals(PNG_MAGIC) ? "image/png" : "image/jpeg";
 }
 
