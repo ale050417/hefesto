@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
 import { filamentTag } from "@/features/inventory/filament-label";
-import { computeQuote } from "../calculator";
+import { computeQuote, formatPrintTime, roundQuote } from "../calculator";
 import { saveCalcAction, deleteCalcAction, quotePriceAction } from "../actions";
 import type {
   CalcConfig,
@@ -109,17 +109,20 @@ export function PriceCalculator({
     : 0;
 
   // Desglose completo (admin). El operador no lo ve; su precio lo da el server.
-  const q = computeQuote({
-    grams,
-    hours: totalHours,
-    costPerKg,
-    kwhPrice: config.kwhPrice,
-    machineWatts: config.machineWatts,
-    machineLifeHours: config.machineLifeHours,
-    maintenanceCost: config.maintenanceCost,
-    marginErrorPct: config.marginErrorPct,
-    marginPct: adminMargin,
-  });
+  // El precio final sale redondeado a $100 (igual que lo guarda el servidor).
+  const q = roundQuote(
+    computeQuote({
+      grams,
+      hours: totalHours,
+      costPerKg,
+      kwhPrice: config.kwhPrice,
+      machineWatts: config.machineWatts,
+      machineLifeHours: config.machineLifeHours,
+      maintenanceCost: config.maintenanceCost,
+      marginErrorPct: config.marginErrorPct,
+      marginPct: adminMargin,
+    }),
+  );
 
   // Operador: pide el precio final al servidor (debounce). Todo el setState va
   // dentro del callback async para no romper la regla set-state-in-effect.
@@ -202,7 +205,8 @@ export function PriceCalculator({
       (h) =>
         !term ||
         h.name.toLowerCase().includes(term) ||
-        (h.customer ?? "").toLowerCase().includes(term),
+        (h.customer ?? "").toLowerCase().includes(term) ||
+        (h.presetName ?? "").toLowerCase().includes(term),
     );
     list = [...list].sort((a, b) => {
       if (sort === "precio")
@@ -219,6 +223,7 @@ export function PriceCalculator({
       "Nombre",
       "Cliente",
       "Material",
+      "Tipo",
       "Gramos",
       "Horas",
       "Margen%",
@@ -231,6 +236,7 @@ export function PriceCalculator({
         esc(h.name),
         esc(h.customer ?? ""),
         esc(h.material ?? ""),
+        esc(h.presetName ?? ""),
         h.grams,
         h.hours,
         h.marginPct,
@@ -467,7 +473,7 @@ export function PriceCalculator({
               {isAdmin ? "Desglose detallado" : "Precio sugerido"}
             </div>
             <span className="text-faint text-[12px]">
-              {f.name || "Sin nombre"} · {totalHours.toFixed(1)} h
+              {f.name || "Sin nombre"} · {formatPrintTime(totalHours)}
             </span>
           </div>
           {!hasData ? (
@@ -601,7 +607,7 @@ export function PriceCalculator({
               </svg>
               <input
                 className="input"
-                placeholder="Buscar pieza o cliente..."
+                placeholder="Buscar pieza, cliente o tipo..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
@@ -643,7 +649,9 @@ export function PriceCalculator({
                   <th>Pieza</th>
                   <th>Cliente</th>
                   <th>Material</th>
+                  <th>Tipo</th>
                   <th className="text-right">Gramos</th>
+                  <th className="text-right">Tiempo</th>
                   <th className="text-right">Precio</th>
                   <th>Fecha</th>
                   <th></th>
@@ -661,8 +669,17 @@ export function PriceCalculator({
                     <td className="muted" data-label="Material">
                       {h.material ?? "—"}
                     </td>
+                    <td className="muted" data-label="Tipo">
+                      {h.presetName ?? "—"}
+                    </td>
                     <td className="text-right" data-label="Gramos">
                       {Number(h.grams)} g
+                    </td>
+                    <td
+                      className="text-right whitespace-nowrap"
+                      data-label="Tiempo"
+                    >
+                      {formatPrintTime(Number(h.hours))}
                     </td>
                     <td className="price text-right" data-label="Precio">
                       <b style={{ color: "var(--gold-bright)" }}>

@@ -33,6 +33,9 @@ export type ProductFilterInput = z.input<typeof productFilterSchema>;
 // en null para los campos opcionales.
 const emptyToNull = (v: unknown) => (v === "" ? null : v);
 
+/** Cuántos colores puede tener un producto (lo comparte la foto con IA). */
+export const MAX_PRODUCT_COLORS = 100;
+
 // Base SIN refinamientos: la API de la app arma su PATCH con `.pick().partial()`
 // (un schema con `.refine` no admite `.pick`). `productInputSchema` es esta base
 // más la regla de la oferta, y sigue exactamente igual para la web.
@@ -65,7 +68,13 @@ export const productInputBase = z.object({
     .preprocess(emptyToNull, z.string().max(120).nullable())
     .optional(),
   colorMode: z.enum(["single", "multi"]).default("single"),
-  colors: z.array(z.string().max(40)).max(24).default([]),
+  // Tope alto a propósito: "Elegir todos" marca cada color cargado en
+  // Filamentos (30 en 2026-11) y el tope viejo de 24 rechazaba el producto
+  // entero con un "Revisá los datos" sin explicación (arreglo de Agustín).
+  colors: z
+    .array(z.string().max(40))
+    .max(MAX_PRODUCT_COLORS, `Hasta ${MAX_PRODUCT_COLORS} colores por producto`)
+    .default([]),
   colorPrices: z.record(z.string(), z.coerce.number()).default({}),
   layerHeight: z
     .preprocess(emptyToNull, z.string().max(60).nullable())

@@ -5,6 +5,8 @@ import { listFilamentsView } from "@/features/inventory/queries";
 import {
   computeQuote,
   resolveCostPerKg,
+  roundPrice,
+  roundQuote,
   selectActiveMargin,
 } from "./calculator";
 import type {
@@ -62,23 +64,29 @@ export async function createCalc(
 ) {
   const presets = (await repo.listMarginPresets()).map(toPreset);
   const marginPct = selectActiveMargin(presets, input.presetId);
+  // Con qué tipo se cotizó: queda escrito en el historial (el tipo puede
+  // cambiar de nombre o borrarse después).
+  const presetName = presets.find((p) => p.id === input.presetId)?.name ?? null;
   if (marginPct == null) {
     // ValidationError (antes un Error genérico): la web y la app muestran el
     // mensaje real en vez de "Ocurrió un error".
     throw new ValidationError("El tipo de producto no está disponible.");
   }
   const cfg = await getCalcConfig();
-  const q = computeQuote({
-    grams: input.grams,
-    hours: input.hours,
-    costPerKg,
-    kwhPrice: cfg.kwhPrice,
-    machineWatts: cfg.machineWatts,
-    machineLifeHours: cfg.machineLifeHours,
-    maintenanceCost: cfg.maintenanceCost,
-    marginErrorPct: cfg.marginErrorPct,
-    marginPct,
-  });
+  // Precio redondeado: el historial guarda lo mismo que se le cotiza al cliente.
+  const q = roundQuote(
+    computeQuote({
+      grams: input.grams,
+      hours: input.hours,
+      costPerKg,
+      kwhPrice: cfg.kwhPrice,
+      machineWatts: cfg.machineWatts,
+      machineLifeHours: cfg.machineLifeHours,
+      maintenanceCost: cfg.maintenanceCost,
+      marginErrorPct: cfg.marginErrorPct,
+      marginPct,
+    }),
+  );
   return repo.insertCalcHistory({
     name: input.name,
     customer: input.customer ?? null,
@@ -88,6 +96,7 @@ export async function createCalc(
     hours: String(input.hours),
     costPerKg: String(costPerKg),
     marginPct: String(marginPct),
+    presetName,
     costoTotal: String(q.costoTotal),
     ganancia: String(q.ganancia),
     precioFinal: String(q.precioFinal),
@@ -187,7 +196,7 @@ export async function quoteFinalPriceByPreset(input: {
     marginErrorPct: cfg.marginErrorPct,
     marginPct,
   });
-  return { precioFinal: q.precioFinal };
+  return { precioFinal: roundPrice(q.precioFinal) };
 }
 
 /**

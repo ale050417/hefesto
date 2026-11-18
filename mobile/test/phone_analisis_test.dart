@@ -1531,7 +1531,7 @@ void main() {
         expectNoLayoutErrors(tester, 'al abrir el historial');
         await _shootAll(tester, 'calc_historial');
 
-        final buscador = find.widgetWithText(TextField, 'Buscar pieza o cliente…');
+        final buscador = find.widgetWithText(TextField, 'Buscar pieza, cliente o tipo…');
         await _reveal(tester, buscador);
         await openKeyboard(tester, buscador);
         expectFocusedFieldVisible(tester);

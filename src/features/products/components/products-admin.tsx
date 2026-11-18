@@ -26,6 +26,7 @@ import { ImageUpload } from "./image-upload";
 import { photoColorOptions } from "../photo-colors";
 import { subtreeIds } from "../category-tree";
 import { ProductStatusActions } from "./product-status-actions";
+import { ShareProductIcon } from "./share-product";
 import {
   QuoteButton,
   QuoteModal,
@@ -369,6 +370,25 @@ export function ProductsAdmin({
                     <span className="badge badge-neutral">Oculto</span>
                   ) : null}
                 </div>
+                {/* Compartir: solo lo publicado (un oculto no abre en la tienda). */}
+                {p.status === "published" ? (
+                  <ShareProductIcon
+                    name={p.name}
+                    slug={p.slug}
+                    price={formatPrice(p.salePrice ?? p.price)}
+                    className="grid place-items-center rounded-full border border-[var(--border)] text-[var(--text-dim)] backdrop-blur transition-colors hover:text-[var(--success)]"
+                    style={{
+                      position: "absolute",
+                      bottom: 10,
+                      right: 94,
+                      zIndex: 3,
+                      width: 34,
+                      height: 34,
+                      background:
+                        "color-mix(in srgb, var(--surface-1) 80%, transparent)",
+                    }}
+                  />
+                ) : null}
                 <button
                   type="button"
                   className="grid place-items-center rounded-full border border-[var(--border)] text-[var(--text-dim)] backdrop-blur transition-colors hover:text-[var(--danger)]"
@@ -511,6 +531,14 @@ export function ProductsAdmin({
                     </td>
                     <td data-label="">
                       <div className="flex justify-end gap-1">
+                        {p.status === "published" ? (
+                          <ShareProductIcon
+                            name={p.name}
+                            slug={p.slug}
+                            price={formatPrice(p.salePrice ?? p.price)}
+                            className="btn-icon btn-ghost hover:text-[var(--success)]"
+                          />
+                        ) : null}
                         <button
                           className="btn-icon btn-ghost"
                           title="Editar"

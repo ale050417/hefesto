@@ -26,6 +26,8 @@ export type CalcHistoryInput = {
   costoTotal: string | number;
   ganancia: string | number;
   precioFinal: string | number;
+  /** Tipo de producto con el que se cotizó (null en cálculos viejos). */
+  presetName?: string | null;
   notes: string | null;
   createdAt: Date;
 };
@@ -41,6 +43,7 @@ export function historyRowToJson(r: CalcHistoryInput, isAdmin: boolean) {
     grams: num(r.grams),
     hours: num(r.hours),
     precioFinal: num(r.precioFinal),
+    presetName: r.presetName ?? null,
     notes: r.notes,
     createdAt: r.createdAt.toISOString(),
     ...(isAdmin

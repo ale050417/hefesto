@@ -391,7 +391,14 @@ void main() {
       );
       expect(find.text('Mate Mario'), findsOneWidget);
       expect(find.widgetWithText(FloatingActionButton, 'Nuevo'), findsNothing);
-      expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
+      // El menú queda solo para compartir lo publicado: nada que cambie datos.
+      await tester.tap(find.byIcon(Icons.more_vert_rounded).first);
+      await _pumpFrames(tester, 3);
+      expect(find.text('Compartir por WhatsApp'), findsOneWidget);
+      expect(find.text('Destacar'), findsNothing);
+      expect(find.text('Quitar de destacados'), findsNothing);
+      expect(find.text('Archivar'), findsNothing);
+      expect(find.text('Eliminar'), findsNothing);
     });
 
     testWidgets('destacar y archivar desde el menú de la fila', (tester) async {

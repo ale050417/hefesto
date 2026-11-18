@@ -25,6 +25,8 @@ export const calcHistory = pgTable(
     marginPct: numeric("margin_pct", { precision: 6, scale: 2 })
       .notNull()
       .default("0"),
+    // Tipo de producto con el que se cotizó (nombre al momento de guardar).
+    presetName: text("preset_name"),
     costoTotal: numeric("costo_total", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),

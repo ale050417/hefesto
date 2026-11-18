@@ -1,6 +1,6 @@
 import { NotFoundError, ValidationError } from "@/core/errors";
 import { listFilamentsView } from "@/features/inventory/queries";
-import { computeQuote, selectActiveMargin } from "./calculator";
+import { computeQuote, roundQuote, selectActiveMargin } from "./calculator";
 import type { CalcSaveInput, QuotePriceInput } from "./schemas";
 import * as service from "./service";
 
@@ -66,16 +66,18 @@ export async function quoteBreakdownFlow(input: QuotePriceInput) {
   const marginPct = selectActiveMargin(presets, input.presetId);
   if (marginPct == null) throw new NotFoundError("El tipo no está disponible.");
   const cfg = await service.getCalcConfig();
-  const quote = computeQuote({
-    grams: input.grams,
-    hours: input.hours,
-    costPerKg: filament.costPerKg,
-    kwhPrice: cfg.kwhPrice,
-    machineWatts: cfg.machineWatts,
-    machineLifeHours: cfg.machineLifeHours,
-    maintenanceCost: cfg.maintenanceCost,
-    marginErrorPct: cfg.marginErrorPct,
-    marginPct,
-  });
+  const quote = roundQuote(
+    computeQuote({
+      grams: input.grams,
+      hours: input.hours,
+      costPerKg: filament.costPerKg,
+      kwhPrice: cfg.kwhPrice,
+      machineWatts: cfg.machineWatts,
+      machineLifeHours: cfg.machineLifeHours,
+      maintenanceCost: cfg.maintenanceCost,
+      marginErrorPct: cfg.marginErrorPct,
+      marginPct,
+    }),
+  );
   return { quote, marginPct, costPerKg: filament.costPerKg };
 }

@@ -187,7 +187,7 @@ class _Body extends StatelessWidget {
   }
 }
 
-/// Botones de la ficha: publicar / archivar / destacar / ver en la tienda /
+/// Botones de la ficha: publicar / archivar / destacar / compartir / ver en la tienda /
 /// eliminar, según estado y permisos.
 class _Actions extends StatelessWidget {
   const _Actions({required this.product, required this.canEdit, required this.canDelete});
@@ -229,6 +229,17 @@ class _Actions extends StatelessWidget {
           onPressed: () => toggleFeatured(context, id: p.id, value: !p.isFeatured),
           icon: Icon(p.isFeatured ? Icons.star_outline_rounded : Icons.star_rounded, size: 18),
           label: Text(p.isFeatured ? 'Quitar destacado' : 'Destacar'),
+        ),
+      if (p.status == ProductState.published)
+        OutlinedButton.icon(
+          onPressed: () => shareProductOnWhatsapp(
+            context,
+            name: p.name,
+            link: '${AppConfig.siteUrl}/producto/${p.slug}',
+            price: formatPrice(p.isOnSale ? (p.salePrice ?? p.price) : p.price),
+          ),
+          icon: const Icon(Icons.share_rounded, size: 18),
+          label: const Text('Compartir'),
         ),
       if (p.status == ProductState.published)
         OutlinedButton.icon(

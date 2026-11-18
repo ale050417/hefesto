@@ -49,6 +49,16 @@ function fieldErrors(error: ZodError): Record<string, string> {
   return out;
 }
 
+/**
+ * El aviso general dice QUÉ dato está mal. El alta por pasos solo muestra este
+ * mensaje, así que un "Revisá los datos" a secas dejaba a quien carga sin
+ * saber qué corregir (arreglo de Agustín, 2026-11-18).
+ */
+function invalidMessage(error: ZodError): string {
+  const first = error.issues[0]?.message;
+  return first ? `Revisá los datos: ${first}` : "Revisá los datos";
+}
+
 const NO_AMORT = {
   ok: false as const,
   error: {
@@ -183,7 +193,7 @@ export async function createProductAction(
       ok: false,
       error: {
         code: "VALIDATION",
-        message: "Revisá los datos",
+        message: invalidMessage(parsed.error),
         fields: fieldErrors(parsed.error),
       },
     };
@@ -217,7 +227,7 @@ export async function updateProductAction(
       ok: false,
       error: {
         code: "VALIDATION",
-        message: "Revisá los datos",
+        message: invalidMessage(parsed.error),
         fields: fieldErrors(parsed.error),
       },
     };

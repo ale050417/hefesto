@@ -392,6 +392,16 @@ class _ProductBodyState extends ConsumerState<_ProductBody> {
                 ),
                 const Spacer(),
                 _RoundButton(
+                  icon: Icons.share_rounded,
+                  onTap: () => shareProductOnWhatsapp(
+                    context,
+                    name: d.base.name,
+                    link: '${AppConfig.siteUrl}/producto/${d.base.slug}',
+                    price: formatPrice(_unitPrice),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _RoundButton(
                   icon: fav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                   color: fav ? Brand.danger : null,
                   onTap: () => ref.read(favoritesProvider.notifier).toggle(d.base),

@@ -759,7 +759,11 @@ void main() {
             phone: phone, me: staffWith(['productos'], role: 'operator', actions: const ['ver']), overrides: _prod());
         expect(find.text('Mate Mario'), findsOneWidget);
         expect(find.byType(FloatingActionButton), findsNothing);
-        expect(find.byIcon(Icons.more_vert_rounded), findsNothing);
+        // El menú queda solo para compartir lo publicado: nada que cambie datos.
+        await _openRowMenu(tester, 'Mate Mario');
+        expect(find.text('Compartir por WhatsApp'), findsOneWidget);
+        expect(find.text('Archivar'), findsNothing);
+        expect(find.text('Eliminar'), findsNothing);
         await shoot(tester, 'prod_solo_lectura');
       });
 

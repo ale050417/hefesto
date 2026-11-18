@@ -128,6 +128,31 @@ export function roundPrice(n: number): number {
   return Math.ceil(n / 100) * 100;
 }
 
+/**
+ * La cotización con el precio final REDONDEADO (`roundPrice`) y la ganancia
+ * recalculada sobre ese precio (lo que sobra del redondeo es ganancia). Es lo
+ * que muestra y guarda la Calculadora: antes salían $63.808 o $8.312 y había
+ * que redondear a mano para pasarle el precio al cliente (arreglo de Agustín,
+ * 2026-11-18). El costo no cambia.
+ */
+export function roundQuote(q: QuoteResult): QuoteResult {
+  const precioFinal = roundPrice(q.precioFinal);
+  return {
+    ...q,
+    precioFinal,
+    ganancia: round2(precioFinal - q.costoTotal),
+  };
+}
+
+/** "23 h 12 min" / "45 min" / "2 h", desde horas con decimales. */
+export function formatPrintTime(hours: number): string {
+  const totalMin = Math.round(clamp0(hours) * 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m} min`;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
 export function computeQuote(input: QuoteInput): QuoteResult {
   const hours = clamp0(input.hours);
   const material = (clamp0(input.grams) / 1000) * clamp0(input.costPerKg);

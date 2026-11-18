@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   computePrintPrice,
   computeQuote,
+  formatPrintTime,
   resolveCostPerKg,
   roundPrice,
+  roundQuote,
   selectActiveMargin,
 } from "./calculator";
 import { marginPresetSchema } from "./schemas";
@@ -200,5 +202,51 @@ describe("roundPrice (múltiplo de $100 hacia arriba)", () => {
     expect(roundPrice(-500)).toBe(0);
     expect(roundPrice(Number.NaN)).toBe(0);
     expect(roundPrice(Number.POSITIVE_INFINITY)).toBe(0);
+  });
+});
+
+// Arreglo de Agustín (2026-11-18): la Calculadora cotiza en números redondos
+// y el historial muestra el tiempo en horas y minutos.
+describe("roundQuote", () => {
+  const base = {
+    grams: 227,
+    hours: 23.2,
+    costPerKg: 26000,
+    kwhPrice: 95,
+    machineWatts: 220,
+    machineLifeHours: 8000,
+    maintenanceCost: 320000,
+    marginErrorPct: 8,
+    marginPct: 300,
+  };
+
+  it("redondea el precio a $100 hacia arriba y no toca el costo", () => {
+    const q = computeQuote(base);
+    const r = roundQuote(q);
+    expect(r.precioFinal % 100).toBe(0);
+    expect(r.precioFinal).toBeGreaterThanOrEqual(q.precioFinal);
+    expect(r.precioFinal - q.precioFinal).toBeLessThan(100);
+    expect(r.costoTotal).toBe(q.costoTotal);
+  });
+
+  it("lo que suma el redondeo va a la ganancia", () => {
+    const r = roundQuote(computeQuote(base));
+    expect(r.costoTotal + r.ganancia).toBeCloseTo(r.precioFinal, 2);
+  });
+
+  it("sin datos sigue dando 0", () => {
+    const r = roundQuote(computeQuote({ ...base, grams: 0, hours: 0 }));
+    expect(r.precioFinal).toBe(0);
+    expect(r.ganancia).toBe(0);
+  });
+});
+
+describe("formatPrintTime", () => {
+  it("horas con decimales → horas y minutos", () => {
+    expect(formatPrintTime(23.2)).toBe("23 h 12 min");
+    expect(formatPrintTime(1.57)).toBe("1 h 34 min");
+    expect(formatPrintTime(2)).toBe("2 h");
+    expect(formatPrintTime(0.75)).toBe("45 min");
+    expect(formatPrintTime(0)).toBe("0 min");
   });
 });

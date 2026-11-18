@@ -119,6 +119,7 @@ class CalcHistoryItem {
     required this.precioFinal,
     required this.notes,
     required this.createdAt,
+    this.presetName,
     this.costPerKg,
     this.marginPct,
     this.costoTotal,
@@ -135,6 +136,9 @@ class CalcHistoryItem {
   final double precioFinal;
   final String? notes;
   final DateTime createdAt;
+
+  /// Tipo de producto con el que se cotizó (null en cálculos viejos).
+  final String? presetName;
 
   // Solo admin.
   final double? costPerKg;
@@ -159,6 +163,7 @@ class CalcHistoryItem {
       precioFinal: jNum(j['precioFinal']),
       notes: jStr(j['notes']),
       createdAt: jDate(j['createdAt']),
+      presetName: jStr(j['presetName']),
       costPerKg: opt('costPerKg'),
       marginPct: opt('marginPct'),
       costoTotal: opt('costoTotal'),

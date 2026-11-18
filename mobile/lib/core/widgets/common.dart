@@ -355,6 +355,24 @@ Future<bool> openWhatsapp(String? phone, String message) {
   return openUrl(digits.isEmpty ? 'https://wa.me/?text=$text' : 'https://wa.me/$digits?text=$text');
 }
 
+/// Comparte un producto por WhatsApp (pedido de Antonella, 2026-11-18): abre
+/// WhatsApp SIN número, para elegir a quién mandárselo, con el nombre, el
+/// precio y el link de la tienda ya escritos. Mismo texto que la web
+/// (src/features/products/share.ts). Avisa si no se pudo abrir.
+Future<void> shareProductOnWhatsapp(
+  BuildContext context, {
+  required String name,
+  required String link,
+  String? price,
+}) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final head = price == null ? name : '$name — $price';
+  final ok = await openWhatsapp(null, '$head\n$link');
+  if (!ok) {
+    messenger.showSnackBar(const SnackBar(content: Text('No pudimos abrir WhatsApp.')));
+  }
+}
+
 /// Abre un enlace fuera de la app (navegador, teléfono, correo). `false` si no
 /// se pudo. Nunca lanza: en un teléfono sin app para ese tipo de enlace (una
 /// tablet sin teléfono, un equipo sin correo configurado) Android tira una

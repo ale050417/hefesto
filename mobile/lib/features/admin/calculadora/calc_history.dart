@@ -83,7 +83,7 @@ class _CalcHistoryTabState extends ConsumerState<CalcHistoryTab> {
             onTapOutside: closeKeyboardOnTapOutside,
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
-              hintText: 'Buscar pieza o cliente…',
+              hintText: 'Buscar pieza, cliente o tipo…',
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: _search.text.isEmpty
                   ? null
@@ -137,6 +137,7 @@ class _HistoryTile extends StatelessWidget {
     final sub = [
       if (h.customer != null) h.customer!,
       if (h.materialLabel.isNotEmpty) h.materialLabel,
+      if (h.presetName != null) h.presetName!,
     ].join(' · ');
     return AdminCard(
       onTap: onTap,
@@ -253,6 +254,7 @@ class _HistoryDetailSheetState extends ConsumerState<_HistoryDetailSheet> {
         const SizedBox(height: 10),
         if (h.customer != null) line('Cliente', h.customer!),
         if (h.materialLabel.isNotEmpty) line('Filamento', h.materialLabel),
+        if (h.presetName != null) line('Tipo de producto', h.presetName!),
         line('Gramos', formatGrams(h.grams)),
         line('Tiempo de impresión', formatDuration(h.hours)),
         line('Fecha', formatDateTime(h.createdAt)),

@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { WhatsappIcon } from "@/components/shared/whatsapp-icon";
+import { ShareProduct } from "@/features/products/components/share-product";
 import { formatPrice } from "@/lib/format";
 import { buildWhatsappUrl, siteUrl } from "@/lib/site";
 import { cn } from "@/lib/utils";
@@ -139,6 +140,12 @@ export function ProductInfo({
             </Button>
           </div>
         )}
+
+        <ShareProduct
+          name={product.name}
+          slug={product.slug}
+          price={formatPrice(unitPrice)}
+        />
       </div>
 
       {product.specs.length > 0 ? (

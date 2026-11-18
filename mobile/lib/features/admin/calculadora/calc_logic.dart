@@ -39,7 +39,7 @@ enum HistorySort {
   final String label;
 }
 
-/// Filtra por nombre o cliente y ordena (igual que el historial de la web).
+/// Filtra por nombre, cliente o tipo de producto y ordena (igual que el historial de la web).
 List<CalcHistoryItem> filterHistory(
   List<CalcHistoryItem> items, {
   String query = '',
@@ -50,7 +50,8 @@ List<CalcHistoryItem> filterHistory(
       .where((h) =>
           term.isEmpty ||
           h.name.toLowerCase().contains(term) ||
-          (h.customer ?? '').toLowerCase().contains(term))
+          (h.customer ?? '').toLowerCase().contains(term) ||
+          (h.presetName ?? '').toLowerCase().contains(term))
       .toList();
   switch (sort) {
     case HistorySort.price:

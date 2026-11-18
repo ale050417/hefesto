@@ -21,6 +21,7 @@ import {
   detectPieceType,
   parsePieceType,
 } from "@/features/products/ai-image/prompt";
+import { MAX_PRODUCT_COLORS } from "@/features/products/schemas";
 
 /**
  * Foto de producto con IA a partir de una foto de la pieza (botón "Generar
@@ -49,10 +50,24 @@ const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const fieldsSchema = z.object({
   name: z.string().trim().min(2).max(120),
   category: z.string().trim().max(80).optional(),
-  colors: z.array(z.string().trim().max(40)).max(24).optional(),
+  colors: z.array(z.string().trim().max(40)).max(MAX_PRODUCT_COLORS).optional(),
   description: z.string().trim().max(600).optional(),
   scene: z.string().trim().max(200).optional(),
 });
+
+/**
+ * Qué decirle a quien carga cuando un dato no pasa. Antes cualquier dato
+ * inválido contestaba "Escribí primero el nombre", también con el nombre bien
+ * puesto: con más de 24 colores elegidos la culpa era de los colores y el
+ * mensaje mandaba a revisar el nombre (arreglo de Agustín, 2026-11-18).
+ */
+const FIELD_MESSAGES: Record<string, string> = {
+  name: "Escribí primero el nombre del producto (paso Básicos).",
+  category: "El nombre de la categoría es demasiado largo.",
+  colors: "Hay demasiados colores elegidos para generar la foto.",
+  description: "La descripción es demasiado larga para generar la foto.",
+  scene: "La escena es demasiado larga (hasta 200 letras).",
+};
 
 function fail(status: number, code: string, message: string, prompt?: string) {
   return NextResponse.json({ ok: false, code, message, prompt }, { status });
@@ -143,18 +158,25 @@ export async function POST(req: Request) {
       colors = undefined;
     }
   }
+  const descriptionRaw = form.get("description");
   const parsed = fieldsSchema.safeParse({
     name: form.get("name") ?? undefined,
     category: form.get("category") || undefined,
     colors,
-    description: form.get("description") || undefined,
+    // La descripción solo orienta la escena: una larga se recorta en vez de
+    // frenar la foto (el producto admite 2000 letras y acá el tope es 600).
+    description:
+      typeof descriptionRaw === "string" && descriptionRaw
+        ? descriptionRaw.slice(0, 600)
+        : undefined,
     scene: form.get("scene") || undefined,
   });
   if (!parsed.success) {
+    const field = String(parsed.error.issues[0]?.path[0] ?? "");
     return fail(
       400,
       "invalid",
-      "Escribí primero el nombre del producto (paso Básicos).",
+      FIELD_MESSAGES[field] ?? "Revisá los datos del producto.",
     );
   }
 

@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/config.dart';
+import '../../../core/format.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
@@ -464,6 +466,9 @@ class ProductTile extends ConsumerWidget {
     ].join(' · ');
 
     final items = <PopupMenuEntry<String>>[
+      // Compartir: solo lo publicado (un oculto no abre en la tienda).
+      if (row.status == ProductState.published)
+        const PopupMenuItem(value: 'share', child: _MenuRow(Icons.share_rounded, 'Compartir por WhatsApp')),
       if (canEdit)
         PopupMenuItem(
           value: 'featured',
@@ -551,6 +556,13 @@ class ProductTile extends ConsumerWidget {
               itemBuilder: (_) => items,
               onSelected: (v) {
                 switch (v) {
+                  case 'share':
+                    shareProductOnWhatsapp(
+                      context,
+                      name: row.name,
+                      link: '${AppConfig.siteUrl}/producto/${row.slug}',
+                      price: formatPrice(row.effectivePrice),
+                    );
                   case 'featured':
                     toggleFeatured(context, id: row.id, value: !row.isFeatured);
                   case 'publish':
