@@ -21,7 +21,7 @@ class HomeScreen extends ConsumerWidget {
       body: SafeArea(
         bottom: false,
         child: home.when(
-          loading: () => const LoadingView(),
+          loading: () => const StorefrontSkeleton(),
           error: (e, _) => ErrorView(
             message: e is ApiException ? e.message : 'No pudimos cargar la tienda.',
             onRetry: () => ref.invalidate(homeProvider),

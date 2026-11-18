@@ -238,7 +238,7 @@ class _HistoryDetailSheetState extends ConsumerState<_HistoryDetailSheet> {
                 minimumSize: const Size.fromHeight(48),
               ),
               icon: _deleting
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Brand.danger))
+                  ? const SizedBox(width: 16, height: 16, child: AppSpinner(color: Brand.danger))
                   : const Icon(Icons.delete_outline_rounded, size: 18),
               label: const Text('Eliminar del historial'),
             )

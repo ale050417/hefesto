@@ -191,7 +191,7 @@ class _DeleteSaleDialogState extends ConsumerState<DeleteSaleDialog> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                  child: AppSpinner(color: Colors.white),
                 )
               : const Text('Eliminar'),
         ),

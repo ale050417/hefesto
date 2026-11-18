@@ -5,6 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../theme/app_theme.dart';
+import 'skeleton.dart';
+
+// Los estados de carga viven en skeleton.dart; se re-exportan para que
+// alcance con importar este archivo.
+export 'skeleton.dart';
 
 /// "78% 0%" (background-position de la web) → Alignment de Flutter.
 Alignment parsePosition(String? position) {
@@ -159,10 +164,7 @@ class GoldButton extends StatelessWidget {
                   ? const SizedBox(
                       width: 22,
                       height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.4,
-                        color: Brand.goldFg,
-                      ),
+                      child: AppSpinner(color: Brand.goldFg),
                     )
                   : Row(
                       mainAxisSize: MainAxisSize.min,
@@ -247,13 +249,6 @@ class SectionHeader extends StatelessWidget {
       ),
     );
   }
-}
-
-class LoadingView extends StatelessWidget {
-  const LoadingView({super.key});
-  @override
-  Widget build(BuildContext context) =>
-      const Center(child: CircularProgressIndicator(color: Brand.gold));
 }
 
 class ErrorView extends StatelessWidget {

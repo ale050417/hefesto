@@ -60,6 +60,10 @@ class ConfigApi {
     return '${json['url'] ?? ''}';
   }
 
+  /// Orden de los banners: [ids] con TODOS, en el orden en que se quieren ver.
+  Future<void> reorderBanners(List<String> ids) =>
+      _c.sendJson('PUT', '$_base/banners/orden', body: {'ids': ids});
+
   Future<void> deleteBanner(String id) => _c.sendJson('DELETE', '$_base/banners/$id');
 
   // Equipo y roles (solo administradores).

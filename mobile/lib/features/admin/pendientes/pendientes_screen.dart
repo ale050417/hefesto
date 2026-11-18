@@ -320,7 +320,7 @@ class _PendientesBodyState extends ConsumerState<_PendientesBody> {
                         ? const SizedBox(
                             width: 20,
                             height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Brand.gold),
+                            child: AppSpinner(),
                           )
                         : const Icon(Icons.send_rounded),
                   ),

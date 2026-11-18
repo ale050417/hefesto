@@ -12,6 +12,7 @@ import 'package:hefesto/core/api/models.dart';
 import 'package:hefesto/core/providers.dart';
 import 'package:hefesto/core/theme/app_theme.dart';
 import 'package:hefesto/core/widgets/common.dart' show GoldButton;
+import 'package:hefesto/core/widgets/frame_editor.dart';
 import 'package:hefesto/core/widgets/photo_picker.dart';
 import 'package:hefesto/features/admin/configuracion/banner_edit_screen.dart';
 import 'package:hefesto/features/admin/configuracion/config_api.dart';
@@ -88,6 +89,8 @@ class FakeConfigApi extends ConfigApi {
   Future<void> saveCotizacion(Map<String, dynamic> body) => _rec('cotizacion', body, null);
   @override
   Future<void> updateBanner(String id, Map<String, dynamic> body) => _rec('banner:$id', body, null);
+  @override
+  Future<void> reorderBanners(List<String> ids) => _rec('banner_order', ids, null);
   @override
   Future<void> deleteBanner(String id) => _rec('banner_delete', id, null);
   @override
@@ -563,14 +566,41 @@ void main() {
       expect(find.text('Figuras de colección'), findsOneWidget);
       expect(find.text('Visible'), findsOneWidget);
       expect(find.text('Oculto'), findsOneWidget);
-      // Las imágenes se cambian desde el teléfono: ya no manda a la web
-      // (solo el ORDEN de los banners sigue siendo de la web).
+      // Las imágenes y el orden de los banners se cambian desde el teléfono.
       expect(find.widgetWithText(OutlinedButton, 'Cambiar logo'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, 'Nuevo banner'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, 'Cambiar imagen de portada'), findsOneWidget);
-      expect(find.textContaining('desde la web'), findsOneWidget);
-      expect(find.text('El nuevo queda al final. El orden de los banners se cambia desde la web.'), findsOneWidget);
+      expect(find.textContaining('desde la web'), findsNothing);
+      expect(find.textContaining('arrastrá un banner desde las rayitas'), findsOneWidget);
+      expect(find.byIcon(Icons.drag_handle_rounded), findsNWidgets(_config.tienda.banners.length));
       expect(find.textContaining('no se pueden subir'), findsNothing);
+    });
+
+    testWidgets('arrastrar un banner desde la manija guarda el orden nuevo', (tester) async {
+      final api = FakeConfigApi();
+      await _show(tester, 'config_tienda_orden', TiendaScreen(initial: _config.tienda, canEdit: true),
+          height: 3000, api: api);
+      final before = [for (final b in _config.tienda.banners) b.id];
+      expect(before.length, greaterThan(1));
+      // El primero se baja más allá del último.
+      final gesture = await tester.startGesture(tester.getCenter(find.byIcon(Icons.drag_handle_rounded).first));
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.moveBy(const Offset(0, 30));
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.moveBy(Offset(0, 90.0 * before.length));
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.up();
+      await _settle(tester);
+      final call = api.calls.single;
+      expect(call.$1, 'banner_order');
+      expect(call.$2, [...before.skip(1), before.first]);
+      expect(find.text('Orden de los banners guardado'), findsOneWidget);
+    });
+
+    testWidgets('solo lectura: los banners no se pueden arrastrar', (tester) async {
+      await _show(tester, 'config_tienda_orden_solo_ver', TiendaScreen(initial: _config.tienda, canEdit: false),
+          height: 3000);
+      expect(find.byIcon(Icons.drag_handle_rounded), findsNothing);
     });
 
     testWidgets('guarda por sección con todo lo de la pantalla', (tester) async {
@@ -892,6 +922,32 @@ void main() {
       final body = api.calls.single.$2! as Map<String, dynamic>;
       expect(body['position'], '50% 0%');
       expect(body.containsKey('imageUrl'), isFalse);
+    });
+
+    testWidgets('encuadre: arrastrar la vista previa cambia position y se guarda', (tester) async {
+      final api = FakeConfigApi();
+      await _show(tester, 'config_banner_arrastre',
+          BannerEditScreen(banner: _bannerWithImage, canEdit: true),
+          height: 1700, api: api);
+      expect(find.text('Arrastrá para acomodar'), findsOneWidget);
+      final before = positionPercents(_bannerWithImage.position);
+      // Arrastrar hacia arriba muestra lo de más abajo: sube el % vertical.
+      await tester.drag(find.byType(FramingBox), const Offset(0, -40));
+      await tester.pump();
+      await tester.tap(_saveButton());
+      await _settle(tester);
+      final body = api.calls.single.$2! as Map<String, dynamic>;
+      final after = positionPercents(body['position'] as String);
+      expect(after.$2, greaterThan(before.$2));
+      expect(after.$1, before.$1, reason: 'solo se movió en vertical');
+    });
+
+    testWidgets('solo lectura: la vista previa no se arrastra', (tester) async {
+      await _show(tester, 'config_banner_solo_ver',
+          BannerEditScreen(banner: _bannerWithImage, canEdit: false),
+          height: 1700);
+      expect(find.byType(FramingBox), findsOneWidget);
+      expect(find.text('Arrastrá para acomodar'), findsNothing);
     });
   });
 

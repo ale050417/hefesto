@@ -136,6 +136,35 @@ Future<bool> deleteProductImage(
   return _guard(context, () => repo.deleteImage(productId, imageId), done: 'Foto eliminada');
 }
 
+/// Guarda el encuadre de una foto (lo que se eligió arrastrándola).
+Future<bool> setImagePosition(
+  BuildContext context, {
+  required String productId,
+  required String imageId,
+  required String position,
+}) {
+  final repo = ProviderScope.containerOf(context).read(productosRepoProvider);
+  return _guard(
+    context,
+    () => repo.setImagePosition(productId, imageId, position),
+    done: 'Encuadre guardado',
+  );
+}
+
+/// Guarda el orden nuevo de las fotos.
+Future<bool> reorderProductImages(
+  BuildContext context, {
+  required String productId,
+  required List<String> imageIds,
+}) {
+  final repo = ProviderScope.containerOf(context).read(productosRepoProvider);
+  return _guard(
+    context,
+    () => repo.reorderImages(productId, imageIds),
+    done: 'Orden de las fotos guardado',
+  );
+}
+
 /// Elige cuál de las fotos YA cargadas es la portada (no sube archivos).
 Future<bool> setPrimaryImage(
   BuildContext context, {

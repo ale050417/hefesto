@@ -55,6 +55,50 @@ class _TiendaScreenState extends ConfigFormState<TiendaScreen> {
   late final Map<String, bool> _sections = {for (final s in widget.initial.homeSections) s.id: s.on};
   String? _accentError;
 
+  /// Orden de los banners recién arrastrado (ids), mientras se guarda y hasta
+  /// que el servidor devuelve la lista nueva. Null = el orden del servidor.
+  List<String>? _bannerOrder;
+  bool _reordering = false;
+
+  /// Los banners en el orden que se ve: el arrastrado si todavía vale (mismos
+  /// banners), si no el del servidor.
+  List<BannerInfo> _ordered(List<BannerInfo> banners) {
+    final order = _bannerOrder;
+    if (order == null || order.length != banners.length) return banners;
+    final byId = {for (final b in banners) b.id: b};
+    if (!order.every(byId.containsKey)) return banners;
+    return [for (final id in order) byId[id]!];
+  }
+
+  /// Soltaron un banner en otro lugar: se ve ya en su lugar nuevo y se guarda.
+  Future<void> _moveBanner(List<BannerInfo> shown, int from, int to) async {
+    if (_reordering) return;
+    if (to == from) return;
+    final ids = [for (final b in shown) b.id];
+    ids.insert(to, ids.removeAt(from));
+    setState(() {
+      _bannerOrder = ids;
+      _reordering = true;
+    });
+    try {
+      await ref.read(configApiProvider).reorderBanners(ids);
+      if (!mounted) return;
+      ref.invalidate(adminConfigProvider);
+      ref.invalidate(homeProvider);
+      showOk(context, 'Orden de los banners guardado');
+    } catch (e) {
+      if (!mounted) return;
+      // No se guardó: vuelven a como están en el servidor.
+      setState(() => _bannerOrder = null);
+      ref.invalidate(adminConfigProvider);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(apiErrorText(e))));
+    } finally {
+      if (mounted) setState(() => _reordering = false);
+    }
+  }
+
   /// Imagen que se está subiendo: `logo` o `hero` (null = ninguna).
   String? _uploading;
 
@@ -150,7 +194,7 @@ class _TiendaScreenState extends ConfigFormState<TiendaScreen> {
     // Los banners y las imágenes se cambian aparte del formulario: acá se
     // muestra siempre lo último que hay en el servidor.
     final live = ref.watch(adminConfigProvider).value?.tienda ?? widget.initial;
-    final banners = live.banners;
+    final banners = _ordered(live.banners);
     final currentAccent = _accent.text.trim().toUpperCase();
 
     return ConfigSectionScaffold(
@@ -395,16 +439,31 @@ class _TiendaScreenState extends ConfigFormState<TiendaScreen> {
             ),
           )
         else
-          for (final b in banners)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _BannerTile(
-                banner: b,
-                onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => BannerEditScreen(banner: b, canEdit: enabled)),
+          // Se arrastran desde la manija para cambiar el orden del carrusel
+          // (pedido de Ale, 2026-11-18). Dentro de la pantalla, sin scroll propio.
+          ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: banners.length,
+            onReorderItem: (from, to) => _moveBanner(banners, from, to),
+            proxyDecorator: (child, _, _) => Material(color: Colors.transparent, child: child),
+            itemBuilder: (context, i) {
+              final b = banners[i];
+              return Padding(
+                key: ValueKey(b.id),
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _BannerTile(
+                  banner: b,
+                  // Con un solo banner no hay nada que ordenar.
+                  dragIndex: enabled && banners.length > 1 && !_reordering ? i : null,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => BannerEditScreen(banner: b, canEdit: enabled)),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
+          ),
         if (enabled) ...[
           const SizedBox(height: 2),
           OutlinedButton.icon(
@@ -416,7 +475,9 @@ class _TiendaScreenState extends ConfigFormState<TiendaScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'El nuevo queda al final. El orden de los banners se cambia desde la web.',
+            banners.length > 1
+                ? 'El nuevo queda al final. Para cambiar el orden, arrastrá un banner desde las rayitas.'
+                : 'El nuevo queda al final.',
             style: TextStyle(fontSize: 11.5, color: c.textFaint),
           ),
         ],
@@ -480,7 +541,7 @@ class _UploadButton extends StatelessWidget {
         icon: busy
             ? const SizedBox.square(
                 dimension: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: Brand.gold),
+                child: AppSpinner(),
               )
             : const Icon(Icons.photo_library_outlined, size: 18),
         // Un rótulo largo con letra grande baja de renglón en vez de cortarse.
@@ -584,9 +645,12 @@ class _SeasonChip extends StatelessWidget {
 
 /// Un banner del inicio: miniatura, título y si está visible.
 class _BannerTile extends StatelessWidget {
-  const _BannerTile({required this.banner, required this.onTap});
+  const _BannerTile({required this.banner, required this.onTap, this.dragIndex});
   final BannerInfo banner;
   final VoidCallback onTap;
+
+  /// Lugar en la lista para arrastrarlo desde la manija (null = sin manija).
+  final int? dragIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -619,7 +683,20 @@ class _BannerTile extends StatelessWidget {
               ],
             ),
           ),
-          Icon(Icons.chevron_right_rounded, color: c.textFaint),
+          if (dragIndex == null)
+            Icon(Icons.chevron_right_rounded, color: c.textFaint)
+          else
+            ReorderableDragStartListener(
+              index: dragIndex!,
+              child: Tooltip(
+                message: 'Arrastrar para ordenar',
+                // Zona táctil de 44 dp aunque el ícono se vea chico.
+                child: SizedBox.square(
+                  dimension: 44,
+                  child: Icon(Icons.drag_handle_rounded, color: c.textDim),
+                ),
+              ),
+            ),
         ],
       ),
     );

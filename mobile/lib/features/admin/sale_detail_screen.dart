@@ -505,7 +505,7 @@ class _StatusSheetState extends ConsumerState<_StatusSheet> {
                             ? const SizedBox(
                                 width: 22,
                                 height: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                                child: AppSpinner(color: Colors.white),
                               )
                             : Text('Sí, ${t.actionLabel.toLowerCase()}'),
                       )

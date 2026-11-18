@@ -458,7 +458,7 @@ class _FallaSheetState extends ConsumerState<_FallaSheet> {
                               ? const SizedBox(
                                   width: 16,
                                   height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Brand.danger),
+                                  child: AppSpinner(color: Brand.danger),
                                 )
                               : const Icon(Icons.delete_outline_rounded, size: 18),
                           label: const Text('Eliminar'),

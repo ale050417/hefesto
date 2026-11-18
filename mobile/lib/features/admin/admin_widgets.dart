@@ -9,6 +9,10 @@ import '../../core/format.dart';
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
+
+// Los esqueletos y la ruedita son de toda la app (core); se re-exportan para
+// las pantallas del panel que solo importan este archivo.
+export '../../core/widgets/skeleton.dart';
 import 'admin_models.dart';
 import 'sale_status.dart';
 
@@ -379,65 +383,6 @@ class AccessDenied extends StatelessWidget {
         title: 'Sin acceso',
         subtitle: 'Tu cuenta no tiene permiso para ver $what. '
             'Pedíselo a un administrador desde Configuración → Roles.',
-      );
-}
-
-/// Bloque gris que late mientras carga (esqueleto).
-class Skeleton extends StatefulWidget {
-  const Skeleton({super.key, this.height = 16, this.width, this.radius = 12});
-  final double height;
-  final double? width;
-  final double radius;
-
-  @override
-  State<Skeleton> createState() => _SkeletonState();
-}
-
-class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin {
-  late final AnimationController _ctl = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  )..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _ctl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.hc;
-    return AnimatedBuilder(
-      animation: _ctl,
-      builder: (_, _) => Container(
-        height: widget.height,
-        width: widget.width,
-        decoration: BoxDecoration(
-          color: Color.lerp(c.surface2, c.surface3, _ctl.value),
-          borderRadius: BorderRadius.circular(widget.radius),
-        ),
-      ),
-    );
-  }
-}
-
-/// Esqueleto de lista (varias filas) para mientras carga.
-class ListSkeleton extends StatelessWidget {
-  const ListSkeleton({super.key, this.rows = 5, this.height = 92});
-  final int rows;
-  final double height;
-
-  @override
-  Widget build(BuildContext context) => ListView(
-        physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        children: [
-          for (var i = 0; i < rows; i++) ...[
-            Skeleton(height: height, radius: 20),
-            const SizedBox(height: 10),
-          ],
-        ],
       );
 }
 

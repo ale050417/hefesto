@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart' show closeInAppWebView;
 
 import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/widgets/skeleton.dart';
 import 'auth_repository.dart';
 
 /// Logo "G" de Google (colores oficiales).
@@ -158,7 +159,7 @@ class _RoundButton extends StatelessWidget {
                     ? SizedBox(
                         width: 22,
                         height: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2.4, color: spinnerColor),
+                        child: AppSpinner(color: spinnerColor),
                       )
                     : child,
               ),

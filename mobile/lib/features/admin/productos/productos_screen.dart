@@ -285,7 +285,7 @@ class _AdminProductosScreenState extends ConsumerState<AdminProductosScreen> {
                   avatar: _pickingCategory && options.isLoading
                       ? const SizedBox.square(
                           dimension: 14,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                          child: AppSpinner(),
                         )
                       : Icon(Icons.folder_open_rounded,
                           size: 16, color: _filter.categoryId == null ? c.textDim : Brand.gold),
@@ -422,7 +422,7 @@ class _ProductList extends StatelessWidget {
                 icon: loadingMore
                     ? const SizedBox.square(
                         dimension: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: AppSpinner(),
                       )
                     : const Icon(Icons.expand_more_rounded),
                 label: Text(loadingMore ? 'Cargando…' : 'Ver más (${page.total - shown} restantes)'),

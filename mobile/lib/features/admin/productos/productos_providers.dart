@@ -80,6 +80,16 @@ class ProductosRepo {
     return '${json['id'] ?? ''}';
   }
 
+  /// Encuadre de una foto ("x% y%"): qué parte se ve cuando la tienda la recorta.
+  Future<void> setImagePosition(String id, String imageId, String position) async {
+    await _api.sendJson('PATCH', '/admin/productos/$id/imagenes/$imageId', body: {'position': position});
+  }
+
+  /// Orden de las fotos: [imageIds] con TODAS, en el orden en que se quieren ver.
+  Future<void> reorderImages(String id, List<String> imageIds) async {
+    await _api.sendJson('PUT', '/admin/productos/$id/imagenes/orden', body: {'ids': imageIds});
+  }
+
   /// Borra una foto (si era la portada, pasa a serlo la siguiente).
   Future<void> deleteImage(String id, String imageId) async {
     await _api.sendJson('DELETE', '/admin/productos/$id/imagenes/$imageId');

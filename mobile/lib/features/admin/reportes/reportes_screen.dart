@@ -70,7 +70,7 @@ class _AdminReportesScreenState extends ConsumerState<AdminReportesScreen> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Brand.gold),
+                  child: AppSpinner(),
                 )
               : const Icon(Icons.copy_all_rounded),
           onPressed: _exporting ? null : _copyCsv,

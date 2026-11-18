@@ -494,7 +494,7 @@ class _ConsultaCard extends StatelessWidget {
                   const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Brand.gold),
+                    child: AppSpinner(),
                   ),
               ],
             ),

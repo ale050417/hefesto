@@ -581,6 +581,44 @@ export async function setImageColorRow(
   return row ?? null;
 }
 
+/**
+ * Encuadre de una foto ya cargada (qué parte se ve cuando la tienda la
+ * recorta). Lo cambia la app arrastrando la foto (2026-11-18).
+ */
+export async function setImagePositionRow(
+  imageId: string,
+  position: string,
+  database: Database = db,
+): Promise<ProductImage | null> {
+  const [row] = await database
+    .update(productImages)
+    .set({ position })
+    .where(eq(productImages.id, imageId))
+    .returning();
+  return row ?? null;
+}
+
+/**
+ * Orden de las fotos de un producto: `ids` en el orden en que se quieren ver.
+ * En una transacción: o quedan todas en su lugar nuevo o ninguna.
+ */
+export async function setImagesOrder(
+  productId: string,
+  ids: string[],
+  database: Database = db,
+): Promise<void> {
+  await database.transaction(async (tx) => {
+    for (const [i, id] of ids.entries()) {
+      await tx
+        .update(productImages)
+        .set({ sortOrder: i })
+        .where(
+          and(eq(productImages.id, id), eq(productImages.productId, productId)),
+        );
+    }
+  });
+}
+
 /** Marca una imagen como principal (y las demás del producto como no principal). */
 export async function setPrimaryImage(
   productId: string,

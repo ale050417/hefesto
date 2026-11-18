@@ -16,6 +16,7 @@ import { ValidationError } from "@/core/errors";
 import * as repo from "./repository";
 import {
   deleteBannerRow,
+  setBannersOrder,
   getSettings,
   insertBanner,
   listActiveBanners,
@@ -613,6 +614,11 @@ export async function updateBanner(
   }>,
 ): Promise<StoreBanner> {
   return updateBannerRow(id, values);
+}
+
+/** Reordena los banners del inicio (la app los arrastra, 2026-11-18). */
+export async function reorderBanners(ids: string[]): Promise<void> {
+  return setBannersOrder(ids);
 }
 
 export async function deleteBanner(id: string): Promise<void> {

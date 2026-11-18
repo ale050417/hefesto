@@ -400,7 +400,7 @@ class _Footer extends ConsumerWidget {
         child: SizedBox(
           width: 22,
           height: 22,
-          child: CircularProgressIndicator(strokeWidth: 2.4, color: Brand.gold),
+          child: AppSpinner(),
         ),
       ),
     );

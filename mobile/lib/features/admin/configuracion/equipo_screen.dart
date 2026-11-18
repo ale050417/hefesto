@@ -355,7 +355,7 @@ class _MemberSheetState extends ConsumerState<MemberSheet> {
         if (_busy)
           const Padding(
             padding: EdgeInsets.only(top: 8),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: AppSpinner()),
           ),
         if (_error != null)
           Padding(

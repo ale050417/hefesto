@@ -31,7 +31,7 @@ class ProductScreen extends ConsumerWidget {
     final async = ref.watch(productDetailProvider(slug));
     return Scaffold(
       body: async.when(
-        loading: () => Stack(children: [const LoadingView(), _BackButton()]),
+        loading: () => Stack(children: [const ProductPageSkeleton(), _BackButton()]),
         error: (e, _) => Stack(children: [
           ErrorView(
             message: e is ApiException ? e.message : 'No pudimos cargar el producto.',

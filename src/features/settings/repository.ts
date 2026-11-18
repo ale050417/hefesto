@@ -122,6 +122,21 @@ export async function updateBannerRow(
   return row;
 }
 
+/** Orden de los banners del inicio: `ids` en el orden en que se quieren ver. */
+export async function setBannersOrder(
+  ids: string[],
+  database: Database = db,
+): Promise<void> {
+  await database.transaction(async (tx) => {
+    for (const [i, id] of ids.entries()) {
+      await tx
+        .update(storeBanners)
+        .set({ sortOrder: i })
+        .where(eq(storeBanners.id, id));
+    }
+  });
+}
+
 export async function deleteBannerRow(
   id: string,
   database: Database = db,

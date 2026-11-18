@@ -183,7 +183,7 @@ class _PagosScreenState extends ConfigFormState<PagosScreen> {
                       child: SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2.2, color: Brand.gold),
+                        child: AppSpinner(),
                       ),
                     ),
                   if (enabled && !_mpBusy) ...[

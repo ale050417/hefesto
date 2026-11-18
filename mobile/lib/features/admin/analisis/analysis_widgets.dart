@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_theme.dart';
-import '../admin_widgets.dart' show Skeleton;
 import 'ar_number.dart';
 
 const List<String> kMonthShort = [
@@ -322,24 +321,6 @@ class NoticeBanner extends StatelessWidget {
       ),
     );
   }
-}
-
-/// Esqueleto de pantalla de análisis (tarjetas que laten).
-class AnalysisSkeleton extends StatelessWidget {
-  const AnalysisSkeleton({super.key, this.cards = 4});
-  final int cards;
-
-  @override
-  Widget build(BuildContext context) => ListView(
-        physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        children: [
-          for (var i = 0; i < cards; i++) ...[
-            Skeleton(height: i == 0 ? 96 : 150, radius: 20),
-            const SizedBox(height: 12),
-          ],
-        ],
-      );
 }
 
 /// Fila de 2 KPIs de igual alto (se achican sin desbordar a 360dp).

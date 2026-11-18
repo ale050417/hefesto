@@ -5,6 +5,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/frame_editor.dart';
 import '../../../core/widgets/modals.dart';
 import '../../../core/widgets/photo_picker.dart';
 import 'catalogo_ui.dart';
@@ -14,8 +15,9 @@ import 'productos_providers.dart';
 
 /// Fotos de un producto en su ficha. Con permiso de editar (pedido de Ale,
 /// 2026-11-17: que se pueda hacer todo desde el teléfono) se suman fotos de la
-/// galería o de la cámara, se elimina la que está a la vista y se elige cuál es
-/// la portada. Hasta [maxProductImages] fotos, como en la web.
+/// galería o de la cámara, se elimina la que está a la vista, se elige cuál es
+/// la portada, se acomoda el encuadre arrastrando y se cambia el orden
+/// arrastrando las miniaturas (2026-11-18). Hasta [maxProductImages] fotos, como en la web.
 class ProductGallery extends ConsumerStatefulWidget {
   const ProductGallery({super.key, required this.product, required this.canEdit});
   final AdminProductDetail product;
@@ -137,6 +139,60 @@ class _ProductGalleryState extends ConsumerState<ProductGallery> {
     setState(() => _busy = false);
   }
 
+  /// Orden recién arrastrado (ids) hasta que llega la lista nueva del servidor.
+  List<String>? _order;
+
+  /// Las fotos en el orden que se ve: el arrastrado si todavía vale.
+  List<AdminProductImage> get _images {
+    final images = _p.images;
+    final order = _order;
+    if (order == null || order.length != images.length) return images;
+    final byId = {for (final i in images) i.id: i};
+    if (!order.every(byId.containsKey)) return images;
+    return [for (final id in order) byId[id]!];
+  }
+
+  /// Soltaron una miniatura en otro lugar.
+  Future<void> _move(int from, int to) async {
+    if (_working) return;
+    if (to == from) return;
+    final ids = [for (final i in _images) i.id];
+    ids.insert(to, ids.removeAt(from));
+    setState(() {
+      _order = ids;
+      _busy = true;
+      _notice = null;
+    });
+    final ok = await reorderProductImages(context, productId: _p.id, imageIds: ids);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (!ok) _order = null; // no se guardó: vuelve al orden del servidor
+    });
+  }
+
+  /// Abre "Acomodar foto": se arrastra en un recuadro cuadrado, como la
+  /// muestra la tienda, y se guarda el encuadre.
+  Future<void> _frame(AdminProductImage img) async {
+    if (_working) return;
+    final position = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => FrameEditorScreen(
+          title: 'Acomodar foto',
+          aspectRatio: 1,
+          url: img.url,
+          initial: img.position ?? '50% 50%',
+          help: 'Así se ve en las tarjetas de la tienda. Arrastrá la foto para elegir qué parte se ve.',
+        ),
+      ),
+    );
+    if (position == null || !mounted) return;
+    setState(() => _busy = true);
+    await setImagePosition(context, productId: _p.id, imageId: img.id, position: position);
+    if (!mounted) return;
+    setState(() => _busy = false);
+  }
+
   Future<void> _delete(AdminProductImage img) async {
     if (_working) return;
     setState(() {
@@ -161,7 +217,7 @@ class _ProductGalleryState extends ConsumerState<ProductGallery> {
   @override
   Widget build(BuildContext context) {
     final c = context.hc;
-    final images = _p.images;
+    final images = _images;
     final canEdit = widget.canEdit;
 
     if (images.isEmpty) {
@@ -243,14 +299,19 @@ class _ProductGalleryState extends ConsumerState<ProductGallery> {
           const SizedBox(height: 10),
           SizedBox(
             height: 62,
-            child: ListView.separated(
+            // Con permiso, se mantiene apretada una miniatura y se arrastra
+            // para cambiar el orden (pedido de Ale, 2026-11-18).
+            child: ReorderableListView.builder(
               scrollDirection: Axis.horizontal,
+              buildDefaultDragHandles: canEdit && !_working,
               itemCount: images.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
+              onReorderItem: _move,
+              proxyDecorator: (child, _, _) => Material(color: Colors.transparent, child: child),
               itemBuilder: (_, i) {
                 final img = images[i];
                 final selected = i == index;
                 return Semantics(
+                  key: ValueKey(img.id),
                   button: true,
                   selected: selected,
                   label: 'Foto ${i + 1} de ${images.length}',
@@ -258,6 +319,7 @@ class _ProductGalleryState extends ConsumerState<ProductGallery> {
                     onTap: () => setState(() => _selId = img.id),
                     child: Container(
                       width: 62,
+                      margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
@@ -285,12 +347,24 @@ class _ProductGalleryState extends ConsumerState<ProductGallery> {
           ),
         ],
         if (canEdit) ...[
+          if (images.length > 1) ...[
+            const SizedBox(height: 6),
+            Text(
+              'Mantené apretada una foto y arrastrala para cambiar el orden.',
+              style: TextStyle(fontSize: 11.5, color: c.textFaint, height: 1.3),
+            ),
+          ],
           const SizedBox(height: 10),
           // Sobre la foto que se está viendo.
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
+              OutlinedButton.icon(
+                onPressed: _working ? null : () => _frame(sel),
+                icon: const Icon(Icons.open_with_rounded, size: 18),
+                label: const Text('Acomodar'),
+              ),
               if (!sel.isPrimary)
                 OutlinedButton.icon(
                   onPressed: _working ? null : () => _makePrimary(sel),
@@ -340,7 +414,7 @@ class _ProductGalleryState extends ConsumerState<ProductGallery> {
           children: [
             const SizedBox.square(
               dimension: 14,
-              child: CircularProgressIndicator(strokeWidth: 2, color: Brand.gold),
+              child: AppSpinner(),
             ),
             const SizedBox(width: 8),
             Expanded(child: Text(_progress!, style: TextStyle(fontSize: 12.5, color: c.textDim))),

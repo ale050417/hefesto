@@ -553,7 +553,7 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
                   padding: EdgeInsets.all(14),
                   child: SizedBox.square(
                     dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Brand.gold),
+                    child: AppSpinner(),
                   ),
                 )
               : Icon(Icons.arrow_drop_down_rounded, color: c.textDim),

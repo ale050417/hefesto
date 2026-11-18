@@ -33,7 +33,7 @@ class AccountScreen extends ConsumerWidget {
             me.when(
               loading: () => const Padding(
                 padding: EdgeInsets.all(32),
-                child: Center(child: CircularProgressIndicator(color: Brand.gold)),
+                child: Center(child: AppSpinner()),
               ),
               error: (e, _) => _ProfileCard(
                 name: session.user.email ?? 'Mi cuenta',
@@ -269,7 +269,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2.2, color: Colors.white),
+                  child: AppSpinner(color: Colors.white),
                 )
               : const Text('Eliminar'),
         ),

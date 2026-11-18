@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/common.dart';
+import '../../../core/widgets/frame_editor.dart';
 import '../../../core/widgets/photo_picker.dart';
 import '../admin_widgets.dart';
 import 'config_api.dart';
@@ -22,8 +22,9 @@ const List<(String, String)> bannerFrames = [
 /// Un banner del inicio: se elige o se cambia su imagen (pedido de Ale,
 /// 2026-11-17: "quise cambiar los banners desde el celular pero no me deja"),
 /// se edita su título, texto, botón y alineación, se muestra u oculta, o se
-/// elimina. Sin [banner] es el alta de uno nuevo (queda al final del carrusel;
-/// el orden se cambia desde la web).
+/// elimina. La imagen se acomoda arrastrándola en la vista previa. Sin [banner]
+/// es el alta de uno nuevo (queda al final del carrusel; el orden se cambia
+/// arrastrando en la lista de Tienda).
 class BannerEditScreen extends ConsumerStatefulWidget {
   const BannerEditScreen({super.key, this.banner, required this.canEdit});
 
@@ -206,42 +207,42 @@ class _BannerEditScreenState extends ConfigFormState<BannerEditScreen> {
       onSave: _onSave,
       onChanged: touch,
       children: [
-        AspectRatio(
-          aspectRatio: 16 / 6,
-          child: picked != null
-              // La foto recién elegida, con el mismo recorte que va a tener.
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Image.memory(
-                    picked.bytes,
-                    fit: BoxFit.cover,
-                    alignment: parsePosition(_position),
-                    gaplessPlayback: true,
-                    errorBuilder: (_, _, _) => ColoredBox(
-                      color: c.surface2,
-                      child: Icon(Icons.image_outlined, color: c.textFaint),
-                    ),
-                  ),
-                )
-              : _hasImage
-                  ? NetImage(widget.banner?.imageUrl, position: _position, radius: 16)
-                  : Container(
-                      decoration: BoxDecoration(
-                        color: c.surface2,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: c.border),
-                      ),
-                      alignment: Alignment.center,
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.image_outlined, size: 30, color: c.textFaint),
-                          const SizedBox(height: 4),
-                          Text('Sin imagen', style: TextStyle(fontSize: 12.5, color: c.textDim)),
-                        ],
-                      ),
-                    ),
-        ),
+        // Vista previa con la forma del banner. Con permiso se arrastra para
+        // elegir qué parte de la imagen se ve (pedido de Ale, 2026-11-18): la
+        // foto recién elegida o la que ya tiene, con el recorte que va a tener.
+        if (_hasImage)
+          FramingBox(
+            bytes: picked?.bytes,
+            url: picked == null ? widget.banner?.imageUrl : null,
+            aspectRatio: 16 / 6,
+            position: _position,
+            onChanged: enabled
+                ? (p) => setState(() {
+                      error = null;
+                      _position = p;
+                    })
+                : null,
+          )
+        else
+          AspectRatio(
+            aspectRatio: 16 / 6,
+            child: Container(
+              decoration: BoxDecoration(
+                color: c.surface2,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: c.border),
+              ),
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.image_outlined, size: 30, color: c.textFaint),
+                  const SizedBox(height: 4),
+                  Text('Sin imagen', style: TextStyle(fontSize: 12.5, color: c.textDim)),
+                ],
+              ),
+            ),
+          ),
         const SizedBox(height: 8),
         if (widget.canEdit) ...[
           Align(
@@ -284,8 +285,8 @@ class _BannerEditScreenState extends ConfigFormState<BannerEditScreen> {
                     ),
                   ),
               ],
-              // Un encuadre fino hecho en la web no coincide con ninguno de
-              // los tres: no se marca ninguno y se conserva hasta que se elija.
+              // Atajos. Un encuadre fino (hecho arrastrando, o en la web) no
+              // coincide con ninguno de los tres: no se marca ninguno.
               selected: {if (bannerFrames.any((f) => f.$1 == _position)) _position},
               emptySelectionAllowed: true,
               showSelectedIcon: false,

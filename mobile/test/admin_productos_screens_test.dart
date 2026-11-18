@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart' show kLongPressTimeout;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +13,7 @@ import 'package:hefesto/core/api/models.dart';
 import 'package:hefesto/core/providers.dart';
 import 'package:hefesto/core/theme/app_theme.dart';
 import 'package:hefesto/core/widgets/common.dart';
+import 'package:hefesto/core/widgets/frame_editor.dart';
 import 'package:hefesto/core/widgets/photo_picker.dart';
 import 'package:hefesto/features/admin/productos/producto_detail_screen.dart';
 import 'package:hefesto/features/admin/productos/producto_form_screen.dart';
@@ -196,6 +198,12 @@ class FakeProductosRepo extends ProductosRepo {
   Future<void> delete(String id) async => calls.add('delete:$id');
   @override
   Future<void> setPrimaryImage(String id, String imageId) async => calls.add('primary:$id:$imageId');
+  @override
+  Future<void> setImagePosition(String id, String imageId, String position) async =>
+      calls.add('position:$id:$imageId:$position');
+  @override
+  Future<void> reorderImages(String id, List<String> imageIds) async =>
+      calls.add('order:$id:${imageIds.join(',')}');
 
   /// Fotos que el "servidor" rechaza (por nombre de archivo).
   final failImages = <String>{};
@@ -505,6 +513,64 @@ void main() {
       await tester.tap(find.text('Usar como portada'));
       await _pumpFrames(tester);
       expect(repo.calls, ['primary:p1:i2']);
+    });
+
+    testWidgets('"Acomodar" abre la vista previa, se arrastra y guarda el encuadre', (tester) async {
+      final repo = FakeProductosRepo();
+      await _show(
+        tester,
+        'producto_acomodar',
+        const AdminProductDetailScreen(id: 'p1'),
+        height: 1200,
+        overrides: [
+          adminProductProvider.overrideWith((ref, id) async => _detail),
+          productosRepoProvider.overrideWithValue(repo),
+        ],
+      );
+      await tester.tap(find.text('Acomodar'));
+      await _pumpFrames(tester);
+      expect(find.text('Acomodar foto'), findsOneWidget);
+      expect(find.textContaining('tarjetas de la tienda'), findsOneWidget);
+      // Sin mover nada no hay qué guardar.
+      expect(tester.widget<GoldButton>(find.widgetWithText(GoldButton, 'Guardar encuadre')).onPressed, isNull);
+      await tester.drag(find.byType(FramingBox), const Offset(0, 60));
+      await tester.pump();
+      await tester.tap(find.text('Guardar encuadre'));
+      await _pumpFrames(tester);
+      expect(repo.calls, hasLength(1));
+      final parts = repo.calls.single.split(':');
+      expect(parts.take(3), ['position', 'p1', _detail.images.first.id]);
+      // Arrastrar hacia abajo muestra lo de más arriba: baja el % vertical.
+      expect(positionPercents(parts[3]).$2, lessThan(positionPercents(_detail.images.first.position).$2));
+      expect(find.text('Encuadre guardado'), findsOneWidget);
+    });
+
+    testWidgets('mantener apretada una miniatura y arrastrarla guarda el orden nuevo', (tester) async {
+      final repo = FakeProductosRepo();
+      await _show(
+        tester,
+        'producto_orden_fotos',
+        const AdminProductDetailScreen(id: 'p1'),
+        height: 1200,
+        overrides: [
+          adminProductProvider.overrideWith((ref, id) async => _detail),
+          productosRepoProvider.overrideWithValue(repo),
+        ],
+      );
+      final ids = [for (final i in _detail.images) i.id];
+      expect(ids.length, greaterThan(1));
+      expect(find.textContaining('Mantené apretada una foto'), findsOneWidget);
+      // 0 = la foto grande, 1 = la 1ª miniatura: se lleva hasta el final.
+      final gesture = await tester.startGesture(tester.getCenter(find.byType(NetImage).at(1)));
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 100));
+      await gesture.moveBy(const Offset(20, 0));
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.moveBy(Offset(70.0 * ids.length, 0));
+      await tester.pump(const Duration(milliseconds: 100));
+      await gesture.up();
+      await _pumpFrames(tester);
+      expect(repo.calls, ['order:p1:${[...ids.skip(1), ids.first].join(',')}']);
+      expect(find.text('Orden de las fotos guardado'), findsOneWidget);
     });
 
     testWidgets('multicolor: los "precios por color" son GRAMOS y nunca se muestran como plata', (tester) async {

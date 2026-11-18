@@ -27,6 +27,8 @@ import {
   listVariantsByProduct,
   replaceProductVariants,
   setImageColorRow,
+  setImagePositionRow,
+  setImagesOrder,
   setPrimaryImage,
   setProductStatus,
   updateCategoryRow,
@@ -559,6 +561,22 @@ export async function setProductImageColor(
   const row = await setImageColorRow(imageId, color);
   if (!row) throw new Error("Imagen no encontrada");
   return row.productId;
+}
+
+/** Encuadre de una foto ya cargada (la app lo cambia arrastrándola). */
+export async function setProductImagePosition(
+  imageId: string,
+  position: string,
+): Promise<void> {
+  await setImagePositionRow(imageId, position);
+}
+
+/** Orden de las fotos del producto (`ids` en el orden nuevo). */
+export async function reorderProductImages(
+  productId: string,
+  ids: string[],
+): Promise<void> {
+  await setImagesOrder(productId, ids);
 }
 
 export async function listProductImages(

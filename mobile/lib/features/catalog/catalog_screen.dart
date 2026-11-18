@@ -319,7 +319,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
       );
 
   Widget _body() {
-    if (_loading) return const LoadingView();
+    if (_loading) return ProductGridSkeleton(delegate: productGridDelegate(context));
     if (_error != null) {
       return ErrorView(message: _error!.message, onRetry: () => _load(reset: true));
     }
@@ -341,7 +341,7 @@ class _CatalogScreenState extends ConsumerState<CatalogScreen> {
         itemCount: _items.length + (_loadingMore ? 2 : 0),
         itemBuilder: (_, i) {
           if (i >= _items.length) {
-            return const Center(child: CircularProgressIndicator(color: Brand.gold));
+            return const ProductCardSkeleton();
           }
           return ProductCard(product: _items[i], section: 'catalogo');
         },
