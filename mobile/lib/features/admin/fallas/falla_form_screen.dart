@@ -569,7 +569,7 @@ class _CarretePicker extends StatelessWidget {
           ? const EmptyView(
               icon: Icons.donut_large_outlined,
               title: 'No hay carretes cargados',
-              subtitle: 'Cargá filamentos en la pestaña Stock para poder registrar fallas.',
+              subtitle: 'Cargá filamentos en Más → Filamentos para poder registrar fallas.',
             )
           : ListView.builder(
               shrinkWrap: true,

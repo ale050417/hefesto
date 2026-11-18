@@ -1,5 +1,5 @@
 // Pruebas "teléfono real" del grupo TALLER del panel: cola de producción,
-// impresiones fallidas, filamentos y la pestaña Stock (2026-11-14, pedido de
+// impresiones fallidas, arreglos, filamentos y su stock (2026-11-14, pedido de
 // Ale: "que las pantallas no estén rotas, que cuando tocás los botones se vean
 // bien los modales").
 //
@@ -20,10 +20,16 @@ import 'package:hefesto/core/api/api_client.dart';
 import 'package:hefesto/core/providers.dart';
 import 'package:hefesto/core/theme/app_theme.dart';
 import 'package:hefesto/core/widgets/common.dart';
+import 'package:hefesto/core/widgets/photo_gallery.dart';
+import 'package:hefesto/core/widgets/photo_picker.dart';
 import 'package:hefesto/features/admin/admin_models.dart';
 import 'package:hefesto/features/admin/admin_providers.dart';
 import 'package:hefesto/features/admin/admin_shell.dart';
 import 'package:hefesto/features/admin/admin_widgets.dart';
+import 'package:hefesto/features/admin/arreglos/arreglo_form_screen.dart';
+import 'package:hefesto/features/admin/arreglos/arreglos_api.dart';
+import 'package:hefesto/features/admin/arreglos/arreglos_models.dart';
+import 'package:hefesto/features/admin/arreglos/arreglos_screen.dart';
 import 'package:hefesto/features/admin/fallas/falla_form_screen.dart';
 import 'package:hefesto/features/admin/fallas/fallas_api.dart';
 import 'package:hefesto/features/admin/fallas/fallas_models.dart';
@@ -42,10 +48,13 @@ import 'package:hefesto/features/admin/sale_status.dart';
 import 'package:hefesto/features/admin/stock_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show Session, User;
 
+import 'admin_arreglos_models_test.dart' show fixJson;
+import 'admin_arreglos_screens_test.dart' show FakeArreglosApi;
 import 'admin_fallas_screens_test.dart' show FakeFallasApi;
 import 'admin_filamentos_screens_test.dart' show FakeFilamentosApi;
 import 'admin_produccion_screens_test.dart' show FakeProduccionApi;
 import 'support/device_kit.dart';
+import 'support/photo_kit.dart';
 
 // ---------------------------------------------------------------------------
 // Datos de ejemplo (formas reales de la API, con valores extremos)
@@ -279,7 +288,7 @@ final extremo = Filamento.fromJson(filamentJson(
 
 final deuda = Filamento.fromJson(filamentJson('3', color: 'Negro', stock: -1530.5, status: 'agotado', hex: '#111111'));
 
-/// Pestaña Stock con 36 carretes (los primeros, con textos y números extremos).
+/// Stock con 36 carretes (los primeros, con textos y números extremos).
 StockPage bigStock() => StockPage.fromJson({
       'counts': {'total': 36, 'low': 12, 'out': 12},
       'items': [
@@ -336,6 +345,43 @@ List<FilamentMovement> movements(int n) => [
           'createdAt': '2026-11-${(i % 28 + 1).toString().padLeft(2, '0')}T15:00:00.000Z',
         }),
     ];
+
+/// Seis fotos (el tope) de un arreglo.
+List<String> fixPhotos(String id) => [for (var i = 0; i < 6; i++) 'https://cdn.test/arreglos/$id/$i.jpg'];
+
+/// Tres arreglos (uno por estado). El primero es de quien mira, urgente, con
+/// título y descripción larguísimos y las seis fotos.
+ArreglosData smallArreglos() => ArreglosData.fromJson({
+      'items': [
+        fixJson('x1',
+            title: longLabel, description: '$longNote $longNote', urgent: true, mine: true, author: longName, images: fixPhotos('x1')),
+        fixJson('x2', title: 'Etiqueta de envío', description: 'Imprimirla desde el detalle.', status: 'in_progress', ownerNote: longNote, author: 'Lucas'),
+        fixJson('x3', title: 'Cierre en Reportes', description: 'Se cerraba sola.', urgent: true, status: 'done', ownerNote: 'Arreglado.', resolvedAt: '2026-11-16T18:30:00.000Z'),
+      ],
+      'statuses': {'pending': 'Pendiente', 'in_progress': 'En curso', 'done': 'Resuelto'},
+      'maxImages': 6,
+    });
+
+/// Listado largo: 18 arreglos en los tres estados (los primeros, con textos extremos).
+ArreglosData bigArreglos() => ArreglosData.fromJson({
+      'items': [
+        fixJson('x1',
+            title: longLabel, description: '$longNote $longNote', urgent: true, mine: true, author: longName, images: fixPhotos('x1')),
+        for (var i = 2; i <= 18; i++)
+          fixJson(
+            'x$i',
+            title: 'Arreglo número $i del listado',
+            description: i.isEven ? longNote : 'Algo corto para arreglar.',
+            urgent: i % 5 == 0,
+            status: const ['pending', 'in_progress', 'done'][i % 3],
+            ownerNote: i % 3 == 0 ? null : (i % 4 == 0 ? longNote : 'Lo veo esta semana.'),
+            images: i % 4 == 0 ? fixPhotos('x$i').take(2).toList() : const [],
+            mine: i.isOdd,
+          ),
+      ],
+      'statuses': {'pending': 'Pendiente', 'in_progress': 'En curso', 'done': 'Resuelto'},
+      'maxImages': 6,
+    });
 
 /// Catálogo grande: 40 colores (nombres de hasta 40 letras, el tope del
 /// servidor), 14 marcas y 11 materiales.
@@ -553,9 +599,9 @@ final _session = Session(
 );
 
 /// El panel REAL (`AdminShell`, con su barra inferior) parado en la pestaña
-/// Stock: así se abren el menú y el informe en la app publicada.
+/// Cola: así se ven la lista y sus hojas en la app publicada.
 GoRouter shellRouter() => GoRouter(
-      initialLocation: '/admin/stock',
+      initialLocation: '/admin/cola',
       routes: [
         StatefulShellRoute.indexedStack(
           builder: (context, state, shell) => AdminShell(shell: shell),
@@ -567,7 +613,7 @@ GoRouter shellRouter() => GoRouter(
               GoRoute(path: '/admin/ventas', builder: (_, _) => const Scaffold(body: Center(child: Text('Ventas')))),
             ]),
             StatefulShellBranch(routes: [
-              GoRoute(path: '/admin/stock', builder: (_, _) => const AdminStockScreen()),
+              GoRoute(path: '/admin/cola', builder: (_, _) => const AdminProduccionScreen()),
             ]),
             StatefulShellBranch(routes: [
               GoRoute(path: '/admin/mas', builder: (_, _) => const Scaffold(body: Center(child: Text('Más')))),
@@ -584,7 +630,10 @@ List<Override> shellOverrides() => [
     ];
 
 void main() {
-  setUpAll(setUpDeviceKit);
+  setUpAll(() async {
+    await setUpDeviceKit();
+    mockImageCachePlugins();
+  });
 
   // =========================================================================
   // COLA DE PRODUCCIÓN
@@ -599,7 +648,7 @@ void main() {
     for (final phone in Phone.both) {
       testWidgets('cola larga con textos y montos extremos en ${phone.name}', (tester) async {
         await pumpPhone(tester, const AdminProduccionScreen(), phone: phone, me: me, overrides: ov(bigBoard()));
-        expect(find.text('Cola de impresión'), findsOneWidget);
+        expect(find.descendant(of: find.byType(AppBar), matching: find.text('Cola')), findsOneWidget);
         expect(find.text('31 trabajos en curso'), findsOneWidget, reason: '36 menos los 5 entregados');
         expect(find.text('2 demorados'), findsOneWidget);
         // El monto de 9 cifras entra entero al lado del nombre larguísimo.
@@ -731,6 +780,50 @@ void main() {
         expect(api.trackings.last, ('o2', 'ab123456789ar'));
         expect(api.moves, [('o2', SaleStatus.shipped)]);
         expect(sheet, findsNothing);
+      });
+      testWidgets('dentro del panel real (pestaña Cola de la barra inferior): lista y hoja en ${phone.name}', (tester) async {
+        final api = FakeProduccionApi();
+        await pumpPhone(tester, const SizedBox(),
+            phone: phone, me: me, router: shellRouter(), overrides: [...shellOverrides(), ...ov(bigBoard(), api)]);
+        final bar = find.byType(NavigationBar);
+        expect(bar, findsOneWidget);
+        // La tercera pestaña es la cola (antes era Stock) y está elegida.
+        expect(find.descendant(of: bar, matching: find.text('Cola')), findsOneWidget);
+        expect(find.descendant(of: bar, matching: find.text('Stock')), findsNothing);
+        expect(tester.widget<NavigationBar>(bar).selectedIndex, 2);
+        expect(find.byType(BackButton), findsNothing, reason: 'una pestaña no lleva flecha de volver');
+        await shoot(tester, 'prod_panel');
+
+        // La hoja de avance cubre también la barra del panel.
+        await tester.tap(find.widgetWithText(FilledButton, 'Confirmar pago').first);
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(find.byType(MoveSheet), findsOneWidget);
+        expectSheetBelowStatusBar(tester);
+        expectReachable(tester, find.widgetWithText(GoldButton, 'Confirmar'), what: 'Confirmar (hoja abierta desde la pestaña)');
+        expect(tester.getRect(sheet).bottom >= currentPhone.height - 0.5, isTrue,
+            reason: 'la hoja tiene que tapar la barra del panel');
+        await shoot(tester, 'prod_panel_hoja');
+        await closeSheet(tester);
+
+        // La última tarjeta queda arriba de la barra del panel.
+        await scrollToEnd(tester,
+            scrollable: find.descendant(of: find.byType(AdminProduccionScreen), matching: find.byType(Scrollable)).first);
+        expect(tester.getRect(find.byType(AdminCard).last).bottom <= tester.getRect(bar).top + 0.5, isTrue,
+            reason: 'la barra del panel tapa la última tarjeta de la cola');
+        await shoot(tester, 'prod_panel_final');
+      });
+
+      testWidgets('pestaña Cola sin permiso de producción: "Sin acceso" dentro del panel en ${phone.name}', (tester) async {
+        await pumpPhone(tester, const SizedBox(),
+            phone: phone,
+            me: staffWith(['pedidos'], role: 'operator'),
+            router: shellRouter(),
+            overrides: [...shellOverrides(), ...ov(smallBoard())]);
+        expect(find.byType(NavigationBar), findsOneWidget);
+        expect(find.text('Sin acceso'), findsOneWidget);
+        expect(find.byType(AdminCard), findsNothing);
+        await shoot(tester, 'prod_panel_sin_acceso');
       });
     }
 
@@ -1165,9 +1258,9 @@ void main() {
   });
 
   // =========================================================================
-  // PESTAÑA STOCK
+  // STOCK DE FILAMENTOS (módulo de "Más")
   // =========================================================================
-  group('pestaña Stock', () {
+  group('stock de filamentos', () {
     final me = staffWith(['filamentos']);
     final fab = find.widgetWithText(FloatingActionButton, 'Agregar');
     List<Override> ov(StockPage page, [FilamentosApi? api]) => [
@@ -1341,39 +1434,6 @@ void main() {
         await closeSheet(tester);
       });
 
-      testWidgets('dentro del panel real (con barra inferior): lista, menú e informe en ${phone.name}', (tester) async {
-        final api = TallerFilamentosApi()..reportText = longReport();
-        await pumpPhone(tester, const SizedBox(),
-            phone: phone, me: me, router: shellRouter(), overrides: [...shellOverrides(), ...ov(bigStock(), api)]);
-        expect(find.byType(NavigationBar), findsOneWidget);
-        expectReachable(tester, fab, what: 'el botón Agregar (con la barra del panel)');
-        expect(tester.getRect(fab).bottom <= tester.getRect(find.byType(NavigationBar)).top + 0.5, isTrue,
-            reason: 'el botón Agregar queda sobre la barra del panel');
-        await shoot(tester, 'stock_panel');
-        await scrollToEnd(tester, scrollable: find.descendant(of: find.byType(AdminStockScreen), matching: find.byType(Scrollable)).first);
-        expect(tester.getRect(find.byType(FilamentTile).last).bottom <= tester.getRect(fab).top + 0.5, isTrue,
-            reason: 'el botón Agregar tapa el último carrete');
-        await shoot(tester, 'stock_panel_final');
-
-        await tester.tap(find.byTooltip('Más opciones'));
-        await settle(tester);
-        await shoot(tester, 'stock_panel_menu');
-        await tester.tap(find.text('Informe de stock'));
-        await settle(tester, 8);
-        expectNoLayoutErrors(tester);
-        final wa = find.widgetWithText(GoldButton, 'WhatsApp');
-        final copy = find.widgetWithText(OutlinedButton, 'Copiar');
-        expectSheetBelowStatusBar(tester);
-        expectReachable(tester, wa, what: 'WhatsApp (informe abierto desde el panel)');
-        expectReachable(tester, copy, what: 'Copiar (informe abierto desde el panel)');
-        await shoot(tester, 'stock_panel_informe');
-        await openKeyboardOnReport(tester);
-        expectCaretVisible(tester);
-        expectReachable(tester, wa, what: 'WhatsApp con teclado (desde el panel)');
-        expectReachable(tester, copy, what: 'Copiar con teclado (desde el panel)');
-        expectSheetBelowStatusBar(tester, 'con teclado (desde el panel)');
-        await shoot(tester, 'stock_panel_informe_teclado');
-      });
     }
 
     testWidgets('letra grande (1,3×) en el teléfono chico: lista, menú e informe', (tester) async {
@@ -1983,6 +2043,388 @@ void main() {
           filamentMovementsProvider.overrideWith((ref, id) async => movements(8)),
         ]);
         await shoot(tester, 'historial_${mode.name}');
+      });
+    }
+  });
+
+  // =========================================================================
+  // ARREGLOS: listado, responder, eliminar, alta con fotos y foto completa
+  // =========================================================================
+  group('arreglos', () {
+    final me = staffWith(['arreglos']);
+    List<Override> ov(ArreglosData d, [ArreglosApi? api, PhotoSource? photos]) => [
+          arreglosProvider.overrideWith((ref) async => d),
+          if (api != null) arreglosApiProvider.overrideWithValue(api),
+          if (photos != null) photoSourceProvider.overrideWithValue(photos),
+        ];
+    final fab = find.widgetWithText(FloatingActionButton, 'Nuevo arreglo');
+    final reply = find.widgetWithText(OutlinedButton, 'Responder / cambiar estado');
+    final titleField = find.widgetWithText(TextField, 'Qué hay que arreglar');
+    final descField = find.widgetWithText(TextField, 'Qué pasa y qué habría que cambiar');
+    final save = find.widgetWithText(GoldButton, 'Cargar arreglo');
+
+    for (final phone in Phone.both) {
+      testWidgets('listado largo con datos extremos en ${phone.name}', (tester) async {
+        await pumpPhone(tester, const AdminArreglosScreen(), phone: phone, me: me, overrides: ov(bigArreglos()));
+        expect(find.descendant(of: find.byType(AppBar), matching: find.text('Arreglos')), findsOneWidget);
+        expectReachable(tester, fab, what: 'el botón Nuevo arreglo');
+        // El título larguísimo se lee entero y la tarjeta marca "Urgente".
+        expect(find.text(longLabel), findsOneWidget);
+        expect(find.text('Urgente'), findsWidgets);
+        await shoot(tester, 'arreglos_lista');
+        // El botón de la tarjeta se puede tocar cómodo.
+        await reveal(tester, reply.first);
+        expectTapTarget(tester, reply.first, what: 'el botón "Responder / cambiar estado"');
+        // La fila de filtros se desplaza hasta el último.
+        await tapVisible(tester, find.text('Todos (18)'));
+        await shoot(tester, 'arreglos_lista_todos');
+        await expectListEndVisible(tester, find.byType(AdminCard).last, what: 'el último arreglo');
+        expect(tester.getRect(find.byType(AdminCard).last).bottom <= tester.getRect(fab).top + 0.5, isTrue,
+            reason: 'el botón Nuevo arreglo tapa el último arreglo');
+        await shoot(tester, 'arreglos_lista_final');
+      });
+
+      testWidgets('descripción larga: "Ver más" la abre sin desbordar en ${phone.name}', (tester) async {
+        await pumpPhone(tester, const AdminArreglosScreen(), phone: phone, me: me, overrides: ov(smallArreglos()));
+        await tapVisible(tester, find.text('Ver más').first);
+        expect(find.text('Ver menos'), findsOneWidget);
+        await shoot(tester, 'arreglos_ver_mas');
+        await tapVisible(tester, find.text('Ver menos'));
+        expect(find.text('Ver menos'), findsNothing);
+      });
+
+      testWidgets('estados: vacío, todo resuelto, error, sin acceso y solo lectura en ${phone.name}', (tester) async {
+        await pumpPhone(tester, const AdminArreglosScreen(),
+            phone: phone, me: me, overrides: ov(ArreglosData.fromJson({'items': <dynamic>[]})));
+        expect(find.text('Todavía no hay arreglos'), findsOneWidget);
+        await scrollToEnd(tester);
+        expectReachable(tester, fab, what: 'el botón Nuevo arreglo con la lista vacía');
+        await shoot(tester, 'arreglos_vacio');
+
+        await pumpPhone(tester, const AdminArreglosScreen(),
+            phone: phone,
+            me: me,
+            overrides: ov(ArreglosData.fromJson({
+              'items': [fixJson('d', status: 'done')],
+            })));
+        expect(find.text('¡Todo resuelto!'), findsOneWidget);
+        await scrollToEnd(tester);
+        await shoot(tester, 'arreglos_todo_resuelto');
+
+        await pumpPhone(tester, const AdminArreglosScreen(), phone: phone, me: me, overrides: [
+          arreglosProvider.overrideWith((ref) => throw ApiException('offline', 'No pudimos conectarnos. Revisá tu conexión e intentá de nuevo.')),
+        ]);
+        expectReachable(tester, find.widgetWithText(GoldButton, 'Reintentar'), what: 'el botón Reintentar');
+        expect(fab, findsNothing, reason: 'sin datos no hay alta');
+        await shoot(tester, 'arreglos_error');
+
+        await pumpPhone(tester, const AdminArreglosScreen(),
+            phone: phone, me: staffWith(['arreglos'], role: 'operator', actions: const []), overrides: ov(smallArreglos()));
+        expect(find.text('Sin acceso'), findsOneWidget);
+        expect(fab, findsNothing);
+        await shoot(tester, 'arreglos_sin_acceso');
+
+        await pumpPhone(tester, const AdminArreglosScreen(),
+            phone: phone, me: staffWith(['arreglos'], role: 'operator', actions: const ['ver']), overrides: ov(smallArreglos()));
+        expect(fab, findsNothing, reason: 'sin arreglos/crear no hay botón Nuevo arreglo');
+        expect(reply, findsNothing, reason: 'sin arreglos/editar no se responde');
+        await scrollToEnd(tester);
+        await shoot(tester, 'arreglos_solo_lectura');
+      });
+
+      testWidgets('hoja "Responder / cambiar estado": teclado, rechazo del servidor y guardar en ${phone.name}', (tester) async {
+        final api = FakeArreglosApi();
+        await pumpPhone(tester, const AdminArreglosScreen(), phone: phone, me: me, overrides: ov(smallArreglos(), api));
+        await tapVisible(tester, reply.first);
+        expect(find.byType(ArregloReplySheet), findsOneWidget);
+        expectSheetBelowStatusBar(tester);
+        final ok = find.widgetWithText(GoldButton, 'Guardar');
+        expectReachable(tester, ok, what: 'el botón Guardar de la hoja');
+        for (final s in ['Pendiente', 'En curso', 'Resuelto']) {
+          expectReachable(tester, find.widgetWithText(ChoiceChip, s), what: 'el estado "$s"');
+        }
+        await shoot(tester, 'arreglo_hoja_responder');
+
+        final note = find.widgetWithText(TextField, 'Respuesta (opcional)');
+        await openKeyboard(tester, note);
+        expectFocusedFieldVisible(tester);
+        expectReachable(tester, ok, what: 'Guardar con el teclado abierto');
+        expectSheetBelowStatusBar(tester, 'con el teclado abierto');
+        await shoot(tester, 'arreglo_hoja_responder_teclado');
+        await tester.enterText(note, longNote);
+        await settle(tester, 4);
+        expectNoLayoutErrors(tester);
+        expectReachable(tester, ok, what: 'Guardar con una respuesta larguísima');
+
+        // El rechazo del servidor se ve en la hoja, arriba del botón.
+        api.failWith = ApiException('invalid', longServerError);
+        await tester.tap(ok);
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(sheet, findsOneWidget, reason: 'con error la hoja sigue abierta');
+        expectOnTop(tester, find.text(longServerError), what: 'el rechazo del servidor');
+        expectReachable(tester, find.text(longServerError), what: 'el rechazo del servidor (con teclado)');
+        expectReachable(tester, ok, what: 'Guardar con el error a la vista');
+        await shoot(tester, 'arreglo_hoja_responder_error');
+        await closeKeyboard(tester);
+
+        api.failWith = null;
+        await tester.tap(find.widgetWithText(ChoiceChip, 'Resuelto'));
+        await settle(tester, 2);
+        await tester.tap(ok);
+        await settle(tester, 8);
+        expect(sheet, findsNothing, reason: 'al guardar se cierra la hoja');
+        expect(api.updated!.status, FixStatus.done);
+        expect(api.updated!.note, longNote);
+        expect(find.text('Arreglo actualizado'), findsOneWidget);
+        await shoot(tester, 'arreglo_actualizado_aviso');
+      });
+
+      testWidgets('la hoja de responder se cierra sin guardar en ${phone.name}', (tester) async {
+        final api = FakeArreglosApi();
+        await pumpPhone(tester, const AdminArreglosScreen(), phone: phone, me: me, overrides: ov(smallArreglos(), api));
+        await tapVisible(tester, reply.first);
+        await closeSheet(tester);
+        expect(api.updated, isNull);
+      });
+
+      testWidgets('eliminar: diálogo con el título larguísimo y sus acciones a mano en ${phone.name}', (tester) async {
+        final api = FakeArreglosApi();
+        await pumpPhone(tester, const AdminArreglosScreen(), phone: phone, me: me, overrides: ov(smallArreglos(), api));
+        await tapVisible(tester, find.widgetWithText(TextButton, 'Eliminar').first);
+        final dialog = find.byType(AlertDialog);
+        expect(dialog, findsOneWidget);
+        expectReachable(tester, find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Eliminar')),
+            what: 'la acción Eliminar del diálogo');
+        expectReachable(tester, find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Cancelar')),
+            what: 'la acción Cancelar del diálogo');
+        await shoot(tester, 'arreglo_eliminar_dialogo');
+        await tester.tap(find.descendant(of: dialog, matching: find.text('Cancelar')));
+        await settle(tester);
+        expect(api.deletedId, isNull);
+
+        await tapVisible(tester, find.widgetWithText(TextButton, 'Eliminar').first);
+        await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.widgetWithText(TextButton, 'Eliminar')));
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(api.deletedId, 'x1');
+        expect(find.text('Arreglo eliminado'), findsOneWidget);
+        await shoot(tester, 'arreglo_eliminado_aviso');
+      });
+
+      testWidgets('foto a pantalla completa: se abre sobre todo y se vuelve en ${phone.name}', (tester) async {
+        await pumpPhone(tester, const AdminArreglosScreen(), phone: phone, me: me, overrides: ov(smallArreglos()));
+        await tapVisible(tester, find.byType(NetImage).at(2));
+        await settle(tester, 6);
+        expectNoLayoutErrors(tester);
+        expect(find.byType(PhotoViewerScreen), findsOneWidget);
+        expect(find.text('Foto 3 de 6'), findsOneWidget);
+        expectReachable(tester, find.byType(BackButton), what: 'la flecha de volver de la foto');
+        // El visor no se mete debajo de la barra de gestos.
+        expect(tester.getRect(find.byType(InteractiveViewer)).bottom <= safeRect.bottom + 0.5, isTrue,
+            reason: 'la foto queda debajo de la barra del sistema');
+        await shoot(tester, 'arreglo_foto_completa');
+        await tester.tap(find.byType(BackButton));
+        await settle(tester, 8);
+        expect(find.byType(PhotoViewerScreen), findsNothing);
+      });
+
+      testWidgets('alta: teclado en cada campo, seis fotos, avance de la subida y aviso en ${phone.name}', (tester) async {
+        final api = FakeArreglosApi()..uploadGate = Completer<void>();
+        final source = FakePhotoSource(gallery: [for (var i = 0; i < 8; i++) fakePhoto('foto_$i.jpg')]);
+        await pumpPhone(tester, const AdminArreglosScreen(),
+            phone: phone, me: me, overrides: ov(smallArreglos(), api, source));
+        await tester.tap(fab);
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expectReachable(tester, save, what: 'el botón Cargar arreglo');
+        await shoot(tester, 'arreglo_alta');
+
+        await focusField(tester, titleField);
+        expectFocusedFieldVisible(tester);
+        expectReachable(tester, save, what: 'Cargar arreglo con el teclado (título)');
+        await shoot(tester, 'arreglo_alta_teclado_primero');
+        await type(tester, titleField, longLabel);
+
+        await focusField(tester, descField);
+        expectFocusedFieldVisible(tester);
+        expectReachable(tester, save, what: 'Cargar arreglo con el teclado (descripción)');
+        await shoot(tester, 'arreglo_alta_teclado_ultimo');
+        await type(tester, descField, longNote);
+        expectReachable(tester, save, what: 'Cargar arreglo con una descripción larguísima');
+        await closeKeyboard(tester);
+
+        // Fotos: entran seis de las ocho y lo dice.
+        await tapVisible(tester, find.widgetWithText(OutlinedButton, 'Sumar fotos'));
+        expect(find.byTooltip('Quitar foto'), findsNWidgets(6));
+        expect(find.textContaining('quedaron 2 afuera'), findsOneWidget);
+        await scrollToEnd(tester);
+        expectReachable(tester, save, what: 'Cargar arreglo al final del formulario');
+        expect(tester.getRect(find.byTooltip('Quitar foto').last).bottom <= tester.getRect(save).top + 0.5, isTrue,
+            reason: 'el botón tapa la última foto');
+        await shoot(tester, 'arreglo_alta_fotos');
+
+        // Guardar: crea y va subiendo; el avance se lee arriba del botón.
+        await tester.tap(save);
+        await settle(tester, 3);
+        expectNoLayoutErrors(tester);
+        expect(api.created, isNotNull);
+        expectReachable(tester, find.text('Subiendo foto 1 de 6…'), what: 'el avance de la subida');
+        await shoot(tester, 'arreglo_alta_subiendo');
+        api.uploadGate!.complete();
+        await settle(tester, 10);
+        expectNoLayoutErrors(tester);
+        expect(api.uploads, hasLength(6));
+        expect(find.byType(ArregloFormScreen), findsNothing);
+        expect(find.text('Arreglo cargado'), findsOneWidget);
+        await shoot(tester, 'arreglo_cargado_aviso');
+      });
+
+      testWidgets('alta: errores a la vista, rechazo del servidor y fotos que no suben en ${phone.name}', (tester) async {
+        final api = FakeArreglosApi()..failWith = ApiException('invalid', longServerError);
+        final source = FakePhotoSource();
+        await pumpPhone(tester, const AdminArreglosScreen(),
+            phone: phone, me: me, overrides: ov(smallArreglos(), api, source));
+        await tester.tap(fab);
+        await settle(tester, 8);
+        // Vacío: marca los campos y avisa arriba del botón.
+        await tester.tap(save);
+        await settle(tester);
+        expectNoLayoutErrors(tester);
+        expectReachable(tester, find.text('Revisá los datos marcados en rojo.'), what: 'el aviso de datos por corregir');
+        expect(find.text('Poné un título corto (qué hay que arreglar).'), findsOneWidget);
+        await shoot(tester, 'arreglo_alta_errores');
+
+        await type(tester, titleField, 'Falla el login');
+        await type(tester, descField, 'No deja entrar con Google.');
+        await tapVisible(tester, find.widgetWithText(OutlinedButton, 'Sumar fotos'));
+        await focusField(tester, descField);
+        await tester.tap(save);
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expectReachable(tester, find.text(longServerError), what: 'el rechazo del servidor (con el teclado abierto)');
+        expectReachable(tester, save, what: 'Cargar arreglo con el rechazo a la vista');
+        expect(find.byType(ArregloFormScreen), findsOneWidget);
+        await shoot(tester, 'arreglo_alta_error_servidor');
+        await closeKeyboard(tester);
+
+        // Ahora el alta entra pero ninguna foto sube: el arreglo queda igual.
+        api
+          ..failWith = null
+          ..failUploads.addAll(['uno.jpg', 'dos.jpg']);
+        await tester.tap(save);
+        await settle(tester, 10);
+        expect(find.byType(ArregloFormScreen), findsNothing);
+        expect(find.text('Arreglo cargado. No pudimos subir ninguna de las 2 fotos.'), findsOneWidget);
+        expectNoLayoutErrors(tester);
+        await shoot(tester, 'arreglo_cargado_sin_fotos_aviso');
+      });
+    }
+
+    testWidgets('volver con un arreglo a medio cargar pregunta antes de descartar', (tester) async {
+      await pumpPhone(tester, const AdminArreglosScreen(),
+          phone: Phone.small, me: me, overrides: ov(smallArreglos(), FakeArreglosApi(), FakePhotoSource()));
+      await tester.tap(fab);
+      await settle(tester, 8);
+      // Sin tocar nada, "atrás" sale directo.
+      await tester.tap(find.byType(BackButton));
+      await settle(tester, 8);
+      expect(find.byType(ArregloFormScreen), findsNothing);
+
+      await tester.tap(fab);
+      await settle(tester, 8);
+      await type(tester, titleField, 'Cartel');
+      await tester.tap(find.byType(BackButton));
+      await settle(tester);
+      expectNoLayoutErrors(tester);
+      final dialog = find.byType(AlertDialog);
+      expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+      expectReachable(tester, find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Descartar')),
+          what: 'Descartar');
+      expectReachable(tester, find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Seguir editando')),
+          what: 'Seguir editando');
+      await shoot(tester, 'arreglo_descartar_dialogo');
+      await tester.tap(find.descendant(of: dialog, matching: find.text('Seguir editando')));
+      await settle(tester);
+      expect(find.byType(ArregloFormScreen), findsOneWidget, reason: 'sigue en el formulario con lo cargado');
+
+      await tester.tap(find.byType(BackButton));
+      await settle(tester);
+      await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.text('Descartar')));
+      await settle(tester, 8);
+      expect(find.byType(ArregloFormScreen), findsNothing);
+    });
+
+    testWidgets('letra grande (1,3×) en el teléfono chico: listado, hoja, diálogo, alta con fotos y foto', (tester) async {
+      await pumpPhone(tester, const AdminArreglosScreen(),
+          phone: Phone.small, textScale: 1.3, me: me, overrides: ov(bigArreglos()));
+      await shoot(tester, 'arreglos_lista_grande');
+      await tapVisible(tester, find.text('Todos (18)'));
+      await expectListEndVisible(tester, find.byType(AdminCard).last, what: 'el último arreglo con letra grande');
+      await shoot(tester, 'arreglos_lista_grande_final');
+
+      final api = FakeArreglosApi();
+      await pumpPhone(tester, const AdminArreglosScreen(),
+          phone: Phone.small, textScale: 1.3, me: me, overrides: ov(smallArreglos(), api));
+      await tapVisible(tester, reply.first);
+      expectSheetBelowStatusBar(tester);
+      final ok = find.widgetWithText(GoldButton, 'Guardar');
+      expectReachable(tester, ok, what: 'Guardar con letra grande');
+      await shoot(tester, 'arreglo_hoja_responder_grande');
+      await openKeyboard(tester, find.widgetWithText(TextField, 'Respuesta (opcional)'));
+      expectFocusedFieldVisible(tester);
+      expectReachable(tester, ok, what: 'Guardar con letra grande y teclado');
+      expectSheetBelowStatusBar(tester, 'con letra grande y teclado');
+      await shoot(tester, 'arreglo_hoja_responder_grande_teclado');
+      await closeKeyboard(tester);
+      await closeSheet(tester);
+
+      await tapVisible(tester, find.widgetWithText(TextButton, 'Eliminar').first);
+      final dialog = find.byType(AlertDialog);
+      expectReachable(tester, find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Eliminar')),
+          what: 'Eliminar del diálogo con letra grande');
+      expectReachable(tester, find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Cancelar')),
+          what: 'Cancelar del diálogo con letra grande');
+      await shoot(tester, 'arreglo_eliminar_dialogo_grande');
+
+      await pumpPhone(tester, const AdminArreglosScreen(), phone: Phone.small, textScale: 1.3, me: me, overrides: ov(smallArreglos()));
+      await tapVisible(tester, find.byType(NetImage).first);
+      await settle(tester, 6);
+      expectNoLayoutErrors(tester);
+      expectReachable(tester, find.byType(BackButton), what: 'volver de la foto con letra grande');
+      await shoot(tester, 'arreglo_foto_completa_grande');
+
+      final source = FakePhotoSource(gallery: [for (var i = 0; i < 6; i++) fakePhoto('foto_$i.jpg')]);
+      await pumpPhone(tester, const ArregloFormScreen(maxImages: 6),
+          phone: Phone.small, textScale: 1.3, me: me, overrides: ov(smallArreglos(), FakeArreglosApi(), source));
+      await shoot(tester, 'arreglo_alta_grande');
+      await focusField(tester, descField);
+      expectFocusedFieldVisible(tester);
+      expectReachable(tester, save, what: 'Cargar arreglo con letra grande y teclado');
+      await shoot(tester, 'arreglo_alta_grande_teclado');
+      await closeKeyboard(tester);
+      await tapVisible(tester, find.widgetWithText(OutlinedButton, 'Sumar fotos'));
+      expect(find.byTooltip('Quitar foto'), findsNWidgets(6));
+      // Con las seis cargadas los dos botones siguen enteros (apagados).
+      await reveal(tester, find.widgetWithText(OutlinedButton, 'Sacar foto'));
+      expectOneLine(tester, 'Sacar foto', fontSize: 14, scale: 1.3);
+      await scrollToEnd(tester);
+      expectReachable(tester, save, what: 'Cargar arreglo al final con letra grande');
+      await shoot(tester, 'arreglo_alta_grande_fotos');
+    });
+
+    for (final mode in [HefestoThemeMode.light, HefestoThemeMode.warm]) {
+      testWidgets('tema ${mode.name}: listado, hoja de responder, alta con fotos', (tester) async {
+        await pumpPhone(tester, const AdminArreglosScreen(),
+            phone: Phone.small, theme: mode, me: me, overrides: ov(smallArreglos(), FakeArreglosApi()));
+        await shoot(tester, 'arreglos_lista_${mode.name}');
+        await tapVisible(tester, reply.first);
+        await shoot(tester, 'arreglo_hoja_responder_${mode.name}');
+        await pumpPhone(tester, const ArregloFormScreen(maxImages: 6),
+            phone: Phone.small, theme: mode, me: me, overrides: ov(smallArreglos(), FakeArreglosApi(), FakePhotoSource()));
+        await tapVisible(tester, find.widgetWithText(OutlinedButton, 'Sumar fotos'));
+        await scrollToEnd(tester);
+        await shoot(tester, 'arreglo_alta_${mode.name}');
       });
     }
   });

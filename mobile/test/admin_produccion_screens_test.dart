@@ -56,7 +56,7 @@ void main() {
         me: me,
         overrides: [produccionProvider.overrideWith((ref) async => data)],
       );
-      expect(find.text('Cola de impresión'), findsOneWidget);
+      expect(find.descendant(of: find.byType(AppBar), matching: find.text('Cola')), findsOneWidget);
       expect(find.text('3 trabajos en curso'), findsOneWidget);
       expect(find.text('Mate Mario ×2 · Cartel'), findsOneWidget);
       expect(find.text('5 llaveros'), findsOneWidget);

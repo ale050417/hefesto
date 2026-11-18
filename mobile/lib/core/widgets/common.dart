@@ -18,6 +18,12 @@ Alignment parsePosition(String? position) {
   return Alignment(axis(parts[0]), axis(parts[1]));
 }
 
+/// Solo para los tests: en `true` las fotos de red no se piden ni se guardan
+/// en disco y se ve el recuadro de "sin foto". En los tests no hay red ni
+/// teléfono, y el caché en disco de `CachedNetworkImage` (carpeta + base del
+/// sistema) hacía fallar las capturas (SHOT_DIR) de las pantallas con fotos.
+bool debugDisableNetworkImages = false;
+
 /// Imagen de red con caché, placeholder de marca y encuadre configurable.
 class NetImage extends StatelessWidget {
   const NetImage(
@@ -41,7 +47,7 @@ class NetImage extends StatelessWidget {
       alignment: Alignment.center,
       child: Icon(Icons.view_in_ar_rounded, color: c.textFaint, size: 32),
     );
-    final Widget image = (url == null || url!.isEmpty)
+    final Widget image = (url == null || url!.isEmpty || debugDisableNetworkImages)
         ? placeholder
         : LayoutBuilder(
             builder: (context, box) {

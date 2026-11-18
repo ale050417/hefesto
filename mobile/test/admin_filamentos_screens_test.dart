@@ -166,7 +166,7 @@ void main() {
     'diameters': ['1.75', '2.85', '—'],
   });
 
-  group('pestaña Stock', () {
+  group('stock de filamentos', () {
     testWidgets('lista los carretes con sus alertas y el botón Agregar', (tester) async {
       await showScreen(
         tester,

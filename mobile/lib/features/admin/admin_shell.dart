@@ -7,7 +7,7 @@ import '../../core/widgets/common.dart';
 import 'admin_providers.dart';
 
 /// Contenedor del panel: valida SESIÓN y ROL antes de mostrar nada y arma la
-/// barra de navegación (Inicio · Ventas · Stock).
+/// barra de navegación (Inicio · Ventas · Cola · Más).
 ///
 /// El rol sale de `/api/v1/me` (servidor). Esto es solo para no mostrar una
 /// pantalla vacía: cada endpoint del panel vuelve a verificar el permiso.
@@ -68,7 +68,7 @@ class AdminShell extends ConsumerWidget {
         }
         final pending = ref.watch(adminDashboardProvider).value?.pendingPayment ?? 0;
         return PopScope(
-          // Desde Ventas/Stock, "atrás" vuelve al Inicio del panel y recién
+          // Desde Ventas/Cola/Más, "atrás" vuelve al Inicio del panel y recién
           // desde ahí sale a la cuenta (no cierra la app de golpe).
           canPop: false,
           onPopInvokedWithResult: (didPop, _) {
@@ -101,9 +101,9 @@ class AdminShell extends ConsumerWidget {
                   label: 'Ventas',
                 ),
                 const NavigationDestination(
-                  icon: Icon(Icons.donut_large_outlined),
-                  selectedIcon: Icon(Icons.donut_large_rounded),
-                  label: 'Stock',
+                  icon: Icon(Icons.print_outlined),
+                  selectedIcon: Icon(Icons.print_rounded),
+                  label: 'Cola',
                 ),
                 const NavigationDestination(
                   icon: Icon(Icons.apps_rounded),

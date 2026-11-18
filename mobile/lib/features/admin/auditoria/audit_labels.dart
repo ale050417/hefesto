@@ -55,6 +55,14 @@ const Map<String, String> auditActionLabels = {
   // La registra el servidor cuando un cliente da de baja su cuenta desde la
   // app (2026-11-14). No tiene actor: la cuenta ya no existe.
   'account.deleted': 'Un cliente eliminó su cuenta',
+  // Consultas y arreglos (2026-11-17).
+  'inquiry.created': 'Cargó una consulta',
+  'inquiry.answered': 'Respondió una consulta',
+  'inquiry.status_changed': 'Cambió el estado de una consulta',
+  'inquiry.deleted': 'Borró una consulta',
+  'fix.created': 'Cargó un arreglo',
+  'fix.updated': 'Cambió el estado de un arreglo',
+  'fix.deleted': 'Borró un arreglo',
 };
 
 final RegExp _uuid = RegExp(
@@ -157,7 +165,10 @@ AuditKind auditKindOf(String code) {
   if (verb.contains('created') || verb.contains('imported') || verb.contains('registered') || verb.contains('published')) {
     return AuditKind.created;
   }
-  if (verb.contains('updated') || verb.contains('adjusted')) return AuditKind.updated;
+  // Responder una consulta es completar sus datos: mismo ícono que una edición.
+  if (verb.contains('updated') || verb.contains('adjusted') || verb.contains('answered')) {
+    return AuditKind.updated;
+  }
   return AuditKind.other;
 }
 

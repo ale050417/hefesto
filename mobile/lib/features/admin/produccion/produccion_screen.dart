@@ -7,7 +7,6 @@ import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../../core/widgets/modals.dart';
-import '../admin_module.dart';
 import '../admin_widgets.dart';
 import '../filamentos/filamentos_format.dart';
 import '../filamentos/shared_widgets.dart';
@@ -19,24 +18,36 @@ import 'produccion_models.dart';
 /// Cola de impresión: los pedidos online y las ventas de mostrador por etapa
 /// (pendiente de pago → entregado), igual que el tablero de la web. Desde acá
 /// se avanza cada trabajo de etapa; confirmar el pago descuenta el filamento.
-/// (Pantalla de entrada del módulo; se abre desde "Más".)
+/// Es la tercera pestaña del panel ("Cola"): el operador la pidió en la barra
+/// de abajo, en el lugar del stock, para mover los pedidos más rápido
+/// (2026-11-17). Por eso lleva la barra superior de las pestañas y no la flecha
+/// de volver de los módulos.
 class AdminProduccionScreen extends ConsumerWidget {
   const AdminProduccionScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final me = ref.watch(meProvider).value;
+    // Sin permiso la pestaña sigue en la barra (como pasaba con Stock) y
+    // muestra "Sin acceso": no se pide la cola al servidor.
+    if (me != null && !me.can('produccion', 'ver')) {
+      return const Scaffold(
+        appBar: AdminAppBar(title: 'Cola'),
+        body: AccessDenied(what: 'la cola de impresión'),
+      );
+    }
     final board = ref.watch(produccionProvider);
-    return AdminModuleScaffold(
-      title: 'Cola de impresión',
-      permission: 'produccion',
-      what: 'la cola de impresión',
-      actions: [
-        IconButton(
-          tooltip: 'Actualizar',
-          icon: const Icon(Icons.refresh_rounded),
-          onPressed: () => ref.invalidate(produccionProvider),
-        ),
-      ],
+    return Scaffold(
+      appBar: AdminAppBar(
+        title: 'Cola',
+        actions: [
+          IconButton(
+            tooltip: 'Actualizar',
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: () => ref.invalidate(produccionProvider),
+          ),
+        ],
+      ),
       body: board.when(
         loading: () => const ListSkeleton(rows: 5, height: 118),
         error: (e, _) => ErrorView(message: '$e', onRetry: () => ref.invalidate(produccionProvider)),
@@ -76,7 +87,9 @@ class _BoardBodyState extends ConsumerState<_BoardBody> {
   }
 
   Future<void> _open(BoardCard card) async {
-    await Navigator.of(context).push<void>(
+    // Sobre el navegador raíz: el detalle tapa la barra inferior del panel,
+    // igual que cuando se abre desde Ventas.
+    await Navigator.of(context, rootNavigator: true).push<void>(
       MaterialPageRoute(builder: (_) => SaleDetailScreen(source: card.source, id: card.id)),
     );
     // Al volver el estado pudo haber cambiado desde el detalle.
@@ -100,7 +113,9 @@ class _BoardBodyState extends ConsumerState<_BoardBody> {
       color: Brand.gold,
       onRefresh: _refresh,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+        // Dentro del panel la barra inferior ya descuenta la zona del sistema
+        // (queda 0); si la pantalla se dibuja sola, se suma acá.
+        padding: EdgeInsets.fromLTRB(16, 4, 16, 28 + MediaQuery.paddingOf(context).bottom),
         children: [
           if (d.degraded.isNotEmpty) ...[
             InlineError('No pudimos cargar ${d.degraded.join(' y ')}: la cola puede estar incompleta. '

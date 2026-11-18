@@ -72,7 +72,7 @@ class _ModuleTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = context.hc;
     return InkWell(
-      // `go` si el módulo es una pestaña del panel (filamentos), `push` si es una pantalla.
+      // `go` si el módulo es una pestaña del panel (la cola), `push` si es una pantalla.
       onTap: () => m.route.startsWith('/admin/m/') ? context.push(m.route) : context.go(m.route),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),

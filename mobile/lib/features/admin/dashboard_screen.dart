@@ -173,7 +173,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                         // este número abre la cola). Filtrar Ventas por un
                         // solo estado mostraba menos pedidos que el número.
                         onTap: canQueue
-                            ? () => context.push('/admin/m/produccion')
+                            ? () => context.go('/admin/cola')
                             : (canSales ? () => context.go('/admin/ventas?status=in_production') : null),
                       ),
                     ),
@@ -235,7 +235,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                         hint: d.lowStockCount > 0 ? 'Por reponer' : 'Todo en orden',
                         value: '${d.lowStockCount}',
                         color: d.lowStockCount > 0 ? Brand.danger : Brand.success,
-                        onTap: canStock ? () => context.go('/admin/stock') : null,
+                        onTap: canStock ? () => context.push('/admin/m/filamentos') : null,
                       ),
                     ),
                   ],
@@ -265,7 +265,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                   AdminSectionTitle(
                     'Filamentos por reponer',
                     action: 'Ver stock',
-                    onAction: () => context.go('/admin/stock'),
+                    onAction: () => context.push('/admin/m/filamentos'),
                   ),
                   for (final f in d.lowStock.take(5)) ...[
                     FilamentTile(f: f),

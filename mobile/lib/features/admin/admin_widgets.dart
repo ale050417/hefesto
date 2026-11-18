@@ -591,3 +591,93 @@ class _ChartPainter extends CustomPainter {
   bool shouldRepaint(_ChartPainter old) =>
       old.points != points || old.selected != selected || old.grid != grid;
 }
+
+/// Píldora de color con un rótulo (estado de un arreglo o de una consulta,
+/// "Urgente"…). Mismo dibujo que [StatusChip], para estados que no son de venta.
+class TonePill extends StatelessWidget {
+  const TonePill(this.text, {super.key, required this.color, this.icon});
+  final String text;
+  final Color color;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(99),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[Icon(icon, size: 12, color: color), const SizedBox(width: 4)],
+            Flexible(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+/// Texto largo de una tarjeta: muestra las primeras líneas y "Ver más" para
+/// leerlo entero (una descripción puede tener hasta 4000 letras y la lista se
+/// volvía interminable).
+class ExpandableText extends StatefulWidget {
+  const ExpandableText(this.text, {super.key, this.collapsedLines = 5, this.style});
+  final String text;
+  final int collapsedLines;
+  final TextStyle? style;
+
+  @override
+  State<ExpandableText> createState() => _ExpandableTextState();
+}
+
+class _ExpandableTextState extends State<ExpandableText> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = DefaultTextStyle.of(context).style.merge(widget.style);
+    return LayoutBuilder(
+      builder: (context, box) {
+        // ¿Entra en las líneas de la versión corta? Si entra, no hay botón.
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: style),
+          maxLines: widget.collapsedLines,
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(maxWidth: box.maxWidth);
+        final long = painter.didExceedMaxLines;
+        painter.dispose();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.text,
+              style: widget.style,
+              maxLines: _open ? null : widget.collapsedLines,
+              overflow: _open ? TextOverflow.visible : TextOverflow.ellipsis,
+            ),
+            if (long)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => setState(() => _open = !_open),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Text(
+                    _open ? 'Ver menos' : 'Ver más',
+                    style: const TextStyle(color: Brand.gold, fontWeight: FontWeight.w700, fontSize: 12.5),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}

@@ -7,6 +7,8 @@ import 'features/admin/admin_shell.dart';
 import 'features/admin/clientes/clientes_screen.dart';
 import 'features/admin/produccion/produccion_screen.dart';
 import 'features/admin/fallas/fallas_screen.dart';
+import 'features/admin/arreglos/arreglos_screen.dart';
+import 'features/admin/consultas/consultas_screen.dart';
 import 'features/admin/productos/productos_screen.dart';
 import 'features/admin/categorias/categorias_screen.dart';
 import 'features/admin/descuentos/descuentos_screen.dart';
@@ -83,8 +85,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               ),
             ),
           ]),
+          // Tercera pestaña: la cola de impresión (2026-11-17, pedido del
+          // operador: tenerla a mano para mover los pedidos más rápido). El
+          // stock de filamentos pasó a ser un módulo de "Más".
           StatefulShellBranch(routes: [
-            GoRoute(path: '/admin/stock', builder: (_, _) => const AdminStockScreen()),
+            GoRoute(path: '/admin/cola', builder: (_, _) => const AdminProduccionScreen()),
           ]),
           StatefulShellBranch(routes: [
             GoRoute(path: '/admin/mas', builder: (_, _) => const AdminMoreScreen()),
@@ -98,14 +103,24 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, _) => const AdminClientesScreen(),
       ),
       GoRoute(
-        path: '/admin/m/produccion',
+        path: '/admin/m/filamentos',
         parentNavigatorKey: _rootKey,
-        builder: (_, _) => const AdminProduccionScreen(),
+        builder: (_, _) => const AdminStockScreen(),
       ),
       GoRoute(
         path: '/admin/m/fallas',
         parentNavigatorKey: _rootKey,
         builder: (_, _) => const AdminFallasScreen(),
+      ),
+      GoRoute(
+        path: '/admin/m/arreglos',
+        parentNavigatorKey: _rootKey,
+        builder: (_, _) => const AdminArreglosScreen(),
+      ),
+      GoRoute(
+        path: '/admin/m/consultas',
+        parentNavigatorKey: _rootKey,
+        builder: (_, _) => const AdminConsultasScreen(),
       ),
       GoRoute(
         path: '/admin/m/productos',

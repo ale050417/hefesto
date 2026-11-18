@@ -105,7 +105,7 @@ final filamentCatalogProvider = FutureProvider.autoDispose<FilamentCatalog>(
   retry: _noRetry,
 );
 
-/// Tras cualquier cambio de stock o de datos: el listado (pestaña Stock), el
+/// Tras cualquier cambio de stock o de datos: el listado (módulo Filamentos), el
 /// inicio (que muestra los carretes con stock bajo), el detalle y el historial
 /// quedan viejos y se vuelven a pedir.
 ///

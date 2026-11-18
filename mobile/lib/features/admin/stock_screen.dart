@@ -24,7 +24,7 @@ Color hexColor(String? hex, {Color fallback = const Color(0xFF8D8C99)}) {
 }
 
 /// Un carrete: color real, material, stock y barra contra el carrete completo.
-/// Con [onTap] se puede tocar (abre el detalle en la pestaña Stock); sin él, es
+/// Con [onTap] se puede tocar (abre el detalle en Filamentos); sin él, es
 /// solo informativo (así lo usa el inicio).
 class FilamentTile extends StatelessWidget {
   const FilamentTile({super.key, required this.f, this.onTap});
@@ -174,6 +174,8 @@ class FilamentTile extends StatelessWidget {
 
 /// Gestión de filamentos: stock con alertas de bajo / agotado, alta, edición,
 /// baja, ajuste de stock con historial, informe y plantilla de colores.
+/// Se abre desde "Más" → Filamentos, sobre la barra del panel (hasta el
+/// 2026-11-17 era la tercera pestaña; ese lugar lo ocupa la cola).
 class AdminStockScreen extends ConsumerStatefulWidget {
   const AdminStockScreen({super.key});
 
@@ -222,15 +224,16 @@ class _AdminStockScreenState extends ConsumerState<AdminStockScreen> {
 
     if (me != null && !me.can('filamentos', 'ver')) {
       return Scaffold(
-        appBar: const AdminAppBar(title: 'Stock'),
+        appBar: AppBar(title: const Text('Filamentos')),
         body: const AccessDenied(what: 'el stock de filamentos'),
       );
     }
     final canCreate = me?.can('filamentos', 'crear') ?? false;
 
     return Scaffold(
-      appBar: AdminAppBar(
-        title: 'Stock',
+      // Barra de módulo: título y flecha de volver a "Más" (la pone sola).
+      appBar: AppBar(
+        title: const Text('Filamentos'),
         actions: [
           IconButton(
             tooltip: 'Historial de movimientos',
@@ -241,8 +244,6 @@ class _AdminStockScreenState extends ConsumerState<AdminStockScreen> {
             tooltip: 'Más opciones',
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (v) {
-              // Sobre el navegador raíz: así la hoja cubre también la barra
-              // inferior del panel (como las demás pantallas de esta pestaña).
               if (v == 'report') {
                 showStockReportSheet(Navigator.of(context, rootNavigator: true).context);
               }
@@ -287,8 +288,8 @@ class _AdminStockScreenState extends ConsumerState<AdminStockScreen> {
             color: Brand.gold,
             onRefresh: _refresh,
             child: ListView(
-              // 96 = lugar para el botón flotante; más la barra del sistema si
-              // la pantalla no está dentro del panel (que ya la descuenta).
+              // 96 = lugar para el botón flotante; más la barra del sistema
+              // (la pantalla ya no está dentro de la barra del panel).
               padding: EdgeInsets.fromLTRB(16, 4, 16, 96 + MediaQuery.paddingOf(context).bottom),
               children: [
                 Row(

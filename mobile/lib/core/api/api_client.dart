@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide MultipartFile;
 
 import '../../features/admin/admin_models.dart';
 import '../../features/admin/sale_status.dart';
@@ -18,6 +18,48 @@ class ApiException implements Exception {
   @override
   String toString() => message;
 }
+
+/// Tope de una foto subida (el mismo del servidor, que igual lo verifica).
+const maxUploadImageBytes = 8 * 1024 * 1024;
+
+/// Subtipo MIME de una foto según su extensión: `jpeg`, `png` o `webp`; null
+/// si es otra cosa (el servidor solo acepta esos tres).
+String? imageSubtypeOf(String filename) {
+  final dot = filename.lastIndexOf('.');
+  final ext = dot < 0 ? '' : filename.substring(dot + 1).toLowerCase();
+  return switch (ext) {
+    'jpg' || 'jpeg' => 'jpeg',
+    'png' => 'png',
+    'webp' => 'webp',
+    _ => null,
+  };
+}
+
+/// Cuerpo `multipart/form-data` de una foto: un solo campo, `file`, con su tipo
+/// de imagen. Lanza [ApiException] si el formato o el peso no sirven (se revisa
+/// acá, antes de gastar datos del teléfono: el servidor rechaza lo que no sea
+/// JPG, PNG o WebP y lo que pase de 8 MB).
+FormData imageFormData(List<int> bytes, String filename) {
+  final subtype = imageSubtypeOf(filename);
+  if (subtype == null) {
+    throw ApiException('invalid', 'La foto tiene que ser JPG, PNG o WebP.');
+  }
+  if (bytes.length > maxUploadImageBytes) {
+    throw ApiException('invalid', 'La foto pesa más de 8 MB. Probá con una más liviana.');
+  }
+  return fileFormData(bytes, filename, 'image/$subtype');
+}
+
+/// Cuerpo `multipart/form-data` de un archivo cualquiera: un solo campo,
+/// `file`, con el tipo que se le pasa ("audio/mpeg", "application/pdf"…). El
+/// servidor decide por ese tipo si lo acepta.
+FormData fileFormData(List<int> bytes, String filename, String contentType) => FormData.fromMap({
+      'file': MultipartFile.fromBytes(
+        bytes,
+        filename: filename,
+        contentType: DioMediaType.parse(contentType),
+      ),
+    });
 
 /// Cliente de `/api/v1`. Adjunta el JWT de Supabase (que supabase_flutter
 /// refresca solo) y traduce los errores al contrato estable de la API.
@@ -95,19 +137,42 @@ class ApiClient {
   }) =>
       _send(method, path, query: query, body: body);
 
+  /// Sube UNA foto como `multipart/form-data` (campo `file`) y devuelve el JSON
+  /// de la respuesta. Pasa por lo mismo que [sendJson]: token, renovación ante
+  /// un 401 y errores traducidos a [ApiException]. El formato y el peso se
+  /// revisan antes de mandar nada (ver [imageFormData]).
+  Future<Map<String, dynamic>> uploadImage(
+    String path, {
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    imageFormData(bytes, filename); // valida: lanza antes de tocar la red
+    return _send(
+      'POST',
+      path,
+      // Un FormData solo se puede mandar una vez: si hay que reintentar tras
+      // renovar la sesión, se arma de nuevo.
+      makeBody: () => imageFormData(bytes, filename),
+      // Subir por datos móviles puede tardar bastante más que un pedido común.
+      sendTimeout: const Duration(seconds: 90),
+    );
+  }
+
   Future<Map<String, dynamic>> _send(
     String method,
     String path, {
     Map<String, dynamic>? query,
     Object? body,
+    Object? Function()? makeBody,
+    Duration? sendTimeout,
     bool retried = false,
   }) async {
     try {
       final res = await _dio.request<Map<String, dynamic>>(
         path,
         queryParameters: query,
-        data: body,
-        options: Options(method: method),
+        data: makeBody != null ? makeBody() : body,
+        options: Options(method: method, sendTimeout: sendTimeout),
       );
       return res.data ?? {};
     } on DioException catch (e) {
@@ -115,7 +180,15 @@ class ApiClient {
       // Un 401 con sesión guardada casi siempre es el token vencido justo en
       // ese instante: se renueva y se reintenta UNA vez antes de avisar.
       if (error.isUnauthorized && !retried && await _refreshAfterUnauthorized()) {
-        return _send(method, path, query: query, body: body, retried: true);
+        return _send(
+          method,
+          path,
+          query: query,
+          body: body,
+          makeBody: makeBody,
+          sendTimeout: sendTimeout,
+          retried: true,
+        );
       }
       throw error;
     } on TypeError {
@@ -145,6 +218,7 @@ class ApiClient {
     }
     final offline = e.type == DioExceptionType.connectionError ||
         e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
         e.type == DioExceptionType.receiveTimeout;
     return ApiException(
       offline ? 'offline' : 'internal',
@@ -243,6 +317,23 @@ class ApiClient {
       if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
     });
   }
+
+  /// Sube UN archivo que no es foto (audio, video, PDF…) como multipart, campo
+  /// `file`, con el tipo de contenido que se indica. Mismo camino que
+  /// [uploadImage]; qué tipos y qué peso se aceptan lo decide cada endpoint
+  /// (y quien llama, antes de mandar).
+  Future<Map<String, dynamic>> uploadFile(
+    String path, {
+    required List<int> bytes,
+    required String filename,
+    required String contentType,
+  }) =>
+      _send(
+        'POST',
+        path,
+        makeBody: () => fileFormData(bytes, filename, contentType),
+        sendTimeout: const Duration(seconds: 90),
+      );
 
   /// Código de seguimiento y/o nota interna de un pedido online. Un campo que
   /// no se manda no se toca; `''` lo borra.

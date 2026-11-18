@@ -27,6 +27,15 @@ class AdminModuleInfo {
 /// Orden y agrupación = sidebar de la web.
 const adminModules = <AdminModuleInfo>[
   AdminModuleInfo(
+    key: 'consultas',
+    title: 'Consultas',
+    subtitle: 'Lo que pregunta la gente, con precio y mensaje listo',
+    icon: Icons.forum_rounded,
+    group: 'Ventas',
+    permission: 'consultas',
+    route: '/admin/m/consultas',
+  ),
+  AdminModuleInfo(
     key: 'clientes',
     title: 'Clientes',
     subtitle: 'Compras, nivel y contacto',
@@ -42,7 +51,9 @@ const adminModules = <AdminModuleInfo>[
     icon: Icons.print_rounded,
     group: 'Producción',
     permission: 'produccion',
-    route: '/admin/m/produccion',
+    // Es la tercera pestaña del panel: desde "Más" se salta a ella (no se
+    // abre una segunda copia encima).
+    route: '/admin/cola',
   ),
   AdminModuleInfo(
     key: 'filamentos',
@@ -51,7 +62,7 @@ const adminModules = <AdminModuleInfo>[
     icon: Icons.donut_large_rounded,
     group: 'Producción',
     permission: 'filamentos',
-    route: '/admin/stock',
+    route: '/admin/m/filamentos',
   ),
   AdminModuleInfo(
     key: 'fallas',
@@ -61,6 +72,15 @@ const adminModules = <AdminModuleInfo>[
     group: 'Producción',
     permission: 'fallas',
     route: '/admin/m/fallas',
+  ),
+  AdminModuleInfo(
+    key: 'arreglos',
+    title: 'Arreglos',
+    subtitle: 'Lo que hay que arreglar o mejorar',
+    icon: Icons.build_rounded,
+    group: 'Producción',
+    permission: 'arreglos',
+    route: '/admin/m/arreglos',
   ),
   AdminModuleInfo(
     key: 'productos',

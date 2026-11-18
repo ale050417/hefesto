@@ -42,6 +42,11 @@ Reglas para que no se rompa nada al agregar pantallas:
 - Un diálogo con campos de texto lleva `scrollable: true`.
 - Los colores y formas de botones, interruptores, diálogos y menús salen del
   tema (`lib/core/theme/app_theme.dart`): no se pisan por pantalla.
+- Fotos del teléfono: `PhotoPickerField` (`lib/core/widgets/photo_picker.dart`);
+  audios y archivos: `AttachmentPickerField` (`lib/core/widgets/file_attach.dart`).
+  En los tests se reemplazan con `photoSourceProvider` / `attachmentSourceProvider`
+  (`test/support/photo_kit.dart`), y las fotos con dirección real se apagan con
+  `mockImageCachePlugins()` para que las capturas no dependan de la red.
 
 ## Subir una versión nueva
 
@@ -140,5 +145,10 @@ proyecto (Authentication):
   también desde la app, en Cuenta).
 - Baja de la cuenta: dentro de la app (Cuenta → Eliminar mi cuenta) y por la web
   en <https://hefesto3d.com.ar/eliminar-cuenta>.
-- La app no usa publicidad, analítica ni rastreadores, y no pide permisos
-  (ubicación, cámara, contactos, notificaciones).
+- La app no usa publicidad, analítica ni rastreadores, y no pide ubicación,
+  contactos ni notificaciones. Lo único que pide (y solo al equipo, en el
+  panel) es la cámara o las fotos al adjuntar una foto a un arreglo o a una
+  consulta: en iPhone con los textos de `ios/Runner/Info.plist`; en Android
+  no hace falta ningún permiso (se usa el selector de fotos del sistema).
+  Los audios, videos y PDF de una consulta se eligen con el selector de
+  archivos del sistema, que no pide permisos en ninguno de los dos.

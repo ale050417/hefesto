@@ -28,7 +28,7 @@ Future<T?> showAppSheet<T>(
       isScrollControlled: true,
       useSafeArea: true,
       // Sobre TODA la pantalla, también en las pestañas (inicio, catálogo,
-      // ventas, stock): si no, la barra de pestañas quedaba a la vista y se
+      // ventas, cola): si no, la barra de pestañas quedaba a la vista y se
       // podía cambiar de pestaña con la hoja abierta.
       useRootNavigator: true,
       showDragHandle: dragHandle,
