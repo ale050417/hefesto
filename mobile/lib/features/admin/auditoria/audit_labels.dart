@@ -63,6 +63,11 @@ const Map<String, String> auditActionLabels = {
   'fix.created': 'Cargó un arreglo',
   'fix.updated': 'Cambió el estado de un arreglo',
   'fix.deleted': 'Borró un arreglo',
+  // Pendientes del equipo, en Ventas (2026-11-17).
+  'team_task.created': 'Anotó un pendiente',
+  'team_task.done': 'Tildó un pendiente como hecho',
+  'team_task.reopened': 'Volvió a abrir un pendiente',
+  'team_task.deleted': 'Borró un pendiente',
 };
 
 final RegExp _uuid = RegExp(
@@ -160,7 +165,8 @@ AuditKind auditKindOf(String code) {
   }
   if (scope == 'team') return AuditKind.team;
   if (scope == 'settings') return AuditKind.settings;
-  if (verb.contains('status')) return AuditKind.status;
+  // Tildar / destildar un pendiente es un cambio de estado.
+  if (verb.contains('status') || verb == 'done' || verb == 'reopened') return AuditKind.status;
   if (verb.contains('deleted') || verb.contains('archived')) return AuditKind.deleted;
   if (verb.contains('created') || verb.contains('imported') || verb.contains('registered') || verb.contains('published')) {
     return AuditKind.created;

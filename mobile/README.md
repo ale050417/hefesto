@@ -47,6 +47,13 @@ Reglas para que no se rompa nada al agregar pantallas:
   En los tests se reemplazan con `photoSourceProvider` / `attachmentSourceProvider`
   (`test/support/photo_kit.dart`), y las fotos con dirección real se apagan con
   `mockImageCachePlugins()` para que las capturas no dependan de la red.
+- Una sola imagen (logo, portada, banner): `pickOnePhoto` (mismo archivo).
+  Toda foto o archivo que sube la app pesa como mucho 4 MB
+  (`maxUploadImageBytes`): el hosting corta los pedidos de más de ~4,5 MB.
+- Un precio que sale de la calculadora (respuesta de una consulta):
+  `showPriceEstimator` (`lib/features/admin/calculadora/price_estimator_sheet.dart`);
+  en los tests, `test/support/calc_kit.dart`. Ventas: `test/support/sales_kit.dart`
+  (fija el "hoy" y los pendientes del equipo).
 
 ## Subir una versión nueva
 
@@ -147,7 +154,8 @@ proyecto (Authentication):
   en <https://hefesto3d.com.ar/eliminar-cuenta>.
 - La app no usa publicidad, analítica ni rastreadores, y no pide ubicación,
   contactos ni notificaciones. Lo único que pide (y solo al equipo, en el
-  panel) es la cámara o las fotos al adjuntar una foto a un arreglo o a una
+  panel) es la cámara o las fotos al cargar una foto: de un producto, del
+  logo, de un banner o de la portada de la tienda, de un arreglo o de una
   consulta: en iPhone con los textos de `ios/Runner/Info.plist`; en Android
   no hace falta ningún permiso (se usa el selector de fotos del sistema).
   Los audios, videos y PDF de una consulta se eligen con el selector de

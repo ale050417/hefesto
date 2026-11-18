@@ -33,12 +33,15 @@ import 'package:hefesto/features/admin/admin_more_screen.dart';
 import 'package:hefesto/features/admin/admin_providers.dart';
 import 'package:hefesto/features/admin/admin_shell.dart';
 import 'package:hefesto/features/admin/admin_widgets.dart';
+import 'package:hefesto/features/admin/calculadora/price_estimator_sheet.dart';
 import 'package:hefesto/features/admin/consultas/consulta_answer_screen.dart';
 import 'package:hefesto/features/admin/consultas/consulta_form_screen.dart';
 import 'package:hefesto/features/admin/consultas/consultas_api.dart';
 import 'package:hefesto/features/admin/consultas/consultas_models.dart';
 import 'package:hefesto/features/admin/consultas/consultas_screen.dart';
 import 'package:hefesto/features/admin/dashboard_screen.dart';
+import 'package:hefesto/features/admin/pendientes/pendientes_models.dart';
+import 'package:hefesto/features/admin/pendientes/pendientes_screen.dart';
 import 'package:hefesto/features/admin/produccion/produccion_api.dart';
 import 'package:hefesto/features/admin/produccion/produccion_models.dart';
 import 'package:hefesto/features/admin/produccion/produccion_screen.dart';
@@ -52,8 +55,10 @@ import 'package:supabase_flutter/supabase_flutter.dart' show Session, User;
 
 import 'admin_consultas_models_test.dart' show answeredJson, inquiryJson;
 import 'admin_consultas_screens_test.dart' show FakeConsultasApi;
+import 'support/calc_kit.dart';
 import 'support/device_kit.dart';
 import 'support/photo_kit.dart';
+import 'support/sales_kit.dart';
 
 // ---------------------------------------------------------------------------
 // Datos de ejemplo (misma forma que devuelve /api/v1/admin/*)
@@ -198,13 +203,26 @@ Map<String, dynamic> _row(
       'total': total,
     };
 
-final _sales = SalesPage.fromJson({
-  'total': 4,
+final _salesJson = [
+  _row('a'),
+  _row('b', source: 'manual', who: 'Cliente de feria', label: '5 llaveros', status: 'delivered', total: 10000, day: 29),
+  _row('c', who: null, label: '', ref: 'HF-0039', status: 'pending_payment', total: 32500, day: 28),
+  _row('d', who: 'Ana', label: 'Figura', ref: 'HF-0038', status: 'cancelled', total: 4500, day: 27),
+];
+
+final _sales = SalesPage.fromJson({'total': 4, 'items': _salesJson});
+
+/// Ventas de tres meses: octubre (el "hoy" de las pruebas), septiembre y
+/// agosto, con dos sin cerrar de meses anteriores y una del 31/10 a las 22:30
+/// de Argentina (ya es noviembre en UTC).
+final _salesMonths = SalesPage.fromJson({
+  'total': 8,
   'items': [
-    _row('a'),
-    _row('b', source: 'manual', who: 'Cliente de feria', label: '5 llaveros', status: 'delivered', total: 10000, day: 29),
-    _row('c', who: null, label: '', ref: 'HF-0039', status: 'pending_payment', total: 32500, day: 28),
-    _row('d', who: 'Ana', label: 'Figura', ref: 'HF-0038', status: 'cancelled', total: 4500, day: 27),
+    {..._row('n1', who: 'Nocturna del 31', ref: 'HF-0050', status: 'confirmed'), 'date': '2026-11-01T01:30:00.000Z'},
+    ..._salesJson,
+    {..._row('s1', who: 'Carla', ref: 'HF-0020', status: 'in_production'), 'date': '2026-09-12T15:00:00.000Z'},
+    {..._row('s2', who: 'Pedro', ref: 'HF-0019', status: 'delivered'), 'date': '2026-09-03T15:00:00.000Z'},
+    {..._row('g1', who: _longName, label: _longProduct, ref: 'HF-0007', status: 'pending_payment'), 'date': '2026-08-05T15:00:00.000Z'},
   ],
 });
 
@@ -845,6 +863,7 @@ List<Override> _world({
   ManualSaleEditData? edit,
   Future<ManualSaleEditData> Function()? editLoader,
   bool withSession = true,
+  FakePendientesApi? pendientes,
 }) =>
     [
       sessionProvider.overrideWith((ref) => Stream<Session?>.value(withSession ? _session : null)),
@@ -852,6 +871,8 @@ List<Override> _world({
       ventasExtraApiProvider.overrideWithValue(ventas ?? _FakeVentas()),
       adminDashboardProvider.overrideWith((ref) => dashboardLoader?.call() ?? Future.value(dashboard ?? _dashboard)),
       adminSalesProvider.overrideWith((ref, f) => salesLoader?.call() ?? Future.value(sales ?? _sales)),
+      // Ventas arranca en el mes actual: "hoy" fijo en octubre de 2026.
+      ...salesKitOverrides(api: pendientes),
       adminSaleProvider.overrideWith((ref, k) => saleLoader?.call() ?? Future.value(sale ?? _online())),
       adminStockProvider.overrideWith((ref) async => _stock),
       produccionProvider.overrideWith((ref) async => _board),
@@ -913,6 +934,10 @@ Future<void> _openDetail(
       editLoader: editLoader,
     ),
   );
+  // Con letra grande, los filtros de arriba dejan la primera venta al borde:
+  // se la trae a la vista como haría quien usa el teléfono.
+  await tester.ensureVisible(find.byType(SaleTile).first);
+  await settle(tester, 3);
   await tester.tap(find.byType(SaleTile).first);
   await _nav(tester);
   expect(find.text('Detalle'), findsOneWidget, reason: 'tendría que haberse abierto el detalle');
@@ -1246,11 +1271,22 @@ void main() {
       });
 
       testWidgets('los atajos llevan a donde dicen en ${phone.name}', (tester) async {
-        await _openPanel(tester, phone: phone);
-        // "Listos" → Ventas filtradas, con el filtro elegido A LA VISTA.
+        // Un pedido listo de AGOSTO (el "hoy" de la prueba es fin de octubre).
+        final withOld = SalesPage.fromJson({
+          'total': 5,
+          'items': [
+            ..._salesJson,
+            {..._row('r', status: 'ready', ref: 'HF-0007'), 'date': '2026-08-05T15:00:00.000Z'},
+          ],
+        });
+        await _openPanel(tester, phone: phone, world: _world(sales: withOld));
+        // "Listos" → Ventas filtradas, con el filtro elegido A LA VISTA y en
+        // TODOS los meses (el número del inicio no es solo de este mes).
         await _tap(tester, find.text('Listos'));
-        expect(find.text('4 ventas'), findsOneWidget);
-        final chip = find.widgetWithText(ChoiceChip, 'Listo para entregar');
+        expect(find.text('1 venta'), findsOneWidget);
+        expect(find.text('HF-0007'), findsOneWidget);
+        expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Todos los meses')).selected, isTrue);
+        final chip = find.widgetWithText(ChoiceChip, 'Listo para entregar (1)');
         expect(tester.widget<ChoiceChip>(chip).selected, isTrue);
         expectReachable(tester, chip, what: 'el filtro elegido ("Listo para entregar")');
         await shoot(tester, 'inicio_atajo_listos');
@@ -1340,15 +1376,25 @@ void main() {
         expectReachable(tester, find.byType(FloatingActionButton), what: 'el botón Nueva venta');
         await shoot(tester, 'ventas');
 
+        // Arriba de todo, la entrada a los pendientes del equipo (sin tapar la lista).
+        expectReachable(tester, find.text('Pendientes del equipo · 3'), what: 'la entrada a los pendientes');
+        expect(find.byType(SaleTile), findsWidgets, reason: 'las ventas se ven sin desplazar');
+        // Arranca en el mes actual.
+        expect(tester.widget<ChoiceChip>(find.byKey(const ValueKey('ventas-mes'))).selected, isTrue);
+        expect(find.widgetWithText(ChoiceChip, 'Octubre 2026'), findsOneWidget);
+
         // Filtros: se pueden tocar y quedan marcados.
         await tester.tap(find.widgetWithText(ChoiceChip, 'Mostrador'));
         await settle(tester);
         expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Mostrador')).selected, isTrue);
-        await tester.tap(find.widgetWithText(ChoiceChip, 'Pendiente de pago'));
+        await tester.tap(find.widgetWithText(ChoiceChip, 'Pendiente de pago (1)'));
         await settle(tester);
-        expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Pendiente de pago')).selected, isTrue);
+        expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Pendiente de pago (1)')).selected, isTrue);
+        expect(find.text('1 venta'), findsOneWidget);
         expectNoLayoutErrors(tester);
         await shoot(tester, 'ventas_filtros');
+        await tester.tap(find.widgetWithText(ChoiceChip, 'Todos (4)'));
+        await settle(tester);
 
         // Buscador con el teclado abierto.
         await _kbd(tester, find.byType(TextField));
@@ -1364,7 +1410,9 @@ void main() {
 
       testWidgets('40 ventas largas en ${phone.name}: la última no queda debajo del botón', (tester) async {
         await _openPanel(tester, phone: phone, at: '/admin/ventas', world: _world(sales: _salesMany));
-        expect(find.text('Mostrando 40 de 350 ventas'), findsOneWidget);
+        expect(find.text('40 ventas'), findsOneWidget);
+        // Hay más en el servidor de las que llegan: se avisa.
+        expect(find.textContaining('Hay 350 ventas y se cargaron las 40 más nuevas'), findsOneWidget);
         await shoot(tester, 'ventas_muchas');
         await _toEnd(tester);
         _expectAbove(tester, find.byType(SaleTile).last, find.byType(FloatingActionButton), reason: 'la última venta');
@@ -1374,12 +1422,15 @@ void main() {
       testWidgets('vacío, error, cargando y sin permiso en ${phone.name}', (tester) async {
         final empty = SalesPage.fromJson({'total': 0, 'items': <dynamic>[]});
         await _openPanel(tester, phone: phone, at: '/admin/ventas', world: _world(sales: empty));
+        expect(find.text('No hay ventas en octubre 2026'), findsOneWidget);
+        expect(find.text('Mirá otro mes con las flechas, o tocá "Todos los meses".'), findsOneWidget);
+        await shoot(tester, 'ventas_vacio');
+        await _tap(tester, find.widgetWithText(ChoiceChip, 'Todos los meses'));
         expect(find.text('No hay ventas para mostrar'), findsOneWidget);
         expect(find.text('Cuando entre un pedido o cargues una venta, aparece acá.'), findsOneWidget);
-        await shoot(tester, 'ventas_vacio');
+        await shoot(tester, 'ventas_vacio_todos');
         // Con un filtro puesto el texto cambia.
-        await tester.tap(find.widgetWithText(ChoiceChip, 'Tienda'));
-        await settle(tester);
+        await _tap(tester, find.widgetWithText(ChoiceChip, 'Tienda'));
         expect(find.text('Probá quitando algún filtro o cambiando la búsqueda.'), findsOneWidget);
         // Con el teclado abierto el aviso se desplaza, no se desborda.
         await _kbd(tester, find.byType(TextField));
@@ -1407,6 +1458,65 @@ void main() {
       });
     }
 
+    for (final phone in Phone.both) {
+      testWidgets('meses en ${phone.name}: mes actual, flechas, atrasadas y todos los meses', (tester) async {
+        await _openPanel(tester, phone: phone, at: '/admin/ventas', world: _world(sales: _salesMonths));
+        // Octubre: las cuatro de siempre + la del 31 a las 22:30 (hora argentina).
+        expect(find.text('5 ventas'), findsOneWidget);
+        expect(find.widgetWithText(ChoiceChip, 'Todos (5)'), findsOneWidget);
+        expect(find.widgetWithText(ChoiceChip, 'Sin cerrar (3)'), findsOneWidget);
+        expect(find.widgetWithText(ChoiceChip, 'Pago confirmado (1)'), findsOneWidget);
+        // Lo que quedó abierto de antes se avisa, con su "Ver" a mano.
+        final notice = find.text('Hay 2 pedidos de meses anteriores sin cerrar');
+        expectReachable(tester, notice, what: 'el aviso de pedidos atrasados');
+        final see = find.widgetWithText(TextButton, 'Ver');
+        expectReachable(tester, see, what: 'el botón Ver del aviso');
+        _expectOneLine(tester, find.text('Octubre 2026'), what: 'el mes');
+        await shoot(tester, 'ventas_mes_actual');
+
+        // Mes anterior: septiembre, con su propio conteo y el camino de vuelta.
+        await tester.tap(find.byTooltip('Mes anterior'));
+        await settle(tester);
+        expectNoLayoutErrors(tester);
+        expect(find.widgetWithText(ChoiceChip, 'Septiembre 2026'), findsOneWidget);
+        expect(find.text('2 ventas'), findsOneWidget);
+        expect(find.text('Hay 1 pedido de meses anteriores sin cerrar'), findsOneWidget);
+        await shoot(tester, 'ventas_mes_anterior');
+        // La fila del mes se desplaza hasta "Volver a octubre 2026".
+        final back = find.widgetWithText(TextButton, 'Volver a octubre 2026');
+        await tester.ensureVisible(back);
+        await settle(tester, 3);
+        expectReachable(tester, back, what: 'Volver a octubre 2026');
+        await shoot(tester, 'ventas_mes_volver');
+        await tester.tap(back);
+        await settle(tester);
+        expect(find.text('5 ventas'), findsOneWidget);
+
+        // Mes siguiente: noviembre vacío (la del 31 a la noche NO cae acá).
+        await tester.ensureVisible(find.byTooltip('Mes siguiente'));
+        await tester.tap(find.byTooltip('Mes siguiente'));
+        await settle(tester);
+        expectNoLayoutErrors(tester);
+        expect(find.text('No hay ventas en noviembre 2026'), findsOneWidget);
+        await shoot(tester, 'ventas_mes_vacio');
+        await tester.tap(find.byKey(const ValueKey('ventas-mes')));
+        await settle(tester);
+        expect(find.widgetWithText(ChoiceChip, 'Octubre 2026'), findsOneWidget);
+
+        // "Ver": todos los meses + lo que sigue sin cerrar.
+        await tester.tap(see);
+        await settle(tester);
+        expectNoLayoutErrors(tester);
+        expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Todos los meses')).selected, isTrue);
+        expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Sin cerrar (5)')).selected, isTrue);
+        expect(find.text('5 ventas'), findsOneWidget);
+        expect(find.textContaining('meses anteriores sin cerrar'), findsNothing);
+        await shoot(tester, 'ventas_atrasadas');
+        await _toEnd(tester);
+        _expectAbove(tester, find.byType(SaleTile).last, find.byType(FloatingActionButton), reason: 'la última venta atrasada');
+      });
+    }
+
     testWidgets('sin permiso de crear no hay botón y la lista usa todo el alto', (tester) async {
       await _openPanel(tester, phone: Phone.small, at: '/admin/ventas', me: _operator, world: _world(sales: _salesMany));
       expect(find.byType(FloatingActionButton), findsNothing);
@@ -1415,6 +1525,17 @@ void main() {
     });
 
     testWidgets('letra grande (1,3×) en el teléfono chico', (tester) async {
+      // Con el aviso de atrasadas y los contadores, con letra grande.
+      await _openPanel(tester, phone: Phone.small, at: '/admin/ventas', textScale: 1.3, world: _world(sales: _salesMonths));
+      expectReachable(tester, find.text('Pendientes del equipo · 3'), what: 'la entrada a los pendientes con letra grande');
+      await _reveal(tester, find.text('Hay 2 pedidos de meses anteriores sin cerrar'));
+      expectReachable(tester, find.widgetWithText(TextButton, 'Ver'), what: 'Ver con letra grande');
+      await shoot(tester, 'ventas_mes_grande');
+      await tester.tap(find.byTooltip('Mes anterior'));
+      await settle(tester);
+      expectNoLayoutErrors(tester);
+      await shoot(tester, 'ventas_mes_anterior_grande');
+
       await _openPanel(tester, phone: Phone.small, at: '/admin/ventas', textScale: 1.3, world: _world(sales: _salesMany));
       await shoot(tester, 'ventas_grande');
       await _toEnd(tester);
@@ -2536,6 +2657,170 @@ void main() {
   // =========================================================================
   // CONSULTAS: listado, mensaje para el cliente, responder y alta con fotos
   // =========================================================================
+  group('Pendientes del equipo', () {
+    /// 14 abiertos (uno larguísimo, de 500 letras) y 20 hechos.
+    PendientesData many() => PendientesData.fromJson({
+          'open': [
+            taskJson('largo', body: ('$_longProduct. ' * 5).substring(0, 500), author: _longName, mine: true),
+            for (var i = 0; i < 13; i++)
+              taskJson('o$i', body: 'Pendiente número $i del equipo', author: i.isEven ? 'Agustín' : 'Antonella', mine: i % 3 == 0),
+          ],
+          'done': [
+            for (var i = 0; i < 20; i++)
+              taskJson('d$i', body: i == 0 ? _longProduct : 'Hecho número $i', done: true, doneBy: i == 0 ? _longName : 'Ale', mine: i.isOdd),
+          ],
+          'maxLength': 500,
+        });
+
+    final input = find.byType(TextField);
+    final send = find.widgetWithIcon(IconButton, Icons.send_rounded);
+
+    /// Ventas → "Pendientes del equipo · N" (el camino real).
+    Future<FakePendientesApi> openFromSales(
+      WidgetTester tester,
+      Phone phone, {
+      PendientesData? data,
+      MeInfo? me,
+      double textScale = 1,
+      HefestoThemeMode theme = HefestoThemeMode.dark,
+    }) async {
+      final api = FakePendientesApi(data);
+      await _openPanel(tester,
+          phone: phone, at: '/admin/ventas', me: me, textScale: textScale, theme: theme, world: _world(pendientes: api));
+      final entry = find.textContaining('Pendientes del equipo · ');
+      expectReachable(tester, entry, what: 'la entrada a los pendientes');
+      await tester.tap(entry);
+      await _nav(tester);
+      expectNoLayoutErrors(tester, 'al abrir los pendientes');
+      expect(find.byType(PendientesScreen), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing, reason: 'los pendientes se abren sobre la barra del panel');
+      return api;
+    }
+
+    for (final phone in Phone.both) {
+      testWidgets('lista, anotar con el teclado, tildar y hechos en ${phone.name}', (tester) async {
+        final api = await openFromSales(tester, phone);
+        expect(find.text('3 pendientes'), findsOneWidget);
+        expectReachable(tester, input, what: 'el campo para anotar');
+        expectReachable(tester, send, what: 'el botón de anotar');
+        await shoot(tester, 'pendientes');
+
+        // Anotar: el campo queda arriba del teclado, con su botón.
+        await openKeyboard(tester, input);
+        expectFocusedFieldVisible(tester);
+        expectReachable(tester, send, what: 'el botón de anotar con el teclado');
+        await _type(tester, input, 'Cargar el pedido de la feria del sábado, con los 12 llaveros y las 3 macetas que quedaron sin anotar');
+        expectNoLayoutErrors(tester);
+        expectFocusedFieldVisible(tester);
+        await shoot(tester, 'pendientes_teclado');
+        await tester.tap(send);
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(api.created, hasLength(1));
+        expect(find.text('4 pendientes'), findsOneWidget);
+        await closeKeyboard(tester);
+
+        // Tildar uno: aviso y pasa a "Hechos".
+        await _tap(tester, find.descendant(of: find.byKey(const ValueKey('pendiente-t2')), matching: find.byType(Checkbox)));
+        expectNoLayoutErrors(tester);
+        expect(find.text('Pendiente hecho'), findsOneWidget);
+        await shoot(tester, 'pendientes_tildado');
+        await _tap(tester, find.text('Hechos (3)'));
+        expectNoLayoutErrors(tester);
+        await _toEnd(tester);
+        _expectAbove(tester, find.text('Reponer bolsas'), input, reason: 'el último hecho (no lo tapa el campo de anotar)');
+        await shoot(tester, 'pendientes_hechos');
+      });
+
+      testWidgets('muchos y larguísimos en ${phone.name}: se lee entero y se borra con confirmación', (tester) async {
+        final api = await openFromSales(tester, phone, data: many());
+        expect(find.text('14 pendientes'), findsOneWidget);
+        // El de 500 letras se lee entero (no se corta).
+        final long = find.descendant(of: find.byKey(const ValueKey('pendiente-largo')), matching: find.textContaining(_longProduct));
+        expect(tester.renderObject<RenderParagraph>(long).didExceedMaxLines, isFalse);
+        await shoot(tester, 'pendientes_muchos');
+
+        // Borrar el larguísimo: el diálogo se desplaza y los botones quedan a mano.
+        await _tap(tester, find.descendant(of: find.byKey(const ValueKey('pendiente-largo')), matching: find.byTooltip('Borrar pendiente')));
+        expectNoLayoutErrors(tester);
+        expect(find.text('¿Borrar este pendiente?'), findsOneWidget);
+        expectReachable(tester, _inDialog(find.widgetWithText(TextButton, 'Borrar')), what: 'Borrar');
+        expectReachable(tester, _inDialog(find.widgetWithText(TextButton, 'Cancelar')), what: 'Cancelar');
+        await shoot(tester, 'pendientes_borrar_dialogo');
+        await tester.tap(_inDialog(find.widgetWithText(TextButton, 'Borrar')));
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(api.deleted, ['largo']);
+        await _reveal(tester, find.text('13 pendientes'));
+
+        // Los 20 hechos: el último queda arriba del campo de anotar.
+        await _toEnd(tester);
+        await _tap(tester, find.text('Hechos (20)'));
+        await _toEnd(tester);
+        _expectAbove(tester, find.text('Hecho número 19'), input, reason: 'el último hecho');
+        await shoot(tester, 'pendientes_muchos_fin');
+      });
+
+      testWidgets('vacío, rechazo al anotar con el teclado y solo lectura en ${phone.name}', (tester) async {
+        final api = await openFromSales(tester, phone, data: const PendientesData(open: [], done: []));
+        expect(find.text('Nada pendiente'), findsOneWidget);
+        await shoot(tester, 'pendientes_vacio');
+        api.failWith = ApiException('invalid', _longServerError);
+        await openKeyboard(tester, input);
+        await _type(tester, input, 'Llamar a Nico');
+        await tester.tap(send);
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expectReachable(tester, find.text(_longServerError), what: 'el rechazo del servidor (con el teclado abierto)');
+        expectFocusedFieldVisible(tester);
+        expectReachable(tester, send, what: 'el botón de anotar con el rechazo a la vista');
+        await shoot(tester, 'pendientes_error');
+        await closeKeyboard(tester);
+
+        // Quien solo mira: sin campo para anotar, la lista usa todo el alto.
+        await openFromSales(tester, phone, data: many(), me: _readOnly);
+        expect(input, findsNothing);
+        await _toEnd(tester);
+        await _tap(tester, find.text('Hechos (20)'));
+        await _toEnd(tester);
+        expectReachable(tester, find.text('Hecho número 19'), what: 'el último hecho');
+        await shoot(tester, 'pendientes_solo_lectura');
+      });
+    }
+
+    testWidgets('letra grande (1,3×) en el teléfono chico', (tester) async {
+      final api = await openFromSales(tester, Phone.small, data: many(), textScale: 1.3);
+      await shoot(tester, 'pendientes_grande');
+      await openKeyboard(tester, input);
+      expectFocusedFieldVisible(tester);
+      expectReachable(tester, send, what: 'el botón de anotar con letra grande y teclado');
+      await shoot(tester, 'pendientes_grande_teclado');
+      await closeKeyboard(tester);
+      await _tap(tester, find.descendant(of: find.byKey(const ValueKey('pendiente-largo')), matching: find.byTooltip('Borrar pendiente')));
+      expectNoLayoutErrors(tester);
+      expectReachable(tester, _inDialog(find.widgetWithText(TextButton, 'Borrar')), what: 'Borrar con letra grande');
+      expectReachable(tester, _inDialog(find.widgetWithText(TextButton, 'Cancelar')), what: 'Cancelar con letra grande');
+      await shoot(tester, 'pendientes_borrar_dialogo_grande');
+      await tester.tap(_inDialog(find.widgetWithText(TextButton, 'Cancelar')));
+      await settle(tester);
+      expect(api.deleted, isEmpty);
+      await _toEnd(tester);
+      await _tap(tester, find.text('Hechos (20)'));
+      await _toEnd(tester);
+      _expectAbove(tester, find.text('Hecho número 19'), input, reason: 'el último hecho con letra grande');
+      await shoot(tester, 'pendientes_grande_fin');
+    });
+
+    for (final mode in [HefestoThemeMode.light, HefestoThemeMode.warm]) {
+      testWidgets('tema ${mode.name}', (tester) async {
+        await openFromSales(tester, Phone.small, theme: mode);
+        await _tap(tester, find.text('Hechos (2)'));
+        await shoot(tester, 'pendientes_${mode.name}');
+      });
+    }
+  });
+
+  // =========================================================================
   group('Consultas', () {
     final me = staffWith(['consultas']);
     List<Override> ov(ConsultasData d, [ConsultasApi? api, PhotoSource? photos, AttachmentSource? files]) => [
@@ -2543,8 +2828,46 @@ void main() {
           if (api != null) consultasApiProvider.overrideWithValue(api),
           if (photos != null) photoSourceProvider.overrideWithValue(photos),
           if (files != null) attachmentSourceProvider.overrideWithValue(files),
+          // "Calcular precio": tipos y filamentos de ejemplo, precio fijo.
+          ...estimatorOverrides(FakeEstimatorApi(), overview: sampleEstimatorOverview(longName: _longCategory)),
         ];
     final fab = find.widgetWithText(FloatingActionButton, 'Nueva consulta');
+    final usePrice = find.widgetWithText(GoldButton, 'Usar este precio');
+
+    /// Abre "Calcular precio" (o "Volver a calcular"), revisa la hoja con el
+    /// teclado en cada campo y usa el precio.
+    Future<void> calculate(WidgetTester tester, String shot, {String button = 'Calcular precio'}) async {
+      await _tap(tester, find.widgetWithText(OutlinedButton, button));
+      expectNoLayoutErrors(tester);
+      expect(find.byType(PriceEstimatorSheet), findsOneWidget);
+      _expectSheetBelowStatusBar(tester);
+      expectReachable(tester, usePrice, what: 'Usar este precio');
+      await shoot(tester, '${shot}_hoja');
+      for (final (label, text) in [('Gramos por unidad', '123.456,75'), ('Horas', '999'), ('Minutos', '59')]) {
+        await openKeyboard(tester, _inSheet(_field(label)));
+        expectFocusedFieldVisible(tester);
+        expectReachable(tester, usePrice, what: 'Usar este precio con el teclado ($label)');
+        _expectSheetBelowStatusBar(tester);
+        await _type(tester, _inSheet(_field(label)), text);
+        expectNoLayoutErrors(tester);
+      }
+      await shoot(tester, '${shot}_hoja_teclado');
+      await closeKeyboard(tester);
+      // El tipo de nombre más largo (lo último de la hoja) se puede tocar.
+      final chip = _inSheet(find.widgetWithText(ChoiceChip, _longCategory));
+      await tester.ensureVisible(chip);
+      await settle(tester, 3);
+      await tester.tap(chip);
+      await settle(tester, 8);
+      expectNoLayoutErrors(tester);
+      expect(tester.widget<Text>(find.byKey(const ValueKey('estimator-price'))).data, r'$2.900');
+      expectReachable(tester, usePrice, what: 'Usar este precio con el precio calculado');
+      await shoot(tester, '${shot}_hoja_precio');
+      await tester.tap(usePrice);
+      await settle(tester, 8);
+      expectNoLayoutErrors(tester);
+      expect(find.byType(PriceEstimatorSheet), findsNothing);
+    }
     final saveAnswer = find.widgetWithText(GoldButton, 'Guardar respuesta');
     final saveNew = find.widgetWithText(GoldButton, 'Cargar consulta');
 
@@ -2803,24 +3126,40 @@ void main() {
         expectReachable(tester, saveAnswer, what: 'Guardar respuesta con el teclado (precio)');
         await fill(tester, r'Precio por unidad ($)', '987.654.321');
         expectNoLayoutErrors(tester);
-        expect(find.text(r'Total por 9999: $9.875.555.555.679'), findsOneWidget);
+        expect(find.text(r'$987.654.321 c/u · $9.875.555.555.679 por las 9999'), findsOneWidget);
         await shoot(tester, 'consulta_responder_teclado_primero');
+        await closeKeyboard(tester);
 
-        for (final label in [r'Costo por unidad ($)', 'Demora', 'Precio por unidad comprando más', 'A partir de cuántas unidades', 'Medidas', 'Colores', 'Nota']) {
+        // "Por las 9999": mismo precio expresado por el total (13 cifras).
+        await _tap(tester, find.widgetWithText(ChoiceChip, 'Por las 9999'));
+        expectNoLayoutErrors(tester);
+        expect(tester.widget<TextField>(_field(r'Precio por las 9999 ($)')).controller!.text, '9.875.555.555.679');
+        await shoot(tester, 'consulta_responder_por_total');
+        await _tap(tester, find.widgetWithText(ChoiceChip, 'Por unidad'));
+        // La ayuda de la calculadora se lee entera (no cortada).
+        await _reveal(tester, find.textContaining('Calculá el precio con la calculadora: elegís'));
+        expect(
+          tester.renderObject<RenderParagraph>(find.textContaining('Calculá el precio con la calculadora: elegís')).didExceedMaxLines,
+          isFalse,
+          reason: 'la ayuda de la calculadora se corta',
+        );
+
+        // El precio sale de la calculadora.
+        await calculate(tester, 'consulta_calcular');
+        await _reveal(tester, _field(r'Precio por unidad ($)'));
+        expect(tester.widget<TextField>(_field(r'Precio por unidad ($)')).controller!.text, '2.900');
+        expect(find.text(r'$2.900 c/u · $28.997.100 por las 9999'), findsOneWidget);
+        expect(find.text('Costo guardado con la calculadora. Podés ajustar el precio a mano.'), findsOneWidget);
+        expect(find.widgetWithText(OutlinedButton, 'Volver a calcular'), findsOneWidget);
+        await shoot(tester, 'consulta_responder_calculado');
+
+        for (final label in ['Demora', 'Precio por unidad comprando más', 'A partir de cuántas unidades', 'Medidas', 'Colores', 'Nota']) {
           await _kbd(tester, _field(label));
           expectFocusedFieldVisible(tester);
           expectReachable(tester, saveAnswer, what: 'Guardar respuesta con el teclado ($label)');
         }
         await fill(tester, 'Nota', _longNote);
         expectNoLayoutErrors(tester);
-        await fill(tester, r'Costo por unidad ($)', '456.789.123,5');
-        // La aclaración del costo se lee entera (no cortada).
-        await _reveal(tester, find.textContaining('No se le muestra al cliente.'));
-        expect(
-          tester.renderObject<RenderParagraph>(find.textContaining('No se le muestra al cliente.')).didExceedMaxLines,
-          isFalse,
-          reason: 'la aclaración del costo se corta',
-        );
 
         await _kbd(tester, _field('Mensaje para el cliente'));
         expectFocusedFieldVisible(tester);
@@ -2835,8 +3174,10 @@ void main() {
         await tester.tap(saveAnswer);
         await settle(tester, 8);
         expectNoLayoutErrors(tester);
-        expect(api.answered!.draft.unitPrice, 987654321);
-        expect(api.answered!.draft.unitCost, 456789123.5);
+        expect(api.answered!.draft.unitPrice, 2900);
+        expect(api.answered!.draft.calc!.grams, 123456.75);
+        expect(api.answered!.draft.calc!.printMinutes, 999 * 60 + 59);
+        expect(api.answered!.draft.toJson()['unitCost'], isNull);
         expect(api.answered!.draft.message, isNull);
         // El resultado: mensaje larguísimo que se desplaza, "Listo" siempre a mano.
         expect(find.text('Respuesta guardada'), findsOneWidget);
@@ -3027,6 +3368,13 @@ void main() {
 
       await openAnswer(tester, Phone.small, _smallConsultas().items[1], api: api, textScale: 1.3);
       await shoot(tester, 'consulta_responder_grande');
+      // La calculadora con letra grande: en modo total y con el teclado.
+      await _tap(tester, find.widgetWithText(ChoiceChip, 'Por las 9999'));
+      expectNoLayoutErrors(tester);
+      await calculate(tester, 'consulta_calcular_grande');
+      await _reveal(tester, _field(r'Precio por las 9999 ($)'));
+      expect(tester.widget<TextField>(_field(r'Precio por las 9999 ($)')).controller!.text, '28.997.100');
+      await shoot(tester, 'consulta_responder_grande_calculado');
       await _kbd(tester, _field('Precio por unidad comprando más'));
       expectFocusedFieldVisible(tester);
       expectReachable(tester, saveAnswer, what: 'Guardar respuesta con letra grande y teclado');

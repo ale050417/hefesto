@@ -66,7 +66,7 @@ Future<bool> changeProductStatus(
   if (target == ProductState.published && !hasPhotos) {
     showSnack(
       context,
-      'No se puede publicar un producto sin fotos. Cargalas desde el panel web.',
+      'No se puede publicar un producto sin fotos. Sumale una desde su ficha.',
       error: true,
     );
     return false;
@@ -106,6 +106,34 @@ Future<bool> deleteProduct(
   if (!ok || !context.mounted) return false;
   final repo = ProviderScope.containerOf(context).read(productosRepoProvider);
   return _guard(context, () => repo.delete(id), done: 'Producto eliminado');
+}
+
+/// Borra una foto del producto (pide confirmación).
+Future<bool> deleteProductImage(
+  BuildContext context, {
+  required String productId,
+  required String imageId,
+  required bool isPrimary,
+  required bool isLast,
+  required bool published,
+}) async {
+  final ok = await confirmDialog(
+    context,
+    title: '¿Eliminar esta foto?',
+    message: isLast
+        ? (published
+            ? 'Es la única foto y el producto está publicado: en la tienda se va a ver sin imagen. No se puede deshacer.'
+            : 'Es la única foto: sin fotos no se puede publicar. No se puede deshacer.')
+        : (isPrimary
+            ? 'Es la portada: la siguiente foto pasa a ser la portada. No se puede deshacer.'
+            : 'No se puede deshacer.'),
+    // "Eliminar foto" y no "Eliminar": que no se confunda con borrar el producto.
+    confirmLabel: 'Eliminar foto',
+    destructive: true,
+  );
+  if (!ok || !context.mounted) return false;
+  final repo = ProviderScope.containerOf(context).read(productosRepoProvider);
+  return _guard(context, () => repo.deleteImage(productId, imageId), done: 'Foto eliminada');
 }
 
 /// Elige cuál de las fotos YA cargadas es la portada (no sube archivos).

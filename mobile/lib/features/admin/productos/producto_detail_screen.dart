@@ -9,6 +9,7 @@ import '../../../core/widgets/common.dart';
 import '../admin_widgets.dart';
 import 'catalogo_ui.dart';
 import 'producto_form_screen.dart';
+import 'producto_photos.dart';
 import 'productos_actions.dart';
 import 'productos_models.dart';
 import 'productos_providers.dart';
@@ -104,7 +105,7 @@ class _Body extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
       children: [
-        _Gallery(product: p, canEdit: canEdit),
+        ProductGallery(product: p, canEdit: canEdit),
         const SizedBox(height: 16),
         Text(p.name, style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 8),
@@ -176,7 +177,7 @@ class _Body extends StatelessWidget {
         const SizedBox(height: 18),
         Center(
           child: Text(
-            'Las fotos, los colores y los tamaños se cargan desde el panel web.',
+            'Los colores y los tamaños se cargan desde el panel web.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 11.5, color: c.textFaint),
           ),
@@ -249,159 +250,6 @@ class _Actions extends StatelessWidget {
     ];
     if (buttons.isEmpty) return const SizedBox.shrink();
     return Wrap(spacing: 10, runSpacing: 10, crossAxisAlignment: WrapCrossAlignment.center, children: buttons);
-  }
-}
-
-/// Galería de solo lectura; se puede elegir cuál de las fotos YA cargadas es la
-/// portada (como en la web). Subir o cambiar fotos se hace desde el panel web.
-class _Gallery extends StatefulWidget {
-  const _Gallery({required this.product, required this.canEdit});
-  final AdminProductDetail product;
-  final bool canEdit;
-
-  @override
-  State<_Gallery> createState() => _GalleryState();
-}
-
-class _GalleryState extends State<_Gallery> {
-  int _sel = 0;
-  bool _busy = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final c = context.hc;
-    final images = widget.product.images;
-    if (images.isEmpty) {
-      return Container(
-        height: 190,
-        decoration: BoxDecoration(
-          color: c.surface2,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: c.border),
-        ),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.no_photography_outlined, size: 40, color: c.textFaint),
-            const SizedBox(height: 8),
-            const Text('Sin fotos', style: TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 2),
-            Text(
-              'Se suben desde el panel web. Sin fotos no se puede publicar.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: c.textDim),
-            ),
-          ],
-        ),
-      );
-    }
-    final index = _sel.clamp(0, images.length - 1);
-    final sel = images[index];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Stack(
-          children: [
-            AspectRatio(
-              aspectRatio: 1.15,
-              child: NetImage(sel.url, position: sel.position, radius: 20),
-            ),
-            if (sel.isPrimary)
-              const Positioned(
-                left: 10,
-                top: 10,
-                child: InfoPill(label: 'Portada', icon: Icons.star_rounded, color: Brand.gold),
-              ),
-            if (sel.color != null)
-              Positioned(
-                right: 10,
-                bottom: 10,
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 180),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: c.surface1.withValues(alpha: 0.85),
-                    borderRadius: BorderRadius.circular(99),
-                    border: Border.all(color: c.border),
-                  ),
-                  child: Text(
-                    sel.color!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-          ],
-        ),
-        if (images.length > 1) ...[
-          const SizedBox(height: 10),
-          SizedBox(
-            height: 62,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: images.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 8),
-              itemBuilder: (_, i) {
-                final img = images[i];
-                final selected = i == index;
-                return GestureDetector(
-                  onTap: () => setState(() => _sel = i),
-                  child: Container(
-                    width: 62,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: selected ? Brand.gold : c.border,
-                        width: selected ? 2 : 1,
-                      ),
-                    ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        NetImage(img.url, position: img.position, radius: 12),
-                        if (img.isPrimary)
-                          const Positioned(
-                            right: 3,
-                            top: 3,
-                            child: Icon(Icons.star_rounded, size: 16, color: Brand.gold),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-        if (widget.canEdit && !sel.isPrimary) ...[
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-            onPressed: _busy
-                ? null
-                : () async {
-                    setState(() => _busy = true);
-                    await setPrimaryImage(
-                      context,
-                      productId: widget.product.id,
-                      imageId: sel.id,
-                    );
-                    if (mounted) setState(() => _busy = false);
-                  },
-            icon: _busy
-                ? const SizedBox.square(
-                    dimension: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Brand.gold),
-                  )
-                : const Icon(Icons.star_outline_rounded, size: 18),
-            label: const Text('Usar como portada'),
-          ),
-        ],
-      ],
-    );
   }
 }
 
@@ -486,7 +334,9 @@ class _VariantCard extends StatelessWidget {
             const SizedBox(height: 4),
             Text('Peso ${_grams(v.weightGrams!)}', style: TextStyle(fontSize: 12, color: c.textDim)),
           ],
-          if (v.colorPrices.isNotEmpty) ...[
+          // Solo en color único son precios: en multicolor esa columna guarda
+          // GRAMOS por color (no se muestran como "$ 49").
+          if (!multi && v.colorPrices.isNotEmpty) ...[
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,

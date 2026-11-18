@@ -10,6 +10,7 @@
 // todo vacío). Con SHOT_DIR=carpeta guarda una captura de cada estado.
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -19,6 +20,7 @@ import 'package:hefesto/core/api/api_client.dart';
 import 'package:hefesto/core/api/models.dart';
 import 'package:hefesto/core/theme/app_theme.dart';
 import 'package:hefesto/core/widgets/common.dart';
+import 'package:hefesto/core/widgets/photo_picker.dart';
 import 'package:hefesto/features/admin/auditoria/audit_detail_screen.dart';
 import 'package:hefesto/features/admin/auditoria/audit_labels.dart';
 import 'package:hefesto/features/admin/auditoria/audit_models.dart';
@@ -41,6 +43,7 @@ import 'package:hefesto/features/admin/configuracion/tienda_screen.dart';
 
 import 'admin_configuracion_fixtures.dart';
 import 'support/device_kit.dart';
+import 'support/photo_kit.dart';
 
 // ---------------------------------------------------------------------------
 // Casos: teléfono + tamaño de letra
@@ -315,6 +318,14 @@ class _Api extends ConfigApi {
   @override
   Future<void> deleteBanner(String id) => _rec('banner_delete', id, null);
   @override
+  Future<String> createBanner(Map<String, dynamic> body) => _rec('banner_create', body, 'b-nuevo');
+  @override
+  Future<String> uploadImage(PickedPhoto photo, String kind) => _rec(
+        'image',
+        {'kind': kind, 'filename': photo.filename},
+        'https://abc.supabase.co/storage/v1/object/public/products/banners/banner-1.webp',
+      );
+  @override
   Future<Map<String, dynamic>> invite({
     required String email,
     required String roleId,
@@ -355,6 +366,9 @@ Future<void> _pumpCfg(
   /// (Riverpod no deja pisar dos veces el mismo provider).
   Override? configOverride,
   Override? teamOverride,
+
+  /// De dónde salen las fotos (galería / cámara de mentira).
+  PhotoSource? photos,
 }) =>
     pumpPhone(
       tester,
@@ -367,6 +381,7 @@ Future<void> _pumpCfg(
         configOverride ?? adminConfigProvider.overrideWith((ref) async => config ?? _config),
         teamOverride ?? adminTeamProvider.overrideWith((ref) async => team ?? _team),
         configApiProvider.overrideWithValue(api ?? _Api()),
+        photoSourceProvider.overrideWithValue(photos ?? FakePhotoSource()),
       ],
     );
 
@@ -890,10 +905,55 @@ void main() {
         await _typeIn(tester, _field('Otro color (hex)'));
         await shoot(tester, 'cfg_tienda_teclado${c.tag}');
         await closeKeyboard(tester);
-        await scrollToEnd(tester);
+        await tester.ensureVisible(find.text('Promo de verano'));
+        await settle(tester, 2);
         expectReachable(tester, find.text('Promo de verano'), what: 'el último banner');
+        await scrollToEnd(tester);
+        // Lo último de la pantalla: la imagen de portada con su botón.
+        expectReachable(tester, find.widgetWithText(OutlinedButton, 'Cambiar imagen de portada'),
+            what: 'el botón de la imagen de portada');
         expectReachable(tester, _gold('Guardar cambios'), what: 'el botón Guardar');
         await shoot(tester, 'cfg_tienda_fin${c.tag}');
+      });
+
+      testWidgets('imágenes desde el teléfono: logo, portada y la hoja para elegir (${c.label})', (tester) async {
+        final api = _Api();
+        final source = FakePhotoSource(gallery: [fakePhoto('logo.png')], camera: fakePhoto('portada.jpg'));
+        await _pumpCfg(tester, TiendaScreen(initial: _config.tienda, canEdit: true), c, api: api, photos: source);
+        final logo = find.widgetWithText(OutlinedButton, 'Cambiar logo');
+        expectReachable(tester, logo, what: 'el botón Cambiar logo');
+        await tester.tap(logo);
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester, 'al abrir la hoja de imagen');
+        final sheet = find.byType(BottomSheet);
+        expect(tester.getRect(sheet).top >= currentPhone.top - 0.5, isTrue,
+            reason: 'la hoja se mete debajo de la barra de estado');
+        expectReachable(tester, find.descendant(of: sheet, matching: find.text('Elegir de la galería')),
+            what: 'la opción de la galería');
+        expectReachable(tester, find.descendant(of: sheet, matching: find.text('Sacar una foto')),
+            what: 'la opción de la cámara');
+        await shoot(tester, 'cfg_imagen_hoja${c.tag}');
+        await tester.tap(find.text('Elegir de la galería'));
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(api.calls.single.$2, {'kind': 'logo', 'filename': 'logo.png'});
+        expect(find.text('Logo actualizado'), findsOneWidget);
+        await shoot(tester, 'cfg_logo_actualizado${c.tag}');
+
+        // La portada, con la cámara; el aviso de un rechazo se lee entero.
+        api.failWith = 'No pudimos procesar la imagen. Probá con otra foto, en JPG, PNG o WebP y de menos de 4 MB.';
+        await scrollToEnd(tester);
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Cambiar imagen de portada'));
+        await settle(tester, 8);
+        await tester.tap(find.text('Sacar una foto'));
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(api.calls.last.$2, {'kind': 'hero', 'filename': 'portada.jpg'});
+        await scrollToEnd(tester);
+        expectReachable(tester, find.textContaining('No pudimos procesar la imagen'), what: 'el aviso del rechazo');
+        expectReachable(tester, find.widgetWithText(OutlinedButton, 'Cambiar imagen de portada'),
+            what: 'el botón de la portada después del rechazo');
+        await shoot(tester, 'cfg_portada_error${c.tag}');
       });
 
       testWidgets('con 12 temporadas, 11 secciones y 12 banners largos (${c.label})', (tester) async {
@@ -906,8 +966,10 @@ void main() {
         await tester.ensureVisible(find.text('Segundos entre banners'));
         await settle(tester, 2);
         await shoot(tester, 'cfg_tienda_largo_banners${c.tag}');
-        await scrollToEnd(tester);
+        await tester.ensureVisible(find.text('Promo 12'));
+        await settle(tester, 2);
         expectReachable(tester, find.text('Promo 12'), what: 'el último banner');
+        expectReachable(tester, find.widgetWithText(OutlinedButton, 'Nuevo banner'), what: 'el botón Nuevo banner');
         await shoot(tester, 'cfg_tienda_largo_fin${c.tag}');
 
         // Sin temporadas, secciones ni banners; y en solo lectura.
@@ -962,7 +1024,9 @@ void main() {
         for (final label in ['Izquierda', 'Centro', 'Derecha']) {
           expect(_lines(tester, find.text(label)), 1, reason: '"$label" tiene que entrar en una línea');
         }
-        final seg = tester.getRect(find.byType(SegmentedButton<String>));
+        final seg = tester.getRect(
+          find.ancestor(of: find.text('Izquierda'), matching: find.byType(SegmentedButton<String>)),
+        );
         expect(seg.left >= 0 && seg.right <= currentPhone.width, isTrue, reason: 'la alineación se sale de la pantalla');
         await shoot(tester, 'cfg_banner_alineacion${c.tag}');
 
@@ -1020,6 +1084,103 @@ void main() {
         await shoot(tester, 'cfg_banner_solo_ver_fin${c.tag}');
       });
     }
+
+    for (final c in _cases) {
+      testWidgets('banner nuevo: elegir imagen, encuadre, teclado y crear (${c.label})', (tester) async {
+        final api = _Api();
+        final source = FakePhotoSource(gallery: [fakePhoto('promo de invierno con un nombre de archivo larguísimo.jpg')]);
+        await _pumpCfg(tester, _Opener(const BannerEditScreen(canEdit: true)), c, api: api, photos: source);
+        await _open(tester);
+        expect(find.text('Nuevo banner'), findsOneWidget);
+        expect(find.text('Sin imagen'), findsOneWidget);
+        expectReachable(tester, _gold('Crear banner'), what: 'el botón Crear banner');
+        await shoot(tester, 'cfg_banner_nuevo${c.tag}');
+
+        // Elegir la imagen: la hoja entra y sus opciones se pueden tocar.
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Elegir imagen'));
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester, 'al abrir la hoja de imagen');
+        final sheet = find.byType(BottomSheet);
+        expect(tester.getRect(sheet).top >= currentPhone.top - 0.5, isTrue,
+            reason: 'la hoja se mete debajo de la barra de estado');
+        expectReachable(tester, find.descendant(of: sheet, matching: find.text('Sacar una foto')),
+            what: 'la opción de la cámara');
+        await shoot(tester, 'cfg_banner_nuevo_hoja${c.tag}');
+        await tester.tap(find.text('Elegir de la galería'));
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(find.text('Imagen nueva: se sube al guardar.'), findsOneWidget);
+
+        // Encuadre: los tres rótulos en una línea y dentro de la pantalla.
+        await tester.ensureVisible(find.text('Abajo'));
+        await settle(tester, 2);
+        for (final label in ['Arriba', 'Medio', 'Abajo']) {
+          expect(_lines(tester, find.text(label)), 1, reason: '"$label" tiene que entrar en una línea');
+        }
+        final frames = tester.getRect(
+          find.ancestor(of: find.text('Arriba'), matching: find.byType(SegmentedButton<String>)),
+        );
+        expect(frames.left >= 0 && frames.right <= currentPhone.width, isTrue, reason: 'el encuadre se sale de la pantalla');
+        await tester.tap(find.text('Abajo'));
+        await settle(tester, 2);
+        await shoot(tester, 'cfg_banner_nuevo_imagen${c.tag}');
+
+        await _typeIn(tester, _field('Título'), save: 'Crear banner');
+        await tester.enterText(_field('Título'), _rep('Promo de invierno ', 110));
+        await settle(tester, 2);
+        await _typeIn(tester, _field('Subtítulo'), save: 'Crear banner');
+        await _typeIn(tester, _field('A dónde lleva'), save: 'Crear banner');
+        await shoot(tester, 'cfg_banner_nuevo_teclado${c.tag}');
+        await closeKeyboard(tester);
+        await scrollToEnd(tester);
+        expect(find.text('Eliminar banner'), findsNothing);
+        expectReachable(tester, _field('A dónde lleva'), what: 'el último campo');
+        await shoot(tester, 'cfg_banner_nuevo_fin${c.tag}');
+
+        await tester.tap(_gold('Crear banner'));
+        await settle(tester, 9);
+        expectNoLayoutErrors(tester);
+        expect(api.calls.map((x) => x.$1), ['image', 'banner_create']);
+        expect((api.calls.last.$2! as Map<String, dynamic>)['position'], '50% 100%');
+        expect(find.byKey(const Key('abrir')), findsOneWidget, reason: 'vuelve a la pantalla anterior');
+        expect(find.text('Banner creado'), findsOneWidget);
+      });
+    }
+
+    testWidgets('banner nuevo con letra grande: foto pesada, permiso negado y salir con cambios', (tester) async {
+      const c = _Case(Phone.small, 1.3);
+      final source = FakePhotoSource(
+        gallery: [PickedPhoto(bytes: Uint8List(maxUploadImageBytes + 1), filename: 'pesada.jpg')],
+      );
+      await _pumpCfg(tester, _Opener(const BannerEditScreen(canEdit: true)), c, photos: source);
+      await _open(tester);
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Elegir imagen'));
+      await settle(tester, 8);
+      await tester.tap(find.text('Elegir de la galería'));
+      await settle(tester, 8);
+      expectNoLayoutErrors(tester);
+      expectReachable(tester, find.text('La foto pesa más de 4 MB. Probá con una más liviana.'), what: 'el aviso del peso');
+      await shoot(tester, 'cfg_banner_nuevo_pesada_grande');
+
+      source.failWith = Exception('camera_access_denied');
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Elegir imagen'));
+      await settle(tester, 8);
+      await tester.tap(find.text('Sacar una foto'));
+      await settle(tester, 8);
+      expectNoLayoutErrors(tester);
+      expectReachable(tester, find.textContaining('No pudimos abrir la cámara'), what: 'el aviso del permiso');
+      await shoot(tester, 'cfg_banner_nuevo_permiso_grande');
+
+      // Con algo escrito, "atrás" pregunta antes de perderlo.
+      await tester.enterText(_field('Título'), 'Promo');
+      await tester.pump();
+      await tester.binding.handlePopRoute();
+      await settle(tester);
+      expectNoLayoutErrors(tester);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      _expectInsideScreen(tester, find.byType(AlertDialog), 'la confirmación de salir');
+      await shoot(tester, 'cfg_banner_nuevo_salir_grande');
+    });
 
     testWidgets('si el servidor rechaza el guardado o el borrado, el error se ve y no se pierde nada', (tester) async {
       const c = _Case(Phone.small, 1.3);

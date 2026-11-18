@@ -1,4 +1,5 @@
-import { apiError, apiOk, requireApiPerm, withApi } from "@/core/api/respond";
+import { apiError, apiOk, withApi } from "@/core/api/respond";
+import { requireCalcAccess } from "@/features/calculator/api-access";
 import { isAdminForUser } from "@/core/auth/permissions";
 import { AppError } from "@/core/errors";
 import { breakdownToJson } from "@/features/calculator/calc-payload";
@@ -23,7 +24,7 @@ export const dynamic = "force-dynamic";
 export const POST = withApi(
   "admin/calculadora/cotizar",
   async (request: Request) => {
-    const auth = await requireApiPerm(request, "calculadora", "ver");
+    const auth = await requireCalcAccess(request);
     if ("response" in auth) return auth.response;
 
     const parsed = quotePriceSchema.safeParse(

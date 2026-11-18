@@ -60,6 +60,10 @@ class Consulta {
     this.files = const [],
     this.unitPrice,
     this.unitCost,
+    this.estFilamentId,
+    this.estMaterial,
+    this.estGrams,
+    this.estMinutes,
     this.saleId,
     this.bulkPrice,
     this.bulkFrom,
@@ -89,9 +93,32 @@ class Consulta {
   // --- Respuesta del operador (todo null hasta que responde) ---
   final double? unitPrice;
 
-  /// Costo por unidad (sale de la calculadora). Es interno: con esto se
-  /// registra el pedido al confirmar. NUNCA va en lo que ve el cliente.
+  /// Costo por unidad cargado a mano en respuestas VIEJAS (hoy el costo sale
+  /// de la calculadora, ver [calc]). Es interno: NUNCA se muestra, ni al
+  /// cliente ni al operador; solo se reenvía tal cual al cambiar una respuesta
+  /// vieja sin recalcular.
   final double? unitCost;
+
+  /// Lo que dejó la calculadora (por unidad): con esto el servidor costea el
+  /// pedido y descuenta el filamento al confirmar.
+  final String? estFilamentId;
+  final String? estMaterial;
+  final double? estGrams;
+  final int? estMinutes;
+
+  /// Datos de la calculadora guardados con la respuesta, o null si no los hay
+  /// (misma regla que la web: alcanza con que haya gramos o minutos).
+  RespuestaCalc? get calc => (estGrams == null && estMinutes == null)
+      ? null
+      : RespuestaCalc(
+          filamentId: estFilamentId,
+          material: estMaterial,
+          grams: estGrams ?? 0,
+          printMinutes: estMinutes ?? 0,
+        );
+
+  /// La respuesta ya tiene con qué costear el pedido (calculadora o costo viejo).
+  bool get hasCostBasis => calc != null || unitCost != null;
 
   /// Pedido que se creó al confirmar (null si todavía no hay).
   final String? saleId;
@@ -157,6 +184,10 @@ class Consulta {
       status: InquiryStatus.parse(j['status']),
       unitPrice: money(j['unitPrice']),
       unitCost: money(j['unitCost']),
+      estFilamentId: strOrNull(j['estFilamentId']),
+      estMaterial: strOrNull(j['estMaterial']),
+      estGrams: money(j['estGrams']),
+      estMinutes: j['estMinutes'] == null ? null : numOf(j['estMinutes']).round(),
       saleId: strOrNull(j['saleId']),
       bulkPrice: money(j['bulkPrice']),
       bulkFrom: from,
@@ -308,11 +339,54 @@ Map<String, String> validateConsultaForm({
   return errors;
 }
 
+/// Lo que deja la calculadora al cotizar UNA pieza: filamento, gramos y
+/// minutos. El servidor saca de acá el costo (el operador nunca lo ve).
+class RespuestaCalc {
+  const RespuestaCalc({
+    required this.filamentId,
+    required this.material,
+    required this.grams,
+    required this.printMinutes,
+  });
+
+  final String? filamentId;
+  final String? material;
+
+  /// Por unidad.
+  final double grams;
+  final int printMinutes;
+
+  /// Lo mismo que exige `inquiryAnswerSchema`: un filamento (o material) y
+  /// gramos o minutos.
+  bool get isComplete => (filamentId != null || material != null) && (grams > 0 || printMinutes > 0);
+}
+
+/// Cómo se está tipeando el precio: por unidad o por toda la cantidad pedida
+/// ("el lote"). Al servidor siempre va el precio por unidad.
+enum PriceMode { unit, total }
+
+/// Precio por unidad a partir de lo tipeado ([typed]) según el modo.
+double unitPriceFrom(double typed, PriceMode mode, int quantity) =>
+    mode == PriceMode.total && quantity > 1 ? typed / quantity : typed;
+
+/// El mismo precio expresado en el otro modo (al tocar "Por unidad" / "Por
+/// las N"), redondeado a centavos como en la web.
+double convertTypedPrice(double typed, {required PriceMode to, required int quantity}) {
+  final value = to == PriceMode.total ? typed * quantity : typed / quantity;
+  return (value * 100).round() / 100;
+}
+
+/// Qué va en el campo cuando la calculadora devuelve un precio: cotiza UNA
+/// pieza, así que en modo total se multiplica por la cantidad.
+double calculatorPriceFor(double piecePrice, PriceMode mode, int quantity) =>
+    mode == PriceMode.total ? piecePrice * quantity : piecePrice;
+
 /// Respuesta del operador a una consulta.
 class RespuestaDraft {
   const RespuestaDraft({
     required this.unitPrice,
-    required this.unitCost,
+    this.calc,
+    this.legacyUnitCost,
     this.bulkPrice,
     this.bulkFrom,
     this.dimensions = '',
@@ -324,8 +398,12 @@ class RespuestaDraft {
 
   final double unitPrice;
 
-  /// Costo por unidad (interno; obligatorio: con esto se registra el pedido).
-  final double unitCost;
+  /// Datos de la calculadora (lo normal).
+  final RespuestaCalc? calc;
+
+  /// Costo de una respuesta vieja, cargado a mano en su momento: se reenvía
+  /// solo si no hay [calc] (igual que la web).
+  final double? legacyUnitCost;
   final double? bulkPrice;
   final int? bulkFrom;
   final String dimensions;
@@ -343,7 +421,11 @@ class RespuestaDraft {
   /// entera cada vez, así un dato que se borró no queda del intento anterior.
   Map<String, dynamic> toJson() => {
         'unitPrice': unitPrice,
-        'unitCost': unitCost,
+        'unitCost': calc != null ? null : legacyUnitCost,
+        'filamentId': calc?.filamentId,
+        'material': calc?.material,
+        'grams': calc?.grams,
+        'printMinutes': calc?.printMinutes,
         'bulkPrice': bulkPrice,
         'bulkFrom': bulkFrom,
         'dimensions': _opt(dimensions),
@@ -365,13 +447,18 @@ String? messageToSend({required String typed, required String? saved}) {
   return t;
 }
 
+/// Lo que dice el servidor cuando a la respuesta le falta el cálculo.
+const missingCalcMessage = 'Calculá el precio con la calculadora: así queda guardado el costo del pedido.';
+
 /// Validación de la respuesta (mismas reglas que `inquiryAnswerSchema`). Los
 /// números llegan como texto, tal cual se tipearon (formato argentino).
 Map<String, String> validateRespuestaForm({
   required String unitPrice,
-  required String unitCost,
+  required bool hasCostBasis,
   required String bulkPrice,
   required String bulkFrom,
+  PriceMode mode = PriceMode.unit,
+  int quantity = 1,
   String dimensions = '',
   String colors = '',
   String deliveryTime = '',
@@ -381,21 +468,17 @@ Map<String, String> validateRespuestaForm({
   final errors = <String, String>{};
   final price = parseArNumber(unitPrice);
   if (unitPrice.trim().isEmpty) {
-    errors['unitPrice'] = 'Poné el precio por unidad.';
+    errors['unitPrice'] =
+        mode == PriceMode.total && quantity > 1 ? 'Poné el precio por las $quantity.' : 'Poné el precio por unidad.';
   } else if (price == null) {
     errors['unitPrice'] = 'No entiendo ese número. Ejemplo: 12.500';
   } else if (price <= 0) {
     errors['unitPrice'] = 'El precio tiene que ser mayor a 0.';
   }
 
-  final cost = parseArNumber(unitCost);
-  if (unitCost.trim().isEmpty) {
-    errors['unitCost'] = 'Poné el costo por unidad (sale de la calculadora).';
-  } else if (cost == null) {
-    errors['unitCost'] = 'No entiendo ese número. Ejemplo: 4.800';
-  } else if (cost <= 0) {
-    errors['unitCost'] = 'El costo tiene que ser mayor a 0.';
-  }
+  // El costo ya no se tipea: sale de la calculadora (o quedó de una respuesta
+  // vieja). Mismo texto que el servidor (campo `calc`).
+  if (!hasCostBasis) errors['calc'] = missingCalcMessage;
 
   final hasBulkPrice = bulkPrice.trim().isNotEmpty;
   final hasBulkFrom = bulkFrom.trim().isNotEmpty;

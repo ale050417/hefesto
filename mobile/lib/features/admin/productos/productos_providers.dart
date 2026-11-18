@@ -2,11 +2,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/providers.dart';
+import '../../../core/widgets/photo_picker.dart';
 import 'productos_models.dart';
 
 // Sin reintentos automáticos: si falla, la pantalla muestra el error al
 // instante con su botón "Reintentar" (en vez de quedar cargando con backoff).
 Duration? _noRetry(int count, Object error) => null;
+
+/// Tope de fotos por producto (el mismo de la web; el servidor lo verifica).
+const maxProductImages = 5;
 
 /// Llamadas a `/api/v1/admin/productos`. Cada una lanza [ApiException] con el
 /// mensaje en castellano del servidor.
@@ -62,6 +66,23 @@ class ProductosRepo {
   Future<void> setPrimaryImage(String id, String imageId) async {
     await _api.sendJson('POST', '/admin/productos/$id/imagen-principal',
         body: {'imageId': imageId});
+  }
+
+  /// Sube UNA foto al producto (la primera queda como portada). [color]: a qué
+  /// color corresponde, si corresponde a alguno. Devuelve el id de la foto.
+  Future<String> addImage(String id, PickedPhoto photo, {String? color}) async {
+    final json = await _api.uploadImage(
+      '/admin/productos/$id/imagenes',
+      bytes: photo.bytes,
+      filename: photo.filename,
+      fields: {if (color != null && color.trim().isNotEmpty) 'color': color.trim()},
+    );
+    return '${json['id'] ?? ''}';
+  }
+
+  /// Borra una foto (si era la portada, pasa a serlo la siguiente).
+  Future<void> deleteImage(String id, String imageId) async {
+    await _api.sendJson('DELETE', '/admin/productos/$id/imagenes/$imageId');
   }
 }
 

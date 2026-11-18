@@ -11,6 +11,8 @@ import 'package:hefesto/core/api/api_client.dart';
 import 'package:hefesto/core/api/models.dart';
 import 'package:hefesto/core/providers.dart';
 import 'package:hefesto/core/theme/app_theme.dart';
+import 'package:hefesto/core/widgets/common.dart' show GoldButton;
+import 'package:hefesto/core/widgets/photo_picker.dart';
 import 'package:hefesto/features/admin/configuracion/banner_edit_screen.dart';
 import 'package:hefesto/features/admin/configuracion/config_api.dart';
 import 'package:hefesto/features/admin/configuracion/config_models.dart';
@@ -27,6 +29,7 @@ import 'package:hefesto/features/admin/configuracion/tienda_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'admin_configuracion_fixtures.dart';
+import 'support/photo_kit.dart';
 
 /// Dibuja cada pantalla de Configuración con datos de ejemplo (humo + capturas
 /// con SHOT_DIR=ruta_de_una_carpeta) y prueba lo importante: guardado por
@@ -88,6 +91,14 @@ class FakeConfigApi extends ConfigApi {
   @override
   Future<void> deleteBanner(String id) => _rec('banner_delete', id, null);
   @override
+  Future<String> createBanner(Map<String, dynamic> body) => _rec('banner_create', body, 'b-nuevo');
+  @override
+  Future<String> uploadImage(PickedPhoto photo, String kind) => _rec(
+        'image',
+        {'kind': kind, 'filename': photo.filename},
+        'https://abc.supabase.co/storage/v1/object/public/products/${kind == 'banner' ? 'banners/banner' : 'brand/$kind'}-1.webp',
+      );
+  @override
   Future<Map<String, dynamic>> invite({
     required String email,
     required String roleId,
@@ -111,6 +122,30 @@ class FakeConfigApi extends ConfigApi {
       _rec('role_update', {'id': id, 'name': name, 'permissions': permissions}, null);
   @override
   Future<void> deleteRole(String id) => _rec('role_delete', id, null);
+}
+
+/// Un banner que ya tiene imagen (y un encuadre fino, hecho en la web).
+const _bannerWithImage = BannerInfo(
+  id: 'b1',
+  title: 'Figuras de colección',
+  imageUrl: 'https://abc.supabase.co/storage/v1/object/public/products/banners/banner-0.webp',
+  position: '78% 0%',
+  ctaText: 'Ver productos',
+  ctaHref: '/productos',
+);
+
+/// Falla el PRIMER guardado del banner (la subida de la imagen sí anda).
+class _FlakyBannerApi extends FakeConfigApi {
+  bool _failed = false;
+
+  @override
+  Future<void> updateBanner(String id, Map<String, dynamic> body) async {
+    calls.add(('banner:$id', body));
+    if (!_failed) {
+      _failed = true;
+      throw ApiException('unavailable', 'No pudimos completar la operación.');
+    }
+  }
 }
 
 final _config = AdminConfig.fromJson(configJson());
@@ -201,6 +236,8 @@ Future<void> _type(WidgetTester tester, String label, String text) async {
 void main() {
   setUpAll(() async {
     await initializeDateFormatting('es_AR');
+    // Banners con imagen real: sin red en los tests (ver `photo_kit.dart`).
+    mockImageCachePlugins();
     // Tipografías de la marca e íconos de Material: con las de verdad, los
     // anchos son los reales (con la fuente de prueba, que es cuadrada, un
     // texto grande se "desborda" aunque en el celular entre de sobra).
@@ -526,7 +563,14 @@ void main() {
       expect(find.text('Figuras de colección'), findsOneWidget);
       expect(find.text('Visible'), findsOneWidget);
       expect(find.text('Oculto'), findsOneWidget);
-      expect(find.textContaining('se cambian desde la web'), findsOneWidget);
+      // Las imágenes se cambian desde el teléfono: ya no manda a la web
+      // (solo el ORDEN de los banners sigue siendo de la web).
+      expect(find.widgetWithText(OutlinedButton, 'Cambiar logo'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Nuevo banner'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Cambiar imagen de portada'), findsOneWidget);
+      expect(find.textContaining('desde la web'), findsOneWidget);
+      expect(find.text('El nuevo queda al final. El orden de los banners se cambia desde la web.'), findsOneWidget);
+      expect(find.textContaining('no se pueden subir'), findsNothing);
     });
 
     testWidgets('guarda por sección con todo lo de la pantalla', (tester) async {
@@ -586,7 +630,9 @@ void main() {
       final api = FakeConfigApi();
       await _show(tester, 'config_banner', BannerEditScreen(banner: _config.tienda.banners.first, canEdit: true),
           height: 1500, api: api);
-      expect(find.text('La imagen se cambia desde la web.'), findsOneWidget);
+      expect(find.textContaining('desde la web'), findsNothing);
+      // Este banner todavía no tiene imagen.
+      expect(find.widgetWithText(OutlinedButton, 'Elegir imagen'), findsOneWidget);
       expect(_saveEnabled(tester), isFalse);
       await _type(tester, 'Título', 'Nuevo título');
       await tester.tap(find.byType(Switch).first);
@@ -631,6 +677,221 @@ void main() {
       await _settle(tester);
       expect(api.calls.single, ('banner_delete', 'b1'));
       expect(find.text('abrir'), findsOneWidget, reason: 'volvió a la pantalla anterior');
+    });
+  });
+
+  group('Imágenes desde el teléfono', () {
+    const bannerUrl = 'https://abc.supabase.co/storage/v1/object/public/products/banners/banner-1.webp';
+
+    /// Toca [button], y en la hoja elige galería o cámara.
+    Future<void> pick(WidgetTester tester, String button, {bool camera = false}) async {
+      await tester.ensureVisible(find.widgetWithText(OutlinedButton, button));
+      await tester.pump();
+      await tester.tap(find.widgetWithText(OutlinedButton, button));
+      await _settle(tester);
+      expect(find.text('Elegir de la galería'), findsOneWidget);
+      expect(find.text('Sacar una foto'), findsOneWidget);
+      await tester.tap(find.text(camera ? 'Sacar una foto' : 'Elegir de la galería'));
+      await _settle(tester);
+    }
+
+    Future<FakeConfigApi> openTienda(WidgetTester tester, String name, FakePhotoSource source,
+        {bool canEdit = true, String? failWith}) async {
+      final api = FakeConfigApi(failWith: failWith);
+      await _show(tester, name, TiendaScreen(initial: _config.tienda, canEdit: canEdit),
+          height: 3400, api: api, overrides: [photoSourceProvider.overrideWithValue(source)]);
+      return api;
+    }
+
+    testWidgets('cambiar el logo: se elige de la galería, sube con kind=logo y queda puesto', (tester) async {
+      final source = FakePhotoSource(gallery: [fakePhoto('logo nuevo.png')]);
+      final api = await openTienda(tester, 'config_logo', source);
+      await pick(tester, 'Cambiar logo');
+      expect(source.galleryCalls, 1);
+      expect(api.calls.single.$1, 'image');
+      expect(api.calls.single.$2, {'kind': 'logo', 'filename': 'logo nuevo.png'});
+      expect(find.text('Logo actualizado'), findsOneWidget);
+      // No toca el formulario de apariencia: "Guardar" sigue apagado.
+      expect(_saveEnabled(tester), isFalse);
+    });
+
+    testWidgets('cambiar la imagen de portada con la cámara: sube con kind=hero', (tester) async {
+      final source = FakePhotoSource(camera: fakePhoto('portada.jpg'));
+      final api = await openTienda(tester, 'config_portada', source);
+      await pick(tester, 'Cambiar imagen de portada', camera: true);
+      expect(source.cameraCalls, 1);
+      expect(api.calls.single.$1, 'image');
+      expect(api.calls.single.$2, {'kind': 'hero', 'filename': 'portada.jpg'});
+      expect(find.text('Imagen de portada actualizada'), findsOneWidget);
+    });
+
+    testWidgets('una foto de más de 4 MB no se manda y se explica', (tester) async {
+      final heavy = PickedPhoto(bytes: Uint8List(maxUploadImageBytes + 1), filename: 'pesada.jpg');
+      final api = await openTienda(tester, 'config_logo_pesado', FakePhotoSource(gallery: [heavy]));
+      await pick(tester, 'Cambiar logo');
+      expect(api.calls, isEmpty);
+      expect(find.text('La foto pesa más de 4 MB. Probá con una más liviana.'), findsOneWidget);
+    });
+
+    testWidgets('otro formato, cancelar y permiso negado', (tester) async {
+      final source = FakePhotoSource(gallery: [fakePhoto('IMG_1.heic')]);
+      final api = await openTienda(tester, 'config_logo_formato', source);
+      await pick(tester, 'Cambiar logo');
+      expect(find.text('La foto tiene que ser JPG, PNG o WebP.'), findsOneWidget);
+      // Cancelar en la galería: nada cambia y se va el aviso anterior.
+      source.gallery = const [];
+      await pick(tester, 'Cambiar logo');
+      expect(find.text('La foto tiene que ser JPG, PNG o WebP.'), findsNothing);
+      source.failWith = Exception('photo_access_denied');
+      await pick(tester, 'Cambiar logo');
+      expect(find.textContaining('No pudimos abrir tus fotos'), findsOneWidget);
+      expect(api.calls, isEmpty);
+    });
+
+    testWidgets('si el servidor rechaza la imagen, se ve el motivo', (tester) async {
+      final api = await openTienda(tester, 'config_logo_rechazo', FakePhotoSource(),
+          failWith: 'Formato no permitido (JPG, PNG o WebP)');
+      await pick(tester, 'Cambiar imagen de portada');
+      expect(api.calls, hasLength(1));
+      expect(find.text('Formato no permitido (JPG, PNG o WebP)'), findsOneWidget);
+      expect(find.text('Imagen de portada actualizada'), findsNothing);
+    });
+
+    testWidgets('solo lectura: no hay botones para cambiar imágenes ni crear banners', (tester) async {
+      await openTienda(tester, 'config_tienda_solo_ver', FakePhotoSource(), canEdit: false);
+      expect(find.text('Cambiar logo'), findsNothing);
+      expect(find.text('Cambiar imagen de portada'), findsNothing);
+      expect(find.text('Nuevo banner'), findsNothing);
+    });
+
+    testWidgets('"Nuevo banner": imagen + título + botón; sube la imagen y lo crea visible', (tester) async {
+      final source = FakePhotoSource(gallery: [fakePhoto('promo.jpg')]);
+      final api = await openTienda(tester, 'config_banner_nuevo_camino', source);
+      await tester.ensureVisible(find.widgetWithText(OutlinedButton, 'Nuevo banner'));
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Nuevo banner'));
+      await _settle(tester);
+      expect(find.text('Nuevo banner'), findsWidgets);
+      expect(find.text('Sin imagen'), findsOneWidget);
+      expect(find.text('Eliminar banner'), findsNothing, reason: 'todavía no existe');
+      expect(tester.widget<GoldButton>(find.widgetWithText(GoldButton, 'Crear banner')).onPressed, isNull);
+
+      await pick(tester, 'Elegir imagen');
+      expect(find.text('Imagen nueva: se sube al guardar.'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, 'Cambiar imagen'), findsOneWidget);
+      expect(api.calls, isEmpty, reason: 'la imagen se sube recién al guardar');
+      await _type(tester, 'Título', 'Promo del Día del Niño');
+      await _type(tester, 'Subtítulo', '20% en figuras');
+      await _type(tester, 'Texto del botón', 'Ver figuras');
+      await _type(tester, 'A dónde lleva', '/productos?cat=figuras');
+      await tester.ensureVisible(find.text('Derecha'));
+      await tester.tap(find.text('Derecha'));
+      await tester.pump();
+      await tester.tap(find.widgetWithText(GoldButton, 'Crear banner'));
+      await _settle(tester);
+
+      expect(api.calls.map((c) => c.$1), ['image', 'banner_create']);
+      expect(api.calls.first.$2, {'kind': 'banner', 'filename': 'promo.jpg'});
+      expect(api.calls.last.$2, {
+        'title': 'Promo del Día del Niño',
+        'subtitle': '20% en figuras',
+        'ctaText': 'Ver figuras',
+        'ctaHref': '/productos?cat=figuras',
+        'align': 'right',
+        'isActive': true,
+        'imageUrl': bannerUrl,
+        'position': '50% 50%',
+      });
+      expect(find.text('Banner creado'), findsOneWidget);
+      expect(find.text('Tienda y apariencia'), findsOneWidget, reason: 'vuelve a Tienda');
+    });
+
+    testWidgets('banner nuevo: el título es obligatorio; sin imagen se crea igual y oculto si se apaga', (tester) async {
+      final api = FakeConfigApi();
+      await _show(tester, 'config_banner_nuevo', const BannerEditScreen(canEdit: true), height: 1700, api: api);
+      await _type(tester, 'Subtítulo', 'Solo texto');
+      await tester.tap(find.widgetWithText(GoldButton, 'Crear banner'));
+      await _settle(tester);
+      expect(api.calls, isEmpty);
+      expect(find.text('Ingresá un título.'), findsOneWidget);
+
+      await _type(tester, 'Título', 'Envíos a todo el país');
+      await tester.tap(find.byType(Switch).first);
+      await tester.pump();
+      await tester.tap(find.widgetWithText(GoldButton, 'Crear banner'));
+      await _settle(tester);
+      final body = api.calls.single.$2! as Map<String, dynamic>;
+      expect(api.calls.single.$1, 'banner_create');
+      expect(body['title'], 'Envíos a todo el país');
+      expect(body['isActive'], false);
+      expect(body.containsKey('imageUrl'), isFalse);
+      expect(body['align'], 'left');
+    });
+
+    testWidgets('cambiar la imagen de un banner: sube y manda su dirección; no la vuelve a subir', (tester) async {
+      final api = FakeConfigApi();
+      await _show(tester, 'config_banner_imagen',
+          BannerEditScreen(banner: _bannerWithImage, canEdit: true),
+          height: 1700,
+          api: api,
+          overrides: [photoSourceProvider.overrideWithValue(FakePhotoSource(camera: fakePhoto('nueva.jpg')))]);
+      expect(_saveEnabled(tester), isFalse);
+      await pick(tester, 'Cambiar imagen', camera: true);
+      expect(_saveEnabled(tester), isTrue, reason: 'elegir otra imagen es un cambio');
+      await tester.tap(_saveButton());
+      await _settle(tester);
+      expect(api.calls.map((c) => c.$1), ['image', 'banner:b1']);
+      final body = api.calls.last.$2! as Map<String, dynamic>;
+      expect(body['imageUrl'], bannerUrl);
+      expect(body.containsKey('position'), isFalse, reason: 'el encuadre no cambió');
+      expect(find.text('Banner actualizado'), findsOneWidget);
+      expect(_saveEnabled(tester), isFalse);
+
+      // Otro cambio después: la imagen ya quedó, no se sube ni se manda de nuevo.
+      await _type(tester, 'Título', 'Otro título');
+      await tester.tap(_saveButton());
+      await _settle(tester);
+      expect(api.calls.map((c) => c.$1), ['image', 'banner:b1', 'banner:b1']);
+      expect((api.calls.last.$2! as Map<String, dynamic>).containsKey('imageUrl'), isFalse);
+    });
+
+    testWidgets('si falla al guardar después de subir, reintentar no sube la imagen otra vez', (tester) async {
+      final api = _FlakyBannerApi();
+      await _show(tester, 'config_banner_reintento',
+          BannerEditScreen(banner: _bannerWithImage, canEdit: true),
+          height: 1700,
+          api: api,
+          overrides: [photoSourceProvider.overrideWithValue(FakePhotoSource())]);
+      await pick(tester, 'Cambiar imagen');
+      await tester.tap(_saveButton());
+      await _settle(tester);
+      expect(find.text('No pudimos completar la operación.'), findsOneWidget);
+      await tester.tap(_saveButton());
+      await _settle(tester);
+      expect(api.calls.map((c) => c.$1), ['image', 'banner:b1', 'banner:b1']);
+      expect(find.text('Banner actualizado'), findsOneWidget);
+    });
+
+    testWidgets('encuadre: elegir "Arriba" manda position; el de la web se conserva si no se toca', (tester) async {
+      final api = FakeConfigApi();
+      await _show(tester, 'config_banner_encuadre',
+          BannerEditScreen(banner: _bannerWithImage, canEdit: true),
+          height: 1700, api: api);
+      for (final label in ['Arriba', 'Medio', 'Abajo']) {
+        expect(find.text(label), findsOneWidget);
+      }
+      // El encuadre de la web ("78% 0%") no es ninguno de los tres: no hay
+      // ninguno marcado y, sin tocarlo, no se manda.
+      final frames = tester.widget<SegmentedButton<String>>(
+        find.ancestor(of: find.text('Arriba'), matching: find.byType(SegmentedButton<String>)),
+      );
+      expect(frames.selected, isEmpty);
+      await tester.tap(find.text('Arriba'));
+      await tester.pump();
+      await tester.tap(_saveButton());
+      await _settle(tester);
+      final body = api.calls.single.$2! as Map<String, dynamic>;
+      expect(body['position'], '50% 0%');
+      expect(body.containsKey('imageUrl'), isFalse);
     });
   });
 

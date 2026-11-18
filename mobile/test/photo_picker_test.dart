@@ -65,7 +65,28 @@ void main() {
       expect(imageFormData(tinyPng, 'a.webp').files.single.value.contentType.toString(), 'image/webp');
     });
 
-    test('otro formato o más de 8 MB se rechazan antes de ir a la red', () async {
+    test('campos de texto al lado de la foto (kind, color): van en el mismo multipart', () {
+      final form = imageFormData(tinyPng, 'banner.jpg', fields: {'kind': 'banner'});
+      expect({for (final f in form.fields) f.key: f.value}, {'kind': 'banner'});
+      expect(form.files.single.key, 'file');
+      final product = imageFormData(tinyPng, 'rojo.webp', fields: {'color': 'Rojo fuego'});
+      expect({for (final f in product.fields) f.key: f.value}, {'color': 'Rojo fuego'});
+      // Con campos también se valida el formato y el peso.
+      expect(() => imageFormData(tinyPng, 'x.gif', fields: {'kind': 'logo'}), throwsA(isA<ApiException>()));
+    });
+
+    test('el tope es 4 MB (el hosting corta los pedidos de más de ~4,5 MB)', () {
+      expect(maxUploadImageBytes, 4 * 1024 * 1024);
+      expect(photoProblem(fakePhoto('a.jpg')), isNull);
+      expect(photoProblem(fakePhoto('a.heic')), 'La foto tiene que ser JPG, PNG o WebP.');
+      expect(
+        photoProblem(PickedPhoto(bytes: Uint8List(maxUploadImageBytes + 1), filename: 'a.jpg')),
+        'La foto pesa más de 4 MB. Probá con una más liviana.',
+      );
+      expect(photoProblem(PickedPhoto(bytes: Uint8List(maxUploadImageBytes), filename: 'a.png')), isNull);
+    });
+
+    test('otro formato o más de 4 MB se rechazan antes de ir a la red', () async {
       expect(
         () => imageFormData(tinyPng, 'foto.heic'),
         throwsA(isA<ApiException>().having((e) => e.message, 'mensaje', contains('JPG, PNG o WebP'))),
@@ -73,7 +94,7 @@ void main() {
       final heavy = Uint8List(maxUploadImageBytes + 1);
       expect(
         () => imageFormData(heavy, 'foto.jpg'),
-        throwsA(isA<ApiException>().having((e) => e.message, 'mensaje', contains('8 MB'))),
+        throwsA(isA<ApiException>().having((e) => e.message, 'mensaje', contains('4 MB'))),
       );
       // Justo en el tope entra.
       expect(imageFormData(Uint8List(maxUploadImageBytes), 'foto.jpg').files, hasLength(1));
@@ -169,7 +190,7 @@ void main() {
       expect(source.cameraCalls, 0);
     });
 
-    testWidgets('no suma formatos que el servidor rechaza ni fotos de más de 8 MB', (tester) async {
+    testWidgets('no suma formatos que el servidor rechaza ni fotos de más de 4 MB', (tester) async {
       final source = FakePhotoSource(gallery: [
         fakePhoto('bien.jpg'),
         fakePhoto('IMG_1.heic'),
@@ -180,7 +201,7 @@ void main() {
       await settle(tester);
       expect(host.photos.map((p) => p.filename), ['bien.jpg']);
       expect(find.textContaining('tiene que ser JPG, PNG o WebP'), findsOneWidget);
-      expect(find.textContaining('pesa más de 8 MB'), findsOneWidget);
+      expect(find.textContaining('pesa más de 4 MB'), findsOneWidget);
     });
 
     testWidgets('cancelar no cambia nada; el permiso negado se explica', (tester) async {

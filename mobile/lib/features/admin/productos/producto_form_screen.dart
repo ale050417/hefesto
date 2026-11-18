@@ -17,8 +17,10 @@ import 'productos_providers.dart';
 /// vuelve con el id del producto. En la edición solo se mandan los campos que
 /// cambiaron y el botón "Guardar" está apagado si no hay cambios.
 ///
-/// Las fotos, los colores y los tamaños NO se editan acá (se cargan desde el
-/// panel web). El alta nace como borrador: publicar exige fotos.
+/// Las fotos se manejan en la ficha del producto (`ProductGallery`): hace falta
+/// que el producto exista para subirlas. Los colores y los tamaños NO se editan
+/// acá (se cargan desde el panel web). El alta nace como borrador: publicar
+/// exige fotos.
 class AdminProductFormScreen extends ConsumerStatefulWidget {
   const AdminProductFormScreen({super.key, this.product});
   final AdminProductDetail? product;
@@ -271,7 +273,7 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
         context,
         _isEdit
             ? 'Cambios guardados'
-            : 'Producto creado como borrador. Cargale las fotos desde el panel web para publicarlo.',
+            : 'Producto creado como borrador. Sumale las fotos para publicarlo.',
       );
       Navigator.of(context).pop(id);
     } on ApiException catch (e) {
@@ -345,8 +347,8 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'El producto se crea como borrador. Las fotos se cargan desde el '
-                                'panel web; cuando tenga fotos, lo publicás desde acá.',
+                                'El producto se crea como borrador. Al guardarlo se abre su ficha: '
+                                'ahí le sumás las fotos y lo publicás.',
                                 style: TextStyle(fontSize: 12.5, height: 1.4, color: c.textDim),
                               ),
                             ),

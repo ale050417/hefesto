@@ -11,6 +11,7 @@
 // Con SHOT_DIR=carpeta guarda una captura de cada estado para mirarlo.
 
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -18,6 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hefesto/core/api/api_client.dart';
 import 'package:hefesto/core/theme/app_theme.dart';
 import 'package:hefesto/core/widgets/common.dart';
+import 'package:hefesto/core/widgets/photo_picker.dart';
 import 'package:hefesto/features/admin/categorias/categoria_form_screen.dart';
 import 'package:hefesto/features/admin/categorias/categorias_models.dart';
 import 'package:hefesto/features/admin/categorias/categorias_providers.dart';
@@ -29,6 +31,7 @@ import 'package:hefesto/features/admin/productos/productos_providers.dart';
 import 'package:hefesto/features/admin/productos/productos_screen.dart';
 
 import 'support/device_kit.dart';
+import 'support/photo_kit.dart';
 
 // ---------------------------------------------------------------------------
 // Datos de ejemplo (misma forma que manda el servidor: ver admin-api.ts)
@@ -382,6 +385,14 @@ class FakeProductosRepo extends ProductosRepo {
   @override
   Future<void> setPrimaryImage(String id, String imageId) => _run('primary:$id:$imageId');
   @override
+  Future<String> addImage(String id, PickedPhoto photo, {String? color}) async {
+    await _run('image:$id:${photo.filename}:${color ?? '-'}');
+    return 'img-${calls.length}';
+  }
+
+  @override
+  Future<void> deleteImage(String id, String imageId) => _run('image_delete:$id:$imageId');
+  @override
   Future<void> patch(String id, Map<String, dynamic> body) async {
     lastPatch = body;
     await _run('patch:$id');
@@ -432,12 +443,14 @@ List<Override> _prod({
   AdminProductDetail? detail,
   ProductOptions? options,
   FakeProductosRepo? repo,
+  PhotoSource? photos,
 }) =>
     [
       adminProductsProvider.overrideWith((ref, f) async => page ?? _page),
       adminProductProvider.overrideWith((ref, id) async => detail ?? _detail),
       adminProductOptionsProvider.overrideWith((ref) async => options ?? _options),
       productosRepoProvider.overrideWithValue(repo ?? FakeProductosRepo()),
+      photoSourceProvider.overrideWithValue(photos ?? FakePhotoSource()),
     ];
 
 List<Override> _catOv({AdminCategoriesData? data, FakeCategoriasRepo? repo}) => [
@@ -799,9 +812,13 @@ void main() {
   // =========================================================================
   group('Productos · ficha', () {
     Future<void> openDetail(WidgetTester tester, Phone phone,
-        {AdminProductDetail? detail, FakeProductosRepo? repo, String row = 'Mate Mario', double textScale = 1}) async {
+        {AdminProductDetail? detail,
+        FakeProductosRepo? repo,
+        PhotoSource? photos,
+        String row = 'Mate Mario',
+        double textScale = 1}) async {
       await pumpPhone(tester, const AdminProductosScreen(),
-          phone: phone, me: _admin, textScale: textScale, overrides: _prod(detail: detail, repo: repo));
+          phone: phone, me: _admin, textScale: textScale, overrides: _prod(detail: detail, repo: repo, photos: photos));
       await _reveal(tester, find.text(row), _mainList());
       await _tap(tester, find.text(row), frames: 8);
       expect(find.byType(AdminProductDetailScreen), findsOneWidget);
@@ -860,10 +877,10 @@ void main() {
 
         final repo = FakeProductosRepo();
         await openDetail(tester, phone, detail: _draftDetail, repo: repo, row: 'Cartel Personalizado');
-        // La app no sube fotos: tiene que decirlo y no ofrecer un botón que no existe.
-        expect(find.textContaining('Se suben desde el panel web'), findsOneWidget);
-        expect(find.textContaining('Subir'), findsNothing);
-        expect(find.textContaining('Agregar foto'), findsNothing);
+        // Las fotos se suman desde acá: los dos botones, a la vista de entrada.
+        expect(find.textContaining('Se suben desde el panel web'), findsNothing);
+        expectReachable(tester, find.widgetWithText(OutlinedButton, 'Sumar fotos'), what: 'el botón Sumar fotos');
+        expectReachable(tester, find.widgetWithText(OutlinedButton, 'Sacar foto'), what: 'el botón Sacar foto');
         await shoot(tester, 'ficha_borrador');
         await _reveal(tester, find.text('Publicar'), detailScroll());
         await _tap(tester, find.text('Publicar'));
@@ -871,6 +888,83 @@ void main() {
         expect(find.textContaining('No se puede publicar un producto sin fotos'), findsOneWidget);
         expectNoLayoutErrors(tester);
         await shoot(tester, 'ficha_borrador_aviso');
+      });
+
+      testWidgets('fotos: sumar eligiendo el color, portada y eliminar (${phone.name})', (tester) async {
+        final repo = FakeProductosRepo();
+        final source = FakePhotoSource(gallery: [fakePhoto('uno.jpg'), fakePhoto('dos.jpg')]);
+        await openDetail(tester, phone, repo: repo, photos: source);
+        final add = find.widgetWithText(OutlinedButton, 'Sumar fotos');
+        await _reveal(tester, add, detailScroll());
+        expectReachable(tester, add, what: 'el botón Sumar fotos');
+        expectReachable(tester, find.widgetWithText(OutlinedButton, 'Sacar foto'), what: 'el botón Sacar foto');
+        expect(find.text('3 de 5 fotos.'), findsOneWidget);
+        await shoot(tester, 'ficha_fotos');
+        await _reveal(tester, find.widgetWithText(OutlinedButton, 'Eliminar foto'), detailScroll());
+        expectReachable(tester, find.widgetWithText(OutlinedButton, 'Eliminar foto'), what: 'el botón Eliminar foto');
+        await _reveal(tester, add, detailScroll());
+
+        // Tiene tres colores: pregunta de cuál son las fotos.
+        await _tap(tester, add, frames: 8);
+        _expectSheetOk(tester, '¿De qué color son las fotos?');
+        for (final o in ['De ninguno en particular', 'Rojo', 'Negro', 'Verde militar']) {
+          expectReachable(tester, _inSheet(find.text(o)), what: 'la opción "$o"');
+        }
+        await shoot(tester, 'ficha_fotos_color');
+        await _tap(tester, _inSheet(find.text('Negro')), frames: 8);
+        expectNoLayoutErrors(tester);
+        expect(repo.calls, ['image:p1:uno.jpg:Negro', 'image:p1:dos.jpg:Negro']);
+        expect(find.text('2 fotos agregadas'), findsOneWidget);
+        await shoot(tester, 'ficha_fotos_agregadas');
+
+        // Elegir la segunda miniatura: aparece "Usar como portada" al lado de "Eliminar foto".
+        await _reveal(tester, find.byType(NetImage).at(2), detailScroll());
+        await _tap(tester, find.byType(NetImage).at(2));
+        final cover = find.widgetWithText(OutlinedButton, 'Usar como portada');
+        await _reveal(tester, cover, detailScroll());
+        expectReachable(tester, cover, what: 'el botón Usar como portada');
+        await shoot(tester, 'ficha_fotos_segunda');
+
+        await _reveal(tester, find.widgetWithText(OutlinedButton, 'Eliminar foto'), detailScroll());
+        await _tap(tester, find.widgetWithText(OutlinedButton, 'Eliminar foto'));
+        expectNoLayoutErrors(tester, 'con la confirmación abierta');
+        final dialog = find.byType(AlertDialog);
+        expect(find.descendant(of: dialog, matching: find.text('¿Eliminar esta foto?')), findsOneWidget);
+        expectReachable(tester, find.descendant(of: dialog, matching: find.text('Eliminar foto')), what: 'Eliminar foto');
+        expectReachable(tester, find.descendant(of: dialog, matching: find.text('Cancelar')), what: 'Cancelar');
+        await shoot(tester, 'ficha_fotos_eliminar');
+        await _tap(tester, find.descendant(of: dialog, matching: find.text('Eliminar foto')), frames: 8);
+        expectNoLayoutErrors(tester);
+        expect(repo.calls.last, 'image_delete:p1:i2');
+        expect(find.text('Foto eliminada'), findsOneWidget);
+      });
+
+      testWidgets('fotos: tope, foto pesada y rechazo del servidor (${phone.name})', (tester) async {
+        // 8 fotos (más que el tope): no deja sumar y lo explica.
+        await openDetail(tester, phone, detail: _extremeDetail, row: _longName);
+        final add = find.widgetWithText(OutlinedButton, 'Sumar fotos');
+        await _reveal(tester, add, detailScroll());
+        expect(tester.widget<OutlinedButton>(add).onPressed, isNull);
+        expectReachable(tester, find.textContaining('Llegaste al tope de 5 fotos'), what: 'el aviso del tope');
+        await shoot(tester, 'ficha_fotos_tope');
+
+        // Borrador sin fotos: una pesada no se manda; el rechazo del servidor se lee entero.
+        final repo = FakeProductosRepo(failWith: _serverCostError);
+        final source = FakePhotoSource(
+          gallery: [PickedPhoto(bytes: Uint8List(maxUploadImageBytes + 1), filename: 'pesada.jpg')],
+          camera: fakePhoto('foto.jpg'),
+        );
+        await openDetail(tester, phone, detail: _draftDetail, repo: repo, photos: source, row: 'Cartel Personalizado');
+        await _tap(tester, find.widgetWithText(OutlinedButton, 'Sumar fotos'), frames: 8);
+        expectNoLayoutErrors(tester);
+        expect(repo.calls, isEmpty);
+        expectReachable(tester, find.textContaining('pesa más de 4 MB'), what: 'el aviso del peso');
+        await shoot(tester, 'ficha_fotos_pesada');
+        await _tap(tester, find.widgetWithText(OutlinedButton, 'Sacar foto'), frames: 8);
+        expectNoLayoutErrors(tester);
+        expect(repo.calls, ['image:p3:foto.jpg:-']);
+        expectReachable(tester, find.text(_serverCostError), what: 'el rechazo del servidor');
+        await shoot(tester, 'ficha_fotos_rechazo');
       });
 
       testWidgets('archivar y eliminar desde la ficha (${phone.name})', (tester) async {
@@ -967,8 +1061,9 @@ void main() {
         await openCreate(tester, phone);
         expectReachable(tester, find.text('Nuevo producto'), what: 'el título');
         expectReachable(tester, find.byType(GoldButton), what: 'el botón "Crear producto"');
-        // La app no sube fotos: el alta lo dice de entrada.
-        expectReachable(tester, find.textContaining('Las fotos se cargan desde el'), what: 'el aviso de las fotos');
+        // Las fotos van después, en la ficha: el alta lo dice de entrada.
+        expectReachable(tester, find.textContaining('ahí le sumás las fotos'), what: 'el aviso de las fotos');
+        expect(find.textContaining('panel web'), findsNothing);
         await shoot(tester, 'form_alta');
         await scrollToEnd(tester, scrollable: formScroll());
         expectReachable(tester, find.text('Destacado'), what: 'el interruptor "Destacado"');
@@ -1575,6 +1670,38 @@ void main() {
       await _tap(tester, find.text('Eliminar'));
       _expectDialogOk(tester, confirm: 'Eliminar para siempre');
       await shoot(tester, 'grande_ficha_dialogo_eliminar');
+    });
+
+    testWidgets('ficha: fotos (botones, hoja del color y confirmación de eliminar)', (tester) async {
+      final repo = FakeProductosRepo();
+      await pumpPhone(tester, const AdminProductosScreen(),
+          phone: phone, me: _admin, textScale: big, overrides: _prod(repo: repo, photos: FakePhotoSource()));
+      await _tap(tester, find.text('Mate Mario'), frames: 8);
+      final list = find.descendant(of: find.byType(AdminProductDetailScreen), matching: find.byType(Scrollable)).first;
+      final add = find.widgetWithText(OutlinedButton, 'Sumar fotos');
+      await _reveal(tester, add, list);
+      expectReachable(tester, add, what: 'el botón Sumar fotos con letra grande');
+      // Con letra grande los dos botones no entran lado a lado: el segundo baja.
+      await _reveal(tester, find.widgetWithText(OutlinedButton, 'Sacar foto'), list);
+      expectReachable(tester, find.widgetWithText(OutlinedButton, 'Sacar foto'), what: 'el botón Sacar foto con letra grande');
+      await shoot(tester, 'grande_ficha_fotos');
+      await _reveal(tester, add, list);
+      await _tap(tester, add, frames: 8);
+      _expectSheetOk(tester, '¿De qué color son las fotos?');
+      await shoot(tester, 'grande_ficha_fotos_color');
+      await _tap(tester, _inSheet(find.text('De ninguno en particular')), frames: 8);
+      expectNoLayoutErrors(tester);
+      expect(repo.calls, ['image:p1:uno.jpg:-', 'image:p1:dos.jpg:-']);
+
+      await _reveal(tester, find.widgetWithText(OutlinedButton, 'Eliminar foto'), list);
+      await _tap(tester, find.widgetWithText(OutlinedButton, 'Eliminar foto'));
+      expectNoLayoutErrors(tester, 'con la confirmación abierta');
+      final dialog = find.byType(AlertDialog);
+      expectReachable(tester, find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Eliminar foto')),
+          what: 'Eliminar foto con letra grande');
+      expectReachable(tester, find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Cancelar')),
+          what: 'Cancelar con letra grande');
+      await shoot(tester, 'grande_ficha_fotos_eliminar');
     });
 
     testWidgets('formulario de producto: teclado en primer y último campo, hojas y descartar', (tester) async {

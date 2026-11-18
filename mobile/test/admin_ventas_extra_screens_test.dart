@@ -22,6 +22,8 @@ import 'package:hefesto/features/admin/ventas_extra/ventas_extra_api.dart';
 import 'package:hefesto/features/admin/ventas_extra/ventas_extra_models.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'support/sales_kit.dart';
+
 /// Dibuja la carga / edición / baja de ventas con datos de ejemplo, a 360dp de
 /// ancho (el celu más angosto) y con fuente grande. Con SHOT_DIR=ruta guarda un
 /// PNG de cada pantalla para revisarlas a ojo.
@@ -234,6 +236,8 @@ Future<void> _open(
     ProviderScope(
       overrides: [
         homeProvider.overrideWith((ref) async => HomeData.fromJson({})),
+        // Ventas arranca en el mes actual: "hoy" fijo en octubre de 2026.
+        ...salesKitOverrides(),
         meProvider.overrideWith((ref) async => me ?? _me()),
         ventasExtraApiProvider.overrideWithValue(api ?? _FakeApi()),
         saleFormDataProvider.overrideWith((ref) async => _formData),

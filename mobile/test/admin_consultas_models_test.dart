@@ -24,6 +24,10 @@ Map<String, dynamic> inquiryJson(
   String status = 'pending',
   Object? unitPrice,
   Object? unitCost,
+  String? estFilamentId,
+  String? estMaterial,
+  Object? estGrams,
+  int? estMinutes,
   String? saleId,
   Object? bulkPrice,
   int? bulkFrom,
@@ -51,6 +55,10 @@ Map<String, dynamic> inquiryJson(
       'status': status,
       'unitPrice': unitPrice,
       'unitCost': unitCost,
+      'estFilamentId': estFilamentId,
+      'estMaterial': estMaterial,
+      'estGrams': estGrams,
+      'estMinutes': estMinutes,
       'saleId': saleId,
       'bulkPrice': bulkPrice,
       'bulkFrom': bulkFrom,
@@ -67,9 +75,12 @@ Map<String, dynamic> inquiryJson(
       'confirmedAt': confirmedAt,
     };
 
-/// La misma consulta ya respondida por el operador.
+/// La misma consulta ya respondida por el operador. Por defecto es una
+/// respuesta VIEJA (costo cargado a mano, `unitCost`); con [withCalc] es una
+/// de las de ahora: el costo sale de los datos de la calculadora.
 Map<String, dynamic> answeredJson(
   String id, {
+  bool withCalc = false,
   String status = 'answered',
   int quantity = 12,
   String? customerPhone = '+54 9 11 2345-6789',
@@ -87,7 +98,11 @@ Map<String, dynamic> answeredJson(
       saleId: saleId,
       files: files,
       unitPrice: 2500,
-      unitCost: 900,
+      unitCost: withCalc ? null : 900,
+      estFilamentId: withCalc ? '11111111-1111-4111-8111-111111111111' : null,
+      estMaterial: withCalc ? 'PLA' : null,
+      estGrams: withCalc ? 18.5 : null,
+      estMinutes: withCalc ? 95 : null,
       bulkPrice: 2000,
       bulkFrom: 50,
       dimensions: '5 × 5 cm',
@@ -324,11 +339,17 @@ void main() {
       expect(minimal.toJson(), {'customerName': 'Pedro', 'title': 'Maceta', 'description': '', 'quantity': 1});
     });
 
-    test('respuesta: sin mensaje va null (lo arma el servidor)', () {
-      const draft = RespuestaDraft(unitPrice: 2500, unitCost: 900, deliveryTime: ' 5 días ', note: '  ');
+    const calc = RespuestaCalc(filamentId: 'f1', material: 'PLA', grams: 18.5, printMinutes: 95);
+
+    test('respuesta con la calculadora: van filamento, gramos y minutos, y el costo va null', () {
+      const draft = RespuestaDraft(unitPrice: 2500, calc: calc, legacyUnitCost: 900, deliveryTime: ' 5 días ', note: '  ');
       expect(draft.toJson(), {
         'unitPrice': 2500,
-        'unitCost': 900,
+        'unitCost': null,
+        'filamentId': 'f1',
+        'material': 'PLA',
+        'grams': 18.5,
+        'printMinutes': 95,
         'bulkPrice': null,
         'bulkFrom': null,
         'dimensions': null,
@@ -339,10 +360,20 @@ void main() {
       });
     });
 
+    test('respuesta vieja sin recalcular: se reenvía su costo y nada de la calculadora', () {
+      const draft = RespuestaDraft(unitPrice: 3000, legacyUnitCost: 900);
+      final json = draft.toJson();
+      expect(json['unitCost'], 900);
+      for (final k in ['filamentId', 'material', 'grams', 'printMinutes']) {
+        expect(json.containsKey(k), isTrue);
+        expect(json[k], isNull);
+      }
+    });
+
     test('respuesta completa con mensaje a mano', () {
       const draft = RespuestaDraft(
         unitPrice: 2500,
-        unitCost: 900,
+        calc: calc,
         bulkPrice: 2000,
         bulkFrom: 50,
         dimensions: '5 × 5 cm',
@@ -355,6 +386,13 @@ void main() {
       expect(json['bulkPrice'], 2000);
       expect(json['bulkFrom'], 50);
       expect(json['message'], 'Hola Carla, sale 2500.');
+    });
+
+    test('datos de la calculadora: completos solo con filamento o material y gramos o minutos', () {
+      expect(calc.isComplete, isTrue);
+      expect(const RespuestaCalc(filamentId: null, material: 'PLA', grams: 0, printMinutes: 30).isComplete, isTrue);
+      expect(const RespuestaCalc(filamentId: 'f1', material: null, grams: 0, printMinutes: 0).isComplete, isFalse);
+      expect(const RespuestaCalc(filamentId: null, material: null, grams: 10, printMinutes: 0).isComplete, isFalse);
     });
 
     test('mensaje: solo se manda si el operador lo escribió o lo cambió', () {
@@ -412,27 +450,94 @@ void main() {
     });
   });
 
+  group('precio por unidad o por el total', () {
+    test('al servidor va siempre el precio por unidad', () {
+      expect(unitPriceFrom(2500, PriceMode.unit, 12), 2500);
+      expect(unitPriceFrom(30000, PriceMode.total, 12), 2500);
+      // Una sola unidad: el total ES el precio por unidad.
+      expect(unitPriceFrom(2500, PriceMode.total, 1), 2500);
+    });
+
+    test('cambiar de modo convierte lo tipeado (a centavos)', () {
+      expect(convertTypedPrice(2500, to: PriceMode.total, quantity: 12), 30000);
+      expect(convertTypedPrice(30000, to: PriceMode.unit, quantity: 12), 2500);
+      expect(convertTypedPrice(1000, to: PriceMode.unit, quantity: 3), 333.33);
+    });
+
+    test('la calculadora cotiza UNA pieza: en modo total se multiplica', () {
+      expect(calculatorPriceFor(2900, PriceMode.unit, 12), 2900);
+      expect(calculatorPriceFor(2900, PriceMode.total, 12), 34800);
+    });
+  });
+
+  group('datos de la calculadora en la consulta', () {
+    test('respuesta de ahora: trae filamento, material, gramos y minutos por unidad', () {
+      final q = Consulta.fromJson(answeredJson('k', withCalc: true));
+      expect(q.unitCost, isNull);
+      expect(q.estFilamentId, '11111111-1111-4111-8111-111111111111');
+      expect(q.estMaterial, 'PLA');
+      expect(q.estGrams, 18.5);
+      expect(q.estMinutes, 95);
+      expect(q.calc!.grams, 18.5);
+      expect(q.calc!.printMinutes, 95);
+      expect(q.hasCostBasis, isTrue);
+    });
+
+    test('respuesta vieja: solo el costo a mano (sin datos de calculadora)', () {
+      final q = Consulta.fromJson(answeredJson('v'));
+      expect(q.calc, isNull);
+      expect(q.unitCost, 900);
+      expect(q.hasCostBasis, isTrue);
+    });
+
+    test('sin responder (o servidor viejo sin esos campos): nada', () {
+      final q = Consulta.fromJson(inquiryJson('p'));
+      expect(q.calc, isNull);
+      expect(q.hasCostBasis, isFalse);
+      final old = Consulta.fromJson(inquiryJson('p')..removeWhere((k, _) => k.startsWith('est')));
+      expect(old.calc, isNull);
+    });
+
+    test('gramos como texto (numeric de la base) y solo minutos', () {
+      final q = Consulta.fromJson(inquiryJson('t', estMaterial: 'PETG', estGrams: '12.50'));
+      expect(q.calc!.grams, 12.5);
+      expect(q.calc!.printMinutes, 0);
+      final m = Consulta.fromJson(inquiryJson('t', estMaterial: 'PETG', estMinutes: 40));
+      expect(m.calc!.grams, 0);
+      expect(m.calc!.printMinutes, 40);
+    });
+  });
+
   group('validateRespuestaForm', () {
     Map<String, String> v({
       String unit = '2.500',
-      String cost = '900',
+      bool basis = true,
       String bulk = '',
       String from = '',
       String note = '',
+      PriceMode mode = PriceMode.unit,
+      int quantity = 1,
     }) =>
-        validateRespuestaForm(unitPrice: unit, unitCost: cost, bulkPrice: bulk, bulkFrom: from, note: note);
+        validateRespuestaForm(
+          unitPrice: unit,
+          hasCostBasis: basis,
+          bulkPrice: bulk,
+          bulkFrom: from,
+          note: note,
+          mode: mode,
+          quantity: quantity,
+        );
 
-    test('el costo por unidad es obligatorio y mayor a 0', () {
-      expect(v(cost: '')['unitCost'], 'Poné el costo por unidad (sale de la calculadora).');
-      expect(v(cost: '0')['unitCost'], 'El costo tiene que ser mayor a 0.');
-      expect(v(cost: 'x').keys, {'unitCost'});
-      expect(v(cost: '1.480,50'), isEmpty);
-      expect(v(unit: '', cost: '').keys, {'unitPrice', 'unitCost'});
+    test('sin calcular (ni costo viejo) pide la calculadora, con el texto del servidor', () {
+      expect(v(basis: false)['calc'], 'Calculá el precio con la calculadora: así queda guardado el costo del pedido.');
+      expect(v(basis: false).keys, {'calc'});
+      expect(v(unit: '', basis: false).keys, {'unitPrice', 'calc'});
     });
 
-    test('el precio por unidad es obligatorio y mayor a 0', () {
+    test('el precio es obligatorio y mayor a 0', () {
       expect(v(), isEmpty);
       expect(v(unit: '')['unitPrice'], 'Poné el precio por unidad.');
+      expect(v(unit: '', mode: PriceMode.total, quantity: 12)['unitPrice'], 'Poné el precio por las 12.');
       expect(v(unit: '0')['unitPrice'], 'El precio tiene que ser mayor a 0.');
       expect(v(unit: 'abc').keys, {'unitPrice'});
       expect(v(unit: '1.250,50'), isEmpty);
@@ -452,7 +557,7 @@ void main() {
       expect(
         validateRespuestaForm(
           unitPrice: '1',
-          unitCost: '1',
+          hasCostBasis: true,
           bulkPrice: '',
           bulkFrom: '',
           dimensions: 'd' * 301,

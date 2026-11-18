@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
+import '../../../core/widgets/photo_picker.dart';
 import '../admin_widgets.dart';
 import 'banner_edit_screen.dart';
 import 'config_api.dart';
@@ -28,8 +30,11 @@ const List<(String, int)> _durations = [('Siempre', 0), ('5 s', 5), ('10 s', 10)
 final RegExp _hexRe = RegExp(r'^#[0-9a-fA-F]{6}$');
 
 /// Tienda y apariencia: modo (vidriera), color de acento, temporada, secciones
-/// del home, segundos entre banners, y el logo y los banners (se ven y se
-/// editan los textos; subir imágenes se hace desde la web).
+/// del home, segundos entre banners, y las imágenes de la tienda: el logo, los
+/// banners (se crean, se les cambia la imagen y los textos) y la imagen de
+/// portada. Las imágenes se suben desde el teléfono (pedido de Ale,
+/// 2026-11-17) y quedan puestas apenas suben: no esperan al "Guardar" de la
+/// apariencia.
 class TiendaScreen extends ConsumerStatefulWidget {
   const TiendaScreen({super.key, required this.initial, required this.canEdit});
   final TiendaConfig initial;
@@ -49,6 +54,46 @@ class _TiendaScreenState extends ConfigFormState<TiendaScreen> {
   late int _interval = widget.initial.bannerIntervalSec.clamp(3, 12);
   late final Map<String, bool> _sections = {for (final s in widget.initial.homeSections) s.id: s.on};
   String? _accentError;
+
+  /// Imagen que se está subiendo: `logo` o `hero` (null = ninguna).
+  String? _uploading;
+
+  /// Aviso por imagen (formato, peso, permiso negado, rechazo del servidor).
+  final Map<String, String> _imageNotice = {};
+
+  /// Cambia el logo o la imagen de portada: se elige, se sube y queda puesta.
+  Future<void> _changeImage(String kind) async {
+    if (_uploading != null) return;
+    final isLogo = kind == 'logo';
+    final res = await pickOnePhoto(context, ref, title: isLogo ? 'Cambiar logo' : 'Cambiar imagen de portada');
+    if (!mounted) return;
+    if (res.photo == null) {
+      setState(() {
+        if (res.error == null) {
+          _imageNotice.remove(kind);
+        } else {
+          _imageNotice[kind] = res.error!;
+        }
+      });
+      return;
+    }
+    setState(() {
+      _uploading = kind;
+      _imageNotice.remove(kind);
+    });
+    try {
+      await ref.read(configApiProvider).uploadImage(res.photo!, kind);
+      if (!mounted) return;
+      ref.invalidate(adminConfigProvider);
+      // El logo y la portada también se ven en la vidriera de la app.
+      ref.invalidate(homeProvider);
+      showOk(context, isLogo ? 'Logo actualizado' : 'Imagen de portada actualizada');
+    } catch (e) {
+      if (mounted) setState(() => _imageNotice[kind] = apiErrorText(e));
+    } finally {
+      if (mounted) setState(() => _uploading = null);
+    }
+  }
 
   @override
   void initState() {
@@ -102,8 +147,10 @@ class _TiendaScreenState extends ConfigFormState<TiendaScreen> {
     final c = context.hc;
     final enabled = widget.canEdit;
     final seasonActive = _season != 'none';
-    // Los banners se editan en su propia pantalla: acá se muestran los últimos.
-    final banners = ref.watch(adminConfigProvider).value?.tienda.banners ?? widget.initial.banners;
+    // Los banners y las imágenes se cambian aparte del formulario: acá se
+    // muestra siempre lo último que hay en el servidor.
+    final live = ref.watch(adminConfigProvider).value?.tienda ?? widget.initial;
+    final banners = live.banners;
     final currentAccent = _accent.text.trim().toUpperCase();
 
     return ConfigSectionScaffold(
@@ -127,7 +174,7 @@ class _TiendaScreenState extends ConfigFormState<TiendaScreen> {
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: c.border),
                 ),
-                child: BrandLogo(url: widget.initial.logoUrl, size: 52),
+                child: BrandLogo(url: live.logoUrl, size: 52),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -137,9 +184,24 @@ class _TiendaScreenState extends ConfigFormState<TiendaScreen> {
                     const Text('Logo', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                     const SizedBox(height: 2),
                     Text(
-                      'El logo y las imágenes de los banners se cambian desde la web (acá todavía no se pueden subir fotos).',
+                      'Se ve en la tienda, en la app y en los comprobantes. Mejor cuadrado y con fondo transparente.',
                       style: TextStyle(fontSize: 12, color: c.textDim, height: 1.35),
                     ),
+                    if (enabled) ...[
+                      const SizedBox(height: 8),
+                      _UploadButton(
+                        label: 'Cambiar logo',
+                        busy: _uploading == 'logo',
+                        onPressed: _uploading == null ? () => _changeImage('logo') : null,
+                      ),
+                    ],
+                    if (_imageNotice['logo'] != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        _imageNotice['logo']!,
+                        style: const TextStyle(fontSize: 12.5, color: Brand.warning, height: 1.3),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -326,7 +388,9 @@ class _TiendaScreenState extends ConfigFormState<TiendaScreen> {
           AdminCard(
             padding: const EdgeInsets.all(16),
             child: Text(
-              'Todavía no hay banners. Los nuevos se cargan desde la web.',
+              enabled
+                  ? 'Todavía no hay banners. Tocá "Nuevo banner" para cargar el primero.'
+                  : 'Todavía no hay banners.',
               style: TextStyle(color: c.textDim, fontSize: 13.5),
             ),
           )
@@ -341,9 +405,87 @@ class _TiendaScreenState extends ConfigFormState<TiendaScreen> {
                 ),
               ),
             ),
+        if (enabled) ...[
+          const SizedBox(height: 2),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const BannerEditScreen(canEdit: true)),
+            ),
+            icon: const Icon(Icons.add_photo_alternate_outlined, size: 18),
+            label: const Text('Nuevo banner'),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'El nuevo queda al final. El orden de los banners se cambia desde la web.',
+            style: TextStyle(fontSize: 11.5, color: c.textFaint),
+          ),
+        ],
+        const AdminSectionTitle('Imagen de portada'),
+        AdminCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AspectRatio(
+                aspectRatio: 16 / 6,
+                child: (live.heroImageUrl ?? '').isEmpty
+                    ? Container(
+                        decoration: BoxDecoration(
+                          color: c.surface2,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: c.border),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text('Sin imagen de portada', style: TextStyle(fontSize: 12.5, color: c.textDim)),
+                      )
+                    : NetImage(live.heroImageUrl, radius: 14),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Se muestra en el inicio de la tienda cuando no hay ningún banner visible.',
+                style: TextStyle(fontSize: 12, color: c.textDim, height: 1.35),
+              ),
+              if (enabled) ...[
+                const SizedBox(height: 8),
+                _UploadButton(
+                  label: 'Cambiar imagen de portada',
+                  busy: _uploading == 'hero',
+                  onPressed: _uploading == null ? () => _changeImage('hero') : null,
+                ),
+              ],
+              if (_imageNotice['hero'] != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _imageNotice['hero']!,
+                  style: const TextStyle(fontSize: 12.5, color: Brand.warning, height: 1.3),
+                ),
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }
+}
+
+/// Botón "Cambiar …" de una imagen: mientras sube muestra el círculo.
+class _UploadButton extends StatelessWidget {
+  const _UploadButton({required this.label, required this.busy, required this.onPressed});
+  final String label;
+  final bool busy;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+        onPressed: busy ? null : onPressed,
+        icon: busy
+            ? const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Brand.gold),
+              )
+            : const Icon(Icons.photo_library_outlined, size: 18),
+        // Un rótulo largo con letra grande baja de renglón en vez de cortarse.
+        label: Text(busy ? 'Subiendo…' : label, textAlign: TextAlign.center),
+      );
 }
 
 /// Muestra de color tocable.

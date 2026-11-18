@@ -8,7 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../api/api_client.dart' show imageSubtypeOf, maxUploadImageBytes;
+import '../api/api_client.dart' show imageSubtypeOf, maxUploadImageBytes, uploadTooBigMessage;
+import 'modals.dart';
 import '../theme/app_theme.dart';
 
 /// Una foto elegida, ya leída: lista para mostrar y para subir.
@@ -27,11 +28,15 @@ abstract class PhotoSource {
 
   /// Una foto sacada en el momento (null si se canceló).
   Future<PickedPhoto?> fromCamera();
+
+  /// UNA sola foto de la galería (null si se canceló): para lo que lleva una
+  /// única imagen (logo, portada del inicio, un banner).
+  Future<PickedPhoto?> oneFromGallery();
 }
 
 /// Galería y cámara del teléfono. Las fotos se achican a 1600 px de ancho y se
 /// comprimen (calidad 80): salen en JPG y livianas, así suben rápido con datos
-/// móviles y entran en el tope de 8 MB del servidor.
+/// móviles y entran en el tope de 4 MB de la app (ver `maxUploadImageBytes`).
 class DevicePhotoSource implements PhotoSource {
   DevicePhotoSource([ImagePicker? picker]) : _picker = picker ?? ImagePicker();
   final ImagePicker _picker;
@@ -49,6 +54,16 @@ class DevicePhotoSource implements PhotoSource {
   Future<PickedPhoto?> fromCamera() async {
     final f = await _picker.pickImage(
       source: ImageSource.camera,
+      imageQuality: _quality,
+      maxWidth: _maxWidth,
+    );
+    return f == null ? null : _read(f);
+  }
+
+  @override
+  Future<PickedPhoto?> oneFromGallery() async {
+    final f = await _picker.pickImage(
+      source: ImageSource.gallery,
       imageQuality: _quality,
       maxWidth: _maxWidth,
     );
@@ -94,7 +109,7 @@ Future<int> uploadOneByOne<T>(
 }
 
 /// Separa las fotos elegidas en las que se pueden subir y un aviso por las
-/// que no: lo que el servidor igual rechazaría (otro formato, más de 8 MB) y
+/// que no: lo que el servidor igual rechazaría (otro formato, más de 4 MB) y
 /// lo que pasa de los [room] lugares que quedan. Se filtra al elegir, para
 /// avisar antes de guardar y no después de haber creado el registro.
 ({List<PickedPhoto> ok, String? notice}) filterPhotos(
@@ -121,9 +136,68 @@ Future<int> uploadOneByOne<T>(
       '${badFormat == 1 ? 'Una foto no se sumó: tiene' : '$badFormat fotos no se sumaron: tienen'} '
           'que ser JPG, PNG o WebP.',
     if (tooBig > 0)
-      '${tooBig == 1 ? 'Una foto no se sumó: pesa' : '$tooBig fotos no se sumaron: pesan'} más de 8 MB.',
+      '${tooBig == 1 ? 'Una foto no se sumó: pesa' : '$tooBig fotos no se sumaron: pesan'} más de 4 MB.',
   ];
   return (ok: ok.take(room < 0 ? 0 : room).toList(), notice: notes.isEmpty ? null : notes.join(' '));
+}
+
+/// Por qué una foto no se puede subir (formato o peso), o null si sirve. Lo
+/// mismo que revisa `imageFormData`, para avisar apenas se elige.
+String? photoProblem(PickedPhoto p) {
+  if (imageSubtypeOf(p.filename) == null) return 'La foto tiene que ser JPG, PNG o WebP.';
+  if (p.bytes.length > maxUploadImageBytes) return uploadTooBigMessage;
+  return null;
+}
+
+/// Resultado de [pickOnePhoto]: la foto, o por qué no se pudo ([error]); los
+/// dos en null si se canceló.
+typedef OnePhotoResult = ({PickedPhoto? photo, String? error});
+
+/// Hoja "de dónde sale la foto" para lo que lleva UNA sola imagen (logo,
+/// portada, banner, foto de un producto): galería o cámara. Devuelve la foto
+/// ya revisada (formato y peso) o el aviso para mostrar.
+Future<OnePhotoResult> pickOnePhoto(
+  BuildContext context,
+  WidgetRef ref, {
+  String title = 'Elegir imagen',
+}) async {
+  final source = ref.read(photoSourceProvider);
+  final camera = await showAppSheet<bool>(
+    context,
+    builder: (ctx) => SheetBody(
+      title: title,
+      subtitle: 'JPG, PNG o WebP, hasta 4 MB.',
+      children: [
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.photo_library_outlined),
+          title: const Text('Elegir de la galería'),
+          onTap: () => Navigator.of(ctx).pop(false),
+        ),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.photo_camera_outlined),
+          title: const Text('Sacar una foto'),
+          onTap: () => Navigator.of(ctx).pop(true),
+        ),
+      ],
+    ),
+  );
+  if (camera == null) return (photo: null, error: null);
+  try {
+    final picked = camera ? await source.fromCamera() : await source.oneFromGallery();
+    if (picked == null) return (photo: null, error: null);
+    final problem = photoProblem(picked);
+    return problem == null ? (photo: picked, error: null) : (photo: null, error: problem);
+  } catch (_) {
+    // Lo más común: el permiso de cámara o de fotos negado en el teléfono.
+    return (
+      photo: null,
+      error: camera
+          ? 'No pudimos abrir la cámara. Revisá el permiso en los ajustes del teléfono.'
+          : 'No pudimos abrir tus fotos. Revisá el permiso en los ajustes del teléfono.',
+    );
+  }
 }
 
 /// "Subiendo foto 2 de 3…"

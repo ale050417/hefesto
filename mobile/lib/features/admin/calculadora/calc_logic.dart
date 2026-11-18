@@ -19,6 +19,17 @@ String formatDuration(double hours) {
   return m == 0 ? '$h h' : '$h h $m min';
 }
 
+/// Precio de la calculadora embebida (consultas): múltiplo de $100 hacia
+/// arriba, igual que `roundPrice` de la web. No es matemática de costos: el
+/// precio lo calculó el servidor; esto solo lo deja en un número redondo.
+double roundQuotePrice(double price) {
+  if (!price.isFinite || price <= 0) return 0;
+  return (price / 100).ceil() * 100;
+}
+
+/// Minutos totales de impresión (horas + minutos tipeados).
+int totalMinutes(double? hours, double? minutes) => ((hours ?? 0) * 60 + (minutes ?? 0)).round();
+
 enum HistorySort {
   recent('Más recientes'),
   price('Mayor precio'),

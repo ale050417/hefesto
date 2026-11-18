@@ -12,12 +12,15 @@ import 'package:hefesto/core/api/models.dart';
 import 'package:hefesto/core/providers.dart';
 import 'package:hefesto/core/theme/app_theme.dart';
 import 'package:hefesto/core/widgets/common.dart';
+import 'package:hefesto/core/widgets/photo_picker.dart';
 import 'package:hefesto/features/admin/productos/producto_detail_screen.dart';
 import 'package:hefesto/features/admin/productos/producto_form_screen.dart';
 import 'package:hefesto/features/admin/productos/productos_models.dart';
 import 'package:hefesto/features/admin/productos/productos_providers.dart';
 import 'package:hefesto/features/admin/productos/productos_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
+
+import 'support/photo_kit.dart';
 
 /// Dibuja las pantallas de Productos con datos de ejemplo. Sirve de humo (si algo
 /// se desborda o lanza, el test falla) y, con SHOT_DIR=ruta_de_una_carpeta,
@@ -193,6 +196,20 @@ class FakeProductosRepo extends ProductosRepo {
   Future<void> delete(String id) async => calls.add('delete:$id');
   @override
   Future<void> setPrimaryImage(String id, String imageId) async => calls.add('primary:$id:$imageId');
+
+  /// Fotos que el "servidor" rechaza (por nombre de archivo).
+  final failImages = <String>{};
+  String imageError = 'Máximo 5 fotos por producto.';
+
+  @override
+  Future<String> addImage(String id, PickedPhoto photo, {String? color}) async {
+    if (failImages.contains(photo.filename)) throw ApiException('invalid', imageError);
+    calls.add('image:$id:${photo.filename}:${color ?? '-'}');
+    return 'img-${calls.length}';
+  }
+
+  @override
+  Future<void> deleteImage(String id, String imageId) async => calls.add('image_delete:$id:$imageId');
   @override
   Future<void> patch(String id, Map<String, dynamic> body) async {
     calls.add('patch:$id');
@@ -481,6 +498,251 @@ void main() {
       await tester.tap(find.text('Usar como portada'));
       await _pumpFrames(tester);
       expect(repo.calls, ['primary:p1:i2']);
+    });
+
+    testWidgets('multicolor: los "precios por color" son GRAMOS y nunca se muestran como plata', (tester) async {
+      final multi = AdminProductDetail.fromJson({
+        ..._rawDetail(),
+        'id': 'p8',
+        'name': 'Llavero bicolor',
+        'status': 'published',
+        'colorMode': 'multi',
+        'colors': ['Rojo', 'Blanco'],
+        // En multicolor esta columna guarda gramos por color.
+        'colorPrices': {'Rojo': 49, 'Blanco': 12.5},
+        'variants': [
+          {'label': 'Grande', 'price': 9000, 'colorGrams': {'Rojo': 80}, 'weightGrams': 100, 'colorPrices': {'Rojo': 49}},
+        ],
+        'images': <dynamic>[],
+      });
+      await _show(
+        tester,
+        'producto_multicolor',
+        const AdminProductDetailScreen(id: 'p8'),
+        height: 2000,
+        overrides: [adminProductProvider.overrideWith((ref, id) async => multi)],
+      );
+      expect(find.text('Rojo · 49 g'), findsOneWidget);
+      expect(find.text('Blanco · 12.5 g'), findsOneWidget);
+      expect(find.textContaining(r'$49'), findsNothing);
+      expect(find.textContaining(r'$12'), findsNothing);
+      expect(find.textContaining(r'Rojo · $'), findsNothing);
+    });
+
+    group('fotos desde el teléfono', () {
+      Future<FakeProductosRepo> openDetail(
+        WidgetTester tester,
+        String name,
+        AdminProductDetail detail,
+        PhotoSource source, {
+        MeInfo? me,
+      }) async {
+        final repo = FakeProductosRepo();
+        await _show(
+          tester,
+          name,
+          AdminProductDetailScreen(id: detail.id),
+          height: 2600,
+          me: me,
+          overrides: [
+            adminProductProvider.overrideWith((ref, id) async => detail),
+            productosRepoProvider.overrideWithValue(repo),
+            photoSourceProvider.overrideWithValue(source),
+          ],
+        );
+        return repo;
+      }
+
+      /// Un producto de un solo color (no pregunta de qué color son las fotos).
+      final plain = AdminProductDetail.fromJson({
+        ..._rawDetail(),
+        'id': 'p5',
+        'name': 'Llavero',
+        'status': 'published',
+        'colors': ['Negro'],
+        'images': [
+          {'id': 'i1', 'url': '', 'isPrimary': true, 'color': null, 'position': '50% 50%'},
+          {'id': 'i2', 'url': '', 'isPrimary': false, 'color': null, 'position': '50% 50%'},
+        ],
+      });
+
+      testWidgets('borrador sin fotos: ofrece sumarlas y ya no manda al panel web', (tester) async {
+        final source = FakePhotoSource();
+        final repo = await openDetail(tester, 'producto_fotos_borrador', _draftDetail, source);
+        expect(find.text('Sin fotos no se puede publicar.'), findsOneWidget);
+        expect(find.textContaining('panel web'), findsOneWidget, reason: 'solo la nota de colores y tamaños');
+        expect(find.text('Los colores y los tamaños se cargan desde el panel web.'), findsOneWidget);
+        expect(find.textContaining('La primera queda de portada'), findsOneWidget);
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Sumar fotos'));
+        await _pumpFrames(tester, 8);
+        expect(source.galleryCalls, 1);
+        // De a una, en orden; sin color (el producto no tiene colores).
+        expect(repo.calls, ['image:p3:uno.jpg:-', 'image:p3:dos.jpg:-']);
+        expect(find.text('2 fotos agregadas'), findsOneWidget);
+      });
+
+      testWidgets('sacar una foto con la cámara', (tester) async {
+        final source = FakePhotoSource(camera: fakePhoto('IMG_0001.jpg'));
+        final repo = await openDetail(tester, 'producto_fotos_camara', plain, source);
+        expect(find.text('2 de 5 fotos.'), findsOneWidget);
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Sacar foto'));
+        await _pumpFrames(tester, 8);
+        expect(source.cameraCalls, 1);
+        expect(repo.calls, ['image:p5:IMG_0001.jpg:-']);
+        expect(find.text('Foto agregada'), findsOneWidget);
+      });
+
+      testWidgets('con varios colores pregunta de qué color son y lo manda', (tester) async {
+        final source = FakePhotoSource(gallery: [fakePhoto('rojo.jpg')]);
+        final repo = await openDetail(tester, 'producto_fotos_color', _detail, source);
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Sumar fotos'));
+        await _pumpFrames(tester, 8);
+        expect(find.text('¿De qué color son las fotos?'), findsOneWidget);
+        expect(find.text('De ninguno en particular'), findsOneWidget);
+        expect(source.galleryCalls, 0, reason: 'primero se elige el color');
+        await tester.tap(find.widgetWithText(ListTile, 'Verde militar'));
+        await _pumpFrames(tester, 8);
+        expect(repo.calls, ['image:p1:rojo.jpg:Verde militar']);
+      });
+
+      testWidgets('"De ninguno en particular" sube sin color; cerrar la hoja no sube nada', (tester) async {
+        final source = FakePhotoSource(gallery: [fakePhoto('a.jpg')]);
+        final repo = await openDetail(tester, 'producto_fotos_sin_color', _detail, source);
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Sumar fotos'));
+        await _pumpFrames(tester, 8);
+        Navigator.of(tester.element(find.text('¿De qué color son las fotos?'))).pop();
+        await _pumpFrames(tester, 8);
+        expect(source.galleryCalls, 0);
+        expect(repo.calls, isEmpty);
+
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Sumar fotos'));
+        await _pumpFrames(tester, 8);
+        await tester.tap(find.text('De ninguno en particular'));
+        await _pumpFrames(tester, 8);
+        expect(repo.calls, ['image:p1:a.jpg:-']);
+      });
+
+      testWidgets('respeta el tope de 5: suma solo las que entran y avisa', (tester) async {
+        final source = FakePhotoSource(gallery: [for (var i = 1; i <= 5; i++) fakePhoto('f$i.jpg')]);
+        final repo = await openDetail(tester, 'producto_fotos_tope', plain, source);
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Sumar fotos'));
+        await _pumpFrames(tester, 8);
+        expect(repo.calls, ['image:p5:f1.jpg:-', 'image:p5:f2.jpg:-', 'image:p5:f3.jpg:-']);
+        expect(find.textContaining('Entran hasta 5 fotos: quedaron 2 afuera.'), findsOneWidget);
+      });
+
+      testWidgets('con 5 fotos no se pueden sumar más', (tester) async {
+        final full = AdminProductDetail.fromJson({
+          ..._rawDetail(),
+          'id': 'p6',
+          'name': 'Lleno',
+          'status': 'draft',
+          'images': [
+            for (var i = 1; i <= 5; i++) {'id': 'i$i', 'url': '', 'isPrimary': i == 1, 'color': null, 'position': '50% 50%'},
+          ],
+        });
+        final source = FakePhotoSource();
+        await openDetail(tester, 'producto_fotos_lleno', full, source);
+        expect(find.text('Llegaste al tope de 5 fotos: eliminá una para sumar otra.'), findsOneWidget);
+        expect(tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Sumar fotos')).onPressed, isNull);
+        expect(tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Sacar foto')).onPressed, isNull);
+      });
+
+      testWidgets('una foto de más de 4 MB o de otro formato no se manda', (tester) async {
+        final source = FakePhotoSource(gallery: [
+          PickedPhoto(bytes: Uint8List(maxUploadImageBytes + 1), filename: 'pesada.jpg'),
+          fakePhoto('IMG.heic'),
+        ]);
+        final repo = await openDetail(tester, 'producto_fotos_pesada', plain, source);
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Sumar fotos'));
+        await _pumpFrames(tester, 8);
+        expect(repo.calls, isEmpty);
+        expect(find.textContaining('pesa más de 4 MB'), findsOneWidget);
+        expect(find.textContaining('tiene que ser JPG, PNG o WebP'), findsOneWidget);
+      });
+
+      testWidgets('si el servidor rechaza una, se ve el motivo; con varias, cuántas fallaron', (tester) async {
+        final source = FakePhotoSource(gallery: [fakePhoto('mala.jpg')]);
+        final repo = await openDetail(tester, 'producto_fotos_rechazo', plain, source);
+        repo.failImages.add('mala.jpg');
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Sumar fotos'));
+        await _pumpFrames(tester, 8);
+        expect(find.text('Máximo 5 fotos por producto.'), findsOneWidget);
+        expect(find.textContaining('agregada'), findsNothing);
+
+        source.gallery = [fakePhoto('bien.jpg'), fakePhoto('mala.jpg')];
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Sumar fotos'));
+        await _pumpFrames(tester, 8);
+        expect(repo.calls, ['image:p5:bien.jpg:-']);
+        expect(find.text('No pudimos subir 1 de las 2 fotos.'), findsOneWidget);
+        expect(find.text('Foto agregada'), findsOneWidget);
+      });
+
+      testWidgets('permiso negado: se explica y no se sube nada', (tester) async {
+        final source = FakePhotoSource()..failWith = Exception('camera_access_denied');
+        final repo = await openDetail(tester, 'producto_fotos_permiso', plain, source);
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Sacar foto'));
+        await _pumpFrames(tester, 8);
+        expect(find.textContaining('No pudimos abrir la cámara'), findsOneWidget);
+        expect(repo.calls, isEmpty);
+      });
+
+      testWidgets('eliminar la foto que se está viendo pide confirmación', (tester) async {
+        final repo = await openDetail(tester, 'producto_fotos_eliminar', plain, FakePhotoSource());
+        // La que se ve es la portada: lo avisa.
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Eliminar foto'));
+        await _pumpFrames(tester);
+        expect(find.text('¿Eliminar esta foto?'), findsOneWidget);
+        expect(find.textContaining('Es la portada: la siguiente foto pasa a ser la portada.'), findsOneWidget);
+        await tester.tap(find.widgetWithText(TextButton, 'Cancelar'));
+        await _pumpFrames(tester);
+        expect(repo.calls, isEmpty);
+
+        // La segunda (no es portada).
+        await tester.tap(find.byType(NetImage).at(2));
+        await _pumpFrames(tester, 3);
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Eliminar foto'));
+        await _pumpFrames(tester);
+        expect(find.textContaining('Es la portada'), findsNothing);
+        await tester.tap(find.descendant(of: find.byType(AlertDialog), matching: find.widgetWithText(TextButton, 'Eliminar foto')));
+        await _pumpFrames(tester);
+        expect(repo.calls, ['image_delete:p5:i2']);
+        expect(find.text('Foto eliminada'), findsOneWidget);
+      });
+
+      testWidgets('eliminar la única foto de un producto publicado lo advierte', (tester) async {
+        final one = AdminProductDetail.fromJson({
+          ..._rawDetail(),
+          'id': 'p7',
+          'name': 'Una sola',
+          'status': 'published',
+          'images': [
+            {'id': 'i1', 'url': '', 'isPrimary': true, 'color': null, 'position': '50% 50%'},
+          ],
+        });
+        await openDetail(tester, 'producto_fotos_unica', one, FakePhotoSource());
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Eliminar foto'));
+        await _pumpFrames(tester);
+        expect(find.textContaining('el producto está publicado: en la tienda se va a ver sin imagen'), findsOneWidget);
+      });
+
+      testWidgets('sin permiso de editar: se ven las fotos pero no hay botones', (tester) async {
+        final viewer = MeInfo.fromJson({
+          'id': 'u2',
+          'email': 'op@hefesto.com',
+          'fullName': 'Operador',
+          'role': 'operator',
+          'isStaff': true,
+          'permissions': {
+            'productos': {'ver': true, 'crear': false, 'editar': false, 'eliminar': false},
+          },
+        });
+        await openDetail(tester, 'producto_fotos_solo_ver', plain, FakePhotoSource(), me: viewer);
+        expect(find.text('Sumar fotos'), findsNothing);
+        expect(find.text('Sacar foto'), findsNothing);
+        expect(find.text('Eliminar foto'), findsNothing);
+        expect(find.text('Usar como portada'), findsNothing);
+      });
     });
 
     testWidgets('borrador sin fotos: se puede publicar (aviso) y no hay costos', (tester) async {

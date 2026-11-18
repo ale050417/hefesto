@@ -26,7 +26,7 @@ class AppConfig {
 
   /// Versión que se muestra en "Cuenta". Tiene que coincidir con `version:` de
   /// pubspec.yaml (lo verifica `test/app_config_test.dart`).
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '1.1.0';
 
   /// En debug apunta al servidor local (10.0.2.2 = la PC vista desde el
   /// emulador de Android); en release, a producción.

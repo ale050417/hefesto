@@ -12,12 +12,16 @@ import 'package:hefesto/features/admin/consultas/consultas_api.dart';
 import 'package:hefesto/features/admin/consultas/consultas_models.dart';
 import 'package:hefesto/features/admin/consultas/consultas_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:hefesto/features/admin/admin_models.dart';
 import 'package:hefesto/features/admin/admin_providers.dart';
+import 'package:hefesto/features/admin/calculadora/calculadora_models.dart';
+import 'package:hefesto/features/admin/calculadora/price_estimator_sheet.dart';
 import 'package:hefesto/features/admin/produccion/produccion_api.dart';
 import 'package:hefesto/features/admin/produccion/produccion_models.dart';
 
 import 'admin_consultas_models_test.dart' show answeredJson, consultasJson, inquiryJson, sampleMessage;
+import 'support/calc_kit.dart';
 import 'support/photo_kit.dart';
 import 'support/produccion_fallas_filamentos_kit.dart';
 
@@ -144,6 +148,7 @@ void main() {
     FakeConsultasApi? api,
     PhotoSource? photos,
     AttachmentSource? files,
+    List<Override> extra = const [],
   }) async {
     final fake = api ?? FakeConsultasApi();
     await showScreen(
@@ -157,6 +162,7 @@ void main() {
         consultasApiProvider.overrideWithValue(fake),
         if (photos != null) photoSourceProvider.overrideWithValue(photos),
         if (files != null) attachmentSourceProvider.overrideWithValue(files),
+        ...extra,
       ],
     );
     return fake;
@@ -607,15 +613,27 @@ void main() {
     final pending = data.items[0];
     final answered = data.items[1];
 
-    Future<FakeConsultasApi> openAnswer(WidgetTester tester, String name, Consulta q) async {
+    late FakeEstimatorApi calcApi;
+
+    Future<FakeConsultasApi> openAnswer(
+      WidgetTester tester,
+      String name,
+      Consulta q, {
+      CalcOverview? overview,
+      Object? calcLoadError,
+    }) async {
       final api = FakeConsultasApi();
+      calcApi = FakeEstimatorApi();
       await showScreen(
         tester,
         name,
         ConsultaAnswerScreen(consulta: q),
         height: 1900,
         me: me,
-        overrides: [consultasApiProvider.overrideWithValue(api)],
+        overrides: [
+          consultasApiProvider.overrideWithValue(api),
+          ...estimatorOverrides(calcApi, overview: overview, loadError: calcLoadError),
+        ],
       );
       return api;
     }
@@ -623,13 +641,34 @@ void main() {
     String messageText(WidgetTester tester) =>
         tester.widget<TextField>(find.widgetWithText(TextField, 'Mensaje para el cliente')).controller!.text;
 
-    testWidgets('consulta sin mensaje: el campo arranca vacío con su ayuda', (tester) async {
+    String fieldText(WidgetTester tester, String label) =>
+        tester.widget<TextField>(find.widgetWithText(TextField, label)).controller!.text;
+
+    final calcButton = find.widgetWithText(OutlinedButton, 'Calcular precio');
+    final recalcButton = find.widgetWithText(OutlinedButton, 'Volver a calcular');
+    const helpWithout = 'Calculá el precio con la calculadora: elegís el tipo de producto y queda '
+        'guardado el costo para cuando se confirme el pedido.';
+    const helpWith = 'Costo guardado con la calculadora. Podés ajustar el precio a mano.';
+
+    /// Abre la calculadora, carga una pieza y usa el precio.
+    Future<void> calculate(WidgetTester tester, {Finder? button, String grams = '18,5', String minutes = '35'}) async {
+      await tapShown(tester, button ?? calcButton);
+      expect(find.byType(PriceEstimatorSheet), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextField, 'Gramos por unidad'), grams);
+      await tester.enterText(find.widgetWithText(TextField, 'Minutos'), minutes);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Llaveros'));
+      await settle(tester);
+      await tester.tap(find.widgetWithText(GoldButton, 'Usar este precio'));
+      await settle(tester);
+      expect(find.byType(PriceEstimatorSheet), findsNothing);
+    }
+
+    testWidgets('consulta sin mensaje: precio con calculadora, sin campo de costo', (tester) async {
       await openAnswer(tester, 'consulta_responder', pending);
       expect(find.text('Responder'), findsOneWidget);
       expect(find.text('12 × Llavero con logo'), findsOneWidget);
       for (final label in [
         r'Precio por unidad ($)',
-        r'Costo por unidad ($)',
         'Demora',
         'Precio por unidad comprando más',
         'A partir de cuántas unidades',
@@ -641,36 +680,81 @@ void main() {
       }
       expect(messageText(tester), isEmpty);
       expect(find.text('Se arma solo con estos datos. Escribí acá solo si querés cambiarlo.'), findsOneWidget);
-      // El costo va al lado del precio, con su aclaración.
-      expect(
-        find.text('No se le muestra al cliente. Con esto se registra el pedido cuando se confirma.'),
-        findsOneWidget,
-      );
-      final price = tester.getTopLeft(find.widgetWithText(TextField, r'Precio por unidad ($)')).dy;
-      final cost = tester.getTopLeft(find.widgetWithText(TextField, r'Costo por unidad ($)')).dy;
-      final delivery = tester.getTopLeft(find.widgetWithText(TextField, 'Demora')).dy;
-      expect(price < cost && cost < delivery, isTrue, reason: 'el costo va justo después del precio');
+      // El costo ya no se tipea ni se muestra: sale de la calculadora.
+      expect(find.textContaining('Costo por unidad'), findsNothing);
+      expect(calcButton, findsOneWidget);
+      expect(find.text(helpWithout), findsOneWidget);
+      // Con más de una unidad se elige cómo se tipea el precio.
+      expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Por unidad')).selected, isTrue);
+      expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Por las 12')).selected, isFalse);
     });
 
-    testWidgets('sin precio marca el error y no llama al servidor', (tester) async {
+    testWidgets('una sola unidad: no hay "Por unidad / Por las N" ni renglón del total', (tester) async {
+      final one = Consulta.fromJson(inquiryJson('u1', quantity: 1));
+      await openAnswer(tester, 'consulta_responder_una', one);
+      expect(find.byType(ChoiceChip), findsNothing);
+      await tester.enterText(find.widgetWithText(TextField, r'Precio por unidad ($)'), '2.500');
+      await tester.pump();
+      expect(find.textContaining('c/u'), findsNothing);
+    });
+
+    testWidgets('sin precio ni cálculo marca los errores y no llama al servidor', (tester) async {
       final api = await openAnswer(tester, 'consulta_responder_errores', pending);
       await tester.enterText(find.widgetWithText(TextField, 'Precio por unidad comprando más'), '2.000');
       await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
       await settle(tester);
       expect(find.text('Poné el precio por unidad.'), findsOneWidget);
-      expect(find.text('Poné el costo por unidad (sale de la calculadora).'), findsOneWidget);
+      expect(find.text('Calculá el precio con la calculadora: así queda guardado el costo del pedido.'), findsOneWidget);
       expect(find.text('Poné desde cuántas unidades.'), findsOneWidget);
       expect(find.text('Revisá los datos marcados en rojo.'), findsOneWidget);
       expect(api.answered, isNull);
     });
 
-    testWidgets('guarda sin mensaje (lo arma el servidor) y muestra cómo quedó', (tester) async {
+    testWidgets('precio tipeado a mano pero sin calcular: no se guarda', (tester) async {
+      final api = await openAnswer(tester, 'consulta_responder_sin_calculo', pending);
+      await tester.enterText(find.widgetWithText(TextField, r'Precio por unidad ($)'), '2500');
+      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await settle(tester);
+      expect(find.text('Calculá el precio con la calculadora: así queda guardado el costo del pedido.'), findsOneWidget);
+      expect(api.answered, isNull);
+    });
+
+    testWidgets('"Calcular precio": el servidor da el precio y queda guardado con qué se calculó', (tester) async {
       final api = await openAnswer(tester, 'consulta_responder_guardar', pending);
-      await tester.enterText(find.widgetWithText(TextField, r'Precio por unidad ($)'), '2.500');
+      await tapShown(tester, calcButton);
+      expect(find.text('Elegí el tipo de producto.'), findsNothing, reason: 'primero pide los gramos o el tiempo');
+      expect(find.text('Cargá los gramos o el tiempo de impresión.'), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextField, 'Gramos por unidad'), '18,5');
+      await tester.enterText(find.widgetWithText(TextField, 'Horas'), '1');
+      await tester.enterText(find.widgetWithText(TextField, 'Minutos'), '35');
       await tester.pump();
-      // Con cantidad > 1 muestra el total mientras se escribe.
-      expect(find.text(r'Total por 12: $30.000'), findsOneWidget);
-      await tester.enterText(find.widgetWithText(TextField, r'Costo por unidad ($)'), '900');
+      // Sin tipo no hay precio (arranca sin ninguno elegido).
+      expect(find.text('Elegí el tipo de producto.'), findsOneWidget);
+      expect(calcApi.quotes, isEmpty);
+      expect(tester.widget<GoldButton>(find.widgetWithText(GoldButton, 'Usar este precio')).onPressed, isNull);
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Llaveros'));
+      await settle(tester);
+      final sent = calcApi.quotes.single;
+      expect(sent.toJson(), {
+        'presetId': 'p1',
+        'filamentId': estimatorFilamentId,
+        'grams': 18.5,
+        'hours': closeTo(95 / 60, 1e-9),
+      });
+      // $2.814 del servidor → número redondo hacia arriba, como en la web.
+      expect(tester.widget<Text>(find.byKey(const ValueKey('estimator-price'))).data, r'$2.900');
+      // Ni margen ni costo de la pieza a la vista.
+      expect(find.textContaining('%'), findsNothing);
+      expect(find.textContaining('anancia'), findsNothing);
+      expect(find.textContaining('osto total'), findsNothing);
+      await tester.tap(find.widgetWithText(GoldButton, 'Usar este precio'));
+      await settle(tester);
+
+      expect(fieldText(tester, r'Precio por unidad ($)'), '2.900');
+      expect(find.text(r'$2.900 c/u · $34.800 por las 12'), findsOneWidget);
+      expect(find.text(helpWith), findsOneWidget);
+      expect(recalcButton, findsOneWidget);
+
       await tester.enterText(find.widgetWithText(TextField, 'Demora'), '5 días hábiles');
       await tester.enterText(find.widgetWithText(TextField, 'Precio por unidad comprando más'), '2.000');
       await tester.enterText(find.widgetWithText(TextField, 'A partir de cuántas unidades'), '50');
@@ -682,8 +766,12 @@ void main() {
 
       expect(api.answered!.id, 'c1');
       expect(api.answered!.draft.toJson(), {
-        'unitPrice': 2500,
-        'unitCost': 900,
+        'unitPrice': 2900,
+        'unitCost': null,
+        'filamentId': estimatorFilamentId,
+        'material': 'PLA',
+        'grams': 18.5,
+        'printMinutes': 95,
         'bulkPrice': 2000,
         'bulkFrom': 50,
         'dimensions': '5 × 5 cm',
@@ -698,49 +786,159 @@ void main() {
       expect(find.textContaining('atención al cliente le va a mandar a Carla Gómez'), findsOneWidget);
       expect(find.text('Copiar mensaje'), findsOneWidget);
       expect(find.widgetWithText(GoldButton, 'Listo'), findsOneWidget);
-      // En lo que se le manda al cliente no va el costo.
-      expect(find.textContaining('900'), findsNothing);
       expect(find.textContaining('osto'), findsNothing);
     });
 
-    testWidgets('sin costo no se guarda aunque esté el precio', (tester) async {
-      final api = await openAnswer(tester, 'consulta_responder_sin_costo', pending);
-      await tester.enterText(find.widgetWithText(TextField, r'Precio por unidad ($)'), '2500');
+    testWidgets('después de calcular se puede ajustar el precio a mano', (tester) async {
+      final api = await openAnswer(tester, 'consulta_responder_ajuste', pending);
+      await calculate(tester);
+      await tester.enterText(find.widgetWithText(TextField, r'Precio por unidad ($)'), '3.000');
       await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
       await settle(tester);
-      expect(find.text('Poné el costo por unidad (sale de la calculadora).'), findsOneWidget);
-      expect(api.answered, isNull);
+      expect(api.answered!.draft.unitPrice, 3000);
+      expect(api.answered!.draft.calc!.grams, 18.5, reason: 'el costo sigue saliendo de lo calculado');
+    });
+
+    testWidgets('"Por las 12": convierte lo tipeado y manda el precio por unidad', (tester) async {
+      final api = await openAnswer(tester, 'consulta_responder_total', pending);
+      await tester.enterText(find.widgetWithText(TextField, r'Precio por unidad ($)'), '2.500');
+      await tester.pump();
+      expect(find.text(r'$2.500 c/u · $30.000 por las 12'), findsOneWidget);
+      await tapShown(tester, find.widgetWithText(ChoiceChip, 'Por las 12'));
+      // Mismo precio, expresado por el total.
+      expect(find.widgetWithText(TextField, r'Precio por unidad ($)'), findsNothing);
+      expect(fieldText(tester, r'Precio por las 12 ($)'), '30.000');
+      expect(find.text(r'$2.500 c/u · $30.000 por las 12'), findsOneWidget);
+      // La calculadora cotiza UNA pieza: en este modo va × 12.
+      await calculate(tester);
+      expect(fieldText(tester, r'Precio por las 12 ($)'), '34.800');
+      expect(find.text(r'$2.900 c/u · $34.800 por las 12'), findsOneWidget);
+      // El operador cierra el lote en un número redondo.
+      await tester.enterText(find.widgetWithText(TextField, r'Precio por las 12 ($)'), '36.000');
+      await tester.pump();
+      expect(find.text(r'$3.000 c/u · $36.000 por las 12'), findsOneWidget);
+      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await settle(tester);
+      expect(api.answered!.draft.unitPrice, 3000);
+      // Y de vuelta a "Por unidad" antes de guardar daría lo mismo.
+    });
+
+    testWidgets('volver a "Por unidad" deja el precio por unidad en el campo', (tester) async {
+      await openAnswer(tester, 'consulta_responder_ida_vuelta', pending);
+      await tapShown(tester, find.widgetWithText(ChoiceChip, 'Por las 12'));
+      await tester.enterText(find.widgetWithText(TextField, r'Precio por las 12 ($)'), '30.000');
+      await tapShown(tester, find.widgetWithText(ChoiceChip, 'Por unidad'));
+      expect(fieldText(tester, r'Precio por unidad ($)'), '2.500');
     });
 
     testWidgets('mensaje escrito a mano: se manda ese texto', (tester) async {
       final api = await openAnswer(tester, 'consulta_responder_a_mano', pending);
-      await tester.enterText(find.widgetWithText(TextField, r'Precio por unidad ($)'), '2500');
-      await tester.enterText(find.widgetWithText(TextField, r'Costo por unidad ($)'), '900');
-      await tester.enterText(find.widgetWithText(TextField, 'Mensaje para el cliente'), 'Hola Carla, sale 2500 cada uno.');
+      await calculate(tester);
+      await tester.enterText(find.widgetWithText(TextField, 'Mensaje para el cliente'), 'Hola Carla, sale 2900 cada uno.');
       await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
       await settle(tester);
-      expect(api.answered!.draft.message, 'Hola Carla, sale 2500 cada uno.');
-      expect(find.text('Hola Carla, sale 2500 cada uno.'), findsOneWidget, reason: 'el resultado muestra lo que quedó');
+      expect(api.answered!.draft.message, 'Hola Carla, sale 2900 cada uno.');
+      expect(find.text('Hola Carla, sale 2900 cada uno.'), findsOneWidget, reason: 'el resultado muestra lo que quedó');
     });
 
-    testWidgets('con mensaje guardado: viene cargado y, sin tocarlo, va null para que se rearme', (tester) async {
+    testWidgets('respuesta vieja (costo a mano): no se muestra el costo y se reenvía tal cual', (tester) async {
       final api = await openAnswer(tester, 'consulta_cambiar_respuesta', answered);
       expect(find.text('Cambiar respuesta'), findsOneWidget);
       expect(messageText(tester), sampleMessage);
       expect(find.textContaining('Si no lo tocás, se vuelve a armar solo'), findsOneWidget);
       // Vienen cargados los datos de la respuesta anterior.
-      expect(tester.widget<TextField>(find.widgetWithText(TextField, r'Precio por unidad ($)')).controller!.text, '2.500');
-      expect(tester.widget<TextField>(find.widgetWithText(TextField, r'Costo por unidad ($)')).controller!.text, '900');
-      expect(tester.widget<TextField>(find.widgetWithText(TextField, 'A partir de cuántas unidades')).controller!.text, '50');
+      expect(fieldText(tester, r'Precio por unidad ($)'), '2.500');
+      expect(fieldText(tester, 'A partir de cuántas unidades'), '50');
+      // El costo viejo ($900) no aparece en ningún lado.
+      expect(find.textContaining('900'), findsNothing);
+      expect(find.textContaining('Costo por unidad'), findsNothing);
+      expect(find.text(helpWith), findsOneWidget);
+      expect(calcButton, findsOneWidget, reason: 'nunca se calculó con la calculadora');
 
       api.builtMessage = 'Mensaje rearmado con \$3.000';
       await tester.enterText(find.widgetWithText(TextField, r'Precio por unidad ($)'), '3.000');
       await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
       await settle(tester);
-      expect(api.answered!.draft.unitPrice, 3000);
-      expect(api.answered!.draft.unitCost, 900, reason: 'el costo cargado antes se manda de nuevo');
+      final json = api.answered!.draft.toJson();
+      expect(json['unitPrice'], 3000);
+      expect(json['unitCost'], 900, reason: 'el costo cargado antes se manda de nuevo');
+      expect(json['filamentId'], isNull);
+      expect(json['grams'], isNull);
       expect(api.answered!.draft.message, isNull, reason: 'sin tocar el texto, lo rearma el servidor');
       expect(find.text('Mensaje rearmado con \$3.000'), findsOneWidget);
+    });
+
+    testWidgets('respuesta vieja recalculada: deja de mandar el costo a mano', (tester) async {
+      final api = await openAnswer(tester, 'consulta_cambiar_recalculada', answered);
+      await calculate(tester);
+      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await settle(tester);
+      final json = api.answered!.draft.toJson();
+      expect(json['unitCost'], isNull);
+      expect(json['filamentId'], estimatorFilamentId);
+      expect(json['printMinutes'], 35);
+    });
+
+    testWidgets('respuesta con cálculo guardado: "Volver a calcular" abre la calculadora cargada', (tester) async {
+      final withCalc = Consulta.fromJson(answeredJson('c9', withCalc: true));
+      final api = await openAnswer(tester, 'consulta_volver_a_calcular', withCalc);
+      expect(recalcButton, findsOneWidget);
+      expect(find.text(helpWith), findsOneWidget);
+      await tapShown(tester, recalcButton);
+      expect(fieldText(tester, 'Gramos por unidad'), '18,5');
+      expect(fieldText(tester, 'Horas'), '1');
+      expect(fieldText(tester, 'Minutos'), '35');
+      expect(find.text('PLA · Rojo · Grilon3'), findsOneWidget, reason: 'el filamento guardado');
+      // Cerrar sin usar no cambia nada.
+      Navigator.of(tester.element(find.byType(PriceEstimatorSheet))).pop();
+      await settle(tester);
+      expect(fieldText(tester, r'Precio por unidad ($)'), '2.500');
+      // Guardar sin recalcular manda de nuevo lo calculado antes.
+      await tester.enterText(find.widgetWithText(TextField, 'Demora'), '7 días');
+      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await settle(tester);
+      final json = api.answered!.draft.toJson();
+      expect(json['unitCost'], isNull);
+      expect(json['filamentId'], '11111111-1111-4111-8111-111111111111');
+      expect(json['material'], 'PLA');
+      expect(json['grams'], 18.5);
+      expect(json['printMinutes'], 95);
+    });
+
+    testWidgets('calculadora: si el servidor no deja cotizar, se ve el motivo y no hay precio para usar', (tester) async {
+      await openAnswer(tester, 'consulta_calculadora_error', pending);
+      calcApi.failWith = ApiException('invalid', 'El filamento elegido ya no existe. Elegí otro.');
+      await tapShown(tester, calcButton);
+      await tester.enterText(find.widgetWithText(TextField, 'Gramos por unidad'), '20');
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Macetas'));
+      await settle(tester);
+      expect(find.text('El filamento elegido ya no existe. Elegí otro.'), findsOneWidget);
+      expect(tester.widget<GoldButton>(find.widgetWithText(GoldButton, 'Usar este precio')).onPressed, isNull);
+    });
+
+    testWidgets('calculadora: sin permiso o sin conexión muestra el aviso con "Reintentar"', (tester) async {
+      await openAnswer(
+        tester,
+        'consulta_calculadora_sin_permiso',
+        pending,
+        calcLoadError: ApiException('forbidden', 'No tenés permiso para esta acción.'),
+      );
+      await tapShown(tester, calcButton);
+      expect(find.text('No tenés permiso para esta acción.'), findsOneWidget);
+      expect(find.widgetWithText(GoldButton, 'Reintentar'), findsOneWidget);
+      expect(find.widgetWithText(GoldButton, 'Usar este precio'), findsNothing);
+    });
+
+    testWidgets('calculadora: sin filamentos ni tipos cargados lo avisa', (tester) async {
+      await openAnswer(
+        tester,
+        'consulta_calculadora_vacia',
+        pending,
+        overview: sampleEstimatorOverview(noFilaments: true, noPresets: true),
+      );
+      await tapShown(tester, calcButton);
+      expect(find.textContaining('No hay filamentos cargados.'), findsOneWidget);
+      expect(find.text('No hay tipos disponibles. Avisale al administrador.'), findsOneWidget);
     });
 
     testWidgets('con mensaje guardado y cambiado a mano: se manda el texto nuevo', (tester) async {
@@ -757,8 +955,7 @@ void main() {
     testWidgets('un rechazo del servidor queda en el formulario', (tester) async {
       final api = await openAnswer(tester, 'consulta_responder_error', pending);
       api.failWith = ApiException('invalid', 'Esta consulta ya está cerrada. Reabrila para cambiar la respuesta.');
-      await tester.enterText(find.widgetWithText(TextField, r'Precio por unidad ($)'), '2500');
-      await tester.enterText(find.widgetWithText(TextField, r'Costo por unidad ($)'), '900');
+      await calculate(tester);
       await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
       await settle(tester);
       expect(find.text('Esta consulta ya está cerrada. Reabrila para cambiar la respuesta.'), findsOneWidget);
@@ -766,11 +963,11 @@ void main() {
     });
 
     testWidgets('desde el listado: "Responder" abre el formulario y "Listo" vuelve', (tester) async {
-      final api = await openList(tester, 'consultas_responder_camino', who: operador);
+      calcApi = FakeEstimatorApi();
+      final api = await openList(tester, 'consultas_responder_camino', who: operador, extra: estimatorOverrides(calcApi));
       await tapShown(tester, find.text('Responder'));
       expect(find.byType(ConsultaAnswerScreen), findsOneWidget);
-      await tester.enterText(find.widgetWithText(TextField, r'Precio por unidad ($)'), '2500');
-      await tester.enterText(find.widgetWithText(TextField, r'Costo por unidad ($)'), '900');
+      await calculate(tester);
       await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
       await settle(tester);
       expect(api.answered!.id, 'c1');

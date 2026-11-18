@@ -6,6 +6,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../analisis/ar_number.dart';
+import '../calculadora/price_estimator_sheet.dart';
 import '../filamentos/shared_widgets.dart';
 import 'consultas_api.dart';
 import 'consultas_models.dart';
@@ -15,6 +16,13 @@ import 'consultas_widgets.dart';
 /// el servidor arma el mensaje para el cliente; al guardar se muestra cómo
 /// quedó, que es lo que va a mandar atención al cliente.
 /// (Pantalla y no hoja: son muchos campos.)
+///
+/// Pedido de Ale (2026-11-17), igual que la web:
+/// - El precio sale de la CALCULADORA ("Calcular precio"): gramos, tiempo,
+///   filamento y tipo de producto. El operador no ve ni el costo ni el margen,
+///   solo el precio; lo calculado queda guardado para costear el pedido.
+/// - Con más de una unidad puede tipear el precio POR UNIDAD o POR EL TOTAL;
+///   al servidor va siempre el precio por unidad.
 class ConsultaAnswerScreen extends ConsumerStatefulWidget {
   const ConsultaAnswerScreen({super.key, required this.consulta});
   final Consulta consulta;
@@ -25,7 +33,6 @@ class ConsultaAnswerScreen extends ConsumerStatefulWidget {
 
 class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
   late final TextEditingController _unitPrice;
-  late final TextEditingController _unitCost;
   late final TextEditingController _delivery;
   late final TextEditingController _bulkPrice;
   late final TextEditingController _bulkFrom;
@@ -35,6 +42,14 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
   late final TextEditingController _message;
 
   static const _fixFieldsMessage = 'Revisá los datos marcados en rojo.';
+
+  PriceMode _mode = PriceMode.unit;
+
+  /// Datos de la calculadora: los guardados con la respuesta o los del último
+  /// "Calcular precio". Null = respuesta nueva sin calcular, o respuesta vieja
+  /// con el costo cargado a mano (ese costo se reenvía tal cual, sin mostrarlo).
+  RespuestaCalc? _calc;
+  bool _recalculated = false;
 
   bool _saving = false;
   bool _submitted = false;
@@ -52,7 +67,7 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
     final q = _q;
     String money(double? v) => v == null ? '' : arEditText(v);
     _unitPrice = TextEditingController(text: money(q.unitPrice));
-    _unitCost = TextEditingController(text: money(q.unitCost));
+    _calc = q.calc;
     _delivery = TextEditingController(text: q.deliveryTime ?? '');
     _bulkPrice = TextEditingController(text: money(q.bulkPrice));
     _bulkFrom = TextEditingController(text: q.bulkFrom?.toString() ?? '');
@@ -66,7 +81,7 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
 
   @override
   void dispose() {
-    for (final c in [_unitPrice, _unitCost, _delivery, _bulkPrice, _bulkFrom, _dimensions, _colors, _note, _message]) {
+    for (final c in [_unitPrice, _delivery, _bulkPrice, _bulkFrom, _dimensions, _colors, _note, _message]) {
       c.dispose();
     }
     super.dispose();
@@ -74,7 +89,9 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
 
   Map<String, String> get _errors => validateRespuestaForm(
         unitPrice: _unitPrice.text,
-        unitCost: _unitCost.text,
+        hasCostBasis: _hasCost,
+        mode: _mode,
+        quantity: _q.quantity,
         bulkPrice: _bulkPrice.text,
         bulkFrom: _bulkFrom.text,
         dimensions: _dimensions.text,
@@ -84,12 +101,68 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
         message: _message.text,
       );
 
+  /// Hay con qué costear el pedido: calculadora, o el costo de una respuesta vieja.
+  bool get _hasCost => _calc != null || _q.unitCost != null;
+
+  /// Precio por unidad según lo tipeado y el modo (null si no es un número > 0).
+  double? get _unitPriceValue {
+    final typed = parseArNumber(_unitPrice.text);
+    if (typed == null || typed <= 0) return null;
+    return unitPriceFrom(typed, _mode, _q.quantity);
+  }
+
+  /// "Por unidad" / "Por las N": el mismo precio, expresado de la otra forma.
+  void _changeMode(PriceMode next) {
+    if (next == _mode) return;
+    final typed = parseArNumber(_unitPrice.text);
+    if (typed != null && typed > 0) {
+      _unitPrice.text = arEditText(convertTypedPrice(typed, to: next, quantity: _q.quantity));
+    }
+    setState(() {
+      _mode = next;
+      _serverError = null;
+    });
+  }
+
+  Future<void> _calculate() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final calc = _calc;
+    final result = await showPriceEstimator(
+      context,
+      initial: calc == null
+          ? null
+          : EstimatorInitial(
+              filamentId: calc.filamentId,
+              material: calc.material,
+              grams: calc.grams,
+              printMinutes: calc.printMinutes,
+            ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _unitPrice.text = arEditText(calculatorPriceFor(result.price, _mode, _q.quantity));
+      _calc = RespuestaCalc(
+        filamentId: result.filamentId,
+        material: result.material,
+        grams: result.grams,
+        printMinutes: result.printMinutes,
+      );
+      _recalculated = true;
+      _serverError = null;
+    });
+  }
+
   /// ¿Cambió algo respecto de lo guardado? (para preguntar antes de salir)
   bool get _dirty {
     final q = _q;
     String money(double? v) => v == null ? '' : arEditText(v);
-    return _unitPrice.text.trim() != money(q.unitPrice) ||
-        _unitCost.text.trim() != money(q.unitCost) ||
+    // El precio se compara por unidad: cambiar de modo no es un cambio.
+    final unit = _unitPriceValue;
+    final priceChanged = unit == null
+        ? _unitPrice.text.trim().isNotEmpty || q.unitPrice != null
+        : (q.unitPrice == null || (unit - q.unitPrice!).abs() > 0.005);
+    return priceChanged ||
+        _recalculated ||
         _delivery.text.trim() != (q.deliveryTime ?? '') ||
         _bulkPrice.text.trim() != money(q.bulkPrice) ||
         _bulkFrom.text.trim() != (q.bulkFrom?.toString() ?? '') ||
@@ -125,8 +198,10 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
       final answered = await ref.read(consultasApiProvider).answer(
             _q.id,
             RespuestaDraft(
-              unitPrice: parseArNumber(_unitPrice.text)!,
-              unitCost: parseArNumber(_unitCost.text)!,
+              unitPrice: _unitPriceValue!,
+              calc: _calc,
+              // Respuesta vieja con el costo a mano: se conserva.
+              legacyUnitCost: _q.unitCost,
               bulkPrice: parseArNumber(_bulkPrice.text),
               bulkFrom: int.tryParse(_bulkFrom.text.trim()),
               dimensions: _dimensions.text,
@@ -158,7 +233,9 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
     final q = _q;
     final errors = _submitted ? _errors : const <String, String>{};
     final hadMessage = q.message != null;
-    final price = parseArNumber(_unitPrice.text);
+    final unit = _unitPriceValue;
+    final qty = q.quantity;
+    final totalMode = _mode == PriceMode.total && qty > 1;
 
     Widget moneyField(TextEditingController ctl, String label, String key, {String? helper}) => TextField(
           controller: ctl,
@@ -218,23 +295,57 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
                     style: TextStyle(fontSize: 12.5, color: c.textDim),
                   ),
                   const SizedBox(height: 16),
+                  if (qty > 1) ...[
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('Por unidad'),
+                          selected: !totalMode,
+                          onSelected: _saving ? null : (_) => _changeMode(PriceMode.unit),
+                        ),
+                        ChoiceChip(
+                          label: Text('Por las $qty'),
+                          selected: totalMode,
+                          onSelected: _saving ? null : (_) => _changeMode(PriceMode.total),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   moneyField(
                     _unitPrice,
-                    'Precio por unidad (\$)',
+                    totalMode ? 'Precio por las $qty (\$)' : 'Precio por unidad (\$)',
                     'unitPrice',
-                    helper: (q.quantity > 1 && price != null && price > 0)
-                        ? 'Total por ${q.quantity}: ${formatConsultaMoney(price * q.quantity)}'
+                    helper: (qty > 1 && unit != null)
+                        ? '${formatConsultaMoney(unit)} c/u · ${formatConsultaMoney(unit * qty)} por las $qty'
                         : null,
                   ),
-                  const SizedBox(height: 14),
-                  // El costo va pegado al precio, pero es interno: no entra en
-                  // el mensaje ni se le muestra al cliente.
-                  moneyField(
-                    _unitCost,
-                    'Costo por unidad (\$)',
-                    'unitCost',
-                    helper: 'No se le muestra al cliente. Con esto se registra el pedido cuando se confirma.',
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: _saving ? null : _calculate,
+                      icon: const Icon(Icons.calculate_outlined, size: 18),
+                      label: Text(_calc != null ? 'Volver a calcular' : 'Calcular precio'),
+                    ),
                   ),
+                  const SizedBox(height: 6),
+                  // El costo no se muestra nunca: solo si ya quedó guardado.
+                  if (errors['calc'] != null)
+                    Text(
+                      errors['calc']!,
+                      style: TextStyle(fontSize: 12, height: 1.35, color: Theme.of(context).colorScheme.error),
+                    )
+                  else
+                    Text(
+                      _hasCost
+                          ? 'Costo guardado con la calculadora. Podés ajustar el precio a mano.'
+                          : 'Calculá el precio con la calculadora: elegís el tipo de producto y queda '
+                              'guardado el costo para cuando se confirme el pedido.',
+                      style: TextStyle(fontSize: 12, height: 1.35, color: c.textFaint),
+                    ),
                   const SizedBox(height: 14),
                   textField(_delivery, 'Demora', 'deliveryTime', hint: 'Ej: 5 días hábiles', max: 120),
                   const SizedBox(height: 18),

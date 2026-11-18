@@ -18,6 +18,8 @@ import 'package:hefesto/features/admin/sales_screen.dart';
 import 'package:hefesto/features/admin/stock_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+import 'support/sales_kit.dart';
+
 /// Dibuja cada pantalla del panel con datos de ejemplo. Sirve de humo (si algo
 /// se desborda o lanza, el test falla) y, con SHOT_DIR=ruta_de_una_carpeta, guarda una
 /// captura PNG de cada una para revisarlas a ojo.
@@ -184,6 +186,8 @@ Future<void> _show(
     ProviderScope(
       overrides: [
         homeProvider.overrideWith((ref) async => HomeData.fromJson({})),
+        // Ventas arranca en el mes actual: "hoy" fijo en octubre de 2026.
+        ...salesKitOverrides(),
         meProvider.overrideWith((ref) async => me ?? _me),
         ...overrides,
       ],

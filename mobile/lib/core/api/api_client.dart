@@ -19,8 +19,13 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
-/// Tope de una foto subida (el mismo del servidor, que igual lo verifica).
-const maxUploadImageBytes = 8 * 1024 * 1024;
+/// Tope de una foto (o archivo) que sube la app: 4 MB. El servidor acepta hasta
+/// 8 MB, pero el hosting corta antes cualquier pedido de más de ~4,5 MB (y
+/// responde un error que no dice nada): se frena acá, con un mensaje claro.
+const maxUploadImageBytes = 4 * 1024 * 1024;
+
+/// Texto del aviso cuando una foto pasa del tope.
+const uploadTooBigMessage = 'La foto pesa más de 4 MB. Probá con una más liviana.';
 
 /// Subtipo MIME de una foto según su extensión: `jpeg`, `png` o `webp`; null
 /// si es otra cosa (el servidor solo acepta esos tres).
@@ -35,25 +40,33 @@ String? imageSubtypeOf(String filename) {
   };
 }
 
-/// Cuerpo `multipart/form-data` de una foto: un solo campo, `file`, con su tipo
-/// de imagen. Lanza [ApiException] si el formato o el peso no sirven (se revisa
+/// Cuerpo `multipart/form-data` de una foto: el campo `file` con su tipo de
+/// imagen y, si hacen falta, campos de texto al lado ([fields]: `kind`,
+/// `color`…). Lanza [ApiException] si el formato o el peso no sirven (se revisa
 /// acá, antes de gastar datos del teléfono: el servidor rechaza lo que no sea
-/// JPG, PNG o WebP y lo que pase de 8 MB).
-FormData imageFormData(List<int> bytes, String filename) {
+/// JPG, PNG o WebP, y el hosting lo que pase de 4 MB).
+FormData imageFormData(List<int> bytes, String filename, {Map<String, String> fields = const {}}) {
   final subtype = imageSubtypeOf(filename);
   if (subtype == null) {
     throw ApiException('invalid', 'La foto tiene que ser JPG, PNG o WebP.');
   }
   if (bytes.length > maxUploadImageBytes) {
-    throw ApiException('invalid', 'La foto pesa más de 8 MB. Probá con una más liviana.');
+    throw ApiException('invalid', uploadTooBigMessage);
   }
-  return fileFormData(bytes, filename, 'image/$subtype');
+  return fileFormData(bytes, filename, 'image/$subtype', fields: fields);
 }
 
-/// Cuerpo `multipart/form-data` de un archivo cualquiera: un solo campo,
-/// `file`, con el tipo que se le pasa ("audio/mpeg", "application/pdf"…). El
-/// servidor decide por ese tipo si lo acepta.
-FormData fileFormData(List<int> bytes, String filename, String contentType) => FormData.fromMap({
+/// Cuerpo `multipart/form-data` de un archivo cualquiera: el campo `file`, con
+/// el tipo que se le pasa ("audio/mpeg", "application/pdf"…), más los campos
+/// de texto de [fields]. El servidor decide por ese tipo si lo acepta.
+FormData fileFormData(
+  List<int> bytes,
+  String filename,
+  String contentType, {
+  Map<String, String> fields = const {},
+}) =>
+    FormData.fromMap({
+      ...fields,
       'file': MultipartFile.fromBytes(
         bytes,
         filename: filename,
@@ -137,22 +150,24 @@ class ApiClient {
   }) =>
       _send(method, path, query: query, body: body);
 
-  /// Sube UNA foto como `multipart/form-data` (campo `file`) y devuelve el JSON
-  /// de la respuesta. Pasa por lo mismo que [sendJson]: token, renovación ante
-  /// un 401 y errores traducidos a [ApiException]. El formato y el peso se
-  /// revisan antes de mandar nada (ver [imageFormData]).
+  /// Sube UNA foto como `multipart/form-data` (campo `file`, más los campos de
+  /// texto de [fields]) y devuelve el JSON de la respuesta. Pasa por lo mismo
+  /// que [sendJson]: token, renovación ante un 401 y errores traducidos a
+  /// [ApiException]. El formato y el peso se revisan antes de mandar nada (ver
+  /// [imageFormData]).
   Future<Map<String, dynamic>> uploadImage(
     String path, {
     required List<int> bytes,
     required String filename,
+    Map<String, String> fields = const {},
   }) async {
-    imageFormData(bytes, filename); // valida: lanza antes de tocar la red
+    imageFormData(bytes, filename, fields: fields); // valida: lanza antes de tocar la red
     return _send(
       'POST',
       path,
       // Un FormData solo se puede mandar una vez: si hay que reintentar tras
       // renovar la sesión, se arma de nuevo.
-      makeBody: () => imageFormData(bytes, filename),
+      makeBody: () => imageFormData(bytes, filename, fields: fields),
       // Subir por datos móviles puede tardar bastante más que un pedido común.
       sendTimeout: const Duration(seconds: 90),
     );

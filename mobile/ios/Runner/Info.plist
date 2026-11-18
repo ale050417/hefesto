@@ -46,9 +46,9 @@
 		<key>ITSAppUsesNonExemptEncryption</key>
 		<false/>
 		<key>NSCameraUsageDescription</key>
-		<string>Para sacar fotos y adjuntarlas a los arreglos y consultas del taller.</string>
+		<string>Para sacar fotos de los productos, los banners de la tienda y los arreglos y consultas del taller.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
-		<string>Para adjuntar fotos a los arreglos y consultas del taller.</string>
+		<string>Para elegir fotos de los productos, el logo y los banners de la tienda, y de los arreglos y consultas del taller.</string>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<key>UIApplicationSceneManifest</key>

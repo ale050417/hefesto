@@ -252,7 +252,7 @@ class _CalcFormState extends ConsumerState<CalcForm> {
                         color: Brand.warning,
                       )
                     else
-                      _FilamentField(filament: f, onTap: _pickFilament),
+                      CalcFilamentField(filament: f, onTap: _pickFilament),
                     const SizedBox(height: 16),
                     ArNumberField(
                       controller: _grams,
@@ -394,8 +394,10 @@ class _CalcFormState extends ConsumerState<CalcForm> {
   }
 }
 
-class _FilamentField extends StatelessWidget {
-  const _FilamentField({required this.filament, required this.onTap});
+/// Campo "Filamento" (abre el selector). Lo usan la calculadora y el
+/// "Calcular precio" de las consultas.
+class CalcFilamentField extends StatelessWidget {
+  const CalcFilamentField({super.key, required this.filament, required this.onTap});
   final CalcFilament? filament;
   final VoidCallback onTap;
 

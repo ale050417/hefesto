@@ -1,4 +1,5 @@
-import { apiOk, requireApiPerm, withApi } from "@/core/api/respond";
+import { apiOk, withApi } from "@/core/api/respond";
+import { requireCalcAccess } from "@/features/calculator/api-access";
 import { isAdminForUser } from "@/core/auth/permissions";
 import { buildCalcPayload } from "@/features/calculator/calc-payload";
 import {
@@ -24,7 +25,7 @@ import {
 export const dynamic = "force-dynamic";
 
 export const GET = withApi("admin/calculadora", async (request: Request) => {
-  const auth = await requireApiPerm(request, "calculadora", "ver");
+  const auth = await requireCalcAccess(request);
   if ("response" in auth) return auth.response;
 
   const admin = await isAdminForUser(auth.user);

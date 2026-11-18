@@ -40,6 +40,14 @@ class FakePhotoSource implements PhotoSource {
     if (failWith != null) throw failWith!;
     return camera;
   }
+
+  /// Una sola de la galería: la primera de [gallery] (null = se canceló).
+  @override
+  Future<PickedPhoto?> oneFromGallery() async {
+    galleryCalls++;
+    if (failWith != null) throw failWith!;
+    return gallery.isEmpty ? null : gallery.first;
+  }
 }
 
 /// Para el `setUpAll` de los tests que dibujan fotos con dirección real

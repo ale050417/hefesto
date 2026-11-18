@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
 import '../../../core/providers.dart';
+import '../../../core/widgets/photo_picker.dart';
 import 'config_models.dart';
 
 /// Llamadas a `/api/v1/admin/configuracion/**`. Todas lanzan [ApiException]
@@ -34,8 +35,30 @@ class ConfigApi {
 
   Future<void> saveCotizacion(Map<String, dynamic> body) => _c.sendJson('PUT', '$_base/cotizacion', body: body);
 
+  /// Edición parcial de un banner: textos, alineación, visible y, desde
+  /// 2026-11-17, también `imageUrl` (una subida con [uploadImage]) y `position`.
   Future<void> updateBanner(String id, Map<String, dynamic> body) =>
       _c.sendJson('PATCH', '$_base/banners/$id', body: body);
+
+  /// Crea un banner (queda al final del carrusel). Devuelve su id.
+  Future<String> createBanner(Map<String, dynamic> body) async {
+    final json = await _c.sendJson('POST', '$_base/banners', body: body);
+    return '${json['id'] ?? ''}';
+  }
+
+  /// Sube una imagen de la tienda y devuelve su dirección. [kind]:
+  ///  - `logo` / `hero`: queda puesta apenas sube;
+  ///  - `banner`: solo se sube; la dirección va después en el banner
+  ///    ([createBanner] / [updateBanner] con `imageUrl`).
+  Future<String> uploadImage(PickedPhoto photo, String kind) async {
+    final json = await _c.uploadImage(
+      '$_base/imagenes',
+      bytes: photo.bytes,
+      filename: photo.filename,
+      fields: {'kind': kind},
+    );
+    return '${json['url'] ?? ''}';
+  }
 
   Future<void> deleteBanner(String id) => _c.sendJson('DELETE', '$_base/banners/$id');
 
