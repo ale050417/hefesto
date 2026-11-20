@@ -96,9 +96,23 @@ la cuenta**):
 | Información personal | IDs de usuario                  | Sí                    |
 | Información personal | Número de teléfono              | Sí (solo si lo carga) |
 
-Todo lo demás (ubicación, información financiera, salud, mensajes, fotos y
-videos, audio, archivos, calendario, contactos, actividad en apps, navegación
-web, información del dispositivo u otros identificadores, diagnósticos): **No**.
+Desde la 1.1.0 el panel sube archivos desde el teléfono, así que también se
+declaran (recopilados, **opcionales**, propósito **Funciones de la app**, no
+compartidos):
+
+| Categoría             | Dato                                                    |
+| --------------------- | ------------------------------------------------------- |
+| Fotos y videos        | Fotos, Videos                                           |
+| Archivos de audio     | Grabaciones de voz o de sonido, Otros archivos de audio |
+| Archivos y documentos | Archivos y documentos (PDF)                             |
+
+En App Store Connect el equivalente es "Fotos o vídeos", "Datos de audio" y
+"Otro contenido del usuario" (funcionalidad de la app, vinculados a la
+identidad, sin seguimiento).
+
+Todo lo demás (ubicación, información financiera, salud, mensajes, calendario,
+contactos, actividad en apps, navegación web, información del dispositivo u
+otros identificadores, diagnósticos): **No**.
 
 ## App Store Connect
 
