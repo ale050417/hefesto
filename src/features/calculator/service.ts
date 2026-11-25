@@ -2,6 +2,8 @@ import * as repo from "./repository";
 import { isAdmin } from "@/core/auth/permissions";
 import { ValidationError } from "@/core/errors";
 import { listFilamentsView } from "@/features/inventory/queries";
+import { listFilamentTypes } from "@/features/inventory/repository";
+import { notifyAdmins } from "@/features/notifications/service";
 import {
   computeQuote,
   resolveCostPerKg,
@@ -13,6 +15,7 @@ import type {
   CalcConfigInput,
   CalcSaveInput,
   MarginPresetInput,
+  PresetLikeInput,
 } from "./schemas";
 
 export type CalcConfig = {
@@ -169,6 +172,43 @@ export async function deleteMarginPreset(id: string) {
 }
 
 /**
+ * Tipo nuevo creado por quien cotiza (sugerencia de Agustín, 2026-11-25: "la
+ * opción de crear más tipos y no tener que estar jodiéndote"). El operador no
+ * conoce los márgenes, así que no carga un %: elige un tipo que YA existe y
+ * el nuevo se cobra igual (el servidor copia el margen, que nunca viaja). El
+ * admin recibe un aviso y lo ajusta cuando quiera en "Tipos y márgenes".
+ */
+export async function createPresetLike(
+  input: PresetLikeInput,
+  actorName: string | null,
+): Promise<MarginPreset> {
+  const presets = (await repo.listMarginPresets()).map(toPreset);
+  const like = presets.find((p) => p.id === input.likePresetId && p.active);
+  if (!like) {
+    throw new ValidationError(
+      "El tipo que elegiste como referencia ya no está disponible.",
+    );
+  }
+  const wanted = input.name.toLowerCase();
+  if (presets.some((p) => p.name.trim().toLowerCase() === wanted)) {
+    throw new ValidationError("Ya hay un tipo con ese nombre.");
+  }
+  const row = await repo.insertMarginPreset({
+    name: input.name,
+    marginPct: String(like.marginPct),
+    active: true,
+    sortOrder: Math.max(0, ...presets.map((p) => p.sortOrder)) + 1,
+  });
+  await notifyAdmins({
+    kind: "calc_preset",
+    title: "Tipo de producto nuevo en la calculadora",
+    body: `${actorName ?? "El operador"} creó "${row.name}", con el mismo margen que "${like.name}". Ajustalo en Tipos y márgenes si hace falta.`,
+    link: "/admin/calculadora",
+  }).catch(() => undefined);
+  return toPreset(row);
+}
+
+/**
  * Cotización para el OPERADOR: el margen sale del tipo elegido en el SERVIDOR
  * (nunca se confía en el cliente ni se le envía el %). Devuelve SOLO el precio
  * final, para no filtrar costo, ganancia ni margen. `costPerKg` lo resuelve la
@@ -218,7 +258,36 @@ export type FilamentOption = {
    * (pedido de Ale, 2026-09: "me saltan tres rojo y ni idea de cual es cual"). */
   brand: string;
   costPerKg: number;
+  /** Tipo de filamento (0084): la calculadora agrupa por acá. */
+  typeId: string | null;
+  typeName: string | null;
 };
+
+/**
+ * Los carretes como opciones de la calculadora, cada uno con SU precio y su
+ * tipo (nada de mapa material→costo, que colapsaba filamentos del mismo
+ * material con distinto costo). Si los tipos no cargan, los carretes igual
+ * salen (sin agrupar).
+ */
+export async function listFilamentOptions(): Promise<FilamentOption[]> {
+  const [rows, types] = await Promise.all([
+    listFilamentsView(),
+    listFilamentTypes().catch(() => []),
+  ]);
+  const typeName = new Map(types.map((t) => [t.id, t.name]));
+  return rows.map((f) => {
+    const name = f.typeId ? (typeName.get(f.typeId) ?? null) : null;
+    return {
+      id: f.id,
+      material: f.material,
+      color: f.color,
+      brand: f.brand,
+      costPerKg: f.costPerKg,
+      typeId: name ? f.typeId : null,
+      typeName: name,
+    };
+  });
+}
 
 export type EstimatorContext = {
   config: CalcConfig;
@@ -275,21 +344,12 @@ export async function getAmortization(input: {
 
 export async function getEstimatorContext(): Promise<EstimatorContext> {
   const admin = await isAdmin();
-  const [config, rows, presetOptions, presets] = await Promise.all([
+  const [config, filaments, presetOptions, presets] = await Promise.all([
     getCalcConfig(),
-    listFilamentsView(),
+    listFilamentOptions(),
     listActivePresetOptions(),
     admin ? listMarginPresets() : Promise.resolve([] as MarginPreset[]),
   ]);
-  // Cada filamento es una opción con SU precio (nada de mapa material→costo,
-  // que colapsaba filamentos del mismo material con distinto costo).
-  const filaments: FilamentOption[] = rows.map((f) => ({
-    id: f.id,
-    material: f.material,
-    color: f.color,
-    brand: f.brand,
-    costPerKg: f.costPerKg,
-  }));
   return { config, filaments, presetOptions, presets, isAdmin: admin };
 }
 

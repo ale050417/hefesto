@@ -1,5 +1,6 @@
 import { NotFoundError, ValidationError } from "@/core/errors";
 import { listFilamentsView } from "@/features/inventory/queries";
+import { findFilamentTypeById } from "@/features/inventory/repository";
 import { computeQuote, roundQuote, selectActiveMargin } from "./calculator";
 import type { CalcSaveInput, QuotePriceInput } from "./schemas";
 import * as service from "./service";
@@ -32,8 +33,18 @@ export async function saveCalcFlow(
   // FILAMENTO elegido (por id): dos filamentos del mismo material pueden
   // costar distinto (fix auditoría 2026-07).
   const filament = await requireFilament(input.filamentId);
+  // Cotizado por TIPO: el historial dice "PLA", no el color del carrete que
+  // lo representó.
+  const type =
+    input.byType && filament.typeId
+      ? await findFilamentTypeById(filament.typeId)
+      : null;
   const row = await service.createCalc(
-    { ...input, material: filament.material, color: filament.color },
+    {
+      ...input,
+      material: type ? type.name : filament.material,
+      color: type ? null : filament.color,
+    },
     filament.costPerKg,
     userId,
   );

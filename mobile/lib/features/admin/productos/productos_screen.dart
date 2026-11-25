@@ -15,6 +15,9 @@ import '../admin_widgets.dart';
 import 'catalogo_ui.dart';
 import 'category_picker.dart';
 import 'producto_detail_screen.dart';
+import 'producto_drafts.dart';
+import 'producto_drafts_provider.dart';
+import 'producto_drafts_sheet.dart';
 import 'producto_form_screen.dart';
 import 'productos_actions.dart';
 import 'productos_models.dart';
@@ -148,15 +151,23 @@ class _AdminProductosScreenState extends ConsumerState<AdminProductosScreen> {
     }
   }
 
-  Future<void> _create() async {
+  /// Abre el alta: vacía, o retomando un borrador sin guardar.
+  Future<void> _create({ProductDraft? draft}) async {
     final id = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const AdminProductFormScreen()),
+      MaterialPageRoute(builder: (_) => AdminProductFormScreen(draft: draft)),
     );
     if (id != null && mounted) {
       await Navigator.of(context).push(
         MaterialPageRoute(builder: (_) => AdminProductDetailScreen(id: id)),
       );
     }
+  }
+
+  /// "Borradores sin guardar": lo que se empezó a cargar y no se creó.
+  Future<void> _openDrafts() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final draft = await showProductDraftsSheet(context);
+    if (draft != null && mounted) await _create(draft: draft);
   }
 
   void _open(AdminProductRow row) {
@@ -188,6 +199,11 @@ class _AdminProductosScreenState extends ConsumerState<AdminProductosScreen> {
     final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0 &&
         (ModalRoute.of(context)?.isCurrent ?? true);
     final showFab = canCreate && !keyboardOpen && !products.hasError;
+    // Altas que quedaron a medio cargar en este teléfono (no son los productos
+    // en estado "Borrador", que ya existen en el servidor). Sin ninguna, la
+    // entrada no aparece; con el teclado abierto se esconde para dejar lugar.
+    final draftCount = ref.watch(productDraftsProvider.select((book) => book.drafts.length));
+    final showDrafts = canCreate && draftCount > 0 && !keyboardOpen;
 
     return AdminModuleScaffold(
       title: 'Productos',
@@ -327,6 +343,27 @@ class _AdminProductosScreenState extends ConsumerState<AdminProductosScreen> {
             ),
           ),
           const SizedBox(height: 2),
+          if (showDrafts)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+              child: AdminCard(
+                onTap: _openDrafts,
+                padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_note_rounded, size: 20, color: c.textDim),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Borradores sin guardar ($draftCount)',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5),
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded, color: c.textDim),
+                  ],
+                ),
+              ),
+            ),
           Expanded(
             child: products.when(
               loading: () => const ListSkeleton(rows: 6, height: 104),

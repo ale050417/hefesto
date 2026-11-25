@@ -13,7 +13,13 @@ import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toastStore";
 import { answerInquiryAction } from "../actions";
 import { buildInquiryMessage } from "../message";
+import {
+  optionHasCost,
+  type InquiryProduct,
+  type InquiryProductOption,
+} from "../product-prefill";
 import type { InquiryView } from "../view";
+import { ProductPicker } from "./product-picker";
 
 const numOrNull = (s: string) => {
   const n = Number(s.replace(",", "."));
@@ -39,16 +45,21 @@ type Calc = {
  *   (para cuando se cotiza "el lote"): se guarda siempre el precio por unidad.
  * - Abajo ve EN VIVO el mensaje que le llega armado a atención al cliente.
  *   Puede retocarlo; mientras no lo toque, se rearma solo con cada cambio.
+ * - Si el producto ya está cargado en la tienda, lo busca arriba y se rellena
+ *   todo solo (sugerencia de Agustín, 2026-11-19).
  */
 export function AnswerForm({
   inquiry,
   defaults,
   estimator,
+  products,
   onDone,
 }: {
   inquiry: InquiryView;
   defaults: QuoteDefaults;
   estimator: EstimatorContext;
+  /** Productos de la tienda para rellenar la respuesta. */
+  products: InquiryProduct[];
   onDone: () => void;
 }) {
   const qty = inquiry.quantity;
@@ -105,6 +116,27 @@ export function AnswerForm({
       grams: v.grams,
       printMinutes: v.printMinutes,
     });
+  }
+
+  /** Rellena la respuesta con la ficha de un producto de la tienda. */
+  function applyProduct(p: InquiryProduct, o: InquiryProductOption) {
+    setPriceText(String(mode === "total" ? o.unitPrice * qty : o.unitPrice));
+    // Si la ficha no alcanza para costear, lo calculado antes era de otra
+    // pieza: se borra y el operador pasa por la calculadora.
+    setCalc(
+      optionHasCost(p, o)
+        ? {
+            filamentId: null,
+            material: p.material,
+            grams: o.grams,
+            printMinutes: o.printMinutes,
+          }
+        : null,
+    );
+    if (p.dimensions) setDimensions(p.dimensions.slice(0, 300));
+    if (p.colors) setColors(p.colors.slice(0, 300));
+    if (p.deliveryTime) setDeliveryTime(p.deliveryTime.slice(0, 120));
+    setErrors({});
   }
 
   const auto = buildInquiryMessage(
@@ -182,6 +214,10 @@ export function AnswerForm({
         </p>
       ) : null}
 
+      {products.length > 0 ? (
+        <ProductPicker products={products} onPick={applyProduct} />
+      ) : null}
+
       <div
         className={`field ${errors.unitPrice || errors.calc ? "invalid" : ""}`}
       >
@@ -249,7 +285,7 @@ export function AnswerForm({
         ) : (
           <p className="text-faint text-xs">
             {hasCost
-              ? "Costo guardado con la calculadora. Podés ajustar el precio a mano."
+              ? "Costo guardado. Podés ajustar el precio a mano."
               : "Calculá el precio con la calculadora: elegís el tipo de producto y queda guardado el costo para cuando se confirme el pedido."}
           </p>
         )}

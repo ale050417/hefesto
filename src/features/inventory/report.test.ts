@@ -11,6 +11,8 @@ const base = (over: Partial<FilamentView>): FilamentView => ({
   stockGrams: 1000,
   spoolGrams: 1000,
   costPerKg: 10000,
+  typeId: null,
+  spoolModelId: null,
   alertThresholdGrams: 200,
   lowStock: false,
   status: "ok",

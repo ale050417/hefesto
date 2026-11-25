@@ -45,8 +45,15 @@ function storagePath(url: string): string | null {
   return path.startsWith(`${PREFIX}/`) ? path : null;
 }
 
-const notify = (title: string, body: string) =>
-  notifyAdmins({ title, body, link: PAGE }).catch(() => undefined);
+const notify = (
+  kind: "inquiry" | "inquiry_answered" | "inquiry_confirmed",
+  title: string,
+  body: string,
+  actor: Actor,
+) =>
+  notifyAdmins({ kind, title, body, link: PAGE, actorId: actor.id }).catch(
+    () => undefined,
+  );
 
 const times = (n: number) => (n > 1 ? ` (x${n})` : "");
 
@@ -71,8 +78,10 @@ export async function createInquiry(
     metadata: { title: row.title, customer: row.customerName },
   });
   await notify(
+    "inquiry",
     "Consulta nueva",
     `${actor.name ?? "Atención al cliente"}: ${row.title}${times(row.quantity)} — ${row.customerName}`,
+    actor,
   );
   revalidatePath(PAGE);
   return row;
@@ -153,8 +162,10 @@ export async function answerInquiry(
     metadata: { title: row.title, unitPrice: input.unitPrice },
   });
   await notify(
+    "inquiry_answered",
     "Consulta respondida",
     `${row.title} — ${formatQuoteMoney(input.unitPrice)}${row.quantity > 1 ? " c/u" : ""} · ${row.customerName}`,
+    actor,
   );
   revalidatePath(PAGE);
   return row;
@@ -248,8 +259,10 @@ async function confirmInquiry(
     },
   });
   await notify(
+    "inquiry_confirmed",
     "Consulta CONFIRMADA → pedido creado",
     `${row.title}${times(row.quantity)} — ${row.customerName}`,
+    actor,
   );
   revalidatePath(PAGE);
   revalidatePath("/admin/produccion");

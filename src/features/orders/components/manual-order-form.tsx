@@ -1159,6 +1159,8 @@ export function ManualSaleForm({
                     <EstimatorModalButton
                       estimator={estimator}
                       onUse={handleEstUse}
+                      // Acá importa el carrete exacto: de ese se descuenta.
+                      byType={false}
                     />
                   </div>
                   {/* Contrato de la cantidad (pedido de Ale): TODO va de la mano.

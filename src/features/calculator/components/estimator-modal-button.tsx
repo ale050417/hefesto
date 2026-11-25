@@ -18,7 +18,11 @@ export function EstimatorModalButton({
   initial,
   label = "Calcular precio",
   colors,
+  byType = true,
 }: {
+  /** false = el selector lista cada carrete (la venta manual descuenta stock
+   * del que se elija); por defecto agrupa por tipo de filamento. */
+  byType?: boolean;
   estimator: EstimatorContext;
   onUse: (v: EstimatorValue) => void;
   initial?: Partial<{
@@ -68,6 +72,7 @@ export function EstimatorModalButton({
             initial={initial}
             onChange={setVal}
             colors={colors}
+            byType={byType}
           />
           <div className="flex justify-end gap-2 border-t border-[var(--border)] pt-4">
             <Button

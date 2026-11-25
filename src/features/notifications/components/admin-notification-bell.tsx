@@ -3,11 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/core/supabase/browser";
+import { toast } from "@/stores/toastStore";
 import {
   getAdminNotificationsAction,
   markAdminNotificationsReadAction,
 } from "../actions";
-import type { Notification } from "../repository";
+import type { KindPref } from "../kinds";
+import { getPushState } from "../push-client";
+import type { AdminNotificationView } from "../service";
+import { NotificationSettings } from "./notification-settings";
 
 const dateFmt = new Intl.DateTimeFormat("es-AR", {
   day: "2-digit",
@@ -21,12 +25,23 @@ const dateFmt = new Intl.DateTimeFormat("es-AR", {
  * Mismo lenguaje visual que la del cliente (NotificationBell). Se actualiza en
  * tiempo real: escucha los INSERT de `notifications` por Supabase Realtime y
  * re-consulta; si Realtime no está disponible, cae a polling cada 30 s (solo
- * con la pestaña visible). Broadcast: lo ve todo el staff.
+ * con la pestaña visible).
+ *
+ * 2026-11-22 (Agustín: "siempre pasa desapercibido el símbolo"): cada persona
+ * ve solo los tipos de aviso de sus módulos y tiene SU contador de no leídos;
+ * un aviso nuevo salta además como cartel en pantalla; y desde el engranaje se
+ * eligen los tipos y se activan los avisos en el dispositivo (push).
  */
 export function AdminNotificationBell() {
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState<Notification[]>([]);
+  const [settings, setSettings] = useState(false);
+  const [items, setItems] = useState<AdminNotificationView[]>([]);
+  const [kinds, setKinds] = useState<KindPref[]>([]);
   const [unread, setUnread] = useState(0);
+  // ¿Conviene ofrecer "activar avisos en este dispositivo"?
+  const [offerPush, setOfferPush] = useState(false);
+  // Último aviso ya conocido: lo que llegue después salta como cartel.
+  const lastSeenId = useRef<string | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   // Canal de realtime ÚNICO por instancia: esta campana se monta 2 veces
   // (topbar móvil + sidebar desktop). Dos canales con el MISMO nombre colisionan
@@ -37,23 +52,43 @@ export function AdminNotificationBell() {
     () => `rt:notifications:admin:${Math.random().toString(36).slice(2, 10)}`,
   );
 
+  const apply = useCallback(
+    (r: Awaited<ReturnType<typeof getAdminNotificationsAction>>) => {
+      const newest = r.items[0];
+      // Llegó algo nuevo con el panel abierto: cartel en pantalla (la campana
+      // sola pasaba desapercibida). En la primera carga no se avisa nada.
+      if (
+        newest &&
+        newest.unread &&
+        lastSeenId.current !== null &&
+        lastSeenId.current !== newest.id
+      ) {
+        toast(newest.body ? `${newest.title}: ${newest.body}` : newest.title);
+      }
+      lastSeenId.current = newest?.id ?? "";
+      setItems(r.items);
+      setKinds(r.kinds);
+      setUnread(r.unread);
+    },
+    [],
+  );
+
   const load = useCallback(async () => {
-    const r = await getAdminNotificationsAction();
-    setItems(r.items);
-    setUnread(r.unread);
-  }, []);
+    apply(await getAdminNotificationsAction());
+  }, [apply]);
 
   useEffect(() => {
     let active = true;
     void getAdminNotificationsAction().then((r) => {
-      if (!active) return;
-      setItems(r.items);
-      setUnread(r.unread);
+      if (active) apply(r);
+    });
+    void getPushState().then((s) => {
+      if (active) setOfferPush(s === "off");
     });
     return () => {
       active = false;
     };
-  }, []);
+  }, [apply]);
 
   // Realtime: INSERT en notifications → re-consulta. Fallback: polling 30 s.
   useEffect(() => {
@@ -111,9 +146,10 @@ export function AdminNotificationBell() {
   function toggle() {
     const next = !open;
     setOpen(next);
+    setSettings(false);
     if (next && unread > 0) {
+      // El numerito se va; los puntos de "nuevo" quedan durante esta vista.
       setUnread(0);
-      setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
       void markAdminNotificationsReadAction();
     }
   }
@@ -145,18 +181,47 @@ export function AdminNotificationBell() {
       {open ? (
         <div className="notif-panel" role="dialog" aria-label="Notificaciones">
           <div className="notif-head">
-            <h3>Notificaciones</h3>
-            <button
-              type="button"
-              className="text-dim hover:text-fg text-lg leading-none"
-              onClick={() => setOpen(false)}
-              aria-label="Cerrar"
-            >
-              ✕
-            </button>
+            <h3>{settings ? "Avisos" : "Notificaciones"}</h3>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="text-dim hover:text-fg text-[12.5px] underline-offset-2 hover:underline"
+                onClick={() => setSettings((v) => !v)}
+              >
+                {settings ? "← Volver" : "⚙ Configurar"}
+              </button>
+              <button
+                type="button"
+                className="text-dim hover:text-fg text-lg leading-none"
+                onClick={() => setOpen(false)}
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
-          {items.length === 0 ? (
+          {!settings && offerPush ? (
+            <button
+              type="button"
+              className="hover:bg-surface-2 flex w-full items-center gap-2 border-b border-[var(--border)] px-4 py-2.5 text-left text-[12.5px]"
+              style={{ color: "var(--gold-bright)" }}
+              onClick={() => setSettings(true)}
+            >
+              🔔 Activá los avisos en este dispositivo para no perderte nada →
+            </button>
+          ) : null}
+
+          {settings ? (
+            <NotificationSettings
+              kinds={kinds}
+              onKindsChange={(next) => {
+                setKinds(next);
+                void load();
+                void getPushState().then((s) => setOfferPush(s === "off"));
+              }}
+            />
+          ) : items.length === 0 ? (
             <div className="notif-empty">
               <svg
                 viewBox="0 0 24 24"
@@ -177,7 +242,7 @@ export function AdminNotificationBell() {
                 const inner = (
                   <>
                     <span
-                      className={n.isRead ? "notif-dot read" : "notif-dot"}
+                      className={n.unread ? "notif-dot" : "notif-dot read"}
                       aria-hidden
                     />
                     <span className="notif-body">
@@ -187,7 +252,7 @@ export function AdminNotificationBell() {
                     </span>
                   </>
                 );
-                const cls = n.isRead ? "notif-item" : "notif-item unread";
+                const cls = n.unread ? "notif-item unread" : "notif-item";
                 return n.link ? (
                   <Link
                     key={n.id}

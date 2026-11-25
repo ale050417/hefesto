@@ -113,6 +113,7 @@ export async function createOrderAction(
 
     // Aviso al panel: entró un pedido nuevo (best-effort; no bloquea la venta).
     await notifyAdmins({
+      kind: "order",
       title: "Nuevo pedido",
       body: `${order.orderNumber} · $${Number(order.total).toLocaleString("es-AR")}`,
       link: `/admin/pedidos/${order.id}`,
@@ -540,6 +541,7 @@ export async function sendOrderMessageAction(
     // Si escribió el CLIENTE, avisamos al panel (best-effort).
     if (!staff) {
       await notifyAdmins({
+        kind: "message",
         title: "Mensaje de un cliente",
         body: parsed.data.body.slice(0, 90),
         link: `/admin/pedidos/${orderId}`,

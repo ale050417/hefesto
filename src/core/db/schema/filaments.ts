@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { filamentTypes, spoolModels } from "./filament-types";
 import {
   check,
   numeric,
@@ -29,6 +30,14 @@ export const filaments = pgTable(
     costPerKg: numeric("cost_per_kg", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
+    // Tipo de filamento (0084): si tiene, su costo/kg es el del tipo.
+    typeId: uuid("type_id").references(() => filamentTypes.id, {
+      onDelete: "set null",
+    }),
+    // Modelo de carrete (peso vacío) usado la última vez que se pesó.
+    spoolModelId: uuid("spool_model_id").references(() => spoolModels.id, {
+      onDelete: "set null",
+    }),
     alertThresholdGrams: numeric("alert_threshold_grams", {
       precision: 10,
       scale: 2,

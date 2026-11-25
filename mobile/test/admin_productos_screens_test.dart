@@ -16,11 +16,14 @@ import 'package:hefesto/core/widgets/common.dart';
 import 'package:hefesto/core/widgets/frame_editor.dart';
 import 'package:hefesto/core/widgets/photo_picker.dart';
 import 'package:hefesto/features/admin/productos/producto_detail_screen.dart';
+import 'package:hefesto/features/admin/productos/producto_drafts.dart';
+import 'package:hefesto/features/admin/productos/producto_drafts_provider.dart';
 import 'package:hefesto/features/admin/productos/producto_form_screen.dart';
 import 'package:hefesto/features/admin/productos/productos_models.dart';
 import 'package:hefesto/features/admin/productos/productos_providers.dart';
 import 'package:hefesto/features/admin/productos/productos_screen.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/photo_kit.dart';
 
@@ -991,6 +994,16 @@ void main() {
       expect(repo.calls, isEmpty);
     });
 
+    testWidgets('alta sin almacenamiento configurado: el borrador vive en memoria y no rompe nada', (tester) async {
+      // Este arnés no pisa `sharedPrefsProvider`: el formulario igual funciona.
+      await _show(tester, 'producto_alta_sin_prefs', const AdminProductFormScreen(), height: 1500);
+      await tester.enterText(find.widgetWithText(TextField, 'Nombre'), 'Mate Luigi');
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(tester.takeException(), isNull);
+      final container = ProviderScope.containerOf(tester.element(find.byType(AdminProductFormScreen)));
+      expect(container.read(productDraftsProvider).drafts.single.title, 'Mate Luigi');
+    });
+
     testWidgets('un error del servidor se muestra en línea y deja reintentar', (tester) async {
       final repo = _FailingRepo();
       await _show(
@@ -1006,6 +1019,338 @@ void main() {
       await _pumpFrames(tester, 8);
       expect(find.text('No pudimos calcular el costo de producción.'), findsOneWidget);
       expect(tester.widget<GoldButton>(find.byType(GoldButton)).onPressed, isNotNull);
+    });
+  });
+
+  // Pedido del operador: "a veces cierro sin querer y debo de empezar el
+  // procedimiento todo de nuevo". Lo cargado se guarda solo en el teléfono.
+  group('Borradores sin guardar', () {
+    late SharedPreferences prefs;
+
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      prefs = await SharedPreferences.getInstance();
+    });
+
+    /// Lo que quedó guardado en el teléfono.
+    ProductDraftBook saved() => ProductDraftBook.decode(prefs.getString(ProductDraftsController.storageKey));
+
+    List<Override> ov({FakeProductosRepo? repo}) => [
+          sharedPrefsProvider.overrideWithValue(prefs),
+          adminProductProvider.overrideWith((ref, id) async => _draftDetail),
+          ...listOverrides(repo: repo ?? FakeProductosRepo()),
+        ];
+
+    Finder field(String label) => find.widgetWithText(TextField, label);
+    final entry = find.textContaining('Borradores sin guardar');
+
+    Future<void> openNew(WidgetTester tester) async {
+      await tester.tap(find.byType(FloatingActionButton));
+      await _pumpFrames(tester, 8);
+      expect(find.byType(AdminProductFormScreen), findsOneWidget);
+    }
+
+    testWidgets('un alta vacía no deja borrador ni avisa al salir', (tester) async {
+      await _show(tester, 'borradores_vacio', const AdminProductosScreen(), overrides: ov());
+      expect(entry, findsNothing);
+      await openNew(tester);
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pageBack();
+      await _pumpFrames(tester, 8);
+      expect(find.byType(AdminProductFormScreen), findsNothing);
+      expect(find.text('Guardado en Borradores'), findsNothing);
+      expect(saved().drafts, isEmpty);
+      expect(entry, findsNothing);
+    });
+
+    testWidgets('el alta se guarda sola, salir no pierde nada, se retoma y al crear se va', (tester) async {
+      final repo = FakeProductosRepo();
+      await _show(tester, 'borradores_alta', const AdminProductosScreen(), height: 1500, overrides: ov(repo: repo));
+      await openNew(tester);
+
+      // Se guarda cuando se deja de tipear (no por cada letra).
+      await tester.enterText(field('Nombre'), 'Mate Luigi');
+      await tester.enterText(field('Precio'), '25.000');
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(saved().drafts, isEmpty);
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(saved().drafts.single.title, 'Mate Luigi');
+      final id = saved().drafts.single.id;
+
+      // Salir sin querer con un cambio todavía sin pasar: no pregunta, no
+      // pierde nada y avisa dónde quedó.
+      await tester.enterText(field('Gramos'), '90');
+      await tester.pageBack();
+      await _pumpFrames(tester, 8);
+      expect(find.byType(AdminProductFormScreen), findsNothing);
+      expect(find.text('¿Descartar los cambios?'), findsNothing);
+      expect(find.text('Guardado en Borradores'), findsOneWidget);
+      expect(saved().drafts.single.fields.weightText, '90');
+      expect(find.text('Borradores sin guardar (1)'), findsOneWidget);
+      expect(find.text('Borradores (12)'), findsOneWidget, reason: 'el filtro por estado sigue aparte');
+
+      // La hoja lo lista y "Continuar" abre el alta con todo cargado.
+      await tester.tap(entry);
+      await _pumpFrames(tester, 8);
+      expect(find.text('Mate Luigi'), findsOneWidget);
+      expect(find.textContaining('Guardado recién'), findsOneWidget);
+      await tester.tap(find.text('Continuar'));
+      await _pumpFrames(tester, 8);
+      expect(find.byType(AdminProductFormScreen), findsOneWidget);
+      expect(find.text('Nuevo producto'), findsOneWidget);
+      expect(tester.widget<TextField>(field('Nombre')).controller!.text, 'Mate Luigi');
+      expect(tester.widget<TextField>(field('Precio')).controller!.text, '25.000');
+      expect(tester.widget<TextField>(field('Gramos')).controller!.text, '90');
+
+      // Lo que se sigue cargando actualiza EL MISMO borrador.
+      await tester.tap(find.text('Elegí una categoría'));
+      await _pumpFrames(tester, 8);
+      await tester.tap(find.text('Funko Pop'));
+      await _pumpFrames(tester, 8);
+      expect(saved().drafts.single.id, id);
+      expect(saved().drafts.single.fields.categoryId, 'c-kid');
+      expect(saved().drafts.single.fields.categoryLabel, 'Figuras de colección › Funko Pop');
+
+      // Al crear el producto, el borrador se va. (Se espera a que se vaya el
+      // aviso "Guardado en Borradores", que tapa el botón unos segundos.)
+      await tester.pump(const Duration(seconds: 5));
+      await _pumpFrames(tester, 5);
+      await tester.ensureVisible(find.text('Crear producto'));
+      await tester.tap(find.text('Crear producto'));
+      await _pumpFrames(tester, 10);
+      expect(repo.lastCreate, {
+        'name': 'Mate Luigi',
+        'categoryId': 'c-kid',
+        'price': 25000.0,
+        'weightGrams': 90,
+        'isFeatured': false,
+      });
+      expect(saved().drafts, isEmpty);
+      expect(find.text('Guardado en Borradores'), findsNothing);
+      // Se abrió la ficha del producto nuevo; al volver, la entrada ya no está.
+      await tester.pageBack();
+      await _pumpFrames(tester, 8);
+      expect(entry, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('si la app pasa a segundo plano se guarda en el momento', (tester) async {
+      await _show(tester, 'borradores_segundo_plano', const AdminProductFormScreen(), height: 1500, overrides: ov());
+      await tester.enterText(field('Nombre'), 'Llavero');
+      expect(saved().drafts, isEmpty);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      addTearDown(() => tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed));
+      expect(saved().drafts.single.title, 'Llavero');
+    });
+
+    testWidgets('vaciar lo cargado saca el borrador', (tester) async {
+      await _show(tester, 'borradores_vaciar', const AdminProductFormScreen(), height: 1500, overrides: ov());
+      await tester.enterText(field('Nombre'), 'Llavero');
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(saved().drafts, hasLength(1));
+      await tester.enterText(field('Nombre'), '');
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(saved().drafts, isEmpty);
+    });
+
+    testWidgets('la hoja lista los borradores y eliminar pide confirmación', (tester) async {
+      final now = DateTime.now();
+      final book = ProductDraftBook.empty
+          .save(ProductDraft(
+            id: 'viejo',
+            updatedAt: now.subtract(const Duration(minutes: 5)),
+            fields: const ProductDraftFields(name: 'Cartel de neón', categoryId: 'c1', categoryLabel: 'Carteles'),
+          ))
+          .save(ProductDraft(
+            id: 'nuevo',
+            updatedAt: now.subtract(const Duration(seconds: 5)),
+            fields: const ProductDraftFields(priceText: '1500'),
+          ));
+      await prefs.setString(ProductDraftsController.storageKey, book.encode());
+
+      await _show(tester, 'borradores_lista', const AdminProductosScreen(), overrides: ov());
+      expect(find.text('Borradores sin guardar (2)'), findsOneWidget);
+      await tester.tap(entry);
+      await _pumpFrames(tester, 8);
+      expect(find.text('Producto sin nombre'), findsOneWidget);
+      expect(find.text('Cartel de neón'), findsOneWidget);
+      expect(find.text('Guardado hace 5 min · Carteles'), findsOneWidget);
+      expect(find.text('Continuar'), findsNWidgets(2));
+      // El más nuevo va primero.
+      expect(tester.getTopLeft(find.text('Producto sin nombre')).dy,
+          lessThan(tester.getTopLeft(find.text('Cartel de neón')).dy));
+
+      final confirm =
+          find.descendant(of: find.byType(AlertDialog), matching: find.widgetWithText(TextButton, 'Eliminar borrador'));
+      await tester.tap(find.text('Eliminar').first);
+      await _pumpFrames(tester, 5);
+      expect(find.text('¿Eliminar este borrador?'), findsOneWidget);
+      await tester.tap(find.widgetWithText(TextButton, 'Cancelar'));
+      await _pumpFrames(tester, 5);
+      expect(saved().drafts, hasLength(2), reason: 'cancelar no elimina');
+
+      await tester.tap(find.text('Eliminar').first);
+      await _pumpFrames(tester, 5);
+      await tester.tap(confirm);
+      await _pumpFrames(tester, 5);
+      expect([for (final d in saved().drafts) d.id], ['viejo']);
+      expect(find.text('Producto sin nombre'), findsNothing);
+      expect(find.text('Cartel de neón'), findsOneWidget, reason: 'la hoja sigue abierta con el que queda');
+
+      // Al eliminar el último, la hoja se cierra y la entrada desaparece.
+      await tester.tap(find.text('Eliminar').first);
+      await _pumpFrames(tester, 5);
+      await tester.tap(confirm);
+      await _pumpFrames(tester, 8);
+      expect(saved().drafts, isEmpty);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(entry, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('quien no puede crear productos no ve la entrada', (tester) async {
+      await prefs.setString(
+        ProductDraftsController.storageKey,
+        ProductDraftBook.empty
+            .save(ProductDraft(id: 'a', updatedAt: DateTime.now(), fields: const ProductDraftFields(name: 'Mate')))
+            .encode(),
+      );
+      await _show(tester, 'borradores_solo_lectura', const AdminProductosScreen(),
+          me: _me(actions: ['ver'], role: 'operator'), overrides: ov());
+      expect(find.text('Mate Mario'), findsOneWidget);
+      expect(entry, findsNothing);
+    });
+
+    group('edición', () {
+      /// Lo que tiene cargado `_detail`, con otro precio.
+      ProductDraft editDraft({String? stamp}) => ProductDraft(
+            id: 'edit-p1',
+            updatedAt: DateTime.now(),
+            productId: 'p1',
+            productUpdatedAt: stamp ?? _detail.updatedAt!.toUtc().toIso8601String(),
+            fields: const ProductDraftFields(
+              name: 'Mate Mario',
+              description: 'Un mate para los fanáticos de Mario, impreso en PLA de alta calidad.',
+              categoryId: 'c-kid',
+              categoryLabel: 'Figuras de colección › Funko Pop',
+              material: 'PLA',
+              priceText: '35000',
+              saleText: '24000',
+              weightText: '120',
+              minutesText: '330',
+              dimensions: '12 cm de alto',
+              productionTime: '3 a 5 días hábiles',
+              featured: true,
+            ),
+          );
+
+      GoldButton button(WidgetTester tester) => tester.widget<GoldButton>(find.byType(GoldButton));
+
+      testWidgets('los cambios sin guardar quedan por producto; volver al original o descartar los saca',
+          (tester) async {
+        // Abierto desde otra pantalla, para poder volver atrás.
+        await _show(
+          tester,
+          'borradores_edicion',
+          Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).push<String>(
+                    MaterialPageRoute(builder: (_) => AdminProductFormScreen(product: _detail)),
+                  ),
+                  child: const Text('abrir'),
+                ),
+              ),
+            ),
+          ),
+          height: 1500,
+          overrides: ov(),
+        );
+        await tester.tap(find.text('abrir'));
+        await _pumpFrames(tester, 8);
+        expect(find.byType(AlertDialog), findsNothing, reason: 'sin borrador no se pregunta nada');
+        await tester.enterText(field('Precio'), '35000');
+        await tester.pump(const Duration(milliseconds: 700));
+        expect(saved().editOf('p1')!.fields.priceText, '35000');
+        expect(saved().drafts, isEmpty, reason: 'una edición no va a la lista de borradores');
+
+        await tester.enterText(field('Precio'), '30000');
+        await tester.pump(const Duration(milliseconds: 700));
+        expect(saved().editOf('p1'), isNull);
+
+        // Con cambios, "atrás" sigue preguntando; descartar a propósito borra todo.
+        await tester.enterText(field('Precio'), '36000');
+        await tester.pump(const Duration(milliseconds: 700));
+        expect(saved().editOf('p1'), isNotNull);
+        await tester.pageBack();
+        await _pumpFrames(tester, 5);
+        expect(find.text('¿Descartar los cambios?'), findsOneWidget);
+        await tester.tap(find.widgetWithText(TextButton, 'Descartar'));
+        await _pumpFrames(tester, 8);
+        expect(saved().editOf('p1'), isNull);
+      });
+
+      testWidgets('al volver a abrir ofrece recuperar; "Recuperar" los aplica y guardar los saca', (tester) async {
+        final repo = FakeProductosRepo();
+        await prefs.setString(
+            ProductDraftsController.storageKey, ProductDraftBook.empty.saveEdit(editDraft()).encode());
+        await _show(tester, 'borradores_edicion_recuperar', AdminProductFormScreen(product: _detail),
+            height: 1500, overrides: ov(repo: repo));
+        expect(find.text('Cambios sin guardar'), findsOneWidget);
+        expect(find.text('Tenés cambios sin guardar de la última vez. ¿Recuperarlos?'), findsOneWidget);
+        expect(button(tester).onPressed, isNull, reason: 'todavía no se aplicó nada');
+        await tester.tap(find.widgetWithText(TextButton, 'Recuperar'));
+        await _pumpFrames(tester, 5);
+        expect(tester.widget<TextField>(field('Precio')).controller!.text, '35000');
+        expect(button(tester).onPressed, isNotNull);
+        expect(saved().editOf('p1'), isNotNull, reason: 'sigue guardado hasta que se guarde el producto');
+
+        await tester.tap(find.text('Guardar cambios'));
+        await _pumpFrames(tester, 8);
+        expect(repo.lastPatch, {'price': 35000.0});
+        expect(saved().editOf('p1'), isNull);
+      });
+
+      testWidgets('"Descartar" los borra y deja el producto como estaba', (tester) async {
+        await prefs.setString(
+            ProductDraftsController.storageKey, ProductDraftBook.empty.saveEdit(editDraft()).encode());
+        await _show(tester, 'borradores_edicion_descartar', AdminProductFormScreen(product: _detail),
+            height: 1500, overrides: ov());
+        await tester.tap(find.widgetWithText(TextButton, 'Descartar'));
+        await _pumpFrames(tester, 5);
+        expect(tester.widget<TextField>(field('Precio')).controller!.text, '30000');
+        expect(button(tester).onPressed, isNull);
+        expect(saved().editOf('p1'), isNull);
+      });
+
+      testWidgets('si el producto cambió después, lo avisa; cerrar sin elegir no pierde nada', (tester) async {
+        await prefs.setString(ProductDraftsController.storageKey,
+            ProductDraftBook.empty.saveEdit(editDraft(stamp: '2026-01-01T00:00:00.000Z')).encode());
+        await _show(tester, 'borradores_edicion_viejo', AdminProductFormScreen(product: _detail),
+            height: 1500, overrides: ov());
+        expect(find.textContaining('El producto se modificó después de eso'), findsOneWidget);
+        // Tocar afuera: ni se aplica ni se borra.
+        await tester.tapAt(const Offset(10, 10));
+        await _pumpFrames(tester, 5);
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(tester.widget<TextField>(field('Precio')).controller!.text, '30000');
+        expect(saved().editOf('p1'), isNotNull);
+      });
+
+      testWidgets('un borrador igual a lo guardado se limpia sin preguntar', (tester) async {
+        final same = ProductDraft(
+          id: 'edit-p1',
+          updatedAt: DateTime.now(),
+          productId: 'p1',
+          fields: ProductDraftFields.fromJson({...editDraft().fields.toJson(), 'price': '30000'}),
+        );
+        await prefs.setString(ProductDraftsController.storageKey, ProductDraftBook.empty.saveEdit(same).encode());
+        await _show(tester, 'borradores_edicion_igual', AdminProductFormScreen(product: _detail),
+            height: 1500, overrides: ov());
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(saved().editOf('p1'), isNull);
+      });
     });
   });
 }

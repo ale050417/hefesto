@@ -160,6 +160,16 @@ export async function canForUser(
   return resolveAllowed(input, module, action);
 }
 
+/**
+ * Lo que hace falta para resolver permisos de un usuario con funciones PURAS
+ * (`resolveAllowed` y las que se arman encima, ej. qué avisos puede ver).
+ */
+export async function getResolveInputForUser(
+  user: CurrentUser | null,
+): Promise<ResolveInput> {
+  return loadResolveInput(user);
+}
+
 /** ¿Es admin (dueño)? Igual que `isAdmin()` pero para el usuario del Bearer token. */
 export async function isAdminForUser(user: CurrentUser): Promise<boolean> {
   const input = await loadResolveInput(user);

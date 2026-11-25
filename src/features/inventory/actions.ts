@@ -5,12 +5,16 @@ import { getCurrentUser } from "@/core/auth/session";
 import { can } from "@/core/auth/permissions";
 import { type ActionResult, toActionError } from "@/core/errors";
 import { deleteFailureFlow, registerFailureFlow } from "./failure-flow";
+import * as filamentTypes from "./filament-types";
 import * as queries from "./queries";
 import {
   brandSchema,
   colorSchema,
   failureSchema,
   filamentSchema,
+  filamentTypeSchema,
+  spoolModelSchema,
+  weighSchema,
 } from "./schemas";
 
 const NOT_STAFF = {
@@ -235,6 +239,106 @@ export async function deleteMaterialAction(
     await queries.removeMaterial(name);
     revalidatePath("/admin/filamentos");
     return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+/* ---------- Tipos de filamento con precio y carretes vacíos (0084) ---------- */
+
+function invalid(error: import("zod").ZodError) {
+  const fields = fieldErrors(error);
+  return {
+    ok: false as const,
+    error: {
+      code: "VALIDATION",
+      message: Object.values(fields)[0] ?? "Revisá los datos.",
+      fields,
+    },
+  };
+}
+
+/** Alta/edición de un tipo. Al editar, su precio baja a todos sus carretes. */
+export async function saveFilamentTypeAction(
+  id: string | null,
+  input: unknown,
+): Promise<ActionResult<{ id: string; spools: number }>> {
+  if (!(await can("filamentos", "editar"))) return NOT_STAFF;
+  const user = await getCurrentUser();
+  const parsed = filamentTypeSchema.safeParse(input);
+  if (!parsed.success) return invalid(parsed.error);
+  try {
+    const data = await filamentTypes.saveFilamentType(
+      id,
+      parsed.data,
+      user?.id ?? null,
+    );
+    revalidatePath("/admin/filamentos");
+    return { ok: true, data };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+export async function deleteFilamentTypeAction(
+  id: string,
+): Promise<ActionResult> {
+  if (!(await can("filamentos", "editar"))) return NOT_STAFF;
+  try {
+    await filamentTypes.deleteFilamentType(id);
+    revalidatePath("/admin/filamentos");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+export async function saveSpoolModelAction(
+  id: string | null,
+  input: unknown,
+): Promise<ActionResult<{ id: string }>> {
+  if (!(await can("filamentos", "editar"))) return NOT_STAFF;
+  const parsed = spoolModelSchema.safeParse(input);
+  if (!parsed.success) return invalid(parsed.error);
+  try {
+    const data = await filamentTypes.saveSpoolModel(id, parsed.data);
+    revalidatePath("/admin/filamentos");
+    return { ok: true, data };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+export async function deleteSpoolModelAction(
+  id: string,
+): Promise<ActionResult> {
+  if (!(await can("filamentos", "editar"))) return NOT_STAFF;
+  try {
+    await filamentTypes.deleteSpoolModel(id);
+    revalidatePath("/admin/filamentos");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+/** "Calcular filamento": confirma el pesado y actualiza el stock. */
+export async function weighFilamentAction(
+  id: string,
+  input: unknown,
+): Promise<ActionResult<filamentTypes.WeighResult>> {
+  if (!(await can("filamentos", "editar"))) return NOT_STAFF;
+  const user = await getCurrentUser();
+  const parsed = weighSchema.safeParse(input);
+  if (!parsed.success) return invalid(parsed.error);
+  try {
+    const data = await filamentTypes.weighFilament(
+      id,
+      parsed.data,
+      user?.id ?? null,
+    );
+    revalidatePath("/admin/filamentos");
+    return { ok: true, data };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
   }

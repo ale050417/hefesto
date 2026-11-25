@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/providers.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../../../core/widgets/modals.dart';
@@ -13,6 +14,8 @@ import 'calc_form.dart';
 import 'calc_logic.dart';
 import 'calculadora_api.dart';
 import 'calculadora_models.dart';
+import 'filament_choices.dart';
+import 'new_preset_dialog.dart';
 
 /// Lo que devuelve "Calcular precio": el precio de UNA pieza y los datos con
 /// los que se calculó (el servidor saca de ahí el costo del pedido).
@@ -45,22 +48,40 @@ class EstimatorInitial {
 
 /// Abre la calculadora embebida (pedido de Ale, 2026-11-17: el precio de una
 /// consulta sale de la calculadora). Devuelve null si se cierra sin usar.
-Future<EstimatorResult?> showPriceEstimator(BuildContext context, {EstimatorInitial? initial}) =>
-    showAppSheet<EstimatorResult>(context, builder: (_) => PriceEstimatorSheet(initial: initial));
+///
+/// El filamento se elige por TIPO ("PLA — $26.000/kg"; sugerencia de Agustín,
+/// 2026-11-24) y el resultado lleva el carrete que representa al tipo. Quien
+/// necesite el carrete CONCRETO (para descontarle stock) pasa `byType: false`
+/// y vuelve la lista carrete por carrete.
+Future<EstimatorResult?> showPriceEstimator(
+  BuildContext context, {
+  EstimatorInitial? initial,
+  bool byType = true,
+}) =>
+    showAppSheet<EstimatorResult>(
+      context,
+      builder: (_) => PriceEstimatorSheet(initial: initial, byType: byType),
+    );
 
 /// Hoja "Calcular precio": filamento, gramos, tiempo y TIPO de producto. El
 /// tipo lleva el porcentaje de ganancia que carga el dueño; acá no se muestra
 /// ni el costo ni ese porcentaje (ni siquiera al admin: para eso está la
 /// Calculadora completa), solo el precio que devuelve el servidor.
 class PriceEstimatorSheet extends ConsumerWidget {
-  const PriceEstimatorSheet({super.key, this.initial});
+  const PriceEstimatorSheet({super.key, this.initial, this.byType = true});
   final EstimatorInitial? initial;
+
+  /// Agrupar el selector de filamento por tipo (ver [showPriceEstimator]).
+  final bool byType;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(calculadoraProvider);
     return async.when(
-      skipLoadingOnRefresh: false,
+      // Al reintentar después de un error se ve "cargando"; si ya había datos
+      // (se creó un tipo nuevo y la lista se vuelve a pedir) el formulario
+      // queda a la vista con lo tipeado.
+      skipLoadingOnRefresh: async.hasValue,
       loading: () => const SheetBody(
         title: 'Calcular precio',
         children: [
@@ -82,15 +103,16 @@ class PriceEstimatorSheet extends ConsumerWidget {
           ),
         ],
       ),
-      data: (overview) => _EstimatorForm(overview: overview, initial: initial),
+      data: (overview) => _EstimatorForm(overview: overview, initial: initial, byType: byType),
     );
   }
 }
 
 class _EstimatorForm extends ConsumerStatefulWidget {
-  const _EstimatorForm({required this.overview, this.initial});
+  const _EstimatorForm({required this.overview, this.initial, this.byType = true});
   final CalcOverview overview;
   final EstimatorInitial? initial;
+  final bool byType;
 
   @override
   ConsumerState<_EstimatorForm> createState() => _EstimatorFormState();
@@ -108,6 +130,9 @@ class _EstimatorFormState extends ConsumerState<_EstimatorForm> {
   /// Arranca sin tipo (como en la web): el precio aparece recién cuando el
   /// operador elige qué tipo de producto es.
   String? _presetId;
+
+  /// Tipo recién creado con "Nuevo tipo" (la lista del servidor tarda en traerlo).
+  CalcPreset? _createdPreset;
 
   double? _price;
   bool _quoting = false;
@@ -130,17 +155,36 @@ class _EstimatorFormState extends ConsumerState<_EstimatorForm> {
   }
 
   /// El filamento guardado; si ya no existe, el primero del mismo material; si
-  /// no, el primero de la lista.
+  /// no, el primero de la lista. Agrupando por tipo, un carrete con tipo deja
+  /// elegido SU tipo (el carrete que lo representa).
   String? _initialFilament(EstimatorInitial? init) {
     final list = _o.filaments;
     if (list.isEmpty) return null;
-    if (init?.filamentId != null && list.any((f) => f.id == init!.filamentId)) return init!.filamentId;
+    String pick(String id) => widget.byType ? (choiceValueFor(list, id) ?? id) : id;
+    if (init?.filamentId != null && list.any((f) => f.id == init!.filamentId)) return pick(init!.filamentId!);
     if (init?.material != null) {
       for (final f in list) {
-        if (f.material == init!.material) return f.id;
+        if (f.material == init!.material) return pick(f.id);
       }
     }
-    return list.first.id;
+    return widget.byType ? firstChoiceValue(list) : list.first.id;
+  }
+
+  /// El TIPO de filamento elegido (null si es un carrete sin tipo, o si este
+  /// selector lista carrete por carrete).
+  TypeChoice? get _typeChoice => widget.byType ? typeChoiceOf(_o.filaments, _filamentId) : null;
+
+  List<CalcPreset> get _presetOptions => presetOptionsWith(_o.presetOptions, _createdPreset);
+
+  /// "＋ Nuevo tipo": un tipo de producto que se cobra como otro.
+  Future<void> _newPreset() async {
+    final created = await showNewPresetDialog(context, options: _presetOptions);
+    if (created == null || !mounted) return;
+    setState(() {
+      _createdPreset = created;
+      _presetId = created.id;
+    });
+    _scheduleQuote();
   }
 
   @override
@@ -213,7 +257,7 @@ class _EstimatorFormState extends ConsumerState<_EstimatorForm> {
   Future<void> _pickFilament() async {
     final picked = await showAppSheet<String>(
       context,
-      builder: (_) => FilamentPickerSheet(filaments: _o.filaments, selectedId: _filamentId),
+      builder: (_) => FilamentPickerSheet(filaments: _o.filaments, selectedId: _filamentId, byType: widget.byType),
     );
     if (!mounted) return;
     if (picked != null && picked != _filamentId) {
@@ -248,6 +292,7 @@ class _EstimatorFormState extends ConsumerState<_EstimatorForm> {
   @override
   Widget build(BuildContext context) {
     final c = context.hc;
+    final canCreateType = ref.watch(meProvider).value?.can('calculadora', 'crear') ?? false;
     final price = _price;
     final ready = price != null && price > 0 && !_quoting;
     final status = _quoting ? 'Calculando…' : (_error ?? _hint ?? (ready ? 'Precio de una pieza.' : 'Completá los datos.'));
@@ -306,7 +351,7 @@ class _EstimatorFormState extends ConsumerState<_EstimatorForm> {
             color: Brand.warning,
           )
         else
-          CalcFilamentField(filament: _filament, onTap: _pickFilament),
+          CalcFilamentField(filament: _filament, type: _typeChoice, onTap: _pickFilament),
         const SizedBox(height: 16),
         ArNumberField(
           controller: _grams,
@@ -353,7 +398,7 @@ class _EstimatorFormState extends ConsumerState<_EstimatorForm> {
         const SizedBox(height: 16),
         Text('Tipo de producto', style: label),
         const SizedBox(height: 8),
-        if (_o.presetOptions.isEmpty)
+        if (_presetOptions.isEmpty)
           Text(
             _o.isAdmin
                 ? 'No hay tipos cargados. Creá uno en Calculadora → "Tipos y márgenes".'
@@ -365,7 +410,7 @@ class _EstimatorFormState extends ConsumerState<_EstimatorForm> {
             spacing: 8,
             runSpacing: 4,
             children: [
-              for (final p in _o.presetOptions)
+              for (final p in _presetOptions)
                 ChoiceChip(
                   // Solo el nombre: el porcentaje no se muestra acá.
                   label: Text(p.name),
@@ -375,6 +420,9 @@ class _EstimatorFormState extends ConsumerState<_EstimatorForm> {
                     _scheduleQuote();
                   },
                 ),
+              // Con permiso de crear, el operador suma un tipo sin pedírselo al
+              // dueño (y sin ver ningún margen).
+              if (canCreateType) NewPresetChip(onPressed: _newPreset),
             ],
           ),
       ],

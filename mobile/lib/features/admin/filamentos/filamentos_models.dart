@@ -16,6 +16,8 @@ class Filamento {
     required this.alertThresholdGrams,
     required this.status,
     this.hex,
+    this.typeId,
+    this.spoolModelId,
   });
 
   final String id;
@@ -23,6 +25,13 @@ class Filamento {
   final String color;
   final String brand;
   final String diameter;
+
+  /// Tipo de filamento (PLA, PETG…) del que sale el precio por kg; null = sin
+  /// tipo, precio propio.
+  final String? typeId;
+
+  /// Modelo de carrete con el que se pesó la última vez ("Calcular filamento").
+  final String? spoolModelId;
 
   /// Puede ser NEGATIVO: se vendió más de lo cargado (deuda de filamento).
   final double stockGrams;
@@ -58,6 +67,8 @@ class Filamento {
         alertThresholdGrams: numOf(j['alertThresholdGrams']),
         status: strOf(j['status'], 'ok'),
         hex: strOrNull(j['hex']),
+        typeId: strOrNull(j['typeId']),
+        spoolModelId: strOrNull(j['spoolModelId']),
       );
 
   /// Para reusar `FilamentTile` (el modelo del listado compartido).
@@ -86,6 +97,7 @@ class FilamentoDraft {
     required this.spoolGrams,
     required this.costPerKg,
     required this.alertThresholdGrams,
+    this.typeId,
   });
 
   final String material;
@@ -94,8 +106,13 @@ class FilamentoDraft {
   final String diameter;
   final double stockGrams;
   final double spoolGrams;
+
+  /// Con [typeId] el servidor lo ignora y usa el precio del tipo.
   final double costPerKg;
   final double alertThresholdGrams;
+
+  /// Tipo de filamento; null = sin tipo (precio propio). Viaja siempre.
+  final String? typeId;
 
   /// Alta: el carrete nace con su stock inicial.
   Map<String, dynamic> toCreateJson() => {...toUpdateJson(), 'stockGrams': stockGrams};
@@ -110,6 +127,7 @@ class FilamentoDraft {
         'spoolGrams': spoolGrams,
         'costPerKg': costPerKg,
         'alertThresholdGrams': alertThresholdGrams,
+        'typeId': typeId,
       };
 }
 
@@ -222,6 +240,119 @@ class StockAdjustResult {
         deltaGrams: numOf(j['deltaGrams']),
         previousStock: numOf(j['previousStock']),
         newStock: numOf(j['newStock']),
+        lowStock: boolOf(j['lowStock']),
+      );
+}
+
+/// Tipo de filamento con su precio por kg (pedido de Agustín, 2026-11-24:
+/// "cambiar el precio en un solo lugar y no en los 32 carretes").
+class FilamentType {
+  const FilamentType({required this.id, required this.name, required this.costPerKg, this.spools = 0});
+
+  final String id;
+  final String name;
+  final double costPerKg;
+
+  /// Cuántos carretes usan este tipo.
+  final int spools;
+
+  factory FilamentType.fromJson(Map<String, dynamic> j) => FilamentType(
+        id: strOf(j['id']),
+        name: strOf(j['name'], 'Sin nombre'),
+        costPerKg: numOf(j['costPerKg']),
+        spools: intOf(j['spools']),
+      );
+}
+
+/// Modelo de carrete con su peso VACÍO (para "Calcular filamento").
+class SpoolModel {
+  const SpoolModel({required this.id, required this.name, required this.emptyGrams});
+
+  final String id;
+  final String name;
+  final double emptyGrams;
+
+  factory SpoolModel.fromJson(Map<String, dynamic> j) => SpoolModel(
+        id: strOf(j['id']),
+        name: strOf(j['name'], 'Sin nombre'),
+        emptyGrams: numOf(j['emptyGrams']),
+      );
+}
+
+/// Lo que devuelve `GET /admin/filaments/types`: los tipos y los modelos de
+/// carrete en un solo pedido.
+class FilamentTypesData {
+  const FilamentTypesData({this.types = const [], this.spoolModels = const []});
+
+  final List<FilamentType> types;
+  final List<SpoolModel> spoolModels;
+
+  factory FilamentTypesData.fromJson(Map<String, dynamic> j) => FilamentTypesData(
+        types: [
+          for (final t in mapsOf(j['types']))
+            if (strOf(t['id']).isNotEmpty) FilamentType.fromJson(t),
+        ],
+        spoolModels: [
+          for (final m in mapsOf(j['spoolModels']))
+            if (strOf(m['id']).isNotEmpty) SpoolModel.fromJson(m),
+        ],
+      );
+
+  FilamentType? typeOf(String? id) {
+    if (id == null) return null;
+    for (final t in types) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
+
+  SpoolModel? spoolModelOf(String? id) {
+    if (id == null) return null;
+    for (final m in spoolModels) {
+      if (m.id == id) return m;
+    }
+    return null;
+  }
+}
+
+/// Respuesta de crear / editar un tipo: [spools] = carretes que cambiaron de
+/// precio.
+class FilamentTypeSaved {
+  const FilamentTypeSaved({required this.id, this.spools = 0});
+
+  final String id;
+  final int spools;
+
+  factory FilamentTypeSaved.fromJson(Map<String, dynamic> j) =>
+      FilamentTypeSaved(id: strOf(j['id']), spools: intOf(j['spools']));
+}
+
+/// Resultado de "Calcular filamento" (pesar el carrete).
+class WeighResult {
+  const WeighResult({
+    required this.remainingGrams,
+    required this.newStockGrams,
+    required this.previousStock,
+    required this.changed,
+    required this.lowStock,
+  });
+
+  /// Filamento que queda en el carrete pesado.
+  final double remainingGrams;
+
+  /// Stock total del color: lo pesado + los carretes cerrados aparte.
+  final double newStockGrams;
+  final double previousStock;
+
+  /// false si el stock ya era ese (no se registró movimiento).
+  final bool changed;
+  final bool lowStock;
+
+  factory WeighResult.fromJson(Map<String, dynamic> j) => WeighResult(
+        remainingGrams: numOf(j['remainingGrams']),
+        newStockGrams: numOf(j['newStockGrams']),
+        previousStock: numOf(j['previousStock']),
+        changed: boolOf(j['changed'], true),
         lowStock: boolOf(j['lowStock']),
       );
 }

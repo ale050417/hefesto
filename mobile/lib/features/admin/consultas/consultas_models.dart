@@ -509,3 +509,93 @@ Map<String, String> validateRespuestaForm({
   if (message.trim().length > 6000) errors['message'] = 'Hasta 6000 letras.';
   return errors;
 }
+
+/// Un tamaño / combinación de un producto de la tienda (o su única opción).
+class ConsultaProductOption {
+  const ConsultaProductOption({
+    required this.label,
+    required this.unitPrice,
+    required this.grams,
+    required this.printMinutes,
+  });
+
+  /// Null = el producto no tiene tamaños para elegir.
+  final String? label;
+
+  /// Precio de la tienda por unidad.
+  final double unitPrice;
+
+  /// Por unidad.
+  final double grams;
+  final int printMinutes;
+
+  factory ConsultaProductOption.fromJson(Map<String, dynamic> j) => ConsultaProductOption(
+        label: strOrNull(j['label']),
+        unitPrice: numOf(j['unitPrice']),
+        grams: numOf(j['grams']),
+        printMinutes: intOf(j['printMinutes']),
+      );
+}
+
+/// Producto ya cargado en la tienda, para responder una consulta sin tipear
+/// todo (sugerencia de Agustín, 2026-11-19): `/admin/consultas/products`.
+class ConsultaProduct {
+  const ConsultaProduct({
+    required this.id,
+    required this.name,
+    required this.categoryName,
+    required this.material,
+    required this.dimensions,
+    required this.deliveryTime,
+    required this.colors,
+    required this.options,
+  });
+
+  final String id;
+  final String name;
+  final String? categoryName;
+  final String? material;
+  final String? dimensions;
+  final String? deliveryTime;
+
+  /// "Blanco, Negro": listo para el campo Colores ('' si no tiene).
+  final String colors;
+  final List<ConsultaProductOption> options;
+
+  /// Con qué se costea el pedido si se responde con [option]; null si la
+  /// ficha no alcanza (sin material, o sin gramos ni tiempo) y hay que pasar
+  /// por la calculadora. Misma regla que `optionHasCost` del servidor.
+  RespuestaCalc? calcFor(ConsultaProductOption option) {
+    final calc = RespuestaCalc(
+      filamentId: null,
+      material: material,
+      grams: option.grams,
+      printMinutes: option.printMinutes,
+    );
+    return calc.isComplete ? calc : null;
+  }
+
+  factory ConsultaProduct.fromJson(Map<String, dynamic> j) => ConsultaProduct(
+        id: strOf(j['id']),
+        name: strOf(j['name'], 'Producto'),
+        categoryName: strOrNull(j['categoryName']),
+        material: strOrNull(j['material']),
+        dimensions: strOrNull(j['dimensions']),
+        deliveryTime: strOrNull(j['deliveryTime']),
+        colors: strOf(j['colors']),
+        options: mapsOf(j['options']).map(ConsultaProductOption.fromJson).toList(),
+      );
+}
+
+/// Resultado de buscar productos para responder una consulta.
+class ConsultaProductPage {
+  const ConsultaProductPage({required this.items, required this.total});
+  final List<ConsultaProduct> items;
+  final int total;
+
+  factory ConsultaProductPage.fromJson(Map<String, dynamic> j) {
+    // Un producto sin opciones no sirve para rellenar nada: se descarta.
+    final items = mapsOf(j['items']).map(ConsultaProduct.fromJson).where((p) => p.options.isNotEmpty).toList();
+    return ConsultaProductPage(items: items, total: intOf(j['total'], items.length));
+  }
+}

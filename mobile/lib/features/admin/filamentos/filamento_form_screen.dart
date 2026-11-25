@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_client.dart';
+import '../../../core/format.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import 'catalog_picker.dart';
+import 'filament_type_picker.dart';
 import 'filamentos_api.dart';
 import 'filamentos_format.dart';
 import 'filamentos_models.dart';
@@ -71,6 +73,9 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
   late String _color;
   late String _brand;
   late String _diameter;
+
+  /// Tipo de filamento del que sale el precio; null = sin tipo (precio propio).
+  String? _typeId;
   late final TextEditingController _stock;
   late final TextEditingController _spool;
   late final TextEditingController _cost;
@@ -96,6 +101,7 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
     _color = f?.color ?? 'Negro';
     _brand = f?.brand ?? 'Grilon3';
     _diameter = (f?.diameter.isNotEmpty ?? false) ? f!.diameter : '1.75';
+    _typeId = f?.typeId;
     _stock = TextEditingController(text: f == null ? '0' : gramsField(f.stockGrams));
     _spool = TextEditingController(text: gramsField(f?.spoolGrams ?? 1000));
     _cost = TextEditingController(text: gramsField(f?.costPerKg ?? 18000));
@@ -106,7 +112,8 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
   /// Lo cargado en el formulario, para saber si se tocó algo.
   late final String _initial;
   String _snapshot() =>
-      [_material, _color, _brand, _diameter, _stock.text, _spool.text, _cost.text, _threshold.text].join('|');
+      [_material, _color, _brand, _diameter, _typeId ?? '', _stock.text, _spool.text, _cost.text, _threshold.text]
+          .join('|');
 
   /// ¿Hay algo cambiado que se perdería al salir?
   bool get _hasUnsaved => !_saving && _snapshot() != _initial;
@@ -139,10 +146,14 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
         diameter: _diameter,
         stock: _stock.text,
         spool: _spool.text,
-        cost: _cost.text,
+        // Con tipo, el costo no se tipea (lo pone el tipo): no se valida.
+        cost: _typeId != null ? '0' : _cost.text,
         threshold: _threshold.text,
         isCreate: !_isEdit,
       );
+
+  /// El tipo elegido, si la lista de tipos ya llegó.
+  FilamentType? get _type => ref.read(filamentTypesProvider).value?.typeOf(_typeId);
 
   /// ¿Cambió algo respecto de lo cargado? (en el alta siempre se puede guardar)
   bool get _dirty {
@@ -152,8 +163,9 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
         _color != f.color ||
         _brand != f.brand ||
         _diameter != f.diameter ||
+        _typeId != f.typeId ||
         parseNumber(_spool.text) != f.spoolGrams ||
-        parseNumber(_cost.text) != f.costPerKg ||
+        (_typeId == null && parseNumber(_cost.text) != f.costPerKg) ||
         parseNumber(_threshold.text) != f.alertThresholdGrams;
   }
 
@@ -164,9 +176,22 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
         diameter: _diameter.trim(),
         stockGrams: parseNumber(_stock.text.isEmpty ? '0' : _stock.text) ?? 0,
         spoolGrams: parseNumber(_spool.text) ?? 0,
-        costPerKg: parseNumber(_cost.text.isEmpty ? '0' : _cost.text) ?? 0,
+        // Con tipo el servidor ignora este costo y usa el del tipo.
+        costPerKg: _typeId != null
+            ? (_type?.costPerKg ?? widget.filament?.costPerKg ?? 0)
+            : (parseNumber(_cost.text.isEmpty ? '0' : _cost.text) ?? 0),
         alertThresholdGrams: parseNumber(_threshold.text.isEmpty ? '0' : _threshold.text) ?? 0,
+        typeId: _typeId,
       );
+
+  Future<void> _pickType() async {
+    final picked = await showFilamentTypePicker(context, current: _typeId);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _typeId = picked.typeId;
+      _serverError = null;
+    });
+  }
 
   Future<void> _pick(CatalogKind kind) async {
     final current = switch (kind) {
@@ -248,6 +273,7 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
   Widget build(BuildContext context) {
     final c = context.hc;
     final catalog = ref.watch(filamentCatalogProvider).value;
+    final type = ref.watch(filamentTypesProvider).value?.typeOf(_typeId);
     final diameters = catalog?.diameters ?? const ['1.75', '2.85', '—'];
     final diaOptions = {...diameters, if (_diameter.isNotEmpty) _diameter}.toList();
     final canSave = _dirty && !_saving;
@@ -337,13 +363,35 @@ class _FilamentoFormScreenState extends ConsumerState<FilamentoFormScreen> {
                     ],
                   ),
                   const SizedBox(height: 14),
-                  _numberField(
-                    _cost,
-                    'Costo por kg',
-                    'cost',
-                    prefix: r'$ ',
-                    helper: 'Sirve para valorizar el stock y calcular lo que cuestan las fallas.',
-                  ),
+                  // El precio se carga una vez por tipo (pedido de Agustín,
+                  // 2026-11-24): con tipo, el costo de este carrete es el suyo.
+                  FilamentTypeField(type: type, hasType: _typeId != null, onTap: _pickType),
+                  const SizedBox(height: 14),
+                  if (_typeId != null)
+                    InputDecorator(
+                      key: const ValueKey('cost-from-type'),
+                      decoration: InputDecoration(
+                        labelText: 'Costo por kg',
+                        enabled: false,
+                        helperText: type != null
+                            ? 'Lo pone el tipo «${type.name}». Se cambia en «Tipos y precios».'
+                            : 'Lo pone el tipo de este carrete.',
+                        helperMaxLines: 3,
+                        helperStyle: TextStyle(color: c.textFaint, fontSize: 11.5),
+                      ),
+                      child: Text(
+                        formatPrice(type?.costPerKg ?? widget.filament?.costPerKg ?? 0),
+                        style: TextStyle(color: c.textDim, fontSize: 15),
+                      ),
+                    )
+                  else
+                    _numberField(
+                      _cost,
+                      'Costo por kg',
+                      'cost',
+                      prefix: r'$ ',
+                      helper: 'Sirve para valorizar el stock y calcular lo que cuestan las fallas.',
+                    ),
                 ],
               ),
             ),

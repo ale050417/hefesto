@@ -15,6 +15,8 @@ import {
 import { runAction } from "@/lib/run-action";
 import { useFormErrors } from "@/hooks/use-form-errors";
 import { FILAMENT_DIAMETERS } from "../constants";
+import type { FilamentTypeView } from "../filament-types";
+import { formatPrice } from "@/lib/format";
 
 export type FilamentFormData = {
   id?: string;
@@ -25,6 +27,8 @@ export type FilamentFormData = {
   stockGrams: number;
   spoolGrams: number;
   costPerKg: number;
+  /** Tipo de filamento: con tipo, el precio es el del tipo. */
+  typeId?: string | null;
   alertThresholdGrams: number;
 };
 
@@ -54,9 +58,12 @@ export function FilamentForm({
   colorCatalog,
   brandCatalog,
   materialCatalog,
+  types = [],
   onDone,
   onCancel,
 }: {
+  /** Tipos de filamento con su precio (Filamentos → "Tipos y precios"). */
+  types?: FilamentTypeView[];
   filament?: FilamentFormData;
   colorCatalog: CatalogItem[];
   brandCatalog: CatalogItem[];
@@ -79,6 +86,14 @@ export function FilamentForm({
     costPerKg: String(init.costPerKg ?? 0),
     alertThresholdGrams: String(init.alertThresholdGrams ?? 0),
   });
+  // Tipo de filamento (Agustín, 2026-11-24): con tipo, el precio sale de ahí.
+  // Un carrete NUEVO arranca en el tipo que se llama como su material.
+  const [typeId, setTypeId] = useState<string>(() =>
+    filament
+      ? (filament.typeId ?? "")
+      : (types.find((t) => t.name === DEFAULTS.material)?.id ?? ""),
+  );
+  const type = types.find((t) => t.id === typeId) ?? null;
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fe = useFormErrors();
@@ -229,7 +244,8 @@ export function FilamentForm({
     setBusy(true);
     try {
       const res = await runAction(
-        () => saveFilamentAction(form, filament?.id),
+        () =>
+          saveFilamentAction({ ...form, typeId: typeId || null }, filament?.id),
         { silent: true },
       );
       if (!res.ok) return fe.fromAction(res.error);
@@ -578,15 +594,39 @@ export function FilamentForm({
 
       <div className="grid-2">
         <div className={`field ${fe.errors.costPerKg ? "invalid" : ""}`}>
-          <label htmlFor="fm-cost">Costo por kg</label>
-          <input
-            id="fm-cost"
-            type="number"
-            className="input"
-            aria-invalid={!!fe.errors.costPerKg}
-            value={form.costPerKg}
-            onChange={(e) => set("costPerKg", e.target.value)}
-          />
+          <label htmlFor="fm-type">Tipo (precio por kg)</label>
+          {types.length > 0 ? (
+            <select
+              id="fm-type"
+              className="select"
+              value={typeId}
+              onChange={(e) => setTypeId(e.target.value)}
+            >
+              {types.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} — {formatPrice(t.costPerKg)}/kg
+                </option>
+              ))}
+              <option value="">Sin tipo (precio propio)</option>
+            </select>
+          ) : null}
+          {type ? (
+            <p className="text-faint text-[11.5px] leading-relaxed">
+              Toma el precio del tipo. Para cambiarlo: Filamentos → «Tipos y
+              precios» (cambia en todos los carretes de ese tipo).
+            </p>
+          ) : (
+            <input
+              id="fm-cost"
+              type="number"
+              className="input"
+              aria-label="Costo por kg"
+              placeholder="Costo por kg"
+              aria-invalid={!!fe.errors.costPerKg}
+              value={form.costPerKg}
+              onChange={(e) => set("costPerKg", e.target.value)}
+            />
+          )}
           {fe.errors.costPerKg ? (
             <p className="field-error">{fe.errors.costPerKg}</p>
           ) : null}

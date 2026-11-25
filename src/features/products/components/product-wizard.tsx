@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ColorSwatches } from "@/components/shared/color-swatches";
@@ -20,6 +20,15 @@ import { useActionOverlayStore } from "@/stores/actionOverlayStore";
 import { compressImageToWebp } from "@/lib/image-compress";
 import { useDragReframe } from "@/hooks/use-drag-reframe";
 import { useFormErrors } from "@/hooks/use-form-errors";
+import { toast } from "@/stores/toastStore";
+import {
+  deleteProductDraft,
+  hasDraftContent,
+  saveProductDraft,
+  type ProductDraft,
+  type WizardFiles,
+  type WizardSnapshot,
+} from "../product-drafts";
 import { AiImagePanel } from "./ai-image-panel";
 import { ColorPhotoRow, MediaBoard } from "./media-board";
 import { draftFromProduct } from "@/features/quotes/drafts";
@@ -63,6 +72,8 @@ type Props = {
   onCreated?: (id: string, quote: QuoteDraft) => void;
   /** Textos por defecto de la cotización. */
   quoteDefaults?: QuoteDefaults;
+  /** Borrador a retomar (ver product-drafts.ts). Sin esto arranca vacío. */
+  draft?: ProductDraft | null;
 };
 
 export function ProductWizard({
@@ -72,21 +83,32 @@ export function ProductWizard({
   sections,
   onCreated,
   quoteDefaults = DEFAULT_QUOTE_DEFAULTS,
+  draft = null,
 }: Props) {
   const router = useRouter();
-  const [step, setStep] = useState(0);
+  // Borrador (Agustín, 2026-11-22): todo lo cargado se guarda solo en este
+  // navegador; si se cierra sin querer, se retoma desde "Borradores".
+  const d0 = draft?.data;
+  const f0 = draft?.files;
+  const [draftId] = useState(() => draft?.id ?? crypto.randomUUID());
+  const [step, setStep] = useState(d0?.step ?? 0);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [genBusy, setGenBusy] = useState(false);
   const fe = useFormErrors();
 
   // Paso 1
-  const [name, setName] = useState("");
-  const [categoryId, setCategoryId] = useState("");
-  const [description, setDescription] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [name, setName] = useState(d0?.name ?? "");
+  const [categoryId, setCategoryId] = useState(() =>
+    // La categoría del borrador pudo haberse borrado mientras tanto.
+    categories.some((c) => c.id === d0?.categoryId)
+      ? (d0?.categoryId ?? "")
+      : "",
+  );
+  const [description, setDescription] = useState(d0?.description ?? "");
+  const [imageFile, setImageFile] = useState<File | null>(f0?.image ?? null);
   // Fotos adicionales (hasta 4) además de la principal → 5 en total.
-  const [extraFiles, setExtraFiles] = useState<File[]>([]);
+  const [extraFiles, setExtraFiles] = useState<File[]>(f0?.extras ?? []);
   // Miniaturas de las fotos extra; se revocan al cambiar para no filtrar memoria.
   const extraUrls = useMemo(
     () => extraFiles.map((f) => URL.createObjectURL(f)),
@@ -96,13 +118,19 @@ export function ProductWizard({
     () => () => extraUrls.forEach((u) => URL.revokeObjectURL(u)),
     [extraUrls],
   );
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(() =>
+    f0?.image ? URL.createObjectURL(f0.image) : null,
+  );
   // Foto original de la pieza cuando la principal se reemplazó por la
   // generada con IA (para poder volver atrás).
-  const [originalPhoto, setOriginalPhoto] = useState<File | null>(null);
+  const [originalPhoto, setOriginalPhoto] = useState<File | null>(
+    f0?.original ?? null,
+  );
   // Foto POR color/combinación: una imagen elegida para cada color (single) o
   // combo (multi). La tienda salta a ella al elegirlo. Clave = color o combo.
-  const [colorImages, setColorImages] = useState<Record<string, File>>({});
+  const [colorImages, setColorImages] = useState<Record<string, File>>(
+    f0?.colorImages ?? {},
+  );
   const colorImageUrls = useMemo(() => {
     const out: Record<string, string> = {};
     for (const [k, f] of Object.entries(colorImages))
@@ -114,8 +142,8 @@ export function ProductWizard({
       Object.values(colorImageUrls).forEach((u) => URL.revokeObjectURL(u)),
     [colorImageUrls],
   );
-  const [posX, setPosX] = useState(50);
-  const [posY, setPosY] = useState(50);
+  const [posX, setPosX] = useState(d0?.posX ?? 50);
+  const [posY, setPosY] = useState(d0?.posY ?? 50);
   // Reencuadre por arrastre sobre la vista previa (mouse y touch).
   const reframe = useDragReframe(posX, posY, (x, y) => {
     setPosX(x);
@@ -123,39 +151,45 @@ export function ProductWizard({
   });
 
   // Paso 2
-  const [colorMode, setColorModeState] = useState<"single" | "multi">("single");
-  const [colors, setColors] = useState<string[]>([]);
+  const [colorMode, setColorModeState] = useState<"single" | "multi">(
+    d0?.colorMode ?? "single",
+  );
+  const [colors, setColors] = useState<string[]>(d0?.colors ?? []);
   // Multicolor: gramos de cada color que lleva la pieza (para descontar stock).
-  const [colorGrams, setColorGrams] = useState<Record<string, number>>({});
+  const [colorGrams, setColorGrams] = useState<Record<string, number>>(
+    d0?.colorGrams ?? {},
+  );
   // Color único: precio EXACTO por color (opcional; vacío = precio de la
   // calculadora). El mismo producto en Dorado o Amarillo puede costar distinto
   // porque el filamento cuesta distinto.
   const [colorPricesSingle, setColorPricesSingle] = useState<
     Record<string, number>
-  >({});
-  const [dimensions, setDimensions] = useState("");
-  const [productionTime, setProductionTime] = useState("");
+  >(d0?.colorPricesSingle ?? {});
+  const [dimensions, setDimensions] = useState(d0?.dimensions ?? "");
+  const [productionTime, setProductionTime] = useState(
+    d0?.productionTime ?? "",
+  );
 
   // Paso 3
-  const [price, setPrice] = useState("");
+  const [price, setPrice] = useState(d0?.price ?? "");
   // Insumos adicionales (como en pedidos): nombre + costo × cantidad; su costo
   // se SUMA al precio final del producto.
   const [extras, setExtras] = useState<
     Array<{ name: string; cost: string; qty: string }>
-  >([]);
+  >(d0?.extras ?? []);
   // El precio varía por DOS ejes INDEPENDIENTES y combinables (pedido de Ale:
   // "el tamaño cambia los gramos Y el color cambia el costo del filamento"):
   // - hasSizes: ¿se vende en varios tamaños?
   // - byColor: ¿cada color cuesta distinto? (solo color único)
   // Ambos activos = MATRIZ tamaño × color (cada celda su precio).
-  const [hasSizes, setHasSizes] = useState(false);
-  const [byColor, setByColor] = useState(false);
+  const [hasSizes, setHasSizes] = useState(d0?.hasSizes ?? false);
+  const [byColor, setByColor] = useState(d0?.byColor ?? false);
   const distinctColorPrice = colorMode === "single" && byColor;
   // MULTICOLOR: ¿una combinación fija o VARIAS? (mariposas: 4 combos de 2
   // colores, cada uno con su foto). Los combos viajan como variantes (label
   // autogenerado "Negro + Rojo" + gramos por color del combo) → el stock y el
   // cobro reusan TODO el circuito de variantes. Excluyente con tamaños en multi.
-  const [multiCombos, setMultiCombosState] = useState(false);
+  const [multiCombos, setMultiCombosState] = useState(d0?.multiCombos ?? false);
   // Cambiar de modo REINICIA lo que depende del modo: colores, precios por
   // color, combos y variantes. Sin esto, volver atrás y cambiar de modo dejaba
   // estados sucios (p. ej. un producto "single" con TODOS los colores tocados).
@@ -193,21 +227,101 @@ export function ProductWizard({
       extrasCost: string;
       comboColors: string[];
     }>
-  >([]);
-  const [est, setEst] = useState<EstimatorValue>({
-    filamentId: null,
-    material: "",
-    color: "",
-    grams: 0,
-    printMinutes: 0,
-    layerHeight: "",
-    presetId: "",
-    price: null,
-  });
+  >(d0?.variants ?? []);
+  const [est, setEst] = useState<EstimatorValue>(
+    d0?.est ?? {
+      filamentId: null,
+      material: "",
+      color: "",
+      grams: 0,
+      printMinutes: 0,
+      layerHeight: "",
+      presetId: "",
+      price: null,
+    },
+  );
   // Por defecto PUBLICADO: el producto se ve en la tienda apenas se crea (Ale
   // quiere que se publique solo; si no, lo pasa a Borrador a mano).
-  const [status, setStatus] = useState<"draft" | "published">("published");
-  const [isFeatured, setIsFeatured] = useState(false);
+  const [status, setStatus] = useState<"draft" | "published">(
+    d0?.status ?? "published",
+  );
+  const [isFeatured, setIsFeatured] = useState(d0?.isFeatured ?? false);
+
+  // --- Guardado automático del borrador ---
+  const snapshot: WizardSnapshot = {
+    step,
+    name,
+    categoryId,
+    description,
+    posX,
+    posY,
+    colorMode,
+    colors,
+    colorGrams,
+    colorPricesSingle,
+    dimensions,
+    productionTime,
+    price,
+    extras,
+    hasSizes,
+    byColor,
+    multiCombos,
+    variants,
+    est,
+    status,
+    isFeatured,
+  };
+  const draftFiles: WizardFiles = {
+    image: imageFile,
+    original: originalPhoto,
+    extras: extraFiles,
+    colorImages,
+  };
+  const fileSig = (f: File | null) => (f ? `${f.name}:${f.size}` : "");
+  // Cambia cuando cambia cualquier cosa guardable (texto o fotos).
+  const draftKey = [
+    JSON.stringify(snapshot),
+    fileSig(imageFile),
+    fileSig(originalPhoto),
+    extraFiles.map(fileSig).join(","),
+    Object.entries(colorImages)
+      .map(([k, f]) => `${k}=${fileSig(f)}`)
+      .join(","),
+  ].join("|");
+  const latest = useRef({ snapshot, draftFiles });
+  // true cuando el producto ya se creó: no se guarda más y el borrador se borra.
+  const createdRef = useRef(false);
+  useEffect(() => {
+    latest.current = { snapshot, draftFiles };
+  });
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const { snapshot: data, draftFiles: files } = latest.current;
+      if (createdRef.current || !hasDraftContent(data, files)) return;
+      void saveProductDraft({
+        id: draftId,
+        updatedAt: Date.now(),
+        data,
+        files,
+      });
+    }, 700);
+    return () => clearTimeout(t);
+  }, [draftKey, draftId]);
+  // Al cerrar (X, Escape, cambiar de página): se guarda lo último y se avisa.
+  useEffect(
+    () => () => {
+      const { snapshot: data, draftFiles: files } = latest.current;
+      if (createdRef.current || !hasDraftContent(data, files)) return;
+      void saveProductDraft({
+        id: draftId,
+        updatedAt: Date.now(),
+        data,
+        files,
+      });
+      toast("Lo que cargaste quedó guardado en Borradores");
+    },
+    [draftId],
+  );
 
   const colorList = useMemo(
     () =>
@@ -672,6 +786,9 @@ export function ProductWizard({
           overlay: false,
         });
       }
+      // Producto creado: el borrador ya no hace falta.
+      createdRef.current = true;
+      void deleteProductDraft(draftId);
       overlay.end();
       setBusy(false);
       if (onCreated) {

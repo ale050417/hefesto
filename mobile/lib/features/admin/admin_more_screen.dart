@@ -6,6 +6,7 @@ import '../../core/providers.dart';
 import '../../core/theme/app_theme.dart';
 import 'admin_modules.dart';
 import 'admin_widgets.dart';
+import 'notificaciones/notifications_api.dart';
 
 /// "Más": todos los módulos del panel, agrupados como en el menú de la web y
 /// filtrados por los permisos de quien entró.
@@ -16,6 +17,7 @@ class AdminMoreScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final c = context.hc;
     final me = ref.watch(meProvider).value;
+    final unread = ref.watch(notificationsProvider.select((s) => s.unread));
     final visible = adminModules
         .where((m) => me == null || me.can(m.permission, 'ver'))
         .toList();
@@ -49,6 +51,21 @@ class AdminMoreScreen extends ConsumerWidget {
               child: AccessDenied(what: 'los módulos del panel'),
             ),
           const SizedBox(height: 22),
+          // Para todo el equipo (no depende de un permiso): avisos y qué recibir.
+          AdminCard(
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              leading: const Icon(Icons.notifications_rounded, color: Brand.gold),
+              title: const Text('Notificaciones', style: TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text(
+                unread > 0 ? '$unread sin ver' : 'Avisos del panel y qué recibir',
+                style: TextStyle(color: c.textDim, fontSize: 12),
+              ),
+              trailing: Icon(Icons.chevron_right_rounded, color: c.textFaint),
+              onTap: () => context.push(notificationsRoute),
+            ),
+          ),
+          const SizedBox(height: 10),
           AdminCard(
             padding: EdgeInsets.zero,
             child: ListTile(

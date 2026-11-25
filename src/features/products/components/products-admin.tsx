@@ -22,6 +22,8 @@ import type { EstimatorContext } from "@/features/calculator/service";
 import { ProductForm, type ProductFormValues } from "./product-form";
 import { EditSection } from "./edit-section";
 import { ProductWizard } from "./product-wizard";
+import { ProductDraftsButton } from "./product-drafts-button";
+import type { ProductDraft } from "../product-drafts";
 import { ImageUpload } from "./image-upload";
 import { photoColorOptions } from "../photo-colors";
 import { subtreeIds } from "../category-tree";
@@ -43,7 +45,7 @@ import { useDeleteResource } from "@/hooks/use-delete-resource";
 type View = "grid" | "list";
 type ModalState =
   | { open: false }
-  | { open: true; mode: "create" }
+  | { open: true; mode: "create"; draft?: ProductDraft }
   | {
       open: true;
       mode: "edit";
@@ -247,13 +249,22 @@ export function ProductsAdmin({
             pedido
           </div>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setModal({ open: true, mode: "create" })}
-        >
-          {Icon.plus} Nuevo producto
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Lo que quedó a medio cargar (se cerró sin querer) se retoma acá. */}
+          <ProductDraftsButton
+            categories={categories}
+            onResume={(draft) =>
+              setModal({ open: true, mode: "create", draft })
+            }
+          />
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setModal({ open: true, mode: "create" })}
+          >
+            {Icon.plus} Nuevo producto
+          </button>
+        </div>
       </div>
 
       <div className="toolbar">
@@ -585,6 +596,8 @@ export function ProductsAdmin({
       >
         {modal.open && modal.mode === "create" ? (
           <ProductWizard
+            key={modal.draft?.id ?? "nuevo"}
+            draft={modal.draft ?? null}
             categories={categories}
             estimator={estimator}
             colorCatalog={colorCatalog}

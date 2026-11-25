@@ -1,9 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hefesto/features/admin/filamentos/filament_types_screen.dart';
 import 'package:hefesto/features/admin/filamentos/filamento_form_screen.dart';
 import 'package:hefesto/features/admin/filamentos/filamentos_format.dart';
 import 'package:hefesto/features/admin/filamentos/filamentos_models.dart';
 import 'package:hefesto/features/admin/filamentos/parse_util.dart';
 import 'package:hefesto/features/admin/filamentos/stock_adjust_sheet.dart';
+import 'package:hefesto/features/admin/filamentos/weigh_sheet.dart';
 
 void main() {
   group('Filamento.fromJson', () {
@@ -332,6 +334,159 @@ void main() {
       expect(
         colorsTemplate([(color: 'Negro', stockGrams: 0)]),
         'Por ahora no tenemos colores en stock.',
+      );
+    });
+  });
+
+  group('tipos con precio y modelos de carrete', () {
+    test('un carrete trae su tipo y su modelo de carrete (o null)', () {
+      final con = Filamento.fromJson({'id': 'f1', 'typeId': 't1', 'spoolModelId': 's1'});
+      expect(con.typeId, 't1');
+      expect(con.spoolModelId, 's1');
+      final sin = Filamento.fromJson({'id': 'f2', 'typeId': null});
+      expect(sin.typeId, isNull);
+      expect(sin.spoolModelId, isNull);
+    });
+
+    test('el formulario manda typeId (o null = sin tipo) en alta y edición', () {
+      FilamentoDraft draft(String? typeId) => FilamentoDraft(
+            material: 'PLA',
+            color: 'Rojo',
+            brand: 'Grilon3',
+            diameter: '1.75',
+            stockGrams: 500,
+            spoolGrams: 1000,
+            costPerKg: 26000,
+            alertThresholdGrams: 200,
+            typeId: typeId,
+          );
+      expect(draft('t1').toCreateJson()['typeId'], 't1');
+      expect(draft('t1').toUpdateJson()['typeId'], 't1');
+      final sinTipo = draft(null).toUpdateJson();
+      expect(sinTipo.containsKey('typeId'), isTrue, reason: 'null viaja: quita el tipo');
+      expect(sinTipo['typeId'], isNull);
+    });
+
+    test('lee GET /admin/filaments/types (numeric como String)', () {
+      final d = FilamentTypesData.fromJson({
+        'types': [
+          {'id': 't1', 'name': 'PLA', 'costPerKg': '26000.00', 'spools': 32},
+          {'id': 't2', 'name': 'PLA Silk (Dorado)', 'costPerKg': 34000, 'spools': 0},
+          {'name': 'sin id'},
+        ],
+        'spoolModels': [
+          {'id': 's1', 'name': 'Grilon3 cartón', 'emptyGrams': '250.00'},
+        ],
+      });
+      expect(d.types, hasLength(2));
+      expect(d.types.first.costPerKg, 26000);
+      expect(d.types.first.spools, 32);
+      expect(d.typeOf('t2')!.name, 'PLA Silk (Dorado)');
+      expect(d.typeOf('nada'), isNull);
+      expect(d.typeOf(null), isNull);
+      expect(d.spoolModelOf('s1')!.emptyGrams, 250);
+      expect(d.spoolModelOf(null), isNull);
+      expect(FilamentTypesData.fromJson({}).types, isEmpty);
+    });
+
+    test('respuestas de guardar un tipo y de pesar', () {
+      expect(FilamentTypeSaved.fromJson({'ok': true, 'id': 't1', 'spools': 3}).spools, 3);
+      final w = WeighResult.fromJson({
+        'remainingGrams': 430,
+        'newStockGrams': 1430,
+        'previousStock': '900.00',
+        'changed': true,
+        'lowStock': false,
+        'filament': {'id': 'f1'},
+      });
+      expect(w.remainingGrams, 430);
+      expect(w.newStockGrams, 1430);
+      expect(w.previousStock, 900);
+      expect(w.changed, isTrue);
+    });
+
+    test('aviso al guardar un tipo: cuántos carretes cambiaron de precio', () {
+      expect(typeSavedMessage(isNew: true, priceChanged: false, spools: 0), 'Tipo agregado');
+      expect(typeSavedMessage(isNew: false, priceChanged: false, spools: 5), 'Tipo guardado');
+      expect(typeSavedMessage(isNew: false, priceChanged: true, spools: 32), 'Precio actualizado en 32 carretes');
+      expect(typeSavedMessage(isNew: false, priceChanged: true, spools: 1), 'Precio actualizado en 1 carrete');
+    });
+
+    test('validación de nombre + número', () {
+      expect(validateNameAmount('PLA', '26000', amountWhat: 'el precio por kg'), isNull);
+      expect(validateNameAmount(' ', '26000', amountWhat: 'el precio por kg'), 'Ingresá el nombre.');
+      expect(validateNameAmount('PLA', '', amountWhat: 'el precio por kg'), 'Ingresá el precio por kg.');
+      expect(validateNameAmount('Carrete', '6000', amountWhat: 'el peso', max: 5000), 'Revisá el peso.');
+      expect(validateNameAmount('Carrete', '0', amountWhat: 'el peso', max: 5000), isNull);
+    });
+  });
+
+  group('planWeigh (calcular filamento pesando el carrete)', () {
+    WeighPlan plan(String total, {double? empty = 250, String sealed = '', double spool = 1000}) =>
+        planWeigh(totalText: total, emptyGrams: empty, sealedText: sealed, spoolGrams: spool);
+
+    test('peso total − carrete vacío = filamento que queda', () {
+      final p = plan('680');
+      expect(p.isValid, isTrue);
+      expect(p.remainingGrams, 430);
+      expect(p.newStockGrams, 430);
+      expect(p.sealedSpools, 0);
+      expect(weighPreviewText(p), 'Carrete vacío: 250 g · Filamento restante: 430 g');
+    });
+
+    test('los carretes cerrados se suman enteros', () {
+      final p = plan('680', sealed: '2');
+      expect(p.remainingGrams, 430);
+      expect(p.newStockGrams, 2430);
+      expect(p.sealedSpools, 2);
+      expect(plan('680', sealed: '0').newStockGrams, 430);
+    });
+
+    test('decimales con coma y redondeo a 2 cifras', () {
+      final p = plan('680,456', empty: 250.1);
+      expect(p.remainingGrams, 430.36);
+    });
+
+    test('el carrete justo vacío da 0 g y es válido', () {
+      final p = plan('250');
+      expect(p.isValid, isTrue);
+      expect(p.remainingGrams, 0);
+    });
+
+    test('pesa menos que vacío: error como el del servidor', () {
+      final p = plan('200');
+      expect(p.isValid, isFalse);
+      expect(p.error, 'El carrete pesa 200 g y vacío pesa 250 g: revisá el peso o el modelo de carrete.');
+    });
+
+    test('sin peso o sin modelo todavía no hay nada que calcular', () {
+      expect(plan('').isValid, isFalse);
+      expect(plan('').error, isNull);
+      expect(plan('680', empty: null).isValid, isFalse);
+      expect(plan('680', empty: null).error, isNull);
+    });
+
+    test('peso en cero o carretes cerrados inválidos', () {
+      expect(plan('0').error, 'Ingresá cuánto pesa el carrete.');
+      expect(plan('680', sealed: '1,5').error, 'Los carretes cerrados tienen que ser un número entero.');
+      expect(plan('680', sealed: '101').error, contains('como mucho 100'));
+    });
+
+    test('texto del resultado', () {
+      expect(
+        weighResultText(const WeighResult(
+            remainingGrams: 430, newStockGrams: 430, previousStock: 900, changed: true, lowStock: false)),
+        'Quedan 430 g en el carrete · stock: 900 g → 430 g',
+      );
+      expect(
+        weighResultText(const WeighResult(
+            remainingGrams: 430, newStockGrams: 430, previousStock: 430, changed: false, lowStock: false)),
+        'Quedan 430 g en el carrete · el stock ya era de 430 g',
+      );
+      expect(
+        weighResultText(const WeighResult(
+            remainingGrams: 90, newStockGrams: 90, previousStock: 900, changed: true, lowStock: true)),
+        contains('conviene reponer'),
       );
     });
   });

@@ -8,6 +8,7 @@ import {
   calcConfigSchema,
   calcSaveSchema,
   marginPresetSchema,
+  presetLikeSchema,
   quotePriceSchema,
 } from "./schemas";
 import { quoteFinalPriceFlow, saveCalcFlow } from "./flows";
@@ -142,6 +143,45 @@ export async function saveCalcConfigAction(
     await service.saveCalcConfig(parsed.data);
     revalidatePath("/admin/calculadora");
     return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+/**
+ * Tipo de producto nuevo creado por quien cotiza (sugerencia de Agustín,
+ * 2026-11-25). No se carga un margen: se elige un tipo que ya existe y el
+ * nuevo se cobra igual. El % solo se devuelve al admin.
+ */
+export async function createPresetLikeAction(
+  input: unknown,
+): Promise<ActionResult<{ id: string; name: string; marginPct?: number }>> {
+  const user = await getCurrentUser();
+  if (!user || !(await can("calculadora", "crear"))) return NOT_STAFF;
+  const parsed = presetLikeSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      error: {
+        code: "VALIDATION",
+        message: "Poné un nombre y elegí con qué tipo se cobra igual.",
+      },
+    };
+  }
+  try {
+    const row = await service.createPresetLike(
+      parsed.data,
+      user.profile?.fullName?.trim() || null,
+    );
+    revalidatePath("/admin/calculadora");
+    return {
+      ok: true,
+      data: {
+        id: row.id,
+        name: row.name,
+        ...((await isAdmin()) ? { marginPct: row.marginPct } : {}),
+      },
+    };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
   }

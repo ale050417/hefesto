@@ -36,6 +36,10 @@ export type FilamentView = {
   stockGrams: number;
   spoolGrams: number;
   costPerKg: number;
+  /** Tipo de filamento (0084); null = sin tipo, precio propio. */
+  typeId: string | null;
+  /** Modelo de carrete con el que se pesó la última vez. */
+  spoolModelId: string | null;
   alertThresholdGrams: number;
   lowStock: boolean;
   status: "ok" | "bajo" | "agotado";

@@ -96,6 +96,8 @@ export async function createFix(
   });
   // Avisos best-effort: nunca rompen el alta.
   await notifyAdmins({
+    kind: "fix",
+    actorId: actor.id,
     title: fix.urgent ? "Arreglo URGENTE" : "Arreglo nuevo",
     body: `${actor.name ?? "El operador"}: ${fix.title}`,
     link: PAGE,
@@ -164,6 +166,7 @@ export async function updateFix(
   // Que el que lo cargó se entere de la respuesta (campanita del panel).
   if (before.status !== fix.status || before.ownerNote !== fix.ownerNote) {
     await notifyAdmins({
+      kind: "fix",
       title: `Arreglo ${FIX_STATUS_LABEL[input.status].toLowerCase()}`,
       body: fix.ownerNote ? `${fix.title} — ${fix.ownerNote}` : fix.title,
       link: PAGE,

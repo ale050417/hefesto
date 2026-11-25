@@ -17,6 +17,7 @@ import { buildWhatsappUrl } from "@/lib/site";
 import { cn } from "@/lib/utils";
 import { toast } from "@/stores/toastStore";
 import { changeInquiryStatusAction, deleteInquiryAction } from "../actions";
+import type { InquiryProduct } from "../product-prefill";
 import {
   INQUIRY_STATUS_LABEL,
   PAYMENT_METHODS,
@@ -68,11 +69,14 @@ export function InquiryList({
   inquiries,
   defaults,
   estimator,
+  products,
 }: {
   inquiries: InquiryView[];
   defaults: QuoteDefaults;
   /** Calculadora del operador; null si no se pudo cargar. */
   estimator: EstimatorContext | null;
+  /** Productos de la tienda para rellenar la respuesta (solo el operador). */
+  products: InquiryProduct[];
 }) {
   const canAnswer = useCan("consultas", "editar");
   const canManage = useCan("consultas", "crear");
@@ -369,6 +373,7 @@ export function InquiryList({
             inquiry={answering}
             defaults={defaults}
             estimator={estimator}
+            products={products}
             onDone={() => setAnswering(null)}
           />
         ) : null}

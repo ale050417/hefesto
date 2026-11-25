@@ -34,6 +34,7 @@ import 'package:hefesto/features/admin/fallas/falla_form_screen.dart';
 import 'package:hefesto/features/admin/fallas/fallas_api.dart';
 import 'package:hefesto/features/admin/fallas/fallas_models.dart';
 import 'package:hefesto/features/admin/fallas/fallas_screen.dart';
+import 'package:hefesto/features/admin/filamentos/filament_types_screen.dart';
 import 'package:hefesto/features/admin/filamentos/filamento_detail_screen.dart';
 import 'package:hefesto/features/admin/filamentos/filamento_form_screen.dart';
 import 'package:hefesto/features/admin/filamentos/filamentos_api.dart';
@@ -54,6 +55,7 @@ import 'admin_fallas_screens_test.dart' show FakeFallasApi;
 import 'admin_filamentos_screens_test.dart' show FakeFilamentosApi;
 import 'admin_produccion_screens_test.dart' show FakeProduccionApi;
 import 'support/device_kit.dart';
+import 'support/notifications_kit.dart';
 import 'support/photo_kit.dart';
 
 // ---------------------------------------------------------------------------
@@ -421,6 +423,18 @@ String longReport() => [
       'FIN DEL INFORME',
     ].join('\n');
 
+/// Tipos con precio y modelos de carrete con nombres largos y muchos renglones.
+FilamentTypesData extremeTypes() => FilamentTypesData.fromJson({
+      'types': [
+        {'id': 't0', 'name': 'PLA Silk tricolor con brillo metalizado edición limitada', 'costPerKg': 9876543.21, 'spools': 132},
+        for (var i = 1; i <= 12; i++) {'id': 't$i', 'name': 'Tipo $i', 'costPerKg': 20000 + i * 1000, 'spools': i},
+      ],
+      'spoolModels': [
+        {'id': 's0', 'name': 'Carrete de cartón reforzado con borde de plástico', 'emptyGrams': 250.5},
+        for (var i = 1; i <= 6; i++) {'id': 's$i', 'name': 'Carrete $i', 'emptyGrams': 150 + i * 10},
+      ],
+    });
+
 /// API de filamentos de mentira con el informe configurable (largo, con error
 /// o que tarda).
 class TallerFilamentosApi extends FakeFilamentosApi {
@@ -627,6 +641,7 @@ GoRouter shellRouter() => GoRouter(
 List<Override> shellOverrides() => [
       sessionProvider.overrideWith((ref) => Stream.value(_session)),
       adminDashboardProvider.overrideWith((ref) async => AdminDashboard.fromJson({})),
+      ...notificationsKitOverrides(),
     ];
 
 void main() {
@@ -1609,6 +1624,152 @@ void main() {
         await shoot(tester, 'ajuste_atajo');
         await closeSheet(tester);
         expect(api.adjusts, isEmpty);
+      });
+
+      testWidgets('calcular filamento: hoja con teclado en cada campo en ${phone.name}', (tester) async {
+        final api = TallerFilamentosApi()..typesData = extremeTypes();
+        await pumpPhone(tester, const FilamentoDetailScreen(id: '9'),
+            phone: phone, me: me, overrides: detailOv(extremo, api: api));
+        await tapVisible(tester, find.widgetWithText(OutlinedButton, 'Calcular filamento'));
+        final confirm = find.widgetWithText(GoldButton, 'Confirmar y actualizar stock');
+        final total = find.widgetWithText(TextField, 'Peso del carrete con filamento');
+        final sealed = find.widgetWithText(TextField, 'Carretes cerrados aparte');
+        expectSheetBelowStatusBar(tester);
+        expectReachable(tester, confirm, what: 'el botón Confirmar y actualizar stock');
+        await shoot(tester, 'pesar');
+
+        await tapVisible(tester, find.textContaining('Carrete de cartón reforzado'));
+        await focusField(tester, total);
+        expectFocusedFieldVisible(tester);
+        expectReachable(tester, confirm, what: 'Confirmar con el teclado (peso)');
+        expectSheetBelowStatusBar(tester, 'con el teclado abierto');
+        await type(tester, total, '1180,5');
+        await settle(tester, 3);
+        expectNoLayoutErrors(tester);
+        await shoot(tester, 'pesar_teclado_peso');
+
+        await focusField(tester, sealed);
+        expectFocusedFieldVisible(tester);
+        expectReachable(tester, confirm, what: 'Confirmar con el teclado (carretes cerrados)');
+        await type(tester, sealed, '12');
+        await settle(tester, 3);
+        expectNoLayoutErrors(tester);
+        expect(find.textContaining('Filamento restante: 930 g'), findsOneWidget);
+        expect(find.textContaining('Stock total: 60,93 kg'), findsOneWidget);
+        await shoot(tester, 'pesar_teclado_cerrados');
+
+        // Pesa menos que vacío: el error se ve y no deja confirmar.
+        await type(tester, total, '100');
+        await settle(tester, 3);
+        expectNoLayoutErrors(tester);
+        expect(find.textContaining('revisá el peso o el modelo de carrete'), findsOneWidget);
+        await shoot(tester, 'pesar_error');
+
+        // Rechazo largo del servidor.
+        await type(tester, total, '1180,5');
+        await settle(tester, 3);
+        api.failWith = ApiException('invalid', longServerError);
+        await tester.tap(confirm);
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(api.weighs, isEmpty);
+        expectReachable(tester, find.text(longServerError), what: 'el rechazo del servidor en la hoja');
+        expectReachable(tester, confirm, what: 'Confirmar con el error del servidor');
+        await shoot(tester, 'pesar_rechazo');
+
+        api.failWith = null;
+        await tester.tap(confirm);
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(api.weighs.single.totalGrams, 1180.5);
+        expect(api.weighs.single.sealedSpools, 12);
+        expect(sheet, findsNothing, reason: 'al confirmar se cierra la hoja');
+        expect(find.textContaining('Quedan 430 g en el carrete'), findsOneWidget);
+        await shoot(tester, 'pesar_aviso');
+      });
+
+      testWidgets('calcular filamento sin modelos: alta de un carrete con teclado en ${phone.name}', (tester) async {
+        final api = TallerFilamentosApi();
+        await pumpPhone(tester, const FilamentoDetailScreen(id: '2'), phone: phone, me: me, overrides: detailOv(rojo, api: api));
+        await tapVisible(tester, find.widgetWithText(OutlinedButton, 'Calcular filamento'));
+        final add = find.widgetWithText(GoldButton, 'Agregar un carrete');
+        expectSheetBelowStatusBar(tester);
+        expectReachable(tester, add, what: 'Agregar un carrete');
+        await shoot(tester, 'pesar_sin_modelos');
+        await tester.tap(add);
+        await settle(tester);
+        expectNoLayoutErrors(tester);
+        final dialog = find.byType(AlertDialog);
+        await focusField(tester, find.widgetWithText(TextField, 'Peso vacío'));
+        expectNoLayoutErrors(tester);
+        expectReachable(tester, find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Guardar')),
+            what: 'Guardar del diálogo con el teclado');
+        await shoot(tester, 'pesar_nuevo_carrete_teclado');
+        await type(tester, find.widgetWithText(TextField, 'Nombre del carrete'), 'Bambu');
+        await type(tester, find.widgetWithText(TextField, 'Peso vacío'), '212,5');
+        await tester.tap(find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Guardar')));
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(api.spoolCreates, [('Bambu', 212.5)]);
+        expect(find.textContaining('Bambu (212,5 g)'), findsOneWidget);
+        await closeSheet(tester);
+      });
+
+      testWidgets('tipos y precios: lista larga y diálogos con teclado en ${phone.name}', (tester) async {
+        final api = TallerFilamentosApi()..typesData = extremeTypes();
+        await pumpPhone(tester, const FilamentTypesScreen(),
+            phone: phone, me: me, overrides: [filamentosApiProvider.overrideWithValue(api)]);
+        expect(find.text('Tipos y precios'), findsOneWidget);
+        await shoot(tester, 'tipos');
+        await expectListEndVisible(tester, find.text('Agregar carrete'), what: 'el botón Agregar carrete');
+
+        await tapVisible(tester, find.textContaining('PLA Silk tricolor'));
+        var dialog = find.byType(AlertDialog);
+        expect(find.text('Editar tipo'), findsOneWidget);
+        await focusField(tester, find.widgetWithText(TextField, 'Precio por kg'));
+        expectNoLayoutErrors(tester);
+        expectReachable(tester, find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Guardar')),
+            what: 'Guardar del diálogo con el teclado');
+        await shoot(tester, 'tipos_editar_teclado');
+        await type(tester, find.widgetWithText(TextField, 'Precio por kg'), '123456,75');
+        api.failWith = ApiException('invalid', longServerError);
+        await tester.tap(find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Guardar')));
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(find.text(longServerError), findsOneWidget);
+        await shoot(tester, 'tipos_editar_rechazo');
+        api.failWith = null;
+        await tester.tap(find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Guardar')));
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(api.typeUpdates.single.$3, 123456.75);
+        expect(find.textContaining('Precio actualizado en'), findsOneWidget);
+
+        await tapVisible(tester, find.byTooltip('Eliminar').first);
+        dialog = find.byType(AlertDialog);
+        expectReachable(tester, find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Eliminar')), what: 'Eliminar del diálogo');
+        expectReachable(tester, find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Cancelar')), what: 'Cancelar del diálogo');
+        await shoot(tester, 'tipos_eliminar_dialogo');
+        await tester.tap(find.descendant(of: dialog, matching: find.widgetWithText(TextButton, 'Cancelar')));
+        await settle(tester);
+        expect(api.typeDeletes, isEmpty);
+      });
+
+      testWidgets('formulario: selector de tipo (precio) en ${phone.name}', (tester) async {
+        final api = TallerFilamentosApi()..typesData = extremeTypes();
+        await pumpPhone(tester, const FilamentoFormScreen(), phone: phone, me: me, overrides: formOv(api));
+        await tapVisible(tester, find.text('Sin tipo (precio propio)'));
+        expectSheetBelowStatusBar(tester);
+        expectNoLayoutErrors(tester);
+        await shoot(tester, 'fil_form_tipos');
+        await tapVisible(tester, find.textContaining('PLA Silk tricolor'));
+        expectNoLayoutErrors(tester);
+        expect(sheet, findsNothing, reason: 'al elegir se cierra la hoja');
+        expect(find.byKey(const ValueKey('cost-from-type')), findsOneWidget);
+        await tester.ensureVisible(find.byKey(const ValueKey('cost-from-type')));
+        await settle(tester, 2);
+        expectNoLayoutErrors(tester);
+        await shoot(tester, 'fil_form_con_tipo');
       });
 
       testWidgets('diálogos del detalle: sumar un carrete y eliminar en ${phone.name}', (tester) async {

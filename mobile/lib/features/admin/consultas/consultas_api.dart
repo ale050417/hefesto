@@ -51,6 +51,13 @@ class ConsultasApi {
         ),
       );
 
+  /// Productos de la tienda para rellenar la respuesta ('' = los primeros).
+  Future<ConsultaProductPage> products({String q = '', int limit = 30}) async =>
+      ConsultaProductPage.fromJson(await _api.getJson(
+        '/admin/consultas/products',
+        query: {if (q.trim().isNotEmpty) 'q': q.trim(), 'limit': limit},
+      ));
+
   /// Respuesta del operador. Devuelve la consulta ya con el mensaje armado.
   Future<Consulta> answer(String id, RespuestaDraft d) async => Consulta.fromJson(
         await _api.sendJson('POST', '/admin/consultas/$id/answer', body: d.toJson()),
@@ -77,6 +84,12 @@ Duration? _noRetry(int count, Object error) => null;
 
 final consultasProvider = FutureProvider.autoDispose<ConsultasData>(
   (ref) => ref.watch(consultasApiProvider).list(),
+  retry: _noRetry,
+);
+
+/// Búsqueda de productos de la tienda al responder ('' = los primeros).
+final consultaProductsProvider = FutureProvider.autoDispose.family<ConsultaProductPage, String>(
+  (ref, q) => ref.watch(consultasApiProvider).products(q: q),
   retry: _noRetry,
 );
 

@@ -86,6 +86,8 @@ export function buildCalcPayload(p: {
     brand: string;
     costPerKg: number;
     hex?: string | null;
+    typeId?: string | null;
+    typeName?: string | null;
   }>;
   presetOptions: MarginPresetOption[];
   presets: MarginPreset[];
@@ -110,6 +112,9 @@ export function buildCalcPayload(p: {
       brand: f.brand,
       costPerKg: num(f.costPerKg),
       hex: f.hex ?? null,
+      // Tipo de filamento (0084): la app agrupa el selector por acá.
+      typeId: f.typeId ?? null,
+      typeName: f.typeName ?? null,
     })),
     // Operador: solo id + nombre de los tipos ACTIVOS (sin margen).
     presetOptions: p.presetOptions.map((o) => ({ id: o.id, name: o.name })),

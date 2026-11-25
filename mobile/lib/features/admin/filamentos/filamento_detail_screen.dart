@@ -8,6 +8,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/common.dart';
 import '../admin_widgets.dart';
 import '../stock_screen.dart' show hexColor;
+import 'filament_type_picker.dart';
 import 'filamento_form_screen.dart';
 import 'filamentos_api.dart';
 import 'filamentos_format.dart';
@@ -15,9 +16,10 @@ import 'filamentos_models.dart';
 import 'movement_tile.dart';
 import 'shared_widgets.dart';
 import 'stock_adjust_sheet.dart';
+import 'weigh_sheet.dart';
 
-/// Detalle de un carrete: stock, costo, acciones (sumar carrete, ajustar,
-/// editar, eliminar) e historial de movimientos.
+/// Detalle de un carrete: stock, costo (con su tipo), acciones (ajustar, calcular
+/// pesando el carrete, sumar carrete, editar, eliminar) e historial de movimientos.
 class FilamentoDetailScreen extends ConsumerWidget {
   const FilamentoDetailScreen({super.key, required this.id});
   final String id;
@@ -33,6 +35,12 @@ class FilamentoDetailScreen extends ConsumerWidget {
   Future<void> _adjust(BuildContext context, WidgetRef ref, Filamento f) async {
     final res = await showStockAdjustSheet(context, f);
     if (res != null && context.mounted) _toastResult(context, res);
+  }
+
+  /// "Calcular filamento": pesar el carrete en uso y restar el carrete vacío.
+  Future<void> _weigh(BuildContext context, Filamento f) async {
+    final res = await showWeighSheet(context, f);
+    if (res != null && context.mounted) showToast(context, weighResultText(res));
   }
 
   void _toastResult(BuildContext context, StockAdjustResult res) {
@@ -114,6 +122,8 @@ class FilamentoDetailScreen extends ConsumerWidget {
     final canDelete = me?.can('filamentos', 'eliminar') ?? false;
     final fil = ref.watch(filamentoProvider(id));
     final movs = ref.watch(filamentMovementsProvider(id));
+    // Solo para mostrar el nombre del tipo: si no llega, se ve el costo solo.
+    final types = ref.watch(filamentTypesProvider).value;
 
     return Scaffold(
       appBar: AppBar(
@@ -153,10 +163,19 @@ class FilamentoDetailScreen extends ConsumerWidget {
                   f: f,
                   onSpool: () => _addSpool(context, ref, f),
                   onAdjust: () => _adjust(context, ref, f),
+                  onWeigh: () => _weigh(context, f),
                 ),
                 const SizedBox(height: 12),
               ],
-              _InfoCard(f),
+              _InfoCard(f, typeName: types?.typeOf(f.typeId)?.name),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => openFilamentTypes(context),
+                  icon: const Icon(Icons.sell_outlined, size: 18),
+                  label: const Text('Tipos y precios'),
+                ),
+              ),
               const AdminSectionTitle('Movimientos'),
               movs.when(
                 loading: () => const Skeleton(height: 90, radius: 20),
@@ -354,10 +373,16 @@ class _StockCard extends StatelessWidget {
 }
 
 class _ActionsCard extends StatelessWidget {
-  const _ActionsCard({required this.f, required this.onSpool, required this.onAdjust});
+  const _ActionsCard({
+    required this.f,
+    required this.onSpool,
+    required this.onAdjust,
+    required this.onWeigh,
+  });
   final Filamento f;
   final VoidCallback onSpool;
   final VoidCallback onAdjust;
+  final VoidCallback onWeigh;
 
   @override
   Widget build(BuildContext context) {
@@ -371,6 +396,15 @@ class _ActionsCard extends StatelessWidget {
             label: 'Ajustar stock',
             icon: Icons.tune_rounded,
             onPressed: onAdjust,
+          ),
+          const SizedBox(height: 10),
+          // Pesar el carrete en uso: peso total − carrete vacío (pedido de
+          // Agustín, 2026-11-24).
+          OutlinedButton.icon(
+            icon: const Icon(Icons.scale_outlined, size: 18),
+            label: const Text('Calcular filamento', maxLines: 1, overflow: TextOverflow.ellipsis),
+            style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+            onPressed: onWeigh,
           ),
           if (f.spoolGrams > 0) ...[
             const SizedBox(height: 10),
@@ -393,8 +427,11 @@ class _ActionsCard extends StatelessWidget {
 }
 
 class _InfoCard extends StatelessWidget {
-  const _InfoCard(this.f);
+  const _InfoCard(this.f, {this.typeName});
   final Filamento f;
+
+  /// Nombre del tipo del que sale el precio (null = sin tipo o no cargó).
+  final String? typeName;
 
   @override
   Widget build(BuildContext context) {
@@ -421,7 +458,7 @@ class _InfoCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Column(
         children: [
-          row('Costo por kg', formatPrice(f.costPerKg)),
+          row('Costo por kg', typeName == null ? formatPrice(f.costPerKg) : '${formatPrice(f.costPerKg)} · $typeName'),
           Divider(height: 1, color: c.border),
           row('Valor en stock', formatPrice(f.stockValue)),
           Divider(height: 1, color: c.border),

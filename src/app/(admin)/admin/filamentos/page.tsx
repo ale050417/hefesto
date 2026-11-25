@@ -8,6 +8,10 @@ import {
   listMaterialCatalog,
   listFilamentsView,
 } from "@/features/inventory/queries";
+import {
+  listFilamentTypesView,
+  listSpoolModelsView,
+} from "@/features/inventory/filament-types";
 import { DegradedNotice } from "@/components/shared/degraded-notice";
 import { compactPrice, formatPrice } from "@/lib/format";
 import { safeLoad } from "@/lib/safe-load";
@@ -40,6 +44,11 @@ export default async function FilamentosPage() {
     await safeLoad("materiales", listMaterialCatalog(), [])
   ).value;
 
+  // Tipos con precio y modelos de carrete vacío (0084, pedidos de Agustín).
+  const types = (await safeLoad("tipos", listFilamentTypesView(), [])).value;
+  const spoolModels = (await safeLoad("carretes", listSpoolModelsView(), []))
+    .value;
+
   const totalG = filaments.reduce((a, f) => a + f.stockGrams, 0);
   const valor = filaments.reduce(
     (a, f) => a + (f.stockGrams / 1000) * f.costPerKg,
@@ -67,6 +76,7 @@ export default async function FilamentosPage() {
           colorCatalog={colorCatalog}
           brandCatalog={brandCatalog}
           materialCatalog={materialCatalog}
+          types={types}
         />
       </div>
 
@@ -116,6 +126,8 @@ export default async function FilamentosPage() {
         colorCatalog={colorCatalog}
         brandCatalog={brandCatalog}
         materialCatalog={materialCatalog}
+        types={types}
+        spoolModels={spoolModels}
       />
     </div>
   );

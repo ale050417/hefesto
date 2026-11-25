@@ -5,9 +5,20 @@ import { Modal } from "@/components/ui/modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
-import { addSpoolAction, deleteFilamentAction } from "../actions";
+import {
+  addSpoolAction,
+  deleteFilamentAction,
+  deleteFilamentTypeAction,
+  deleteSpoolModelAction,
+  saveFilamentTypeAction,
+  saveSpoolModelAction,
+} from "../actions";
 import { filColor } from "../constants";
+import type { FilamentTypeView, SpoolModelView } from "../filament-types";
 import type { FilamentView } from "../types";
+import { useCan } from "@/components/auth/perms-provider";
+import { NameValueListButton } from "./name-value-list-button";
+import { WeighModal } from "./weigh-modal";
 import { FilamentForm, type CatalogItem } from "./filament-form";
 import { FilamentReportButton } from "./filament-report-button";
 import { runAction } from "@/lib/run-action";
@@ -62,6 +73,21 @@ const EditIcon = (
     <path d="M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
   </svg>
 );
+// Balanza: "Calcular filamento" pesando el carrete.
+const ScaleIcon = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden
+  >
+    <path d="M5 7h14l1.5 12a2 2 0 0 1-2 2.2h-13a2 2 0 0 1-2-2.2z" />
+    <path d="M9 7a3 3 0 0 1 6 0M12 12v3" />
+  </svg>
+);
 const TrashIcon = (
   <svg
     viewBox="0 0 24 24"
@@ -82,7 +108,12 @@ export function FilamentsBoard({
   colorCatalog,
   brandCatalog,
   materialCatalog,
+  types,
+  spoolModels,
 }: {
+  /** Tipos de filamento con precio y modelos de carrete vacío (0084). */
+  types: FilamentTypeView[];
+  spoolModels: SpoolModelView[];
   filaments: FilamentView[];
   materials: string[];
   colorCatalog: CatalogItem[];
@@ -96,6 +127,10 @@ export function FilamentsBoard({
   const [view, setView] = useState<View>("grilla");
   const [editing, setEditing] = useState<FilamentView | null>(null);
   const [confirming, setConfirming] = useState<FilamentView | null>(null);
+  const [weighing, setWeighing] = useState<FilamentView | null>(null);
+  const canEdit = useCan("filamentos", "editar");
+  const typeName = (f: FilamentView) =>
+    types.find((t) => t.id === f.typeId)?.name ?? null;
   const [pendingId, setPendingId] = useState<string | null>(null);
 
   const list = useMemo(() => {
@@ -237,6 +272,62 @@ export function FilamentsBoard({
           </button>
         ))}
         <div className="grow" />
+        {canEdit ? (
+          <>
+            <NameValueListButton
+              label="Tipos y precios"
+              title="Tipos de filamento y precios"
+              intro={
+                <>
+                  El precio por kg se carga una sola vez por tipo. Cada carrete
+                  elige su tipo y toma ese precio: si cambiás un precio acá,
+                  cambia en <b>todos</b> los carretes de ese tipo y en la
+                  calculadora.
+                </>
+              }
+              namePlaceholder="Tipo (ej. PLA Silk)"
+              valueLabel="Precio"
+              valueSuffix="$/kg"
+              addLabel="Agregar tipo"
+              savedMessage="Tipos y precios guardados"
+              items={types.map((t) => ({
+                id: t.id,
+                name: t.name,
+                value: t.costPerKg,
+                note: `${t.spools} carrete${t.spools === 1 ? "" : "s"}`,
+              }))}
+              onSave={(id, v) =>
+                saveFilamentTypeAction(id, { name: v.name, costPerKg: v.value })
+              }
+              onDelete={deleteFilamentTypeAction}
+            />
+            <NameValueListButton
+              label="Carretes vacíos"
+              title="Modelos de carrete vacío"
+              intro={
+                <>
+                  Cuánto pesa <b>vacío</b> cada modelo de carrete. Se usa en
+                  «Calcular filamento»: pesás el carrete en uso y se le resta
+                  este peso.
+                </>
+              }
+              namePlaceholder="Carrete (ej. Bambu Lab plástico)"
+              valueLabel="Peso"
+              valueSuffix="g vacío"
+              addLabel="Agregar carrete"
+              savedMessage="Carretes guardados"
+              items={spoolModels.map((m) => ({
+                id: m.id,
+                name: m.name,
+                value: m.emptyGrams,
+              }))}
+              onSave={(id, v) =>
+                saveSpoolModelAction(id, { name: v.name, emptyGrams: v.value })
+              }
+              onDelete={deleteSpoolModelAction}
+            />
+          </>
+        ) : null}
         <button
           className="btn btn-secondary btn-sm"
           onClick={copyColorTemplate}
@@ -360,9 +451,22 @@ export function FilamentsBoard({
                   </div>
                   <div className="mt-3.5 flex items-center justify-between border-t border-[var(--border)] pt-3">
                     <span className="text-faint text-[12px]">
-                      Costo {formatPrice(f.costPerKg)}/kg
+                      {typeName(f) ? `${typeName(f)} · ` : "Costo "}
+                      {formatPrice(f.costPerKg)}/kg
                     </span>
                     <div className="flex items-center gap-1">
+                      {canEdit ? (
+                        <button
+                          className="btn-icon btn-ghost"
+                          title="Calcular filamento (pesar el carrete)"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setWeighing(f);
+                          }}
+                        >
+                          {ScaleIcon}
+                        </button>
+                      ) : null}
                       <button
                         className="btn btn-secondary btn-sm"
                         title="Sumar carrete"
@@ -464,6 +568,15 @@ export function FilamentsBoard({
                       </td>
                       <td data-label="">
                         <div className="flex justify-end gap-1">
+                          {canEdit ? (
+                            <button
+                              className="btn-icon btn-ghost"
+                              title="Calcular filamento (pesar el carrete)"
+                              onClick={() => setWeighing(f)}
+                            >
+                              {ScaleIcon}
+                            </button>
+                          ) : null}
                           <button
                             className="btn-icon btn-ghost"
                             title="Sumar carrete"
@@ -514,8 +627,10 @@ export function FilamentsBoard({
               stockGrams: editing.stockGrams,
               spoolGrams: editing.spoolGrams,
               costPerKg: editing.costPerKg,
+              typeId: editing.typeId,
               alertThresholdGrams: editing.alertThresholdGrams,
             }}
+            types={types}
             colorCatalog={colorCatalog}
             brandCatalog={brandCatalog}
             materialCatalog={materialCatalog}
@@ -524,6 +639,14 @@ export function FilamentsBoard({
           />
         ) : null}
       </Modal>
+
+      {weighing ? (
+        <WeighModal
+          filament={weighing}
+          spoolModels={spoolModels}
+          onClose={() => setWeighing(null)}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={!!confirming}

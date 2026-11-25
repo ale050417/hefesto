@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
 import 'admin_providers.dart';
 import 'admin_widgets.dart';
+import 'notificaciones/notifications_screen.dart';
 import 'sale_status.dart';
 import 'stock_screen.dart';
 
@@ -81,6 +82,8 @@ class AdminDashboardScreen extends ConsumerWidget {
                     ],
                   ),
                 ),
+                // "Tenés N novedades" (solo si hay algo sin ver).
+                const NotificationsBanner(),
                 if (d.degraded.isNotEmpty) ...[
                   _DegradedNotice(d.degraded),
                   const SizedBox(height: 12),

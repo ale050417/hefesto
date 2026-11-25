@@ -508,6 +508,54 @@ void main() {
     });
   });
 
+  group('productos de la tienda para responder', () {
+    test('lee la página y descarta lo que no sirve', () {
+      final page = ConsultaProductPage.fromJson({
+        'total': 7,
+        'items': [
+          {
+            'id': 'p1',
+            'name': 'Trofeo',
+            'categoryName': ' ',
+            'material': 'PLA',
+            'dimensions': null,
+            'deliveryTime': '5 días',
+            'colors': 'Dorado',
+            'options': [
+              {'label': null, 'unitPrice': '18000.00', 'grams': 140, 'printMinutes': 420},
+            ],
+          },
+          {'id': 'p2', 'name': 'Sin opciones', 'options': []},
+          'basura',
+        ],
+      });
+      expect(page.total, 7);
+      final p = page.items.single;
+      expect(p.categoryName, isNull);
+      expect(p.dimensions, isNull);
+      expect(p.options.single.unitPrice, 18000);
+      final calc = p.calcFor(p.options.single)!;
+      expect((calc.filamentId, calc.material, calc.grams, calc.printMinutes), (null, 'PLA', 140.0, 420));
+    });
+
+    test('sin material, o sin gramos ni tiempo, no hay con qué costear', () {
+      ConsultaProduct product(String? material, num grams, int minutes) => ConsultaProduct.fromJson({
+            'id': 'p',
+            'name': 'X',
+            'material': material,
+            'options': [
+              {'unitPrice': 100, 'grams': grams, 'printMinutes': minutes},
+            ],
+          });
+      final sinMaterial = product(null, 10, 10);
+      expect(sinMaterial.calcFor(sinMaterial.options.single), isNull);
+      final sinDatos = product('PLA', 0, 0);
+      expect(sinDatos.calcFor(sinDatos.options.single), isNull);
+      final soloTiempo = product('PLA', 0, 30);
+      expect(soloTiempo.calcFor(soloTiempo.options.single), isNotNull);
+    });
+  });
+
   group('validateRespuestaForm', () {
     Map<String, String> v({
       String unit = '2.500',

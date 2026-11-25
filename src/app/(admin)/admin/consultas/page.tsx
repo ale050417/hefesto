@@ -6,9 +6,11 @@ import { safeLoad } from "@/lib/safe-load";
 import { getEstimatorContext } from "@/features/calculator/service";
 import { InquiryList } from "@/features/consultas/components/inquiry-list";
 import { NuevaConsultaButton } from "@/features/consultas/components/nueva-consulta-button";
+import { inquiryProduct } from "@/features/consultas/product-prefill";
 import { listInquiries } from "@/features/consultas/queries";
 import { toInquiryView } from "@/features/consultas/view";
 import { DEFAULT_QUOTE_DEFAULTS } from "@/features/quotes/build-quote";
+import { listProductsForSale } from "@/features/products/services/catalogService";
 import { getQuoteDefaults } from "@/features/quotes/service";
 
 export const dynamic = "force-dynamic";
@@ -34,10 +36,17 @@ export default async function ConsultasPage() {
     safeLoad("consultas", listInquiries(), []),
     safeLoad("cotización", getQuoteDefaults(), DEFAULT_QUOTE_DEFAULTS),
   ]);
-  // La calculadora solo hace falta para quien responde (el operador).
-  const estimator = (await can("consultas", "editar"))
-    ? (await safeLoad("calculadora", getEstimatorContext(), null)).value
-    : null;
+  // La calculadora y los productos de la tienda (para rellenar la respuesta)
+  // solo hacen falta para quien responde (el operador).
+  const canAnswer = await can("consultas", "editar");
+  const [estimatorR, productsR] = canAnswer
+    ? await Promise.all([
+        safeLoad("calculadora", getEstimatorContext(), null),
+        safeLoad("productos", listProductsForSale(), []),
+      ])
+    : [null, null];
+  const estimator = estimatorR?.value ?? null;
+  const products = (productsR?.value ?? []).map(inquiryProduct);
 
   const rows = listR.value.map((row) => {
     const v = toInquiryView(row, user?.id ?? null);
@@ -73,6 +82,7 @@ export default async function ConsultasPage() {
           inquiries={rows}
           defaults={defaultsR.value}
           estimator={estimator}
+          products={products}
         />
       )}
     </div>

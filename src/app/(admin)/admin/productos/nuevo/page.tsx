@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requirePermissionPage } from "@/core/auth/permissions";
-import { ProductWizard } from "@/features/products/components/product-wizard";
+import { NewProductWizard } from "@/features/products/components/new-product-wizard";
 import { listCategories } from "@/features/products/services/catalogService";
 import { getEstimatorContext } from "@/features/calculator/service";
 import { listProductColors } from "@/features/inventory/queries";
@@ -61,7 +61,7 @@ export default async function NuevoProductoPage() {
         </div>
       </div>
       <div className="mt-2">
-        <ProductWizard
+        <NewProductWizard
           categories={categories}
           estimator={estimator}
           colorCatalog={colorCatalog}

@@ -1,12 +1,14 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/core/db";
 import {
   filamentCatalog,
   filamentMovements,
+  filamentTypes,
   filaments,
   manualSales,
   orders,
   printFailures,
+  spoolModels,
 } from "@/core/db/schema";
 import type { MovementRow } from "./movements";
 import type {
@@ -587,4 +589,123 @@ export async function getSaleColorsFor(
       ),
     );
   return rows.map((r) => r.color);
+}
+
+// --- Tipos de filamento con precio y modelos de carrete vacío (0084) ---
+
+export type FilamentTypeRow = typeof filamentTypes.$inferSelect;
+export type SpoolModelRow = typeof spoolModels.$inferSelect;
+
+export async function listFilamentTypes(
+  database: Database = db,
+): Promise<FilamentTypeRow[]> {
+  return database
+    .select()
+    .from(filamentTypes)
+    .orderBy(asc(filamentTypes.sortOrder), asc(filamentTypes.name));
+}
+
+export async function findFilamentTypeById(
+  id: string,
+  database: Database = db,
+): Promise<FilamentTypeRow | null> {
+  const [row] = await database
+    .select()
+    .from(filamentTypes)
+    .where(eq(filamentTypes.id, id));
+  return row ?? null;
+}
+
+export async function insertFilamentType(
+  values: typeof filamentTypes.$inferInsert,
+  database: Database = db,
+): Promise<FilamentTypeRow> {
+  const [row] = await database.insert(filamentTypes).values(values).returning();
+  if (!row) throw new Error("No se pudo crear el tipo de filamento");
+  return row;
+}
+
+/**
+ * Edita el tipo y, en la misma transacción, lleva su precio a TODOS sus
+ * carretes (ese es el punto: se cambia en un solo lugar). Devuelve cuántos
+ * carretes cambiaron de precio.
+ */
+export async function updateFilamentTypeTx(
+  id: string,
+  fields: { name: string; costPerKg: string },
+  database: Database = db,
+): Promise<{ row: FilamentTypeRow | null; spools: number }> {
+  return database.transaction(async (tx) => {
+    const [row] = await tx
+      .update(filamentTypes)
+      .set(fields)
+      .where(eq(filamentTypes.id, id))
+      .returning();
+    if (!row) return { row: null, spools: 0 };
+    const changed = await tx
+      .update(filaments)
+      .set({ costPerKg: fields.costPerKg })
+      .where(
+        and(
+          eq(filaments.typeId, id),
+          sql`${filaments.costPerKg} <> ${fields.costPerKg}::numeric`,
+        ),
+      )
+      .returning({ id: filaments.id });
+    return { row, spools: changed.length };
+  });
+}
+
+/** Borra el tipo: sus carretes quedan sin tipo y conservan el precio. */
+export async function deleteFilamentTypeRow(
+  id: string,
+  database: Database = db,
+): Promise<void> {
+  await database.delete(filamentTypes).where(eq(filamentTypes.id, id));
+}
+
+export async function listSpoolModels(
+  database: Database = db,
+): Promise<SpoolModelRow[]> {
+  return database.select().from(spoolModels).orderBy(asc(spoolModels.name));
+}
+
+export async function findSpoolModelById(
+  id: string,
+  database: Database = db,
+): Promise<SpoolModelRow | null> {
+  const [row] = await database
+    .select()
+    .from(spoolModels)
+    .where(eq(spoolModels.id, id));
+  return row ?? null;
+}
+
+export async function insertSpoolModel(
+  values: typeof spoolModels.$inferInsert,
+  database: Database = db,
+): Promise<SpoolModelRow> {
+  const [row] = await database.insert(spoolModels).values(values).returning();
+  if (!row) throw new Error("No se pudo crear el modelo de carrete");
+  return row;
+}
+
+export async function updateSpoolModelRow(
+  id: string,
+  fields: Partial<typeof spoolModels.$inferInsert>,
+  database: Database = db,
+): Promise<SpoolModelRow | null> {
+  const [row] = await database
+    .update(spoolModels)
+    .set(fields)
+    .where(eq(spoolModels.id, id))
+    .returning();
+  return row ?? null;
+}
+
+export async function deleteSpoolModelRow(
+  id: string,
+  database: Database = db,
+): Promise<void> {
+  await database.delete(spoolModels).where(eq(spoolModels.id, id));
 }

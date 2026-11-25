@@ -845,6 +845,9 @@ export type ProductForSale = {
   colorPrices: Record<string, number>;
   variants: SaleVariant[];
   categoryName: string | null;
+  /** Medidas y demora de la ficha: autocompletan la respuesta de una consulta. */
+  dimensions?: string | null;
+  productionTime?: string | null;
 };
 
 /** Productos publicados para el selector "cargar desde la tienda" de una venta
@@ -884,5 +887,7 @@ export async function listProductsForSale(): Promise<ProductForSale[]> {
     colorPrices: p.colorPrices ?? {},
     variants: byProduct.get(p.id) ?? [],
     categoryName: p.categoryName,
+    dimensions: p.dimensions,
+    productionTime: p.productionTime,
   }));
 }

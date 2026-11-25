@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +11,8 @@ import '../../../core/widgets/modals.dart';
 import '../admin_widgets.dart';
 import 'catalogo_ui.dart';
 import 'category_picker.dart';
+import 'producto_drafts.dart';
+import 'producto_drafts_provider.dart';
 import 'producto_form_logic.dart';
 import 'productos_models.dart';
 import 'productos_providers.dart';
@@ -21,29 +25,57 @@ import 'productos_providers.dart';
 /// que el producto exista para subirlas. Los colores y los tamaños NO se editan
 /// acá (se cargan desde el panel web). El alta nace como borrador: publicar
 /// exige fotos.
+///
+/// Lo que se va cargando se guarda solo en el teléfono (pedido del operador:
+/// "a veces cierro sin querer y debo de empezar todo de nuevo"). En el alta
+/// queda en "Borradores sin guardar" del listado y con [draft] se retoma; en la
+/// edición, al volver a abrir el producto se ofrece recuperar los cambios.
 class AdminProductFormScreen extends ConsumerStatefulWidget {
-  const AdminProductFormScreen({super.key, this.product});
+  const AdminProductFormScreen({super.key, this.product, this.draft})
+      : assert(product == null || draft == null, 'un borrador solo se retoma en el alta');
   final AdminProductDetail? product;
+
+  /// Alta: borrador que se retoma (lo que se siga cargando lo actualiza).
+  final ProductDraft? draft;
 
   @override
   ConsumerState<AdminProductFormScreen> createState() => _AdminProductFormScreenState();
 }
 
 class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen> {
-  late final _name = TextEditingController(text: widget.product?.name ?? '');
-  late final _desc = TextEditingController(text: widget.product?.description ?? '');
-  late final _price = TextEditingController(text: numberToField(widget.product?.price));
-  late final _sale = TextEditingController(text: numberToField(widget.product?.salePrice));
-  late final _weight = TextEditingController(text: widget.product?.weightGrams?.toString() ?? '');
-  late final _minutes =
-      TextEditingController(text: widget.product?.printTimeMinutes?.toString() ?? '');
-  late final _dims = TextEditingController(text: widget.product?.dimensions ?? '');
-  late final _production = TextEditingController(text: widget.product?.productionTime ?? '');
+  /// Con qué arranca el formulario: el borrador que se retoma, el producto
+  /// que se edita, o vacío.
+  late final ProductDraftFields _seed = widget.draft?.fields ??
+      (widget.product == null ? const ProductDraftFields() : _fieldsOf(widget.product!));
 
-  late String? _categoryId = widget.product?.categoryId;
-  late String? _categoryLabel = widget.product?.categoryPath ?? widget.product?.categoryName;
-  late String? _material = widget.product?.material;
-  late bool _featured = widget.product?.isFeatured ?? false;
+  late final _name = TextEditingController(text: _seed.name);
+  late final _desc = TextEditingController(text: _seed.description);
+  late final _price = TextEditingController(text: _seed.priceText);
+  late final _sale = TextEditingController(text: _seed.saleText);
+  late final _weight = TextEditingController(text: _seed.weightText);
+  late final _minutes = TextEditingController(text: _seed.minutesText);
+  late final _dims = TextEditingController(text: _seed.dimensions);
+  late final _production = TextEditingController(text: _seed.productionTime);
+
+  late String? _categoryId = _seed.categoryId;
+  late String? _categoryLabel = _seed.categoryLabel;
+  late String? _material = _seed.material;
+  late bool _featured = _seed.featured;
+
+  static ProductDraftFields _fieldsOf(AdminProductDetail p) => ProductDraftFields(
+        name: p.name,
+        description: p.description ?? '',
+        categoryId: p.categoryId,
+        categoryLabel: p.categoryPath ?? p.categoryName,
+        material: p.material,
+        priceText: numberToField(p.price),
+        saleText: numberToField(p.salePrice),
+        weightText: p.weightGrams?.toString() ?? '',
+        minutesText: p.printTimeMinutes?.toString() ?? '',
+        dimensions: p.dimensions ?? '',
+        productionTime: p.productionTime ?? '',
+        featured: p.isFeatured,
+      );
 
   late final ProductFormValues? _initial =
       widget.product == null ? null : ProductFormValues.fromDetail(widget.product!);
@@ -73,15 +105,14 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
       id: GlobalKey(),
   };
 
-  /// El formulario vacío (para saber si en el alta ya se cargó algo).
-  static final _blank = ProductFormValues.fromRaw();
-
   bool get _isEdit => widget.product != null;
 
-  ProductFormValues _values() => ProductFormValues.fromRaw(
+  /// Lo que hay en pantalla, tal cual está escrito.
+  ProductDraftFields _fields() => ProductDraftFields(
         name: _name.text,
         description: _desc.text,
         categoryId: _categoryId,
+        categoryLabel: _categoryLabel,
         material: _material,
         priceText: _price.text,
         saleText: _sale.text,
@@ -92,8 +123,168 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
         featured: _featured,
       );
 
+  ProductFormValues _values() => _fields().toValues();
+
+  // ---- Borrador local ------------------------------------------------------
+
+  /// Se toma al abrir: también se usa cuando la pantalla ya se cerró.
+  late final ProductDraftsController _drafts;
+  late final AppLifecycleListener _lifecycle;
+
+  /// Alta: el borrador al que se va guardando (null = todavía no hay ninguno).
+  late String? _draftId = widget.draft?.id;
+  Timer? _draftTimer;
+
+  /// Hay cambios que todavía no se pasaron al borrador.
+  bool _draftDirty = false;
+
+  /// El producto se guardó (o la persona descartó los cambios): ya no se
+  /// escribe ningún borrador.
+  bool _draftClosed = false;
+
+  /// Fecha de modificación del producto que se edita, como se guarda en el
+  /// borrador (para avisar si alguien lo cambió en el medio).
+  String? get _productStamp => widget.product?.updatedAt?.toUtc().toIso8601String();
+
+  @override
+  void initState() {
+    super.initState();
+    _drafts = ref.read(productDraftsProvider.notifier);
+    // Al salir de la app (o si el sistema la cierra) no se espera al reloj.
+    _lifecycle = AppLifecycleListener(
+      onStateChange: (state) {
+        if (state != AppLifecycleState.resumed) _flushDraft();
+      },
+    );
+    if (_isEdit) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _offerRecovery());
+    }
+  }
+
+  /// Cambió algo: se guarda el borrador cuando la persona deja de tipear.
+  void _touch() {
+    if (_draftClosed) return;
+    _draftDirty = true;
+    _draftTimer?.cancel();
+    _draftTimer = Timer(const Duration(milliseconds: 600), _flushDraft);
+  }
+
+  /// Guarda ya lo pendiente (si hay).
+  void _flushDraft() {
+    _draftTimer?.cancel();
+    _draftTimer = null;
+    if (!_draftDirty || _draftClosed) return;
+    _draftDirty = false;
+    _draftWrite()();
+  }
+
+  /// Arma el guardado del borrador con lo que hay en pantalla AHORA; se
+  /// ejecuta después (al cerrarse la pantalla los campos ya no existen).
+  VoidCallback _draftWrite() {
+    final fields = _fields();
+    final drafts = _drafts;
+    final now = DateTime.now();
+    final product = widget.product;
+    if (product != null) {
+      // Edición: solo mientras haya cambios respecto de lo guardado.
+      if (fields.toValues() == _initial) return () => drafts.removeEdit(product.id);
+      final draft = ProductDraft(
+        id: 'edit-${product.id}',
+        updatedAt: now,
+        fields: fields,
+        productId: product.id,
+        productUpdatedAt: _productStamp,
+      );
+      return () => drafts.saveEdit(draft);
+    }
+    if (fields.isBlank) {
+      // Un alta vacía no deja borrador (y si se vació uno, se va).
+      final id = _draftId;
+      _draftId = null;
+      return () {
+        if (id != null) drafts.remove(id);
+      };
+    }
+    final id = _draftId ??= now.microsecondsSinceEpoch.toRadixString(36);
+    final draft = ProductDraft(id: id, updatedAt: now, fields: fields);
+    return () => drafts.save(draft);
+  }
+
+  /// El producto quedó guardado: su borrador ya no hace falta.
+  void _closeDraft() {
+    _draftClosed = true;
+    _draftTimer?.cancel();
+    final product = widget.product;
+    if (product != null) {
+      _drafts.removeEdit(product.id);
+    } else if (_draftId != null) {
+      _drafts.remove(_draftId!);
+    }
+  }
+
+  /// Edición: si quedaron cambios sin guardar de la vez anterior (se cerró la
+  /// app, se apagó el teléfono), se ofrece recuperarlos.
+  Future<void> _offerRecovery() async {
+    if (!mounted) return;
+    final product = widget.product!;
+    final draft = ref.read(productDraftsProvider).editOf(product.id);
+    if (draft == null) return;
+    if (draft.fields.toValues() == _initial) {
+      _drafts.removeEdit(product.id);
+      return;
+    }
+    final stale = draft.productUpdatedAt != _productStamp;
+    final recover = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        scrollable: true,
+        title: const Text('Cambios sin guardar'),
+        content: Text(
+          stale
+              ? 'Tenés cambios sin guardar de la última vez. ¿Recuperarlos?\n\n'
+                  'El producto se modificó después de eso: revisá los datos antes de guardar.'
+              : 'Tenés cambios sin guardar de la última vez. ¿Recuperarlos?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Descartar')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Recuperar')),
+        ],
+      ),
+    );
+    // Cerrado sin elegir (tocar afuera, "atrás"): no se pierde ni se aplica.
+    if (recover == null || !mounted) return;
+    if (!recover) {
+      _drafts.removeEdit(product.id);
+      return;
+    }
+    final f = draft.fields;
+    setState(() {
+      _name.text = f.name;
+      _desc.text = f.description;
+      _price.text = f.priceText;
+      _sale.text = f.saleText;
+      _weight.text = f.weightText;
+      _minutes.text = f.minutesText;
+      _dims.text = f.dimensions;
+      _production.text = f.productionTime;
+      _categoryId = f.categoryId;
+      _categoryLabel = f.categoryLabel;
+      _material = f.material;
+      _featured = f.featured;
+      _errors = const {};
+    });
+  }
+
   @override
   void dispose() {
+    _draftTimer?.cancel();
+    _lifecycle.dispose();
+    if (_draftDirty && !_draftClosed) {
+      // La pantalla se cerró con algo pendiente. Se guarda apenas termina de
+      // desarmarse (avisar a quien mira los borradores en este instante no
+      // se puede: el árbol de pantallas está bloqueado).
+      Future.microtask(_draftWrite());
+    }
     for (final c in [_name, _desc, _price, _sale, _weight, _minutes, _dims, _production]) {
       c.dispose();
     }
@@ -140,6 +331,7 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
         _categoryLabel = options.categories.where((o) => o.id == id).firstOrNull?.path;
         _errors = {..._errors}..remove('category');
       });
+      _touch();
     } finally {
       _picking = false;
     }
@@ -208,7 +400,10 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
           );
         },
       );
-      if (picked != null && mounted) setState(() => _material = picked.value);
+      if (picked != null && mounted) {
+        setState(() => _material = picked.value);
+        _touch();
+      }
     } finally {
       _picking = false;
     }
@@ -267,6 +462,9 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
       } else {
         id = await repo.create(values.toCreateBody());
       }
+      // Ya está en el servidor: el borrador se va (aunque la pantalla se haya
+      // cerrado mientras guardaba; si no, quedaría para crearlo dos veces).
+      _closeDraft();
       invalidateProducts(ref);
       if (!mounted) return;
       showSnack(
@@ -302,7 +500,20 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
       cancelLabel: 'Seguir editando',
       destructive: true,
     );
-    if (leave && mounted) Navigator.of(context).pop();
+    if (!leave || !mounted) return;
+    // Lo descartó a propósito: tampoco queda para "recuperar" la próxima vez.
+    _draftClosed = true;
+    _draftTimer?.cancel();
+    _drafts.removeEdit(widget.product!.id);
+    Navigator.of(context).pop();
+  }
+
+  /// Alta: se salió sin crear el producto. Nada se pierde: lo cargado queda en
+  /// "Borradores sin guardar" del listado, y se avisa.
+  void _leftCreate() {
+    if (_draftClosed) return;
+    _flushDraft();
+    if (_draftId != null && !_busy) showSnack(context, 'Guardado en Borradores');
   }
 
   @override
@@ -314,14 +525,18 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
     final changed = _isEdit ? values != _initial : true;
     // Con la edición sin cambios (o guardando) no se puede apretar "Guardar".
     final canSave = !_busy && (!_isEdit || changed);
-    // ¿Se perdería algo al salir? En la edición, cualquier cambio; en el alta,
-    // cualquier dato ya cargado (antes "atrás" se llevaba todo sin avisar).
-    final unsaved = (_isEdit ? changed : values != _blank) && !_busy;
+    // ¿Se perdería algo al salir? Solo en la edición con cambios: se pregunta.
+    // El alta se deja salir siempre: lo cargado ya está en un borrador.
+    final unsaved = _isEdit && changed && !_busy;
 
     return PopScope(
       canPop: !unsaved,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _confirmLeave();
+        if (!didPop) {
+          _confirmLeave();
+        } else if (!_isEdit) {
+          _leftCreate();
+        }
       },
       child: Scaffold(
         appBar: AppBar(title: Text(_isEdit ? 'Editar producto' : 'Nuevo producto')),
@@ -446,7 +661,12 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
                         // Sin colores a mano: el tema ya pinta el interruptor
                         // (con el pulgar dorado la pista quedaba color oliva).
                         value: _featured,
-                        onChanged: _busy ? null : (v) => setState(() => _featured = v),
+                        onChanged: _busy
+                            ? null
+                            : (v) {
+                                setState(() => _featured = v);
+                                _touch();
+                              },
                       ),
                     ),
                   ],
@@ -499,10 +719,13 @@ class _AdminProductFormScreenState extends ConsumerState<AdminProductFormScreen>
       enabled: !_busy,
       maxLines: maxLines,
       maxLength: maxLength,
-      onChanged: (_) => setState(() {
-        // Al corregir un campo se le saca el error.
-        if (_errors.isNotEmpty) _errors = const {};
-      }),
+      onChanged: (_) {
+        setState(() {
+          // Al corregir un campo se le saca el error.
+          if (_errors.isNotEmpty) _errors = const {};
+        });
+        _touch();
+      },
       textCapitalization: capitalize ? TextCapitalization.sentences : TextCapitalization.none,
       keyboardType: money
           ? const TextInputType.numberWithOptions(decimal: true)

@@ -13,6 +13,32 @@ export const filamentSchema = z.object({
   alertThresholdGrams: z.coerce
     .number()
     .min(0, "El umbral no puede ser negativo."),
+  // Tipo de filamento (0084): con tipo, el costo/kg es el del tipo (lo pone el
+  // servidor). null = sin tipo, precio propio. Sin el campo = no se toca (las
+  // versiones viejas de la app no lo mandan).
+  typeId: z.uuid().nullable().optional(),
+});
+
+// Tipo de filamento con su precio por kg.
+export const filamentTypeSchema = z.object({
+  name: z.string().trim().min(1, "Ingresá el nombre del tipo.").max(60),
+  costPerKg: z.coerce.number().min(0, "El precio no puede ser negativo."),
+});
+
+// Modelo de carrete con su peso vacío.
+export const spoolModelSchema = z.object({
+  name: z.string().trim().min(1, "Ingresá el nombre del carrete.").max(60),
+  emptyGrams: z.coerce
+    .number()
+    .min(0, "El peso no puede ser negativo.")
+    .max(5000, "Revisá el peso del carrete vacío."),
+});
+
+// "Calcular filamento": peso total del carrete en uso y su modelo.
+export const weighSchema = z.object({
+  spoolModelId: z.uuid("Elegí el modelo de carrete."),
+  totalGrams: z.coerce.number().positive("Ingresá cuánto pesa el carrete."),
+  sealedSpools: z.coerce.number().int().min(0).max(100).optional(),
 });
 
 export const failureSchema = z.object({
@@ -82,6 +108,9 @@ export const catalogItemSchema = z.object({
 });
 
 export type FilamentInput = z.infer<typeof filamentSchema>;
+export type FilamentTypeInput = z.infer<typeof filamentTypeSchema>;
+export type SpoolModelInput = z.infer<typeof spoolModelSchema>;
+export type WeighInput = z.infer<typeof weighSchema>;
 export type FilamentDetailsInput = z.infer<typeof filamentDetailsSchema>;
 export type StockAdjustInput = z.infer<typeof stockAdjustSchema>;
 export type ColorInput = z.infer<typeof colorSchema>;

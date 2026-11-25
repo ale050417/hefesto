@@ -6,13 +6,11 @@ import {
   getCalcConfig,
   getStats,
   listActivePresetOptions,
+  listFilamentOptions,
   listHistory,
   listMarginPresets,
 } from "@/features/calculator/service";
-import {
-  listColorCatalog,
-  listFilamentsView,
-} from "@/features/inventory/queries";
+import { listColorCatalog } from "@/features/inventory/queries";
 
 /**
  * GET /api/v1/admin/calculadora — todo lo que necesita la Calculadora 3D de la
@@ -34,7 +32,7 @@ export const GET = withApi("admin/calculadora", async (request: Request) => {
       getCalcConfig(),
       listHistory(),
       getStats(),
-      listFilamentsView(),
+      listFilamentOptions(),
       listActivePresetOptions(),
       admin ? listMarginPresets() : Promise.resolve([]),
       // El catálogo de colores es decorativo: si falla, la calculadora sigue.
@@ -51,11 +49,7 @@ export const GET = withApi("admin/calculadora", async (request: Request) => {
     buildCalcPayload({
       config,
       filaments: filaments.map((f) => ({
-        id: f.id,
-        material: f.material,
-        color: f.color,
-        brand: f.brand,
-        costPerKg: f.costPerKg,
+        ...f,
         hex: hexByColor.get(f.color.trim().toLowerCase()) ?? null,
       })),
       presetOptions,

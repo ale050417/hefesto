@@ -1225,26 +1225,48 @@ void main() {
         expectNoLayoutErrors(tester);
       });
 
-      testWidgets('alta: salir con datos cargados pregunta antes de perderlos (${phone.name})', (tester) async {
+      testWidgets('alta: salir con datos cargados los deja en "Borradores sin guardar" (${phone.name})',
+          (tester) async {
         await openCreate(tester, phone);
-        // Sin tocar nada se sale directo.
+        // Sin tocar nada se sale directo y no queda ningún borrador.
         await _tap(tester, find.byTooltip('Atrás'), frames: 8);
         expect(find.byType(AdminProductFormScreen), findsNothing);
+        expect(find.textContaining('Borradores sin guardar'), findsNothing);
 
+        // Con algo cargado tampoco pregunta: lo guarda y avisa (antes había que
+        // elegir entre quedarse o perder todo).
         await _tap(tester, find.byType(FloatingActionButton), frames: 8);
-        await tester.enterText(field('Nombre'), 'Mate Luigi');
+        await tester.enterText(
+            field('Nombre'), 'Mate Luigi edición especial con un nombre larguísimo que no entra en un renglón');
         await settle(tester, 2);
-        await _tap(tester, find.byTooltip('Atrás'));
-        expect(find.text('¿Descartar los cambios?'), findsOneWidget,
-            reason: 'volver atrás con el alta a medio cargar perdía todo sin avisar');
-        _expectDialogOk(tester, confirm: 'Descartar', cancel: 'Seguir editando');
-        await shoot(tester, 'form_alta_descartar');
-        await _tap(tester, find.widgetWithText(TextButton, 'Seguir editando'));
-        expect(find.byType(AdminProductFormScreen), findsOneWidget);
-        expect(find.text('Mate Luigi'), findsOneWidget, reason: 'lo cargado sigue ahí');
-        await _tap(tester, find.byTooltip('Atrás'));
-        await _tap(tester, find.widgetWithText(TextButton, 'Descartar'), frames: 8);
+        await _tap(tester, find.byTooltip('Atrás'), frames: 8);
         expect(find.byType(AdminProductFormScreen), findsNothing);
+        expect(find.text('¿Descartar los cambios?'), findsNothing);
+        expect(find.text('Guardado en Borradores'), findsOneWidget);
+        expectReachable(tester, find.text('Borradores sin guardar (1)'), what: 'la entrada a los borradores');
+        expectNoLayoutErrors(tester, 'con la entrada a los borradores');
+        await shoot(tester, 'borradores_entrada');
+
+        // La hoja: título, el borrador y sus dos acciones a mano.
+        await _tap(tester, find.text('Borradores sin guardar (1)'), frames: 8);
+        _expectSheetOk(tester, 'Borradores sin guardar');
+        expectReachable(tester, _inSheet(find.widgetWithText(OutlinedButton, 'Continuar')), what: 'Continuar');
+        expectReachable(tester, _inSheet(find.widgetWithText(TextButton, 'Eliminar')), what: 'Eliminar');
+        await shoot(tester, 'borradores_hoja');
+
+        // Eliminar pregunta antes; cancelar lo deja.
+        await _tap(tester, _inSheet(find.widgetWithText(TextButton, 'Eliminar')));
+        expect(find.text('¿Eliminar este borrador?'), findsOneWidget);
+        _expectDialogOk(tester, confirm: 'Eliminar borrador');
+        await shoot(tester, 'borradores_eliminar');
+        await _tap(tester, find.widgetWithText(TextButton, 'Cancelar'));
+
+        // "Continuar" vuelve al alta con lo cargado.
+        await _tap(tester, _inSheet(find.widgetWithText(OutlinedButton, 'Continuar')), frames: 8);
+        expect(_sheet, findsNothing);
+        expect(find.byType(AdminProductFormScreen), findsOneWidget);
+        expect(find.textContaining('Mate Luigi edición especial'), findsOneWidget, reason: 'lo cargado sigue ahí');
+        expectNoLayoutErrors(tester, 'al retomar el borrador');
       });
 
       testWidgets('edición: se dibuja con datos al límite, teclado y diálogo de descartar (${phone.name})',
@@ -1770,9 +1792,22 @@ void main() {
       await shoot(tester, 'grande_form_error_servidor');
       await closeKeyboard(tester);
 
-      await _tap(tester, find.byTooltip('Atrás'));
-      _expectDialogOk(tester, confirm: 'Descartar', cancel: 'Seguir editando');
-      await shoot(tester, 'grande_form_descartar');
+      // Salir no pregunta: lo cargado queda en "Borradores sin guardar".
+      await _tap(tester, find.byTooltip('Atrás'), frames: 8);
+      expect(find.byType(AdminProductFormScreen), findsNothing);
+      expectReachable(tester, find.text('Borradores sin guardar (1)'), what: 'la entrada a los borradores');
+      expectNoLayoutErrors(tester, 'con la entrada a los borradores y letra grande');
+      await shoot(tester, 'grande_borradores_entrada');
+      await _tap(tester, find.text('Borradores sin guardar (1)'), frames: 8);
+      _expectSheetOk(tester, 'Borradores sin guardar');
+      expectReachable(tester, _inSheet(find.widgetWithText(OutlinedButton, 'Continuar')),
+          what: 'Continuar con letra grande');
+      expectReachable(tester, _inSheet(find.widgetWithText(TextButton, 'Eliminar')),
+          what: 'Eliminar con letra grande');
+      await shoot(tester, 'grande_borradores_hoja');
+      await _tap(tester, _inSheet(find.widgetWithText(TextButton, 'Eliminar')));
+      _expectDialogOk(tester, confirm: 'Eliminar borrador');
+      await shoot(tester, 'grande_borradores_eliminar');
     });
 
     testWidgets('categorías: listado, menú, diálogos y estados', (tester) async {

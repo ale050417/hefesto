@@ -11,9 +11,12 @@ import '../analisis/analysis_widgets.dart';
 import '../analisis/ar_number.dart';
 import '../analisis/number_field.dart';
 import '../reportes/reportes_sections.dart' show formatGrams;
+import 'calc_extras_api.dart';
 import 'calc_logic.dart';
 import 'calculadora_api.dart';
 import 'calculadora_models.dart';
+import 'filament_choices.dart';
+import 'new_preset_dialog.dart';
 
 /// Formulario de un presupuesto con cotización en vivo: cada cambio (con
 /// debounce) le pide el costo y el precio al SERVIDOR, que usa el mismo
@@ -40,8 +43,14 @@ class _CalcFormState extends ConsumerState<CalcForm> {
   final _minutes = TextEditingController();
   final _notes = TextEditingController();
 
+  /// Lo elegido en "Filamento": un carrete sin tipo o, si se eligió un TIPO,
+  /// el carrete que lo representa (ver `filament_choices.dart`).
   String? _filamentId;
   String? _presetId;
+
+  /// Tipo recién creado con "Nuevo tipo": se muestra y queda elegido aunque la
+  /// lista del servidor todavía no lo traiga.
+  CalcPreset? _createdPreset;
 
   CalcQuote? _quote;
   bool _quoting = false;
@@ -56,18 +65,24 @@ class _CalcFormState extends ConsumerState<CalcForm> {
   @override
   void initState() {
     super.initState();
-    _filamentId = _o.filaments.isEmpty ? null : _o.filaments.first.id;
+    _filamentId = firstChoiceValue(_o.filaments);
     _presetId = _o.presetOptions.isEmpty ? null : _o.presetOptions.first.id;
   }
+
+  List<CalcPreset> get _presetOptions => presetOptionsWith(_o.presetOptions, _createdPreset);
 
   @override
   void didUpdateWidget(CalcForm old) {
     super.didUpdateWidget(old);
     // Si el filamento o el tipo elegido desaparecieron del servidor, se re-elige.
-    if (_filamentId != null && !_o.filaments.any((f) => f.id == _filamentId)) {
-      _filamentId = _o.filaments.isEmpty ? null : _o.filaments.first.id;
+    // (Si al carrete elegido le pusieron un tipo, queda elegido ese tipo.)
+    if (_filamentId != null) {
+      _filamentId = choiceValueFor(_o.filaments, _filamentId) ?? firstChoiceValue(_o.filaments);
     }
-    if (_presetId != null && !_o.presetOptions.any((p) => p.id == _presetId)) {
+    if (_createdPreset != null && _o.presetOptions.any((p) => p.id == _createdPreset!.id)) {
+      _createdPreset = null; // ya vino del servidor
+    }
+    if (_presetId != null && !_presetOptions.any((p) => p.id == _presetId)) {
       _presetId = _o.presetOptions.isEmpty ? null : _o.presetOptions.first.id;
     }
     if (old.overview.config != widget.overview.config) _scheduleQuote();
@@ -87,6 +102,21 @@ class _CalcFormState extends ConsumerState<CalcForm> {
       if (f.id == _filamentId) return f;
     }
     return null;
+  }
+
+  /// El TIPO de filamento elegido (null si se eligió un carrete sin tipo).
+  TypeChoice? get _typeChoice => typeChoiceOf(_o.filaments, _filamentId);
+
+  /// "＋ Nuevo tipo": un tipo de producto que se cobra como otro.
+  Future<void> _newPreset() async {
+    final created = await showNewPresetDialog(context, options: _presetOptions);
+    if (created == null || !mounted) return;
+    setState(() {
+      _createdPreset = created;
+      _presetId = created.id;
+    });
+    showSnack(context, 'Tipo «${created.name}» creado');
+    _scheduleQuote();
   }
 
   bool get _fieldsOk =>
@@ -163,15 +193,29 @@ class _CalcFormState extends ConsumerState<CalcForm> {
       _saveError = null;
     });
     try {
-      await ref.read(calculadoraApiProvider).saveCalc(
-            name: _name.text.trim(),
-            customer: _customer.text.trim(),
-            filamentId: req.filamentId,
-            grams: req.grams,
-            hours: req.hours,
-            presetId: req.presetId,
-            notes: _notes.text.trim(),
-          );
+      if (_typeChoice != null) {
+        // Se eligió un TIPO de filamento: el historial guarda el nombre del
+        // tipo y ningún color (el carrete solo lo representa).
+        await ref.read(calcExtrasApiProvider).saveCalcByType(
+              name: _name.text.trim(),
+              customer: _customer.text.trim(),
+              filamentId: req.filamentId,
+              grams: req.grams,
+              hours: req.hours,
+              presetId: req.presetId,
+              notes: _notes.text.trim(),
+            );
+      } else {
+        await ref.read(calculadoraApiProvider).saveCalc(
+              name: _name.text.trim(),
+              customer: _customer.text.trim(),
+              filamentId: req.filamentId,
+              grams: req.grams,
+              hours: req.hours,
+              presetId: req.presetId,
+              notes: _notes.text.trim(),
+            );
+      }
       ref.invalidate(calculadoraProvider);
       if (!mounted) return;
       showSnack(context, 'Presupuesto guardado en el historial');
@@ -252,7 +296,7 @@ class _CalcFormState extends ConsumerState<CalcForm> {
                         color: Brand.warning,
                       )
                     else
-                      CalcFilamentField(filament: f, onTap: _pickFilament),
+                      CalcFilamentField(filament: f, type: _typeChoice, onTap: _pickFilament),
                     const SizedBox(height: 16),
                     ArNumberField(
                       controller: _grams,
@@ -299,7 +343,7 @@ class _CalcFormState extends ConsumerState<CalcForm> {
                     Text('Tipo de producto',
                         style: TextStyle(fontSize: 12.5, color: c.textDim, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
-                    if (_o.presetOptions.isEmpty)
+                    if (_presetOptions.isEmpty)
                       Text(
                         _o.isAdmin
                             ? 'No hay tipos cargados. Creá uno desde "Tipos y márgenes".'
@@ -311,7 +355,7 @@ class _CalcFormState extends ConsumerState<CalcForm> {
                         spacing: 8,
                         runSpacing: 4,
                         children: [
-                          for (final p in _o.presetOptions)
+                          for (final p in _presetOptions)
                             ChoiceChip(
                               label: Text(_presetLabel(p)),
                               selected: p.id == _presetId,
@@ -320,6 +364,9 @@ class _CalcFormState extends ConsumerState<CalcForm> {
                                 _scheduleQuote();
                               },
                             ),
+                          // Con permiso de crear, el operador suma un tipo sin
+                          // pedírselo al dueño (y sin ver ningún margen).
+                          if (widget.canSave) NewPresetChip(onPressed: _newPreset),
                         ],
                       ),
                     const SizedBox(height: 16),
@@ -397,14 +444,29 @@ class _CalcFormState extends ConsumerState<CalcForm> {
 /// Campo "Filamento" (abre el selector). Lo usan la calculadora y el
 /// "Calcular precio" de las consultas.
 class CalcFilamentField extends StatelessWidget {
-  const CalcFilamentField({super.key, required this.filament, required this.onTap});
+  const CalcFilamentField({super.key, required this.filament, required this.onTap, this.type});
   final CalcFilament? filament;
   final VoidCallback onTap;
+
+  /// Si se eligió un TIPO (PLA, PETG…), se muestra el tipo y no el carrete que
+  /// lo representa.
+  final TypeChoice? type;
 
   @override
   Widget build(BuildContext context) {
     final c = context.hc;
     final f = filament;
+    final t = type;
+    if (f != null && t != null) {
+      return InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: InputDecorator(
+          decoration: const InputDecoration(labelText: 'Filamento', suffixIcon: Icon(Icons.expand_more_rounded)),
+          child: _TypeLine(t),
+        ),
+      );
+    }
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: onTap,
@@ -465,11 +527,49 @@ class _Swatch extends StatelessWidget {
   }
 }
 
-/// Selector de filamento (con búsqueda): cada uno muestra SU costo por kg.
+/// "PLA" + "$26.000 por kg · 32 carretes".
+class _TypeLine extends StatelessWidget {
+  const _TypeLine(this.type);
+  final TypeChoice type;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.hc;
+    final t = type;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(t.name, maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+        Text(
+          typeChoiceSubtitle(t),
+          style: TextStyle(fontSize: 11.5, color: t.costPerKg > 0 ? c.textFaint : Brand.warning),
+        ),
+      ],
+    );
+  }
+}
+
+/// "$ 26.000 por kg · 32 carretes".
+String typeChoiceSubtitle(TypeChoice t) => [
+      t.costPerKg > 0 ? '${formatArMoney(t.costPerKg, decimals: 0)} por kg' : 'Sin precio por kg',
+      t.spools == 1 ? '1 carrete' : '${t.spools} carretes',
+    ].join(' · ');
+
+const looseSpoolsHeading = 'Carretes sin tipo (precio propio)';
+
+/// Selector de filamento (con búsqueda). Por defecto agrupa por TIPO
+/// (sugerencia de Agustín, 2026-11-24): "PLA — $26.000/kg" en vez de los 50
+/// carretes con el precio repetido; los carretes sin tipo van abajo, de a uno.
+/// Con `byType: false` (o si ningún carrete tiene tipo) lista cada carrete con
+/// SU costo por kg. Devuelve el id de un carrete: el elegido, o el que
+/// representa al tipo elegido.
 class FilamentPickerSheet extends StatefulWidget {
-  const FilamentPickerSheet({super.key, required this.filaments, this.selectedId});
+  const FilamentPickerSheet({super.key, required this.filaments, this.selectedId, this.byType = true});
   final List<CalcFilament> filaments;
   final String? selectedId;
+  final bool byType;
 
   @override
   State<FilamentPickerSheet> createState() => _FilamentPickerSheetState();
@@ -496,7 +596,18 @@ class _FilamentPickerSheetState extends State<FilamentPickerSheet> {
   Widget build(BuildContext context) {
     final c = context.hc;
     final term = _q.trim().toLowerCase();
-    final list = widget.filaments.where((f) => term.isEmpty || f.label.toLowerCase().contains(term)).toList();
+    bool matches(String text) => term.isEmpty || text.toLowerCase().contains(term);
+    final choices = filamentChoices(widget.filaments);
+    final grouped = widget.byType && choices.grouped;
+    // Renglones: los tipos, el rótulo de los sueltos y los carretes sin tipo.
+    final types = grouped ? choices.types.where((t) => matches(t.name)).toList() : const <TypeChoice>[];
+    final spools = (grouped ? choices.loose : widget.filaments).where((f) => matches(f.label)).toList();
+    final list = <Object>[
+      ...types,
+      if (grouped && spools.isNotEmpty) looseSpoolsHeading,
+      ...spools,
+    ];
+    final selected = grouped ? choiceValueFor(widget.filaments, widget.selectedId) : widget.selectedId;
     final height = MediaQuery.sizeOf(context).height * 0.7;
     // Lista con buscador (2026-11-14, pedido de Ale: que los modales se vean
     // bien): abajo deja el teclado o la barra del sistema (`sheetBottomInset`)
@@ -532,8 +643,35 @@ class _FilamentPickerSheetState extends State<FilamentPickerSheet> {
                       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                       itemCount: list.length,
                       itemBuilder: (_, i) {
-                        final f = list[i];
-                        final sel = f.id == widget.selectedId;
+                        final row = list[i];
+                        if (row is String) {
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                            child: Text(
+                              row.toUpperCase(),
+                              style: TextStyle(
+                                fontFamily: 'Orbitron',
+                                fontSize: 10.5,
+                                letterSpacing: 1.6,
+                                fontWeight: FontWeight.w700,
+                                color: c.textFaint,
+                              ),
+                            ),
+                          );
+                        }
+                        if (row is TypeChoice) {
+                          return ListTile(
+                            leading: Icon(Icons.layers_outlined, color: c.textDim),
+                            title: Text(row.name, maxLines: 2, overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                            subtitle: Text(typeChoiceSubtitle(row)),
+                            trailing:
+                                row.value == selected ? const Icon(Icons.check_circle_rounded, color: Brand.gold) : null,
+                            onTap: () => Navigator.of(context).pop(row.value),
+                          );
+                        }
+                        final f = row as CalcFilament;
+                        final sel = f.id == selected;
                         return ListTile(
                           leading: _Swatch(f.hex),
                           // Dos líneas: con una sola, dos filamentos del mismo

@@ -1,6 +1,6 @@
 import { colorsWithFilament } from "./product-colors";
 import { recordAudit } from "@/core/audit";
-import { NotFoundError } from "@/core/errors";
+import { NotFoundError, ValidationError } from "@/core/errors";
 import * as repo from "./repository";
 import { notifyLowStockAfterSale } from "./lowStockNotify";
 import { toMovementView, type MovementView } from "./movements";
@@ -32,6 +32,8 @@ export function toFilamentView(f: Filament): FilamentView {
     stockGrams: stock,
     spoolGrams: Number(f.spoolGrams),
     costPerKg: Number(f.costPerKg),
+    typeId: f.typeId ?? null,
+    spoolModelId: f.spoolModelId ?? null,
     alertThresholdGrams: threshold,
     lowStock: isLowStock(stock, threshold),
     status: filamentStatus(stock, threshold),
@@ -95,9 +97,27 @@ export async function updateFilamentDetails(
     brand: input.brand,
     diameter: input.diameter,
     spoolGrams: String(input.spoolGrams),
-    costPerKg: String(input.costPerKg),
     alertThresholdGrams: String(input.alertThresholdGrams),
+    ...(await typeAndCost(input, current.typeId)),
   });
+}
+
+/**
+ * Tipo y costo/kg de un carrete (0084). Con tipo, el costo es el DEL TIPO: lo
+ * que mande el formulario no cuenta (así el precio se cambia en un solo
+ * lugar). `typeId` sin definir = no se toca el tipo que ya tenía (las
+ * versiones viejas de la app no lo mandan); null = sin tipo, precio propio.
+ */
+async function typeAndCost(
+  input: { costPerKg: number; typeId?: string | null },
+  currentTypeId: string | null = null,
+): Promise<{ costPerKg: string; typeId?: string | null }> {
+  const typeId = input.typeId === undefined ? currentTypeId : input.typeId;
+  const set = input.typeId === undefined ? {} : { typeId: input.typeId };
+  if (!typeId) return { costPerKg: String(input.costPerKg), ...set };
+  const type = await repo.findFilamentTypeById(typeId);
+  if (!type) throw new ValidationError("El tipo de filamento ya no existe.");
+  return { costPerKg: String(type.costPerKg), ...set };
 }
 
 /** Ajuste manual de stock por el ledger (ver stock-adjust.ts). */
@@ -133,7 +153,7 @@ export async function getFailure(id: string): Promise<PrintFailure | null> {
   return repo.findFailureById(id);
 }
 
-function toRow(input: FilamentInput) {
+async function toRow(input: FilamentInput, currentTypeId: string | null) {
   return {
     material: input.material,
     color: input.color,
@@ -141,20 +161,22 @@ function toRow(input: FilamentInput) {
     diameter: input.diameter,
     stockGrams: String(input.stockGrams),
     spoolGrams: String(input.spoolGrams),
-    costPerKg: String(input.costPerKg),
     alertThresholdGrams: String(input.alertThresholdGrams),
+    ...(await typeAndCost(input, currentTypeId)),
   };
 }
 
 export async function addFilament(input: FilamentInput): Promise<Filament> {
-  return repo.insertFilament(toRow(input));
+  return repo.insertFilament(await toRow(input, null));
 }
 
 export async function updateFilament(
   id: string,
   input: FilamentInput,
 ): Promise<Filament> {
-  return repo.updateFilamentRow(id, toRow(input));
+  const current = await repo.findFilamentById(id);
+  if (!current) throw new NotFoundError("No encontramos el filamento.");
+  return repo.updateFilamentRow(id, await toRow(input, current.typeId));
 }
 
 /** Suma un carrete (spoolGrams) al stock actual. */

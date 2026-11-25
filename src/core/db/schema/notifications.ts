@@ -20,6 +20,10 @@ export const notifications = pgTable(
     customerId: uuid("customer_id").references(() => profiles.id, {
       onDelete: "cascade",
     }),
+    // Tipo de aviso del panel (0085): ver features/notifications/kinds.ts.
+    kind: text("kind"),
+    // Quién lo generó: a esa persona no se le avisa lo que acaba de hacer.
+    actorId: uuid("actor_id"),
     title: text("title").notNull(),
     body: text("body"),
     link: text("link"),

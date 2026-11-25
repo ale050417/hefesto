@@ -14,6 +14,7 @@ import '../../core/widgets/common.dart';
 // las pantallas del panel que solo importan este archivo.
 export '../../core/widgets/skeleton.dart';
 import 'admin_models.dart';
+import 'notificaciones/notifications_bell.dart';
 import 'sale_status.dart';
 
 String formatDateTime(DateTime d) => DateFormat("d MMM · HH:mm", 'es_AR').format(d);
@@ -59,6 +60,8 @@ class AdminAppBar extends ConsumerWidget implements PreferredSizeWidget {
       ),
       actions: [
         ...actions,
+        // Campana con lo que falta ver: a la vista en las cuatro pestañas.
+        const NotificationsBell(),
         IconButton(
           tooltip: 'Volver a la tienda',
           icon: const Icon(Icons.storefront_rounded),

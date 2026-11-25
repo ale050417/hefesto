@@ -60,6 +60,8 @@ class CalcFilament {
     required this.brand,
     required this.costPerKg,
     this.hex,
+    this.typeId,
+    this.typeName,
   });
 
   final String id;
@@ -68,6 +70,11 @@ class CalcFilament {
   final String brand;
   final double costPerKg;
   final String? hex;
+
+  /// Tipo de filamento (PLA, PETG…) del que sale el precio; null si el carrete
+  /// no tiene tipo (precio propio).
+  final String? typeId;
+  final String? typeName;
 
   /// "PLA · Rojo · Grilon3".
   String get label => [material, color, if (brand.isNotEmpty) brand].join(' · ');
@@ -79,6 +86,8 @@ class CalcFilament {
         brand: jStr(j['brand']) ?? '',
         costPerKg: jNum(j['costPerKg']),
         hex: jStr(j['hex']),
+        typeId: jStr(j['typeId']),
+        typeName: jStr(j['typeName']),
       );
 }
 

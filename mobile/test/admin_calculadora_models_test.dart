@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hefesto/features/admin/calculadora/calc_logic.dart';
 import 'package:hefesto/features/admin/calculadora/calculadora_api.dart';
 import 'package:hefesto/features/admin/calculadora/calculadora_models.dart';
+import 'package:hefesto/features/admin/calculadora/filament_choices.dart';
+import 'package:hefesto/features/admin/calculadora/new_preset_dialog.dart';
 
 Map<String, dynamic> _filament(String id, String color, num cost) =>
     {'id': id, 'material': 'PLA', 'color': color, 'brand': 'Grilon3', 'costPerKg': cost, 'hex': '#CC2200'};
@@ -213,6 +215,106 @@ void main() {
       expect(filterHistory(items, query: 'ANA').map((e) => e.name), ['Llavero']);
       expect(filterHistory(items, query: 'xyz'), isEmpty);
       expect(filterHistory(items, query: '  ').length, 3);
+    });
+  });
+  group('filamentos agrupados por tipo (filament_choices)', () {
+    CalcFilament f(String id, String color, String? typeId, String? typeName, [double cost = 26000]) => CalcFilament(
+          id: id,
+          material: 'PLA',
+          color: color,
+          brand: 'Bambu Lab',
+          costPerKg: cost,
+          typeId: typeId,
+          typeName: typeName,
+        );
+    // Los mismos casos que `filament-choices.test.ts` de la web.
+    final list = [
+      f('a', 'Verde', 't-pla', 'PLA'),
+      f('b', 'Azul', 't-pla', 'PLA'),
+      f('c', 'Dorado', 't-silk', 'PLA Silk (Dorado)', 34000),
+      f('d', 'Negro', null, null, 18000),
+      f('e', 'Negro', 't-petg', 'PETG'),
+    ];
+
+    test('el JSON de un filamento trae typeId y typeName (o null)', () {
+      final con = CalcFilament.fromJson({'id': 'a', 'material': 'PLA', 'costPerKg': 26000, 'typeId': 't-pla', 'typeName': 'PLA'});
+      expect(con.typeId, 't-pla');
+      expect(con.typeName, 'PLA');
+      final sin = CalcFilament.fromJson({'id': 'd', 'material': 'PLA', 'costPerKg': 18000, 'typeId': null, 'typeName': null});
+      expect(sin.typeId, isNull);
+      expect(sin.typeName, isNull);
+      expect(CalcFilament.fromJson({'id': 'x'}).typeId, isNull, reason: 'servidor viejo: sin el campo');
+    });
+
+    test('junta los carretes del mismo tipo en una sola opción, en orden alfabético', () {
+      final c = filamentChoices(list);
+      expect(c.grouped, isTrue);
+      expect([for (final t in c.types) (t.name, t.costPerKg, t.spools)], [
+        ('PETG', 26000.0, 1),
+        ('PLA', 26000.0, 2),
+        ('PLA Silk (Dorado)', 34000.0, 1),
+      ]);
+      expect([for (final x in c.loose) x.id], ['d']);
+    });
+
+    test('cada tipo viaja con el id de uno de sus carretes', () {
+      final pla = filamentChoices(list).types.firstWhere((t) => t.typeId == 't-pla');
+      expect(pla.value, 'a');
+    });
+
+    test('sin tipos cargados, todos los carretes quedan sueltos (la lista de siempre)', () {
+      final plain = [f('a', 'Verde', null, null), f('b', 'Azul', null, null)];
+      final c = filamentChoices(plain);
+      expect(c.grouped, isFalse);
+      expect(c.types, isEmpty);
+      expect(c.loose, plain);
+    });
+
+    test('si falta el nombre del tipo se usa el material', () {
+      expect(filamentChoices([f('a', 'Verde', 't1', null)]).types.single.name, 'PLA');
+    });
+
+    test('el orden no distingue mayúsculas ni tildes', () {
+      final c = filamentChoices([
+        f('1', 'x', 't1', 'petg'),
+        f('2', 'x', 't2', 'ÁBS'),
+        f('3', 'x', 't3', 'Nylon'),
+      ]);
+      expect([for (final t in c.types) t.name], ['ÁBS', 'Nylon', 'petg']);
+    });
+
+    test('choiceValueFor: un carrete con tipo cae en la opción de su tipo', () {
+      expect(choiceValueFor(list, 'b'), 'a');
+      expect(choiceValueFor(list, 'd'), 'd', reason: 'sin tipo se elige a sí mismo');
+      expect(choiceValueFor(list, 'zzz'), isNull, reason: 'ya no existe');
+      expect(choiceValueFor(list, null), isNull);
+    });
+
+    test('firstChoiceValue: el primer tipo; sin tipos, el primer carrete; sin nada, null', () {
+      expect(firstChoiceValue(list), 'e');
+      expect(firstChoiceValue([f('x', 'Rojo', null, null)]), 'x');
+      expect(firstChoiceValue([]), isNull);
+    });
+
+    test('typeChoiceOf: el tipo de un carrete, o null si va suelto', () {
+      expect(typeChoiceOf(list, 'b')!.name, 'PLA');
+      expect(typeChoiceOf(list, 'b')!.spools, 2);
+      expect(typeChoiceOf(list, 'd'), isNull);
+      expect(typeChoiceOf(list, null), isNull);
+    });
+  });
+
+  group('tipos de producto con el recién creado', () {
+    const a = CalcPreset(id: 'p1', name: 'Llaveros');
+    const nuevo = CalcPreset(id: 'p9', name: 'Mates');
+
+    test('se agrega al final mientras el servidor todavía no lo trae', () {
+      expect([for (final p in presetOptionsWith(const [a], nuevo)) p.id], ['p1', 'p9']);
+    });
+
+    test('no se repite cuando ya vino en la lista, y sin creado queda igual', () {
+      expect(presetOptionsWith(const [a, nuevo], nuevo), hasLength(2));
+      expect(presetOptionsWith(const [a], null), hasLength(1));
     });
   });
 }

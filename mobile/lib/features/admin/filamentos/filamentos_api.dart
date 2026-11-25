@@ -71,6 +71,66 @@ class FilamentosApi {
     await _api.sendJson('DELETE', '/admin/filaments/catalog', query: {'kind': kind, 'name': name});
   }
 
+  // --- Tipos con precio y modelos de carrete (pedidos de Agustín, 2026-11-24) ---
+
+  /// Tipos de filamento (con precio) y modelos de carrete vacío.
+  Future<FilamentTypesData> types() async =>
+      FilamentTypesData.fromJson(await _api.getJson('/admin/filaments/types'));
+
+  Future<FilamentTypeSaved> createType({required String name, required double costPerKg}) async =>
+      FilamentTypeSaved.fromJson(await _api.sendJson('POST', '/admin/filaments/types', body: {
+        'name': name,
+        'costPerKg': costPerKg,
+      }));
+
+  /// El precio nuevo baja a todos los carretes del tipo (`spools` = cuántos).
+  Future<FilamentTypeSaved> updateType(String id, {required String name, required double costPerKg}) async =>
+      FilamentTypeSaved.fromJson(await _api.sendJson('PATCH', '/admin/filaments/types/$id', body: {
+        'name': name,
+        'costPerKg': costPerKg,
+      }));
+
+  /// Sus carretes conservan el precio y quedan "sin tipo".
+  Future<void> deleteType(String id) async {
+    await _api.sendJson('DELETE', '/admin/filaments/types/$id');
+  }
+
+  /// Devuelve el id del modelo nuevo.
+  Future<String> createSpoolModel({required String name, required double emptyGrams}) async {
+    final json = await _api.sendJson('POST', '/admin/filaments/spools', body: {
+      'name': name,
+      'emptyGrams': emptyGrams,
+    });
+    return strOf(json['id']);
+  }
+
+  Future<void> updateSpoolModel(String id, {required String name, required double emptyGrams}) async {
+    await _api.sendJson('PATCH', '/admin/filaments/spools/$id', body: {
+      'name': name,
+      'emptyGrams': emptyGrams,
+    });
+  }
+
+  Future<void> deleteSpoolModel(String id) async {
+    await _api.sendJson('DELETE', '/admin/filaments/spools/$id');
+  }
+
+  /// "Calcular filamento": peso total del carrete en uso − carrete vacío. El
+  /// servidor fija el stock (queda en el historial) y recuerda el modelo.
+  Future<WeighResult> weigh(
+    String id, {
+    required String spoolModelId,
+    required double totalGrams,
+    int sealedSpools = 0,
+  }) async {
+    final json = await _api.sendJson('POST', '/admin/filaments/$id/weigh', body: {
+      'spoolModelId': spoolModelId,
+      'totalGrams': totalGrams,
+      if (sealedSpools > 0) 'sealedSpools': sealedSpools,
+    });
+    return WeighResult.fromJson(json);
+  }
+
   /// Informe de stock en texto (para copiar o mandar por WhatsApp).
   Future<String> report() async {
     final json = await _api.getJson('/admin/filaments/report');
@@ -105,6 +165,12 @@ final filamentCatalogProvider = FutureProvider.autoDispose<FilamentCatalog>(
   retry: _noRetry,
 );
 
+/// Tipos de filamento (con precio) y modelos de carrete vacío.
+final filamentTypesProvider = FutureProvider.autoDispose<FilamentTypesData>(
+  (ref) => ref.watch(filamentosApiProvider).types(),
+  retry: _noRetry,
+);
+
 /// Tras cualquier cambio de stock o de datos: el listado (módulo Filamentos), el
 /// inicio (que muestra los carretes con stock bajo), el detalle y el historial
 /// quedan viejos y se vuelven a pedir.
@@ -119,4 +185,6 @@ void invalidateFilamentos(ProviderContainer container) {
   container.invalidate(adminDashboardProvider);
   container.invalidate(filamentoProvider);
   container.invalidate(filamentMovementsProvider);
+  // Cuántos carretes tiene cada tipo, y los modelos de carrete.
+  container.invalidate(filamentTypesProvider);
 }

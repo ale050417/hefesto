@@ -878,6 +878,8 @@ export async function findProductsForSale() {
       colors: products.colors,
       colorMode: products.colorMode,
       colorPrices: products.colorPrices,
+      dimensions: products.dimensions,
+      productionTime: products.productionTime,
       categoryName: categories.name,
     })
     .from(products)

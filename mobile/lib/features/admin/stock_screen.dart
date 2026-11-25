@@ -9,6 +9,7 @@ import 'admin_models.dart';
 import 'admin_providers.dart';
 import 'admin_widgets.dart';
 import 'filamentos/filamento_detail_screen.dart';
+import 'filamentos/filament_type_picker.dart';
 import 'filamentos/filamento_form_screen.dart';
 import 'filamentos/filamentos_format.dart';
 import 'filamentos/movements_screen.dart';
@@ -247,9 +248,11 @@ class _AdminStockScreenState extends ConsumerState<AdminStockScreen> {
               if (v == 'report') {
                 showStockReportSheet(Navigator.of(context, rootNavigator: true).context);
               }
+              if (v == 'types') openFilamentTypes(context);
               if (v == 'colors') _copyColors(stock.value?.items ?? const []);
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(value: 'types', child: Text('Tipos y precios')),
               PopupMenuItem(value: 'report', child: Text('Informe de stock')),
               PopupMenuItem(value: 'colors', child: Text('Copiar colores en stock')),
             ],

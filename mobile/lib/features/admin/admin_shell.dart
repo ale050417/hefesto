@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/providers.dart';
 import '../../core/widgets/common.dart';
 import 'admin_providers.dart';
+import 'notificaciones/notifications_bell.dart';
 
 /// Contenedor del panel: valida SESIÓN y ROL antes de mostrar nada y arma la
 /// barra de navegación (Inicio · Ventas · Cola · Más).
@@ -67,7 +68,9 @@ class AdminShell extends ConsumerWidget {
           ));
         }
         final pending = ref.watch(adminDashboardProvider).value?.pendingPayment ?? 0;
-        return PopScope(
+        // Mientras el panel está a la vista, las notificaciones se actualizan solas.
+        return NotificationsPoller(
+            child: PopScope(
           // Desde Ventas/Cola/Más, "atrás" vuelve al Inicio del panel y recién
           // desde ahí sale a la cuenta (no cierra la app de golpe).
           canPop: false,
@@ -113,7 +116,7 @@ class AdminShell extends ConsumerWidget {
               ],
             ),
           ),
-        );
+        ));
       },
     );
   }

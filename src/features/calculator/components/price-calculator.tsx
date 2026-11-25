@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/stores/toastStore";
 import { formatPrice } from "@/lib/format";
-import { filamentTag } from "@/features/inventory/filament-label";
 import { computeQuote, formatPrintTime, roundQuote } from "../calculator";
 import { saveCalcAction, deleteCalcAction, quotePriceAction } from "../actions";
+import { firstChoiceValue } from "../filament-choices";
+import { FilamentSelect } from "./filament-select";
+import { NewPresetInline, type CreatedPreset } from "./new-preset-inline";
 import type {
   CalcConfig,
   FilamentOption,
@@ -79,7 +81,8 @@ export function PriceCalculator({
   const [f, setF] = useState({
     name: "",
     customer: "",
-    filamentId: filaments[0]?.id ?? "",
+    // El selector agrupa por tipo de filamento (Agustín, 2026-11-24).
+    filamentId: firstChoiceValue(filaments),
     grams: "",
     hours: "",
     minutes: "",
@@ -104,9 +107,21 @@ export function PriceCalculator({
   const hasData = grams > 0 || totalHours > 0;
 
   // Margen del tipo elegido: SOLO admin lo conoce (presets viene vacío al operador).
-  const adminMargin = isAdmin
-    ? (presets.find((p) => p.id === f.presetId)?.marginPct ?? 0)
-    : 0;
+  // Tipos creados recién con "＋ Nuevo tipo" (hasta que recargue la página).
+  const [created, setCreated] = useState<CreatedPreset[]>([]);
+  const allOptions = [
+    ...presetOptions,
+    ...created.filter((c) => !presetOptions.some((p) => p.id === c.id)),
+  ];
+  const marginOf = (id: string) =>
+    presets.find((p) => p.id === id)?.marginPct ??
+    created.find((c) => c.id === id)?.marginPct ??
+    0;
+  const adminMargin = isAdmin ? marginOf(f.presetId) : 0;
+  // Con tipo, lo elegido es "PLA" (no un color): así se muestra y se guarda.
+  const filamentName = filament
+    ? (filament.typeName ?? `${filament.material} ${filament.color}`)
+    : "";
 
   // Desglose completo (admin). El operador no lo ve; su precio lo da el server.
   // El precio final sale redondeado a $100 (igual que lo guarda el servidor).
@@ -171,6 +186,7 @@ export function PriceCalculator({
           hours: totalHours,
           presetId: f.presetId,
           notes: f.notes,
+          byType: !!filament?.typeId,
         }),
       { silent: true },
     );
@@ -348,18 +364,12 @@ export function PriceCalculator({
                   cotizar.
                 </p>
               ) : (
-                <select
+                <FilamentSelect
                   id="ci-fil"
-                  className="select"
+                  filaments={filaments}
                   value={f.filamentId}
-                  onChange={(e) => set("filamentId", e.target.value)}
-                >
-                  {filaments.map((x) => (
-                    <option key={x.id} value={x.id}>
-                      {filamentTag(x)} — {formatPrice(x.costPerKg)}/kg
-                    </option>
-                  ))}
-                </select>
+                  onChange={(id) => set("filamentId", id)}
+                />
               )}
             </div>
             <div
@@ -371,8 +381,8 @@ export function PriceCalculator({
             >
               {filament
                 ? costPerKg
-                  ? `${filament.material} ${filament.color}: ${formatPrice(costPerKg)}/kg`
-                  : `${filament.material} ${filament.color} no tiene costo/kg (editalo en Filamentos).`
+                  ? `${filamentName}: ${formatPrice(costPerKg)}/kg`
+                  : `${filamentName} no tiene costo/kg (editalo en Filamentos).`
                 : "Elegí un filamento para calcular el costo del material."}
             </div>
             <div className="field">
@@ -426,7 +436,7 @@ export function PriceCalculator({
             </div>
             <div className="field">
               <label htmlFor="ci-tipo">Tipo de producto</label>
-              {presetOptions.length === 0 ? (
+              {allOptions.length === 0 ? (
                 <p className="text-faint text-[12.5px]">
                   {isAdmin
                     ? 'No hay tipos cargados. Creá uno en "Tipos y márgenes".'
@@ -439,16 +449,21 @@ export function PriceCalculator({
                   value={f.presetId}
                   onChange={(e) => set("presetId", e.target.value)}
                 >
-                  {presetOptions.map((p) => (
+                  {allOptions.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
-                      {isAdmin
-                        ? ` · ${presets.find((x) => x.id === p.id)?.marginPct ?? 0}%`
-                        : ""}
+                      {isAdmin ? ` · ${marginOf(p.id)}%` : ""}
                     </option>
                   ))}
                 </select>
               )}
+              <NewPresetInline
+                options={allOptions}
+                onCreated={(p) => {
+                  setCreated((list) => [...list, p]);
+                  set("presetId", p.id);
+                }}
+              />
             </div>
             <div className="field">
               <label htmlFor="ci-obs">Observaciones</label>

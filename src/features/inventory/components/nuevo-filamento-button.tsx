@@ -3,13 +3,16 @@
 import { useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { useCan } from "@/components/auth/perms-provider";
+import type { FilamentTypeView } from "../filament-types";
 import { FilamentForm, type CatalogItem } from "./filament-form";
 
 export function NuevoFilamentoButton({
   colorCatalog,
   brandCatalog,
   materialCatalog,
+  types,
 }: {
+  types: FilamentTypeView[];
   colorCatalog: CatalogItem[];
   brandCatalog: CatalogItem[];
   materialCatalog: CatalogItem[];
@@ -47,6 +50,7 @@ export function NuevoFilamentoButton({
           colorCatalog={colorCatalog}
           brandCatalog={brandCatalog}
           materialCatalog={materialCatalog}
+          types={types}
           onDone={() => setOpen(false)}
           onCancel={() => setOpen(false)}
         />

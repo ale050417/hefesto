@@ -57,6 +57,7 @@ import 'admin_consultas_models_test.dart' show answeredJson, inquiryJson;
 import 'admin_consultas_screens_test.dart' show FakeConsultasApi;
 import 'support/calc_kit.dart';
 import 'support/device_kit.dart';
+import 'support/notifications_kit.dart';
 import 'support/photo_kit.dart';
 import 'support/sales_kit.dart';
 
@@ -873,6 +874,8 @@ List<Override> _world({
       adminSalesProvider.overrideWith((ref, f) => salesLoader?.call() ?? Future.value(sales ?? _sales)),
       // Ventas arranca en el mes actual: "hoy" fijo en octubre de 2026.
       ...salesKitOverrides(api: pendientes),
+      // El panel mantiene al día la campana: sin avisos, salvo que el test los pise.
+      ...notificationsKitOverrides(),
       adminSaleProvider.overrideWith((ref, k) => saleLoader?.call() ?? Future.value(sale ?? _online())),
       adminStockProvider.overrideWith((ref) async => _stock),
       produccionProvider.overrideWith((ref) async => _board),
@@ -3149,7 +3152,7 @@ void main() {
         await _reveal(tester, _field(r'Precio por unidad ($)'));
         expect(tester.widget<TextField>(_field(r'Precio por unidad ($)')).controller!.text, '2.900');
         expect(find.text(r'$2.900 c/u · $28.997.100 por las 9999'), findsOneWidget);
-        expect(find.text('Costo guardado con la calculadora. Podés ajustar el precio a mano.'), findsOneWidget);
+        expect(find.text('Costo guardado. Podés ajustar el precio a mano.'), findsOneWidget);
         expect(find.widgetWithText(OutlinedButton, 'Volver a calcular'), findsOneWidget);
         await shoot(tester, 'consulta_responder_calculado');
 

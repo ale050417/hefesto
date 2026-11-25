@@ -8,6 +8,7 @@ import '../../../core/widgets/common.dart';
 import '../analisis/ar_number.dart';
 import '../calculadora/price_estimator_sheet.dart';
 import '../filamentos/shared_widgets.dart';
+import 'consulta_product_picker.dart';
 import 'consultas_api.dart';
 import 'consultas_models.dart';
 import 'consultas_widgets.dart';
@@ -23,6 +24,9 @@ import 'consultas_widgets.dart';
 ///   solo el precio; lo calculado queda guardado para costear el pedido.
 /// - Con más de una unidad puede tipear el precio POR UNIDAD o POR EL TOTAL;
 ///   al servidor va siempre el precio por unidad.
+/// - Si el producto ya está cargado en la tienda, "Cargar desde un producto"
+///   rellena precio, medidas, demora, colores y el costeo (sugerencia de
+///   Agustín, 2026-11-19).
 class ConsultaAnswerScreen extends ConsumerStatefulWidget {
   const ConsultaAnswerScreen({super.key, required this.consulta});
   final Consulta consulta;
@@ -50,6 +54,9 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
   /// con el costo cargado a mano (ese costo se reenvía tal cual, sin mostrarlo).
   RespuestaCalc? _calc;
   bool _recalculated = false;
+
+  /// Producto de la tienda con el que se rellenó la respuesta (solo aviso).
+  String? _loadedFrom;
 
   bool _saving = false;
   bool _submitted = false;
@@ -148,6 +155,29 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
         printMinutes: result.printMinutes,
       );
       _recalculated = true;
+      _serverError = null;
+    });
+  }
+
+  /// Rellena la respuesta con la ficha de un producto de la tienda.
+  Future<void> _loadFromProduct() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final pick = await Navigator.of(context).push<ConsultaProductPick>(
+      MaterialPageRoute(builder: (_) => const ConsultaProductPickerScreen()),
+    );
+    if (pick == null || !mounted) return;
+    final p = pick.product;
+    String cut(String s, int max) => s.length > max ? s.substring(0, max) : s;
+    setState(() {
+      _unitPrice.text = arEditText(calculatorPriceFor(pick.option.unitPrice, _mode, _q.quantity));
+      // Si la ficha no alcanza para costear, lo calculado antes era de otra
+      // pieza: se borra y el operador pasa por la calculadora.
+      _calc = p.calcFor(pick.option);
+      _recalculated = true;
+      if (p.dimensions != null) _dimensions.text = cut(p.dimensions!, 300);
+      if (p.colors.isNotEmpty) _colors.text = cut(p.colors, 300);
+      if (p.deliveryTime != null) _delivery.text = cut(p.deliveryTime!, 120);
+      _loadedFrom = pick.option.label == null ? p.name : '${p.name} · ${pick.option.label}';
       _serverError = null;
     });
   }
@@ -294,6 +324,23 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
                     'Para ${q.customerName}',
                     style: TextStyle(fontSize: 12.5, color: c.textDim),
                   ),
+                  const SizedBox(height: 14),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: OutlinedButton.icon(
+                      onPressed: _saving ? null : _loadFromProduct,
+                      icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                      label: const Text('Cargar desde un producto'),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _loadedFrom != null
+                        ? 'Datos cargados desde $_loadedFrom. Podés cambiar lo que haga falta.'
+                        : 'Si ya está cargado en la tienda, elegilo y se rellenan el precio, las '
+                            'medidas, la demora y los colores.',
+                    style: TextStyle(fontSize: 12, height: 1.35, color: c.textFaint),
+                  ),
                   const SizedBox(height: 16),
                   if (qty > 1) ...[
                     Wrap(
@@ -341,7 +388,7 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
                   else
                     Text(
                       _hasCost
-                          ? 'Costo guardado con la calculadora. Podés ajustar el precio a mano.'
+                          ? 'Costo guardado. Podés ajustar el precio a mano.'
                           : 'Calculá el precio con la calculadora: elegís el tipo de producto y queda '
                               'guardado el costo para cuando se confirme el pedido.',
                       style: TextStyle(fontSize: 12, height: 1.35, color: c.textFaint),

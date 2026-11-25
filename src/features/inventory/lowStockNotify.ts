@@ -26,6 +26,7 @@ export async function notifyLowStockAfterSale(
         ? "un ajuste de stock"
         : "una venta";
   await notifyAdmins({
+    kind: "low_stock",
     title: short.length
       ? "Falta filamento para reponer"
       : "Stock bajo de filamento",

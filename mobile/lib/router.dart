@@ -18,6 +18,8 @@ import 'features/admin/ganancias/ganancias_screen.dart';
 import 'features/admin/calculadora/calculadora_screen.dart';
 import 'features/admin/configuracion/configuracion_screen.dart';
 import 'features/admin/auditoria/auditoria_screen.dart';
+import 'features/admin/notificaciones/notifications_api.dart' show notificationsRoute;
+import 'features/admin/notificaciones/notifications_screen.dart';
 import 'features/admin/admin_more_screen.dart';
 import 'features/admin/dashboard_screen.dart';
 import 'features/admin/sale_detail_screen.dart';
@@ -166,6 +168,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/admin/m/auditoria',
         parentNavigatorKey: _rootKey,
         builder: (_, _) => const AdminAuditoriaScreen(),
+      ),
+      // Notificaciones (campana de la barra del panel): para todo el equipo.
+      GoRoute(
+        path: notificationsRoute,
+        parentNavigatorKey: _rootKey,
+        builder: (_, _) => const NotificationsScreen(),
       ),
       // El detalle se abre SOBRE la barra del panel (navegador raíz).
       GoRoute(

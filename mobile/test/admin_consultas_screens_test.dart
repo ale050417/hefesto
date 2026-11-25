@@ -61,6 +61,16 @@ class FakeConsultasApi extends ConsultasApi {
     return 'https://cdn.test/consultas/$id/${photo.filename}';
   }
 
+  /// Productos de la tienda que "devuelve el servidor" al buscar.
+  List<Map<String, dynamic>> storeProducts = const [];
+  final productSearches = <String>[];
+
+  @override
+  Future<ConsultaProductPage> products({String q = '', int limit = 30}) async {
+    productSearches.add(q);
+    return ConsultaProductPage.fromJson({'total': storeProducts.length, 'items': storeProducts});
+  }
+
   @override
   Future<Consulta> answer(String id, RespuestaDraft d) async {
     if (failWith != null) throw failWith!;
@@ -648,7 +658,7 @@ void main() {
     final recalcButton = find.widgetWithText(OutlinedButton, 'Volver a calcular');
     const helpWithout = 'Calculá el precio con la calculadora: elegís el tipo de producto y queda '
         'guardado el costo para cuando se confirme el pedido.';
-    const helpWith = 'Costo guardado con la calculadora. Podés ajustar el precio a mano.';
+    const helpWith = 'Costo guardado. Podés ajustar el precio a mano.';
 
     /// Abre la calculadora, carga una pieza y usa el precio.
     Future<void> calculate(WidgetTester tester, {Finder? button, String grams = '18,5', String minutes = '35'}) async {
@@ -687,6 +697,88 @@ void main() {
       // Con más de una unidad se elige cómo se tipea el precio.
       expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Por unidad')).selected, isTrue);
       expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Por las 12')).selected, isFalse);
+    });
+
+    // Sugerencia de Agustín (2026-11-19): elegir un producto ya cargado y que
+    // se rellene todo, como al cargar una venta.
+    const trofeo = <String, dynamic>{
+      'id': 'p-trofeo',
+      'name': 'Trofeo taekwondo',
+      'categoryName': 'Trofeos',
+      'material': 'PLA',
+      'dimensions': 'Alto: 20 cm',
+      'deliveryTime': '5 días hábiles',
+      'colors': 'Dorado, Negro',
+      'options': [
+        {'label': 'Chico', 'unitPrice': 12000, 'grams': 80, 'printMinutes': 240},
+        {'label': 'Grande', 'unitPrice': 18000, 'grams': 140.5, 'printMinutes': 420},
+      ],
+    };
+    final loadButton = find.widgetWithText(OutlinedButton, 'Cargar desde un producto');
+
+    testWidgets('"Cargar desde un producto": rellena todo y guarda con qué se costea', (tester) async {
+      final api = await openAnswer(tester, 'consulta_responder_producto', pending);
+      api.storeProducts = [trofeo];
+      await tapShown(tester, loadButton);
+      expect(find.text('Elegir producto'), findsOneWidget);
+      expect(find.text(r'desde $12.000'), findsOneWidget);
+      await tester.tap(find.text('Trofeo taekwondo'));
+      await settle(tester);
+      // Tiene dos tamaños: pregunta cuál.
+      expect(find.text('¿Cuál se cotiza?'), findsOneWidget);
+      await tester.tap(find.text('Grande'));
+      await settle(tester);
+
+      expect(find.text('Elegir producto'), findsNothing);
+      expect(fieldText(tester, r'Precio por unidad ($)'), '18.000');
+      expect(fieldText(tester, 'Demora'), '5 días hábiles');
+      expect(fieldText(tester, 'Medidas'), 'Alto: 20 cm');
+      expect(fieldText(tester, 'Colores'), 'Dorado, Negro');
+      expect(find.text(helpWith), findsOneWidget);
+      expect(
+        find.text('Datos cargados desde Trofeo taekwondo · Grande. Podés cambiar lo que haga falta.'),
+        findsOneWidget,
+      );
+
+      await tapShown(tester, find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      expect(api.answered!.draft.toJson(), {
+        'unitPrice': 18000,
+        'unitCost': null,
+        'filamentId': null,
+        'material': 'PLA',
+        'grams': 140.5,
+        'printMinutes': 420,
+        'bulkPrice': null,
+        'bulkFrom': null,
+        'dimensions': 'Alto: 20 cm',
+        'colors': 'Dorado, Negro',
+        'deliveryTime': '5 días hábiles',
+        'note': null,
+        'message': null,
+      });
+    });
+
+    testWidgets('producto sin gramos ni material: pone el precio pero pide la calculadora', (tester) async {
+      final api = await openAnswer(tester, 'consulta_responder_producto_sin_costo', pending);
+      api.storeProducts = [
+        {
+          'id': 'p-x',
+          'name': 'Llavero simple',
+          'options': [
+            {'label': null, 'unitPrice': 2500, 'grams': 0, 'printMinutes': 0},
+          ],
+        },
+      ];
+      await tapShown(tester, loadButton);
+      await tester.tap(find.text('Llavero simple'));
+      await settle(tester);
+      // Un solo tamaño: no pregunta nada.
+      expect(find.text('Elegir producto'), findsNothing);
+      expect(fieldText(tester, r'Precio por unidad ($)'), '2.500');
+      expect(fieldText(tester, 'Medidas'), isEmpty);
+      expect(find.text(helpWithout), findsOneWidget);
+      await tapShown(tester, find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      expect(api.answered, isNull);
     });
 
     testWidgets('una sola unidad: no hay "Por unidad / Por las N" ni renglón del total', (tester) async {

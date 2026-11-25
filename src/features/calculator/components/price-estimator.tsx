@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatPrice } from "@/lib/format";
-import { filamentTag } from "@/features/inventory/filament-label";
 import { computeQuote, roundPrice } from "../calculator";
 import { quotePriceAction } from "../actions";
+import { choiceValueFor, firstChoiceValue } from "../filament-choices";
+import { FilamentSelect } from "./filament-select";
+import { NewPresetInline, type CreatedPreset } from "./new-preset-inline";
 import type {
   CalcConfig,
   FilamentOption,
@@ -31,12 +33,6 @@ export type EstimatorValue = {
   colorGrams?: Record<string, number>;
 };
 
-/** Etiqueta del selector: "PLA · Dorado · Grilon3 — $35.000/kg" (la marca
- *  distingue dos carretes del mismo color). */
-function filamentLabel(f: FilamentOption): string {
-  return `${filamentTag(f)} — ${formatPrice(f.costPerKg)}/kg`;
-}
-
 /**
  * Motor de precio de la calculadora, embebible en el alta de producto y en el
  * pedido manual. Admin: calcula en el cliente y muestra el desglose. Operador:
@@ -46,6 +42,11 @@ function filamentLabel(f: FilamentOption): string {
  * Fix auditoría 2026-07: se elige un FILAMENTO (id), no un material. Dos
  * filamentos del mismo material pueden costar distinto (PLA dorado ≠ PLA
  * blanco) y antes el precio no cambiaba al elegir uno u otro.
+ *
+ * 2026-11-24 (Agustín): el selector agrupa por TIPO de filamento ("PLA —
+ * $26.000/kg") en vez de listar los 50 carretes; el id que viaja es el de un
+ * carrete de ese tipo (todos valen lo mismo). `byType={false}` vuelve a la
+ * lista por carrete (venta manual: ahí importa de cuál se descuenta).
  */
 export function PriceEstimator({
   config,
@@ -56,7 +57,9 @@ export function PriceEstimator({
   initial,
   onChange,
   colors,
+  byType = true,
 }: {
+  byType?: boolean;
   config: CalcConfig;
   filaments: FilamentOption[];
   presetOptions: MarginPresetOption[];
@@ -80,13 +83,27 @@ export function PriceEstimator({
   // Default: el filamento inicial (edición), o el primero que coincida con el
   // material guardado (productos viejos, sin filamentId), o el primero.
   const [filamentId, setFilamentId] = useState<string>(() => {
-    if (initial?.filamentId) return initial.filamentId;
+    // Agrupado por tipo, el valor es el carrete que representa al tipo.
+    const pick = (id: string) =>
+      byType ? choiceValueFor(filaments, id) || id : id;
+    if (initial?.filamentId) return pick(initial.filamentId);
     if (initial?.material) {
       const byMat = filaments.find((f) => f.material === initial.material);
-      if (byMat) return byMat.id;
+      if (byMat) return pick(byMat.id);
     }
-    return filaments[0]?.id ?? "";
+    return byType ? firstChoiceValue(filaments) : (filaments[0]?.id ?? "");
   });
+  // Tipos creados recién desde acá ("＋ Nuevo tipo"): se suman a la lista sin
+  // recargar la página.
+  const [created, setCreated] = useState<CreatedPreset[]>([]);
+  const allOptions = [
+    ...presetOptions,
+    ...created.filter((c) => !presetOptions.some((p) => p.id === c.id)),
+  ];
+  const marginOf = (id: string) =>
+    presets.find((p) => p.id === id)?.marginPct ??
+    created.find((c) => c.id === id)?.marginPct ??
+    0;
   const [grams, setGrams] = useState(
     initial?.grams ? String(initial.grams) : "",
   );
@@ -126,9 +143,7 @@ export function PriceEstimator({
   const hasData = gramsN > 0 || totalMin > 0;
 
   // Margen del tipo: SOLO admin lo conoce (presets viene vacío al operador).
-  const adminMargin = isAdmin
-    ? (presets.find((p) => p.id === presetId)?.marginPct ?? 0)
-    : 0;
+  const adminMargin = isAdmin ? marginOf(presetId) : 0;
 
   const q = computeQuote({
     grams: gramsN,
@@ -202,7 +217,8 @@ export function PriceEstimator({
     onChangeRef.current = onChange;
   });
   const material = selected?.material ?? "";
-  const color = selected?.color ?? "";
+  // Elegido por tipo no hay un color: el carrete solo representa al tipo.
+  const color = byType && selected?.typeId ? "" : (selected?.color ?? "");
   useEffect(() => {
     onChangeRef.current?.({
       filamentId: filamentId || null,
@@ -238,18 +254,13 @@ export function PriceEstimator({
               No hay filamentos cargados. Cargá uno en Filamentos para cotizar.
             </p>
           ) : (
-            <select
+            <FilamentSelect
               id="pe-fil"
-              className="select"
+              filaments={filaments}
               value={filamentId}
-              onChange={(e) => setFilamentId(e.target.value)}
-            >
-              {filaments.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {filamentLabel(f)}
-                </option>
-              ))}
-            </select>
+              onChange={setFilamentId}
+              byType={byType}
+            />
           )}
           {selected && !selected.costPerKg ? (
             <div className="text-[11.5px]" style={{ color: "var(--warning)" }}>
@@ -352,7 +363,7 @@ export function PriceEstimator({
 
       <div className="field">
         <label htmlFor="pe-tipo">Tipo de producto</label>
-        {presetOptions.length === 0 ? (
+        {allOptions.length === 0 ? (
           <p className="text-faint text-[12.5px]">
             {isAdmin
               ? 'No hay tipos cargados. Creá uno en "Tipos y márgenes" (Calculadora).'
@@ -366,16 +377,21 @@ export function PriceEstimator({
             onChange={(e) => setPresetId(e.target.value)}
           >
             <option value="">Elegí un tipo…</option>
-            {presetOptions.map((p) => (
+            {allOptions.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
-                {isAdmin
-                  ? ` · ${presets.find((x) => x.id === p.id)?.marginPct ?? 0}%`
-                  : ""}
+                {isAdmin ? ` · ${marginOf(p.id)}%` : ""}
               </option>
             ))}
           </select>
         )}
+        <NewPresetInline
+          options={allOptions}
+          onCreated={(p) => {
+            setCreated((list) => [...list, p]);
+            setPresetId(p.id);
+          }}
+        />
       </div>
 
       {/* Precio propio: cobrás lo que decidiste y la calculadora te muestra

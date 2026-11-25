@@ -19,6 +19,10 @@ export const calcSaveSchema = z.object({
   // nunca manda el % ni el costo: se resuelven desde el tipo y el filamento.
   presetId: z.string().trim().min(1, "Elegí un tipo de producto."),
   notes: z.preprocess(emptyToUndef, z.string().trim().max(500).optional()),
+  // Se eligió un TIPO de filamento (PLA, PETG…), no un carrete: el historial
+  // guarda el nombre del tipo y ningún color (el carrete que viaja solo
+  // representa al tipo para resolver el precio).
+  byType: z.boolean().optional(),
 });
 
 export type CalcSaveInput = z.infer<typeof calcSaveSchema>;
@@ -53,3 +57,11 @@ export const marginPresetSchema = z.object({
 });
 
 export type MarginPresetInput = z.infer<typeof marginPresetSchema>;
+
+// Tipo nuevo "que se cobra como" otro (lo crea quien cotiza, sin ver márgenes).
+export const presetLikeSchema = z.object({
+  name: z.string().trim().min(1, "Ingresá un nombre.").max(120),
+  likePresetId: z.uuid("Elegí con qué tipo se cobra igual."),
+});
+
+export type PresetLikeInput = z.infer<typeof presetLikeSchema>;

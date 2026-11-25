@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hefesto/core/api/api_client.dart';
+import 'package:hefesto/core/api/models.dart' show MeInfo;
+import 'package:hefesto/core/widgets/common.dart' show GoldButton;
+import 'package:hefesto/features/admin/calculadora/calc_extras_api.dart';
 import 'package:hefesto/features/admin/calculadora/calc_config_screen.dart';
 import 'package:hefesto/features/admin/calculadora/calculadora_api.dart';
 import 'package:hefesto/features/admin/calculadora/calculadora_models.dart';
 import 'package:hefesto/features/admin/calculadora/calculadora_screen.dart';
 import 'package:hefesto/features/admin/calculadora/presets_screen.dart';
+import 'package:hefesto/features/admin/calculadora/price_estimator_sheet.dart';
 
 import 'analisis_test_kit.dart';
+import 'support/calc_kit.dart';
 
 Map<String, dynamic> _filament(String id, String color, num cost, String hex) =>
     {'id': id, 'material': 'PLA', 'color': color, 'brand': 'Grilon3', 'costPerKg': cost, 'hex': hex};
@@ -26,12 +31,14 @@ Map<String, dynamic> _hist(String id, String name, num price, {bool admin = true
       if (admin) ...{'costPerKg': 25000, 'marginPct': 150, 'costoTotal': 1234.5, 'ganancia': 1851.75},
     };
 
-CalcOverview _overview({bool admin = true, bool noFilaments = false}) => CalcOverview.fromJson({
+CalcOverview _overview({bool admin = true, bool noFilaments = false, bool typed = false}) => CalcOverview.fromJson({
       'isAdmin': admin,
       'config': {'kwhPrice': 95, 'machineWatts': 220, 'machineLifeHours': 8000, 'maintenanceCost': 320000, 'marginErrorPct': 8},
       'filaments': noFilaments
           ? []
-          : [_filament('f1', 'Rojo', 25000, '#CC2200'), _filament('f2', 'Dorado', 35000, '#C9A84C')],
+          : typed
+              ? typedFilamentsJson()
+              : [_filament('f1', 'Rojo', 25000, '#CC2200'), _filament('f2', 'Dorado', 35000, '#C9A84C')],
       'presetOptions': [
         {'id': 'p1', 'name': 'Llaveros'},
         {'id': 'p2', 'name': 'Macetas'},
@@ -535,6 +542,270 @@ void main() {
       );
       expect(find.text('Sin acceso'), findsOneWidget);
       expect(find.textContaining('Margen'), findsNothing);
+    });
+  });
+
+  group('filamento agrupado por tipo', () {
+    Future<(_FakeApi, FakeCalcExtrasApi)> open(WidgetTester tester, String name, {bool admin = true}) async {
+      final api = _FakeApi(admin: admin);
+      final extras = FakeCalcExtrasApi();
+      await showScreen(
+        tester,
+        name,
+        const AdminCalculadoraScreen(),
+        height: 1900,
+        me: admin ? meWith(['calculadora']) : meWith(['calculadora'], role: 'operator', actions: {'ver', 'crear'}),
+        overrides: [
+          calculadoraProvider.overrideWith((ref) async => _overview(admin: admin, typed: true)),
+          calculadoraApiProvider.overrideWithValue(api),
+          calcExtrasApiProvider.overrideWithValue(extras),
+        ],
+      );
+      return (api, extras);
+    }
+
+    testWidgets('arranca en el primer tipo y el selector lista un renglón por tipo', (tester) async {
+      final (api, _) = await open(tester, 'calculadora_tipos_filamento');
+      // El campo muestra el TIPO, no el carrete que lo representa.
+      expect(find.text('PLA'), findsOneWidget);
+      expect(find.text('\$26.000 por kg · 2 carretes'), findsOneWidget);
+      expect(find.text('PLA · Verde · Bambu Lab'), findsNothing);
+
+      await _fill(tester, 'Gramos utilizados', '80');
+      await advance(tester, 600);
+      expect(api.quotes.last.filamentId, typedPlaVerdeId, reason: 'viaja el carrete que representa al tipo');
+
+      await tester.tap(find.text('PLA'));
+      await advance(tester, 400);
+      expect(find.text('PLA Silk (Dorado)'), findsOneWidget);
+      expect(find.text('\$34.000 por kg · 1 carrete'), findsOneWidget);
+      expect(find.text('CARRETES SIN TIPO (PRECIO PROPIO)'), findsOneWidget);
+      expect(find.text('PETG · Negro · Printalot'), findsOneWidget);
+      expect(find.text('PLA · Azul · Bambu Lab'), findsNothing, reason: 'los carretes con tipo no se listan de a uno');
+
+      await tester.tap(find.text('PLA Silk (Dorado)'));
+      await advance(tester, 800);
+      expect(api.quotes.last.filamentId, typedSilkId);
+    });
+
+    testWidgets('guardar con un TIPO elegido avisa byType al servidor', (tester) async {
+      final (api, extras) = await open(tester, 'calculadora_tipos_guardar');
+      await _fill(tester, 'Gramos utilizados', '120');
+      await tester.enterText(find.widgetWithText(TextField, 'Nombre de la pieza'), 'Soporte');
+      await advance(tester, 600);
+      await tester.tap(find.text('Guardar'));
+      await advance(tester, 400);
+      expect(extras.savedByType!['filamentId'], typedPlaVerdeId);
+      expect(extras.savedByType!['presetId'], 'p1');
+      expect(api.saved, isNull, reason: 'fue por el guardado "por tipo"');
+      expect(find.text('Presupuesto guardado en el historial'), findsOneWidget);
+    });
+
+    testWidgets('guardar con un carrete SIN tipo usa el guardado de siempre', (tester) async {
+      final (api, extras) = await open(tester, 'calculadora_tipos_guardar_suelto');
+      await tester.tap(find.text('PLA'));
+      await advance(tester, 400);
+      await tester.tap(find.text('PETG · Negro · Printalot'));
+      await advance(tester, 400);
+      await _fill(tester, 'Gramos utilizados', '50');
+      await tester.enterText(find.widgetWithText(TextField, 'Nombre de la pieza'), 'Otra');
+      await advance(tester, 600);
+      await tester.tap(find.text('Guardar'));
+      await advance(tester, 400);
+      expect(api.saved!['filamentId'], looseNegroId);
+      expect(api.saved!['name'], 'Otra');
+      expect(extras.savedByType, isNull);
+    });
+
+    testWidgets('el buscador filtra tipos y carretes sueltos', (tester) async {
+      await open(tester, 'calculadora_tipos_buscar');
+      await tester.tap(find.text('PLA'));
+      await advance(tester, 400);
+      await tester.enterText(find.widgetWithText(TextField, 'Buscar material, color o marca…'), 'silk');
+      await advance(tester, 200);
+      expect(find.text('PLA Silk (Dorado)'), findsOneWidget);
+      expect(find.text('PETG · Negro · Printalot'), findsNothing);
+      expect(find.text('CARRETES SIN TIPO (PRECIO PROPIO)'), findsNothing);
+    });
+  });
+
+  group('nuevo tipo de producto ("se cobra como")', () {
+    final operador = meWith(['calculadora'], role: 'operator', actions: {'ver', 'crear'});
+
+    Future<FakeCalcExtrasApi> open(WidgetTester tester, String name, {MeInfo? me, double width = 392, double textScale = 1}) async {
+      final extras = FakeCalcExtrasApi();
+      await showScreen(
+        tester,
+        name,
+        const AdminCalculadoraScreen(),
+        width: width,
+        height: 1900,
+        textScale: textScale,
+        me: me ?? operador,
+        overrides: [
+          calculadoraProvider.overrideWith((ref) async => _overview(admin: false)),
+          calculadoraApiProvider.overrideWithValue(_FakeApi(admin: false)),
+          calcExtrasApiProvider.overrideWithValue(extras),
+        ],
+      );
+      return extras;
+    }
+
+    testWidgets('el operador lo crea eligiendo con cuál se cobra igual, sin ver márgenes', (tester) async {
+      final extras = await open(tester, 'calculadora_nuevo_tipo');
+      await tester.tap(find.text('Nuevo tipo'));
+      await advance(tester, 400);
+      expect(find.text('Nombre del tipo'), findsOneWidget);
+      expect(find.text('Se cobra como'), findsOneWidget);
+      expect(find.text('Se cobra igual que el tipo que elijas. Ale puede ajustarlo después.'), findsOneWidget);
+      expect(find.textContaining('%'), findsNothing, reason: 'nunca un margen');
+
+      // Sin elegir con cuál se cobra igual, no se manda.
+      await tester.enterText(find.widgetWithText(TextField, 'Nombre del tipo'), 'Mates');
+      await tester.tap(find.text('Crear tipo'));
+      await advance(tester, 300);
+      expect(extras.presetsCreated, isEmpty);
+      expect(find.text('Poné un nombre y elegí con qué tipo se cobra igual.'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Macetas').last);
+      await tester.pump();
+      await tester.tap(find.text('Crear tipo'));
+      await advance(tester, 600);
+      expect(extras.presetsCreated, [(name: 'Mates', likePresetId: 'p2')]);
+      expect(find.text('Nombre del tipo'), findsNothing, reason: 'el diálogo se cierra');
+      // Queda en la lista y elegido, aunque el servidor todavía no lo traiga.
+      final chip = tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Mates'));
+      expect(chip.selected, isTrue);
+      expect(find.textContaining('%'), findsNothing);
+    });
+
+    testWidgets('el tipo nuevo se usa para cotizar', (tester) async {
+      final api = _FakeApi(admin: false);
+      final extras = FakeCalcExtrasApi();
+      await showScreen(
+        tester,
+        'calculadora_nuevo_tipo_cotiza',
+        const AdminCalculadoraScreen(),
+        height: 1900,
+        me: operador,
+        overrides: [
+          calculadoraProvider.overrideWith((ref) async => _overview(admin: false)),
+          calculadoraApiProvider.overrideWithValue(api),
+          calcExtrasApiProvider.overrideWithValue(extras),
+        ],
+      );
+      await _fill(tester, 'Gramos utilizados', '100');
+      await advance(tester, 600);
+      await tester.tap(find.text('Nuevo tipo'));
+      await advance(tester, 400);
+      await tester.enterText(find.widgetWithText(TextField, 'Nombre del tipo'), 'Mates');
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Llaveros').last);
+      await tester.tap(find.text('Crear tipo'));
+      await advance(tester, 900);
+      expect(api.quotes.last.presetId, 'p-nuevo');
+    });
+
+    testWidgets('un nombre repetido se ve dentro del diálogo', (tester) async {
+      final extras = await open(tester, 'calculadora_nuevo_tipo_repetido');
+      extras.failWith = ApiException('invalid', 'Ya hay un tipo con ese nombre.', status: 422);
+      await tester.tap(find.text('Nuevo tipo'));
+      await advance(tester, 400);
+      await tester.enterText(find.widgetWithText(TextField, 'Nombre del tipo'), 'Llaveros');
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Macetas').last);
+      await tester.tap(find.text('Crear tipo'));
+      await advance(tester, 400);
+      expect(find.text('Ya hay un tipo con ese nombre.'), findsOneWidget);
+      expect(find.text('Nombre del tipo'), findsOneWidget);
+    });
+
+    testWidgets('sin permiso de crear no aparece "Nuevo tipo"', (tester) async {
+      await open(tester, 'calculadora_sin_nuevo_tipo', me: meWith(['calculadora'], role: 'operator', actions: {'ver'}));
+      expect(find.text('Llaveros'), findsOneWidget);
+      expect(find.text('Nuevo tipo'), findsNothing);
+    });
+
+    testWidgets('a 360dp y con letra grande el diálogo no se desborda', (tester) async {
+      await open(tester, 'calculadora_nuevo_tipo_grande', width: 360, textScale: 1.4);
+      await tester.ensureVisible(find.text('Nuevo tipo'));
+      await tester.tap(find.text('Nuevo tipo'));
+      await advance(tester, 400);
+      expect(find.text('Se cobra como'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('calcular precio (calculadora embebida)', () {
+    final operador = meWith(['calculadora'], role: 'operator', actions: {'ver', 'crear'});
+
+    Future<(FakeEstimatorApi, FakeCalcExtrasApi)> open(
+      WidgetTester tester,
+      String name, {
+      bool byType = true,
+      bool typed = true,
+      MeInfo? me,
+    }) async {
+      final api = FakeEstimatorApi();
+      final extras = FakeCalcExtrasApi();
+      await showScreen(
+        tester,
+        name,
+        Scaffold(body: PriceEstimatorSheet(byType: byType)),
+        height: 1200,
+        me: me ?? operador,
+        overrides: estimatorOverrides(api, overview: sampleEstimatorOverview(typed: typed), extras: extras),
+      );
+      return (api, extras);
+    }
+
+    testWidgets('agrupa por tipo y cotiza con el carrete que lo representa', (tester) async {
+      final (api, _) = await open(tester, 'estimador_tipos');
+      expect(find.text('PLA'), findsOneWidget);
+      expect(find.text('\$26.000 por kg · 2 carretes'), findsOneWidget);
+      await _fill(tester, 'Gramos por unidad', '50');
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Llaveros'));
+      await advance(tester, 600);
+      expect(api.quotes.last.filamentId, typedPlaVerdeId);
+
+      await tester.tap(find.text('PLA'));
+      await advance(tester, 400);
+      expect(find.text('CARRETES SIN TIPO (PRECIO PROPIO)'), findsOneWidget);
+      expect(find.text('PLA · Azul · Bambu Lab'), findsNothing);
+    });
+
+    testWidgets('con byType: false lista carrete por carrete (quien necesita el carrete concreto)', (tester) async {
+      await open(tester, 'estimador_por_carrete', byType: false);
+      expect(find.text('PLA · Verde · Bambu Lab'), findsOneWidget);
+      await tester.tap(find.text('PLA · Verde · Bambu Lab'));
+      await advance(tester, 400);
+      expect(find.text('PLA · Azul · Bambu Lab'), findsOneWidget);
+      expect(find.text('CARRETES SIN TIPO (PRECIO PROPIO)'), findsNothing);
+    });
+
+    testWidgets('sin tipos cargados queda la lista de siempre', (tester) async {
+      await open(tester, 'estimador_sin_tipos', typed: false);
+      expect(find.text('PLA · Rojo · Grilon3'), findsOneWidget);
+    });
+
+    testWidgets('"Nuevo tipo" lo crea, lo deja elegido y no pierde lo tipeado', (tester) async {
+      final (api, extras) = await open(tester, 'estimador_nuevo_tipo');
+      await _fill(tester, 'Gramos por unidad', '50');
+      await tester.tap(find.text('Nuevo tipo'));
+      await advance(tester, 400);
+      await tester.enterText(find.widgetWithText(TextField, 'Nombre del tipo'), 'Mates');
+      await tester.tap(find.widgetWithText(ChoiceChip, 'Macetas').last);
+      await tester.tap(find.text('Crear tipo'));
+      await advance(tester, 900);
+      expect(extras.presetsCreated, [(name: 'Mates', likePresetId: 'p2')]);
+      expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Mates')).selected, isTrue);
+      expect(find.text('50'), findsOneWidget, reason: 'los gramos tipeados siguen ahí');
+      expect(api.quotes.last.presetId, 'p-nuevo');
+      expect(tester.widget<GoldButton>(find.widgetWithText(GoldButton, 'Usar este precio')).onPressed, isNotNull);
+    });
+
+    testWidgets('sin permiso de crear no aparece "Nuevo tipo"', (tester) async {
+      await open(tester, 'estimador_sin_nuevo_tipo', me: meWith(['calculadora'], role: 'operator', actions: {'ver'}));
+      expect(find.text('Llaveros'), findsOneWidget);
+      expect(find.text('Nuevo tipo'), findsNothing);
     });
   });
 

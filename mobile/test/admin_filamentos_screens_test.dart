@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/misc.dart' show Override;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hefesto/core/api/api_client.dart';
 import 'package:hefesto/core/theme/app_theme.dart' show HefestoThemeMode;
 import 'package:hefesto/core/widgets/common.dart' show GoldButton;
 import 'package:hefesto/features/admin/admin_models.dart';
 import 'package:hefesto/features/admin/admin_providers.dart';
+import 'package:hefesto/features/admin/filamentos/filament_types_screen.dart';
 import 'package:hefesto/features/admin/filamentos/filamento_detail_screen.dart';
 import 'package:hefesto/features/admin/filamentos/filamento_form_screen.dart';
 import 'package:hefesto/features/admin/filamentos/filamentos_api.dart';
 import 'package:hefesto/features/admin/filamentos/filamentos_models.dart';
 import 'package:hefesto/features/admin/filamentos/movements_screen.dart';
 import 'package:hefesto/features/admin/filamentos/stock_adjust_sheet.dart';
+import 'package:hefesto/features/admin/filamentos/weigh_sheet.dart';
 import 'package:hefesto/features/admin/stock_screen.dart';
 
 import 'support/produccion_fallas_filamentos_kit.dart';
@@ -29,8 +32,78 @@ class FakeFilamentosApi extends FilamentosApi {
   StockAdjustResult adjustResult =
       const StockAdjustResult(deltaGrams: 1000, previousStock: 840, newStock: 1840, lowStock: false);
 
+  /// Tipos con precio y modelos de carrete que "devuelve el servidor" (vacío
+  /// por defecto: las pantallas de siempre no dependen de ellos).
+  FilamentTypesData typesData = const FilamentTypesData();
+  final typeCreates = <(String name, double costPerKg)>[];
+  final typeUpdates = <(String id, String name, double costPerKg)>[];
+  final typeDeletes = <String>[];
+  final spoolCreates = <(String name, double emptyGrams)>[];
+  final spoolUpdates = <(String id, String name, double emptyGrams)>[];
+  final spoolDeletes = <String>[];
+  final weighs = <({String id, String spoolModelId, double totalGrams, int sealedSpools})>[];
+
+  /// Cuántos carretes "cambiaron de precio" al editar un tipo.
+  int typeSpoolsChanged = 3;
+  WeighResult weighResult =
+      const WeighResult(remainingGrams: 430, newStockGrams: 430, previousStock: 120, changed: true, lowStock: false);
+
   void _maybeFail() {
     if (failWith != null) throw failWith!;
+  }
+
+  @override
+  Future<FilamentTypesData> types() async => typesData;
+
+  @override
+  Future<FilamentTypeSaved> createType({required String name, required double costPerKg}) async {
+    _maybeFail();
+    typeCreates.add((name, costPerKg));
+    return const FilamentTypeSaved(id: 't-nuevo');
+  }
+
+  @override
+  Future<FilamentTypeSaved> updateType(String id, {required String name, required double costPerKg}) async {
+    _maybeFail();
+    typeUpdates.add((id, name, costPerKg));
+    return FilamentTypeSaved(id: id, spools: typeSpoolsChanged);
+  }
+
+  @override
+  Future<void> deleteType(String id) async {
+    _maybeFail();
+    typeDeletes.add(id);
+  }
+
+  @override
+  Future<String> createSpoolModel({required String name, required double emptyGrams}) async {
+    _maybeFail();
+    spoolCreates.add((name, emptyGrams));
+    // Como el servidor: la próxima lista ya lo trae.
+    typesData = FilamentTypesData(
+      types: typesData.types,
+      spoolModels: [...typesData.spoolModels, SpoolModel(id: 's-nuevo', name: name, emptyGrams: emptyGrams)],
+    );
+    return 's-nuevo';
+  }
+
+  @override
+  Future<void> updateSpoolModel(String id, {required String name, required double emptyGrams}) async {
+    _maybeFail();
+    spoolUpdates.add((id, name, emptyGrams));
+  }
+
+  @override
+  Future<void> deleteSpoolModel(String id) async {
+    _maybeFail();
+    spoolDeletes.add(id);
+  }
+
+  @override
+  Future<WeighResult> weigh(String id, {required String spoolModelId, required double totalGrams, int sealedSpools = 0}) async {
+    _maybeFail();
+    weighs.add((id: id, spoolModelId: spoolModelId, totalGrams: totalGrams, sealedSpools: sealedSpools));
+    return weighResult;
   }
 
   @override
@@ -90,6 +163,19 @@ Map<String, dynamic> filJson(String id, String color, String hex, num stock, Str
       'status': status,
       'hex': hex,
     };
+
+/// Tipos y modelos de carrete de ejemplo (`GET /admin/filaments/types`).
+FilamentTypesData sampleTypes() => FilamentTypesData.fromJson({
+      'types': [
+        {'id': 't1', 'name': 'PLA', 'costPerKg': 26000, 'spools': 32},
+        {'id': 't2', 'name': 'PLA Silk (Dorado)', 'costPerKg': 34000, 'spools': 1},
+        {'id': 't3', 'name': 'PETG', 'costPerKg': 31000, 'spools': 0},
+      ],
+      'spoolModels': [
+        {'id': 's1', 'name': 'Grilon3 cartón', 'emptyGrams': 250},
+        {'id': 's2', 'name': 'Printalot plástico', 'emptyGrams': 180},
+      ],
+    });
 
 Future<void> settle(WidgetTester tester) async {
   for (var i = 0; i < 8; i++) {
@@ -613,6 +699,441 @@ void main() {
         overrides: [filamentCatalogProvider.overrideWith((ref) async => catalog)],
       );
       expect(find.text('Nuevo filamento'), findsOneWidget);
+    });
+  });
+
+  group('tipos y precios', () {
+    Future<FakeFilamentosApi> open(
+      WidgetTester tester,
+      String name, {
+      FilamentTypesData? data,
+      bool canEdit = true,
+      double width = 392,
+      double textScale = 1.0,
+    }) async {
+      final api = FakeFilamentosApi()..typesData = data ?? sampleTypes();
+      await showScreen(
+        tester,
+        name,
+        const FilamentTypesScreen(),
+        width: width,
+        height: 1500,
+        textScale: textScale,
+        me: canEdit ? full : readOnly,
+        overrides: [filamentosApiProvider.overrideWithValue(api)],
+      );
+      return api;
+    }
+
+    testWidgets('lista los tipos con su precio y cuántos carretes tienen, y los carretes vacíos', (tester) async {
+      await open(tester, 'filamento_tipos');
+      expect(find.text('Tipos y precios'), findsOneWidget);
+      expect(find.text('PLA'), findsOneWidget);
+      expect(find.text('32 carretes'), findsOneWidget);
+      expect(find.text('1 carrete'), findsOneWidget);
+      expect(find.text('Sin carretes'), findsOneWidget);
+      expect(find.textContaining('26.000'), findsOneWidget);
+      expect(find.text('Grilon3 cartón'), findsOneWidget);
+      expect(find.text('Vacío: 250 g'), findsOneWidget);
+      expect(find.text('Agregar tipo'), findsOneWidget);
+      expect(find.text('Agregar carrete'), findsOneWidget);
+    });
+
+    testWidgets('agregar un tipo manda nombre y precio', (tester) async {
+      final api = await open(tester, 'filamento_tipos_alta');
+      await tester.tap(find.text('Agregar tipo'));
+      await settle(tester);
+      expect(find.text('Nuevo tipo'), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextField, 'Nombre del tipo'), 'ABS');
+      await tester.enterText(find.widgetWithText(TextField, 'Precio por kg'), '29500');
+      await tester.pump();
+      expect(find.textContaining('29.500'), findsOneWidget, reason: 'muestra cómo se leyó el precio');
+      await tester.tap(find.text('Guardar'));
+      await settle(tester);
+      expect(api.typeCreates, [('ABS', 29500.0)]);
+      expect(find.text('Tipo agregado'), findsOneWidget);
+    });
+
+    testWidgets('cambiar el precio avisa en cuántos carretes se actualizó', (tester) async {
+      final api = await open(tester, 'filamento_tipos_precio');
+      api.typeSpoolsChanged = 32;
+      await tester.tap(find.text('PLA'));
+      await settle(tester);
+      expect(find.text('Editar tipo'), findsOneWidget);
+      expect(find.textContaining('se aplica a 32 carretes'), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextField, 'Precio por kg'), '28000');
+      await tester.tap(find.text('Guardar'));
+      await settle(tester);
+      expect(api.typeUpdates, [('t1', 'PLA', 28000.0)]);
+      expect(find.text('Precio actualizado en 32 carretes'), findsOneWidget);
+    });
+
+    testWidgets('cambiar solo el nombre no habla de precios', (tester) async {
+      final api = await open(tester, 'filamento_tipos_nombre');
+      await tester.tap(find.text('PETG'));
+      await settle(tester);
+      await tester.enterText(find.widgetWithText(TextField, 'Nombre del tipo'), 'PETG HF');
+      await tester.tap(find.text('Guardar'));
+      await settle(tester);
+      expect(api.typeUpdates, [('t3', 'PETG HF', 31000.0)]);
+      expect(find.text('Tipo guardado'), findsOneWidget);
+    });
+
+    testWidgets('un nombre repetido se ve dentro del diálogo y no lo cierra', (tester) async {
+      final api = await open(tester, 'filamento_tipos_repetido');
+      api.failWith = ApiException('invalid', 'Ya hay un tipo con ese nombre.', status: 422);
+      await tester.tap(find.text('Agregar tipo'));
+      await settle(tester);
+      await tester.enterText(find.widgetWithText(TextField, 'Nombre del tipo'), 'PLA');
+      await tester.enterText(find.widgetWithText(TextField, 'Precio por kg'), '1');
+      await tester.tap(find.text('Guardar'));
+      await settle(tester);
+      expect(find.text('Ya hay un tipo con ese nombre.'), findsOneWidget);
+      expect(find.text('Nuevo tipo'), findsOneWidget);
+    });
+
+    testWidgets('sin nombre o sin precio no llama al servidor', (tester) async {
+      final api = await open(tester, 'filamento_tipos_invalido');
+      await tester.tap(find.text('Agregar tipo'));
+      await settle(tester);
+      await tester.tap(find.text('Guardar'));
+      await settle(tester);
+      expect(find.text('Ingresá el nombre.'), findsOneWidget);
+      expect(api.typeCreates, isEmpty);
+    });
+
+    testWidgets('eliminar un tipo pide confirmación y avisa que los carretes quedan sin tipo', (tester) async {
+      final api = await open(tester, 'filamento_tipos_borrar');
+      await tester.tap(find.byTooltip('Eliminar').first);
+      await settle(tester);
+      expect(find.text('¿Eliminar el tipo «PLA»?'), findsOneWidget);
+      expect(find.textContaining('quedan sin tipo'), findsOneWidget);
+      await tester.tap(find.text('Cancelar'));
+      await settle(tester);
+      expect(api.typeDeletes, isEmpty);
+      await tester.tap(find.byTooltip('Eliminar').first);
+      await settle(tester);
+      await tester.tap(find.text('Eliminar'));
+      await settle(tester);
+      expect(api.typeDeletes, ['t1']);
+      expect(find.text('Tipo eliminado'), findsOneWidget);
+    });
+
+    testWidgets('agregar, editar y eliminar un carrete vacío', (tester) async {
+      final api = await open(tester, 'filamento_carretes_vacios');
+      await tester.tap(find.text('Agregar carrete'));
+      await settle(tester);
+      expect(find.text('Nuevo carrete'), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextField, 'Nombre del carrete'), 'Bambu');
+      await tester.enterText(find.widgetWithText(TextField, 'Peso vacío'), '212,5');
+      await tester.tap(find.text('Guardar'));
+      await settle(tester);
+      expect(api.spoolCreates, [('Bambu', 212.5)]);
+      expect(find.text('Bambu'), findsOneWidget, reason: 'la lista se vuelve a pedir');
+
+      await tester.tap(find.text('Grilon3 cartón'));
+      await settle(tester);
+      expect(find.text('Editar carrete'), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextField, 'Peso vacío'), '245');
+      await tester.tap(find.text('Guardar'));
+      await settle(tester);
+      expect(api.spoolUpdates, [('s1', 'Grilon3 cartón', 245.0)]);
+
+      await tester.tap(find.byTooltip('Eliminar').last);
+      await settle(tester);
+      expect(find.textContaining('¿Eliminar el carrete'), findsOneWidget);
+      await tester.tap(find.text('Eliminar'));
+      await settle(tester);
+      expect(api.spoolDeletes, hasLength(1));
+    });
+
+    testWidgets('con permiso solo de ver no hay botones de edición', (tester) async {
+      await open(tester, 'filamento_tipos_solo_ver', canEdit: false);
+      expect(find.text('PLA'), findsOneWidget);
+      expect(find.text('Agregar tipo'), findsNothing);
+      expect(find.text('Agregar carrete'), findsNothing);
+      expect(find.byTooltip('Eliminar'), findsNothing);
+      await tester.tap(find.text('PLA'));
+      await settle(tester);
+      expect(find.text('Editar tipo'), findsNothing);
+    });
+
+    testWidgets('sin tipos ni carretes invita a cargarlos', (tester) async {
+      await open(tester, 'filamento_tipos_vacio', data: const FilamentTypesData());
+      expect(find.textContaining('Todavía no hay tipos'), findsOneWidget);
+      expect(find.text('Todavía no hay carretes cargados.'), findsOneWidget);
+    });
+
+    testWidgets('sin overflow a 360 dp con fuente grande (lista y diálogo)', (tester) async {
+      await open(tester, 'filamento_tipos_fuente_grande', width: 360, textScale: 1.4);
+      await tester.tap(find.text('PLA Silk (Dorado)'));
+      await settle(tester);
+      expect(find.text('Editar tipo'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('calcular filamento (pesar el carrete)', () {
+    Future<FakeFilamentosApi> open(
+      WidgetTester tester,
+      String name, {
+      Filamento? f,
+      FilamentTypesData? data,
+      double width = 392,
+      double textScale = 1.0,
+    }) async {
+      final api = FakeFilamentosApi()..typesData = data ?? sampleTypes();
+      await showScreen(
+        tester,
+        name,
+        Scaffold(body: WeighSheet(filament: f ?? rojo)),
+        width: width,
+        height: 1100,
+        textScale: textScale,
+        me: full,
+        overrides: [filamentosApiProvider.overrideWithValue(api)],
+      );
+      return api;
+    }
+
+    final total = find.widgetWithText(TextField, 'Peso del carrete con filamento');
+    final sealed = find.widgetWithText(TextField, 'Carretes cerrados aparte');
+    final confirm = find.widgetWithText(GoldButton, 'Confirmar y actualizar stock');
+
+    testWidgets('elige el modelo, tipea el peso y ve en vivo cuánto queda', (tester) async {
+      final api = await open(tester, 'pesar_carrete');
+      expect(find.text('Calcular filamento'), findsOneWidget);
+      expect(find.text('Grilon3 cartón (250 g)'), findsOneWidget);
+      expect(find.text('Printalot plástico (180 g)'), findsOneWidget);
+      expect(tester.widget<GoldButton>(confirm).onPressed, isNull, reason: 'falta el modelo y el peso');
+
+      await tester.enterText(total, '680');
+      await tester.pump();
+      expect(find.byKey(const ValueKey('weigh-preview')), findsNothing, reason: 'todavía no eligió el modelo');
+      await tester.tap(find.text('Grilon3 cartón (250 g)'));
+      await tester.pump();
+      expect(find.text('Carrete vacío: 250 g · Filamento restante: 430 g'), findsOneWidget);
+      expect(find.textContaining('Stock total'), findsNothing);
+
+      await tester.tap(confirm);
+      await settle(tester);
+      expect(api.weighs.single, (id: '2', spoolModelId: 's1', totalGrams: 680.0, sealedSpools: 0));
+    });
+
+    testWidgets('con carretes cerrados muestra y manda el stock total', (tester) async {
+      final api = await open(tester, 'pesar_carrete_cerrados');
+      await tester.tap(find.text('Printalot plástico (180 g)'));
+      await tester.enterText(total, '680');
+      await tester.enterText(sealed, '2');
+      await tester.pump();
+      expect(find.text('Carrete vacío: 180 g · Filamento restante: 500 g'), findsOneWidget);
+      expect(find.text('Stock total: 2,50 kg (con 2 carretes cerrados)'), findsOneWidget);
+      await tester.tap(confirm);
+      await settle(tester);
+      expect(api.weighs.single.sealedSpools, 2);
+      expect(api.weighs.single.spoolModelId, 's2');
+    });
+
+    testWidgets('el modelo con el que se pesó la última vez viene elegido', (tester) async {
+      final conModelo = Filamento.fromJson({...filJson('2', 'Rojo', '#CC2200', 120, 'bajo'), 'spoolModelId': 's2'});
+      final api = await open(tester, 'pesar_carrete_recordado', f: conModelo);
+      await tester.enterText(total, '300');
+      await tester.pump();
+      expect(find.text('Carrete vacío: 180 g · Filamento restante: 120 g'), findsOneWidget);
+      await tester.tap(confirm);
+      await settle(tester);
+      expect(api.weighs.single.spoolModelId, 's2');
+    });
+
+    testWidgets('si pesa menos que el carrete vacío no deja confirmar', (tester) async {
+      final api = await open(tester, 'pesar_carrete_error');
+      await tester.tap(find.text('Grilon3 cartón (250 g)'));
+      await tester.enterText(total, '200');
+      await tester.pump();
+      expect(find.textContaining('vacío pesa 250 g'), findsOneWidget);
+      expect(tester.widget<GoldButton>(confirm).onPressed, isNull);
+      expect(api.weighs, isEmpty);
+    });
+
+    testWidgets('un rechazo del servidor se ve en la hoja', (tester) async {
+      final api = await open(tester, 'pesar_carrete_rechazo');
+      api.failWith = ApiException('invalid', 'El modelo de carrete ya no existe. Elegí otro.', status: 422);
+      await tester.tap(find.text('Grilon3 cartón (250 g)'));
+      await tester.enterText(total, '680');
+      await tester.pump();
+      await tester.tap(confirm);
+      await settle(tester);
+      expect(find.text('El modelo de carrete ya no existe. Elegí otro.'), findsOneWidget);
+    });
+
+    testWidgets('sin modelos de carrete invita a agregar uno y lo deja elegido', (tester) async {
+      final api = await open(tester, 'pesar_carrete_sin_modelos', data: const FilamentTypesData());
+      expect(find.textContaining('Todavía no cargaste ningún modelo de carrete'), findsOneWidget);
+      await tester.tap(find.widgetWithText(GoldButton, 'Agregar un carrete'));
+      await settle(tester);
+      expect(find.text('Nuevo carrete'), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextField, 'Nombre del carrete'), 'Bambu');
+      await tester.enterText(find.widgetWithText(TextField, 'Peso vacío'), '210');
+      await tester.tap(find.text('Guardar'));
+      await settle(tester);
+      expect(api.spoolCreates, [('Bambu', 210.0)]);
+      expect(find.text('Bambu (210 g)'), findsOneWidget);
+      await tester.enterText(total, '710');
+      await tester.pump();
+      expect(find.text('Carrete vacío: 210 g · Filamento restante: 500 g'), findsOneWidget);
+    });
+
+    testWidgets('desde la hoja se edita y se elimina el modelo elegido', (tester) async {
+      final api = await open(tester, 'pesar_carrete_modelos');
+      expect(find.text('Editar'), findsNothing, reason: 'sin modelo elegido no hay qué editar');
+      await tester.tap(find.text('Grilon3 cartón (250 g)'));
+      await tester.pump();
+      await tester.tap(find.text('Editar'));
+      await settle(tester);
+      expect(find.text('Editar carrete'), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextField, 'Peso vacío'), '240');
+      await tester.tap(find.text('Guardar'));
+      await settle(tester);
+      expect(api.spoolUpdates, [('s1', 'Grilon3 cartón', 240.0)]);
+
+      await tester.tap(find.text('Eliminar'));
+      await settle(tester);
+      await tester.tap(find.text('Eliminar').last);
+      await settle(tester);
+      expect(api.spoolDeletes, ['s1']);
+    });
+
+    testWidgets('sin overflow a 360 dp con fuente grande', (tester) async {
+      await open(tester, 'pesar_carrete_fuente_grande', width: 360, textScale: 1.4);
+      await tester.tap(find.text('Grilon3 cartón (250 g)'));
+      await tester.enterText(total, '680');
+      await tester.enterText(sealed, '3');
+      await tester.pump();
+      expect(find.textContaining('Stock total'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  });
+
+  group('tipo de filamento en el carrete', () {
+    List<Override> ov(FakeFilamentosApi api, {Filamento? detail}) => [
+          filamentCatalogProvider.overrideWith((ref) async => catalog),
+          filamentosApiProvider.overrideWithValue(api),
+          if (detail != null) ...[
+            filamentoProvider.overrideWith((ref, id) async => detail),
+            filamentMovementsProvider.overrideWith((ref, id) async => movs),
+          ],
+        ];
+    final conTipo = Filamento.fromJson({...filJson('2', 'Rojo', '#CC2200', 120, 'bajo', cost: 26000), 'typeId': 't1'});
+
+    testWidgets('alta: al elegir un tipo el costo lo pone el tipo y viaja typeId', (tester) async {
+      final api = FakeFilamentosApi()..typesData = sampleTypes();
+      await showScreen(tester, 'filamento_form_tipo', const FilamentoFormScreen(),
+          height: 1400, me: full, overrides: ov(api));
+      expect(find.text('Tipo (precio)'), findsOneWidget);
+      expect(find.text('Sin tipo (precio propio)'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Costo por kg'), findsOneWidget);
+
+      await tester.tap(find.text('Sin tipo (precio propio)'));
+      await settle(tester);
+      expect(find.text('PLA Silk (Dorado)'), findsOneWidget);
+      await tester.tap(find.text('PLA Silk (Dorado)'));
+      await settle(tester);
+
+      expect(find.widgetWithText(TextField, 'Costo por kg'), findsNothing, reason: 'el costo ya no se tipea');
+      expect(find.byKey(const ValueKey('cost-from-type')), findsOneWidget);
+      expect(find.textContaining('Lo pone el tipo «PLA Silk (Dorado)»'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(GoldButton, 'Agregar filamento'));
+      await settle(tester);
+      expect(api.created!.typeId, 't2');
+      expect(api.created!.costPerKg, 34000);
+      expect(api.created!.toCreateJson()['typeId'], 't2');
+    });
+
+    testWidgets('alta sin tipo: el costo se tipea como siempre y typeId viaja null', (tester) async {
+      final api = FakeFilamentosApi()..typesData = sampleTypes();
+      await showScreen(tester, 'filamento_form_sin_tipo', const FilamentoFormScreen(),
+          height: 1400, me: full, overrides: ov(api));
+      await tester.enterText(find.widgetWithText(TextField, 'Costo por kg'), '21500');
+      await tester.tap(find.widgetWithText(GoldButton, 'Agregar filamento'));
+      await settle(tester);
+      expect(api.created!.typeId, isNull);
+      expect(api.created!.costPerKg, 21500);
+      expect(api.created!.toCreateJson().containsKey('typeId'), isTrue);
+    });
+
+    testWidgets('edición: quitarle el tipo vuelve al precio propio y guarda typeId null', (tester) async {
+      final api = FakeFilamentosApi()..typesData = sampleTypes();
+      await showScreen(tester, 'filamento_form_quitar_tipo', FilamentoFormScreen(filament: conTipo),
+          height: 1400, me: full, overrides: ov(api));
+      expect(find.textContaining('PLA — '), findsOneWidget);
+      expect(find.byKey(const ValueKey('cost-from-type')), findsOneWidget);
+
+      await tester.tap(find.textContaining('PLA — '));
+      await settle(tester);
+      await tester.tap(find.text('Sin tipo (precio propio)'));
+      await settle(tester);
+      expect(find.widgetWithText(TextField, 'Costo por kg'), findsOneWidget);
+      await tester.tap(find.widgetWithText(GoldButton, 'Guardar cambios'));
+      await settle(tester);
+      expect(api.updated!.$2.typeId, isNull);
+      expect(api.updated!.$2.toUpdateJson()['typeId'], isNull);
+    });
+
+    testWidgets('edición: cambiar de tipo alcanza para poder guardar', (tester) async {
+      final api = FakeFilamentosApi()..typesData = sampleTypes();
+      await showScreen(tester, 'filamento_form_cambiar_tipo', FilamentoFormScreen(filament: conTipo),
+          height: 1400, me: full, overrides: ov(api));
+      await tester.tap(find.widgetWithText(GoldButton, 'Guardar cambios'));
+      await settle(tester);
+      expect(api.updated, isNull, reason: 'sin cambios no guarda');
+      await tester.tap(find.textContaining('PLA — '));
+      await settle(tester);
+      await tester.tap(find.text('PETG'));
+      await settle(tester);
+      await tester.tap(find.widgetWithText(GoldButton, 'Guardar cambios'));
+      await settle(tester);
+      expect(api.updated!.$2.typeId, 't3');
+    });
+
+    testWidgets('el selector lleva a "Tipos y precios"', (tester) async {
+      final api = FakeFilamentosApi()..typesData = sampleTypes();
+      await showScreen(tester, 'filamento_form_ir_a_tipos', const FilamentoFormScreen(),
+          height: 1400, me: full, overrides: ov(api));
+      await tester.tap(find.text('Sin tipo (precio propio)'));
+      await settle(tester);
+      await tester.tap(find.text('Tipos y precios'));
+      await settle(tester);
+      expect(find.byType(FilamentTypesScreen), findsOneWidget);
+    });
+
+    testWidgets('detalle: el tipo se ve al lado del costo y está "Calcular filamento"', (tester) async {
+      final api = FakeFilamentosApi()..typesData = sampleTypes();
+      await showScreen(tester, 'filamento_detalle_tipo', const FilamentoDetailScreen(id: '2'),
+          height: 1600, me: full, overrides: ov(api, detail: conTipo));
+      expect(find.textContaining(' · PLA'), findsWidgets);
+      expect(find.text('Calcular filamento'), findsOneWidget);
+      expect(find.text('Tipos y precios'), findsOneWidget);
+
+      await tester.tap(find.text('Calcular filamento'));
+      await settle(tester);
+      expect(find.text('Confirmar y actualizar stock'), findsOneWidget);
+      await tester.tap(find.text('Grilon3 cartón (250 g)'));
+      await tester.enterText(find.widgetWithText(TextField, 'Peso del carrete con filamento'), '680');
+      await tester.pump();
+      await tester.tap(find.widgetWithText(GoldButton, 'Confirmar y actualizar stock'));
+      await settle(tester);
+      expect(api.weighs.single.totalGrams, 680);
+      expect(find.text('Confirmar y actualizar stock'), findsNothing, reason: 'la hoja se cierra');
+      expect(find.text('Quedan 430 g en el carrete · stock: 120 g → 430 g'), findsOneWidget);
+    });
+
+    testWidgets('detalle con permiso solo de ver: sin "Calcular filamento"', (tester) async {
+      final api = FakeFilamentosApi()..typesData = sampleTypes();
+      await showScreen(tester, 'filamento_detalle_tipo_solo_ver', const FilamentoDetailScreen(id: '2'),
+          height: 1600, me: readOnly, overrides: ov(api, detail: conTipo));
+      expect(find.text('Calcular filamento'), findsNothing);
+      expect(find.text('Tipos y precios'), findsOneWidget);
     });
   });
 
