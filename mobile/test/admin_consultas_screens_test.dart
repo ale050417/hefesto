@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -20,10 +22,17 @@ import 'package:hefesto/features/admin/calculadora/price_estimator_sheet.dart';
 import 'package:hefesto/features/admin/produccion/produccion_api.dart';
 import 'package:hefesto/features/admin/produccion/produccion_models.dart';
 
-import 'admin_consultas_models_test.dart' show answeredJson, consultasJson, inquiryJson, sampleMessage;
+import 'admin_consultas_models_test.dart' show answeredJson, chatMessageJson, consultasJson, inquiryJson, sampleMessage;
 import 'support/calc_kit.dart';
 import 'support/photo_kit.dart';
 import 'support/produccion_fallas_filamentos_kit.dart';
+
+/// El botón de guardar la cotización: "Crear cotización" la primera vez y
+/// "Cambiar cotización" cuando ya había una.
+final saveQuote = find.byWidgetPredicate(
+  (w) => w is GoldButton && (w.label == 'Crear cotización' || w.label == 'Cambiar cotización'),
+  description: 'el botón de guardar la cotización',
+);
 
 /// API de mentira: guarda lo que la pantalla le manda y no toca la red.
 class FakeConsultasApi extends ConsultasApi {
@@ -101,6 +110,53 @@ class FakeConsultasApi extends ConsultasApi {
   Future<void> delete(String id) async {
     if (failWith != null) throw failWith!;
     deletedId = id;
+  }
+
+  // --- Chat de la consulta ---
+
+  /// Lo que "tiene el servidor" (JSON de cada mensaje, el más viejo primero).
+  final chat = <Map<String, dynamic>>[];
+
+  /// Cada pedido de mensajes, con su `after`.
+  final chatFetches = <({String id, DateTime? after})>[];
+
+  /// Cada mensaje mandado (con el nombre de la foto, si llevaba).
+  final sent = <({String id, String body, String? photo})>[];
+  Object? failChat;
+  Object? failSend;
+
+  /// Si está puesto, el envío espera a que se complete (para ver "enviando…").
+  Completer<void>? sendGate;
+
+  @override
+  Future<ChatPage> messages(String id, {DateTime? after}) async {
+    chatFetches.add((id: id, after: after));
+    if (failChat != null) throw failChat!;
+    return ChatPage.fromJson({
+      'items': [
+        for (final m in chat)
+          if (after == null || DateTime.parse('${m['createdAt']}').isAfter(after)) m,
+      ],
+      'maxLength': 2000,
+    });
+  }
+
+  @override
+  Future<ChatMessage> sendMessage(String id, {String body = '', PickedPhoto? photo}) async {
+    await sendGate?.future;
+    if (failSend != null) throw failSend!;
+    sent.add((id: id, body: body, photo: photo?.filename));
+    final n = sent.length;
+    final json = chatMessageJson(
+      'sent-$n',
+      author: 'Ale',
+      mine: true,
+      body: body,
+      image: photo == null ? null : 'https://cdn.test/consultas/$id/chat/${photo.filename}',
+      createdAt: '2026-11-25T18:00:${n.toString().padLeft(2, '0')}.000Z',
+    );
+    chat.add(json);
+    return ChatMessage.fromJson(json);
   }
 }
 
@@ -185,8 +241,8 @@ void main() {
       // Chips con su cuenta; "Abiertas" es el filtro inicial.
       for (final chip in [
         'Abiertas (2)',
-        'Sin responder (1)',
-        'Respondidas (1)',
+        'Sin cotizar (1)',
+        'Cotizadas (1)',
         'Confirmadas (1)',
         'No se hicieron (1)',
         'Todas (4)',
@@ -199,8 +255,8 @@ void main() {
       expect(find.text('Carla Gómez'), findsNWidgets(2));
       expect(find.text('+54 9 11 2345-6789'), findsNWidgets(2));
       expect(find.textContaining('Cargó Antonella · '), findsNWidgets(2));
-      expect(find.text('Sin responder'), findsOneWidget);
-      expect(find.text('Respondida'), findsOneWidget);
+      expect(find.text('Sin cotizar'), findsOneWidget);
+      expect(find.text('Cotizada · espera seña'), findsOneWidget);
       expect(find.text('Con el escudo del club, de 5 cm.'), findsNWidgets(2));
       expect(find.byType(NetImage), findsOneWidget);
       // Los adjuntos que no son fotos, debajo de las fotos.
@@ -236,7 +292,7 @@ void main() {
       expect(find.text('Reabrir'), findsNothing, reason: 'ya generó un pedido');
       expect(find.text('Adjuntar'), findsNothing, reason: 'cerrada: no se adjunta más');
 
-      // Una confirmada vieja, sin pedido, sí se puede reabrir.
+      // Una confirmada nunca se reabre, tampoco una vieja sin pedido.
       await openList(
         tester,
         'consultas_confirmada_sin_pedido',
@@ -246,7 +302,51 @@ void main() {
       );
       await tapShown(tester, find.text('Confirmadas (1)'));
       expect(find.text('Confirmada'), findsOneWidget);
-      expect(find.text('Reabrir'), findsOneWidget);
+      expect(find.text('Reabrir'), findsNothing);
+    });
+
+    testWidgets('cotizada: "Pedido pendiente de pago" con el total, y el mensaje para mandar', (tester) async {
+      await openList(tester, 'consultas_pendiente_de_pago', who: atencion);
+      expect(find.text('Pedido pendiente de pago'), findsOneWidget, reason: 'solo en la cotizada (c2)');
+      expect(find.text(r'Total del pedido: $30.000'), findsOneWidget);
+      expect(find.text('Cotizada · espera seña'), findsOneWidget);
+      expect(find.text('Copiar mensaje'), findsOneWidget);
+      expect(find.text('WhatsApp'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Señó · Confirmar pedido'), findsOneWidget);
+
+      // Confirmada o descartada ya no espera el pago.
+      await tapShown(tester, find.text('Confirmadas (1)'));
+      expect(find.text('Pedido pendiente de pago'), findsNothing);
+    });
+
+    testWidgets('"No se hizo" con cotización avisa que se canceló el pedido pendiente', (tester) async {
+      final api = await openList(
+        tester,
+        'consultas_no_se_hizo_con_pedido',
+        who: atencion,
+        d: ConsultasData.fromJson({
+          'items': [answeredJson('p', saleId: 'sale-pend')],
+        }),
+      );
+      await tapShown(tester, find.widgetWithText(OutlinedButton, 'No se hizo'));
+      expect(api.moves.single, (id: 'p', to: InquiryMove.cancel));
+      expect(find.text('Quedó como "No se hizo" y se canceló el pedido pendiente'), findsOneWidget);
+    });
+
+    testWidgets('"No se hizo" con pedido (saleId) se puede reabrir', (tester) async {
+      final api = await openList(
+        tester,
+        'consultas_reabrir_con_pedido',
+        who: atencion,
+        d: ConsultasData.fromJson({
+          'items': [answeredJson('x', status: 'cancelled', saleId: 'sale-cancelada')],
+        }),
+      );
+      await tapShown(tester, find.text('No se hicieron (1)'));
+      expect(find.text('Pedido pendiente de pago'), findsNothing);
+      await tapShown(tester, find.text('Reabrir'));
+      expect(api.moves.single, (id: 'x', to: InquiryMove.reopen));
+      expect(find.text('Consulta reabierta'), findsOneWidget);
     });
 
     testWidgets('una sola unidad no lleva prefijo ni total', (tester) async {
@@ -323,10 +423,10 @@ void main() {
     testWidgets('atención al cliente: carga, confirma, descarta y reabre; no responde', (tester) async {
       final api = await openList(tester, 'consultas_atencion', who: atencion);
       expect(find.text('Nueva consulta'), findsOneWidget);
-      expect(find.text('Responder'), findsNothing);
-      expect(find.text('Cambiar respuesta'), findsNothing);
-      // "Confirmado" solo en la respondida; "No se hizo" en las dos abiertas.
-      expect(find.text('Confirmado'), findsOneWidget);
+      expect(find.text('Crear cotización'), findsNothing);
+      expect(find.text('Cambiar cotización'), findsNothing);
+      // "Señó · Confirmar pedido" solo en la cotizada; "No se hizo" en las dos abiertas.
+      expect(find.text('Señó · Confirmar pedido'), findsOneWidget);
       expect(find.text('No se hizo'), findsNWidgets(2));
       // La suya sin responder la puede borrar; la respondida de otro, no.
       expect(find.text('Eliminar'), findsOneWidget);
@@ -336,9 +436,11 @@ void main() {
 
       await tapShown(tester, find.text('No se hizo').first);
       expect(api.moves.last, (id: 'c1', to: InquiryMove.cancel));
+      // Sin cotizar no hay pedido que cancelar.
+      expect(find.text('Quedó como "No se hizo"'), findsOneWidget);
 
       await tapShown(tester, find.text('No se hicieron (1)'));
-      expect(find.text('Confirmado'), findsNothing);
+      expect(find.text('Señó · Confirmar pedido'), findsNothing);
       expect(find.widgetWithText(OutlinedButton, 'No se hizo'), findsNothing, reason: 'queda solo el rótulo del estado');
       await tapShown(tester, find.text('Reabrir'));
       expect(api.moves.last, (id: 'c4', to: InquiryMove.reopen));
@@ -348,9 +450,9 @@ void main() {
     testWidgets('operador: responde o cambia la respuesta; no carga ni cierra', (tester) async {
       await openList(tester, 'consultas_operador', who: operador);
       expect(find.text('Nueva consulta'), findsNothing);
-      expect(find.text('Responder'), findsOneWidget);
-      expect(find.text('Cambiar respuesta'), findsOneWidget);
-      expect(find.text('Confirmado'), findsNothing);
+      expect(find.text('Crear cotización'), findsOneWidget);
+      expect(find.text('Cambiar cotización'), findsOneWidget);
+      expect(find.text('Señó · Confirmar pedido'), findsNothing);
       expect(find.text('No se hizo'), findsNothing);
       // Quien responde puede adjuntar en las dos abiertas (un audio, un PDF).
       expect(find.text('Adjuntar'), findsNWidgets(2));
@@ -360,8 +462,8 @@ void main() {
 
       // Cerradas: ya no se responden.
       await tapShown(tester, find.text('Todas (4)'));
-      expect(find.text('Responder'), findsOneWidget);
-      expect(find.text('Cambiar respuesta'), findsOneWidget);
+      expect(find.text('Crear cotización'), findsOneWidget);
+      expect(find.text('Cambiar cotización'), findsOneWidget);
       expect(find.text('Reabrir'), findsNothing);
     });
 
@@ -392,12 +494,12 @@ void main() {
   group('confirmar crea el pedido', () {
     testWidgets('"Confirmado" abre la hoja: qué pedido se crea, cómo paga y los dos botones', (tester) async {
       final api = await openList(tester, 'consultas_confirmar_hoja', who: atencion);
-      await tapShown(tester, find.text('Confirmado'));
+      await tapShown(tester, find.text('Señó · Confirmar pedido'));
       expect(find.byType(ConfirmOrderSheet), findsOneWidget);
       expect(api.moves, isEmpty, reason: 'abrir la hoja todavía no confirma nada');
       expect(
-        find.text(r'Se va a crear el pedido de Carla Gómez: 12 × Llavero con logo, por $30.000. '
-            'Entra como confirmado a Pedidos y a la cola de impresión.'),
+        find.text(r'El cliente señó el pedido de Carla Gómez: 12 × Llavero con logo, por $30.000. '
+            'El pedido pasa a confirmado y entra a la cola de impresión.'),
         findsOneWidget,
       );
       expect(find.text('¿CÓMO PAGA?'), findsOneWidget);
@@ -405,7 +507,7 @@ void main() {
         expect(find.widgetWithText(ChoiceChip, m), findsOneWidget);
       }
       expect(tester.widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Transferencia')).selected, isTrue);
-      expect(find.widgetWithText(GoldButton, 'Confirmar y crear pedido'), findsOneWidget);
+      expect(find.widgetWithText(GoldButton, 'Confirmar pedido'), findsOneWidget);
 
       // "Todavía no" cierra sin tocar nada.
       await tester.tap(find.text('Todavía no'));
@@ -416,21 +518,21 @@ void main() {
 
     testWidgets('confirma con transferencia por defecto y avisa que el pedido está en Pedidos', (tester) async {
       final api = await openList(tester, 'consultas_confirmar', who: atencion);
-      await tapShown(tester, find.text('Confirmado'));
-      await tester.tap(find.widgetWithText(GoldButton, 'Confirmar y crear pedido'));
+      await tapShown(tester, find.text('Señó · Confirmar pedido'));
+      await tester.tap(find.widgetWithText(GoldButton, 'Confirmar pedido'));
       await settle(tester);
       expect(api.moves.single, (id: 'c2', to: InquiryMove.confirm));
       expect(api.paidWith, 'transfer');
       expect(find.byType(ConfirmOrderSheet), findsNothing);
-      expect(find.text('Confirmada: el pedido ya está en Pedidos'), findsOneWidget);
+      expect(find.text('Confirmado: el pedido pasó a producción'), findsOneWidget);
     });
 
     testWidgets('se elige otro medio de pago', (tester) async {
       final api = await openList(tester, 'consultas_confirmar_efectivo', who: atencion);
-      await tapShown(tester, find.text('Confirmado'));
+      await tapShown(tester, find.text('Señó · Confirmar pedido'));
       await tester.tap(find.widgetWithText(ChoiceChip, 'Efectivo'));
       await tester.pump();
-      await tester.tap(find.widgetWithText(GoldButton, 'Confirmar y crear pedido'));
+      await tester.tap(find.widgetWithText(GoldButton, 'Confirmar pedido'));
       await settle(tester);
       expect(api.paidWith, 'cash');
     });
@@ -444,7 +546,7 @@ void main() {
           'items': [answeredJson('u', quantity: 1)],
         }),
       );
-      await tapShown(tester, find.text('Confirmado'));
+      await tapShown(tester, find.text('Señó · Confirmar pedido'));
       expect(find.textContaining(r'1 × Llavero con logo, por $2.500.'), findsOneWidget);
     });
 
@@ -452,12 +554,12 @@ void main() {
       const msg = 'A la respuesta le falta el costo por unidad. Pedile al operador que la complete.';
       final api = FakeConsultasApi()..failWith = ApiException('invalid', msg);
       await openList(tester, 'consultas_confirmar_error', who: atencion, api: api);
-      await tapShown(tester, find.text('Confirmado'));
-      await tester.tap(find.widgetWithText(GoldButton, 'Confirmar y crear pedido'));
+      await tapShown(tester, find.text('Señó · Confirmar pedido'));
+      await tester.tap(find.widgetWithText(GoldButton, 'Confirmar pedido'));
       await settle(tester);
       expect(find.text(msg), findsOneWidget);
       expect(find.byType(ConfirmOrderSheet), findsOneWidget);
-      expect(find.text('Confirmada: el pedido ya está en Pedidos'), findsNothing);
+      expect(find.text('Confirmado: el pedido pasó a producción'), findsNothing);
     });
 
     test('al confirmar se refrescan las consultas y todo lo de ventas', () {
@@ -675,7 +777,9 @@ void main() {
 
     testWidgets('consulta sin mensaje: precio con calculadora, sin campo de costo', (tester) async {
       await openAnswer(tester, 'consulta_responder', pending);
-      expect(find.text('Responder'), findsOneWidget);
+      // El título de la pantalla y el botón de guardar.
+      expect(find.text('Crear cotización'), findsNWidgets(2));
+      expect(find.widgetWithText(GoldButton, 'Crear cotización'), findsOneWidget);
       expect(find.text('12 × Llavero con logo'), findsOneWidget);
       for (final label in [
         r'Precio por unidad ($)',
@@ -740,7 +844,7 @@ void main() {
         findsOneWidget,
       );
 
-      await tapShown(tester, find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tapShown(tester, saveQuote);
       expect(api.answered!.draft.toJson(), {
         'unitPrice': 18000,
         'unitCost': null,
@@ -777,7 +881,7 @@ void main() {
       expect(fieldText(tester, r'Precio por unidad ($)'), '2.500');
       expect(fieldText(tester, 'Medidas'), isEmpty);
       expect(find.text(helpWithout), findsOneWidget);
-      await tapShown(tester, find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tapShown(tester, saveQuote);
       expect(api.answered, isNull);
     });
 
@@ -793,7 +897,7 @@ void main() {
     testWidgets('sin precio ni cálculo marca los errores y no llama al servidor', (tester) async {
       final api = await openAnswer(tester, 'consulta_responder_errores', pending);
       await tester.enterText(find.widgetWithText(TextField, 'Precio por unidad comprando más'), '2.000');
-      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tester.tap(saveQuote);
       await settle(tester);
       expect(find.text('Poné el precio por unidad.'), findsOneWidget);
       expect(find.text('Calculá el precio con la calculadora: así queda guardado el costo del pedido.'), findsOneWidget);
@@ -805,7 +909,7 @@ void main() {
     testWidgets('precio tipeado a mano pero sin calcular: no se guarda', (tester) async {
       final api = await openAnswer(tester, 'consulta_responder_sin_calculo', pending);
       await tester.enterText(find.widgetWithText(TextField, r'Precio por unidad ($)'), '2500');
-      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tester.tap(saveQuote);
       await settle(tester);
       expect(find.text('Calculá el precio con la calculadora: así queda guardado el costo del pedido.'), findsOneWidget);
       expect(api.answered, isNull);
@@ -853,7 +957,7 @@ void main() {
       await tester.enterText(find.widgetWithText(TextField, 'Medidas'), '5 × 5 cm');
       await tester.enterText(find.widgetWithText(TextField, 'Colores'), 'negro, dorado');
       await tester.enterText(find.widgetWithText(TextField, 'Nota'), 'Con argolla incluida.');
-      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tester.tap(saveQuote);
       await settle(tester);
 
       expect(api.answered!.id, 'c1');
@@ -873,7 +977,7 @@ void main() {
         'message': null,
       });
       // El resultado: el mensaje que armó el servidor, listo para mandar.
-      expect(find.text('Respuesta guardada'), findsOneWidget);
+      expect(find.text('Cotización creada'), findsOneWidget);
       expect(find.textContaining('Te paso la cotización'), findsOneWidget);
       expect(find.textContaining('atención al cliente le va a mandar a Carla Gómez'), findsOneWidget);
       expect(find.text('Copiar mensaje'), findsOneWidget);
@@ -885,7 +989,7 @@ void main() {
       final api = await openAnswer(tester, 'consulta_responder_ajuste', pending);
       await calculate(tester);
       await tester.enterText(find.widgetWithText(TextField, r'Precio por unidad ($)'), '3.000');
-      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tester.tap(saveQuote);
       await settle(tester);
       expect(api.answered!.draft.unitPrice, 3000);
       expect(api.answered!.draft.calc!.grams, 18.5, reason: 'el costo sigue saliendo de lo calculado');
@@ -909,7 +1013,7 @@ void main() {
       await tester.enterText(find.widgetWithText(TextField, r'Precio por las 12 ($)'), '36.000');
       await tester.pump();
       expect(find.text(r'$3.000 c/u · $36.000 por las 12'), findsOneWidget);
-      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tester.tap(saveQuote);
       await settle(tester);
       expect(api.answered!.draft.unitPrice, 3000);
       // Y de vuelta a "Por unidad" antes de guardar daría lo mismo.
@@ -927,7 +1031,7 @@ void main() {
       final api = await openAnswer(tester, 'consulta_responder_a_mano', pending);
       await calculate(tester);
       await tester.enterText(find.widgetWithText(TextField, 'Mensaje para el cliente'), 'Hola Carla, sale 2900 cada uno.');
-      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tester.tap(saveQuote);
       await settle(tester);
       expect(api.answered!.draft.message, 'Hola Carla, sale 2900 cada uno.');
       expect(find.text('Hola Carla, sale 2900 cada uno.'), findsOneWidget, reason: 'el resultado muestra lo que quedó');
@@ -935,7 +1039,8 @@ void main() {
 
     testWidgets('respuesta vieja (costo a mano): no se muestra el costo y se reenvía tal cual', (tester) async {
       final api = await openAnswer(tester, 'consulta_cambiar_respuesta', answered);
-      expect(find.text('Cambiar respuesta'), findsOneWidget);
+      expect(find.text('Cambiar cotización'), findsNWidgets(2));
+      expect(find.widgetWithText(GoldButton, 'Cambiar cotización'), findsOneWidget);
       expect(messageText(tester), sampleMessage);
       expect(find.textContaining('Si no lo tocás, se vuelve a armar solo'), findsOneWidget);
       // Vienen cargados los datos de la respuesta anterior.
@@ -949,7 +1054,7 @@ void main() {
 
       api.builtMessage = 'Mensaje rearmado con \$3.000';
       await tester.enterText(find.widgetWithText(TextField, r'Precio por unidad ($)'), '3.000');
-      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tester.tap(saveQuote);
       await settle(tester);
       final json = api.answered!.draft.toJson();
       expect(json['unitPrice'], 3000);
@@ -963,7 +1068,7 @@ void main() {
     testWidgets('respuesta vieja recalculada: deja de mandar el costo a mano', (tester) async {
       final api = await openAnswer(tester, 'consulta_cambiar_recalculada', answered);
       await calculate(tester);
-      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tester.tap(saveQuote);
       await settle(tester);
       final json = api.answered!.draft.toJson();
       expect(json['unitCost'], isNull);
@@ -987,7 +1092,7 @@ void main() {
       expect(fieldText(tester, r'Precio por unidad ($)'), '2.500');
       // Guardar sin recalcular manda de nuevo lo calculado antes.
       await tester.enterText(find.widgetWithText(TextField, 'Demora'), '7 días');
-      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tester.tap(saveQuote);
       await settle(tester);
       final json = api.answered!.draft.toJson();
       expect(json['unitCost'], isNull);
@@ -1039,7 +1144,7 @@ void main() {
         find.widgetWithText(TextField, 'Mensaje para el cliente'),
         '$sampleMessage\n\n¡Gracias por escribirnos!',
       );
-      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tester.tap(saveQuote);
       await settle(tester);
       expect(api.answered!.draft.message, '$sampleMessage\n\n¡Gracias por escribirnos!');
     });
@@ -1048,25 +1153,26 @@ void main() {
       final api = await openAnswer(tester, 'consulta_responder_error', pending);
       api.failWith = ApiException('invalid', 'Esta consulta ya está cerrada. Reabrila para cambiar la respuesta.');
       await calculate(tester);
-      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tester.tap(saveQuote);
       await settle(tester);
       expect(find.text('Esta consulta ya está cerrada. Reabrila para cambiar la respuesta.'), findsOneWidget);
-      expect(find.text('Respuesta guardada'), findsNothing);
+      expect(find.text('Cotización creada'), findsNothing);
     });
 
-    testWidgets('desde el listado: "Responder" abre el formulario y "Listo" vuelve', (tester) async {
+    testWidgets('desde el listado: "Crear cotización" abre el formulario y "Listo" vuelve con el aviso', (tester) async {
       calcApi = FakeEstimatorApi();
       final api = await openList(tester, 'consultas_responder_camino', who: operador, extra: estimatorOverrides(calcApi));
-      await tapShown(tester, find.text('Responder'));
+      await tapShown(tester, find.text('Crear cotización'));
       expect(find.byType(ConsultaAnswerScreen), findsOneWidget);
       await calculate(tester);
-      await tester.tap(find.widgetWithText(GoldButton, 'Guardar respuesta'));
+      await tester.tap(saveQuote);
       await settle(tester);
       expect(api.answered!.id, 'c1');
       await tester.tap(find.widgetWithText(GoldButton, 'Listo'));
       await settle(tester);
       expect(find.byType(ConsultaAnswerScreen), findsNothing);
       expect(find.byType(AdminConsultasScreen), findsOneWidget);
+      expect(find.text('Cotización creada: el pedido quedó pendiente de pago'), findsOneWidget);
     });
   });
 
@@ -1188,7 +1294,7 @@ void main() {
           mode: mode,
           me: me,
         );
-        expect(find.text('Guardar respuesta'), findsOneWidget);
+        expect(saveQuote, findsOneWidget);
         await showScreen(
           tester,
           'consulta_form_${mode.name}_360',

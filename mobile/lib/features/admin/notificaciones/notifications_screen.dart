@@ -14,7 +14,7 @@ import 'notifications_models.dart';
 IconData _kindIcon(String kind) => switch (kind) {
       'inquiry' || 'inquiry_answered' || 'inquiry_confirmed' => Icons.forum_rounded,
       'order' => Icons.receipt_long_rounded,
-      'message' => Icons.chat_bubble_rounded,
+      'message' || 'inquiry_message' => Icons.chat_bubble_rounded,
       'low_stock' => Icons.warning_amber_rounded,
       'fix' => Icons.build_rounded,
       'calc_preset' => Icons.calculate_rounded,

@@ -9,6 +9,11 @@ import {
 import { deleteObject, storeImage, uploadObject } from "@/core/storage";
 import { notifyAdmins } from "@/features/notifications/service";
 import { registerManualSale } from "@/features/orders/manual-sale-flow";
+import {
+  deleteManualSale,
+  getManualSale,
+  updateManualSaleStatus,
+} from "@/features/orders/services/manualSaleService";
 import { formatQuoteMoney } from "@/features/quotes/build-quote";
 import { getQuoteDefaults } from "@/features/quotes/service";
 import { buildInquiryMessage } from "./message";
@@ -112,9 +117,113 @@ export async function addInquiryImage(
   return url;
 }
 
+/** Hoy en Argentina, como lo manda el formulario de ventas (AAAA-MM-DD). */
+function todayAr(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Argentina/Buenos_Aires",
+  }).format(new Date());
+}
+
+/** Lo que hace falta de una consulta cotizada para armar su pedido. */
+type Quoted = {
+  customerName: string;
+  title: string;
+  quantity: number;
+  unitPrice: number;
+  unitCost: number | null;
+  filamentId: string | null;
+  material: string | null;
+  grams: number;
+  printMinutes: number;
+};
+
+/** ¿Alcanza lo cargado para costear el pedido? */
+function quoteHasCost(q: Quoted): { fromCalc: boolean; ok: boolean } {
+  const fromCalc =
+    (q.filamentId != null || q.material != null) &&
+    (q.grams > 0 || q.printMinutes > 0);
+  return {
+    fromCalc,
+    ok: q.unitPrice > 0 && (fromCalc || (q.unitCost ?? 0) > 0),
+  };
+}
+
 /**
- * Respuesta del operador: guarda el precio y los datos, y deja armado el
- * mensaje para el cliente (el que escribió el operador, o el automático).
+ * Crea el pedido de una consulta cotizada. El costo lo resuelve el servidor
+ * desde lo que cargó el operador en la calculadora (filamento + gramos +
+ * minutos), igual que una venta cargada a mano; si cargó el costo a mano, va
+ * ese. En "pendiente de pago" no descuenta filamento: eso pasa al confirmar.
+ */
+async function createInquirySale(
+  q: Quoted,
+  status: "pending_payment" | "confirmed",
+  paymentMethod: InquiryPaymentMethod,
+  actor: Actor,
+) {
+  const { fromCalc, ok } = quoteHasCost(q);
+  if (!ok) {
+    throw new ValidationError(
+      "A la cotización le falta el cálculo del costo. Calculá el precio con la calculadora y volvé a crearla.",
+    );
+  }
+  return registerManualSale({
+    input: {
+      saleDate: todayAr(),
+      customerName: q.customerName,
+      detail: q.title.slice(0, 300),
+      quantity: q.quantity,
+      total: q.unitPrice * q.quantity,
+      paymentMethod,
+      status,
+      ...(fromCalc
+        ? {
+            filamentId: q.filamentId ?? undefined,
+            material: q.material ?? undefined,
+            grams: q.grams,
+            printMinutes: q.printMinutes,
+          }
+        : {}),
+    },
+    actorId: actor.id,
+    ...(fromCalc ? {} : { manualCost: (q.unitCost ?? 0) * q.quantity }),
+  });
+}
+
+/** Los números de una consulta ya cotizada (lo que guardó el operador). */
+function quotedOf(row: repo.Inquiry): Quoted {
+  return {
+    customerName: row.customerName,
+    title: row.title,
+    quantity: row.quantity,
+    unitPrice: Number(row.unitPrice),
+    unitCost: row.unitCost == null ? null : Number(row.unitCost),
+    filamentId: row.estFilamentId,
+    material: row.estMaterial,
+    grams: Number(row.estGrams ?? 0),
+    printMinutes: row.estMinutes ?? 0,
+  };
+}
+
+/** Borra el pedido de una cotización SOLO si sigue sin cobrarse. */
+async function dropPendingSale(saleId: string | null): Promise<void> {
+  if (!saleId) return;
+  const sale = await getManualSale(saleId);
+  if (!sale) return;
+  if (sale.status === "pending_payment" || sale.status === "cancelled") {
+    await deleteManualSale(saleId);
+  }
+}
+
+/**
+ * "Crear cotización" (pedido de Ale, 2026-11-25): el operador, con la pieza ya
+ * modelada y el precio calculado, guarda la cotización. Queda armado el
+ * mensaje para el cliente (el que escribió el operador, o el automático) y se
+ * crea SOLO el pedido en "pendiente de pago", que ya se ve en Pedidos. La
+ * vendedora copia o manda el mensaje y, cuando el cliente seña, lo confirma.
+ *
+ * Volver a cotizar reemplaza el pedido pendiente por uno con los números
+ * nuevos. El pedido se crea ANTES de guardar la cotización: si el costo no se
+ * puede calcular, no queda nada a medias.
  */
 export async function answerInquiry(
   id: string,
@@ -134,7 +243,23 @@ export async function answerInquiry(
       { title: before.title, quantity: before.quantity, ...input },
       await getQuoteDefaults(),
     );
-  const row = await repo.saveInquiryAnswer(id, {
+  const sale = await createInquirySale(
+    {
+      customerName: before.customerName,
+      title: before.title,
+      quantity: before.quantity,
+      unitPrice: input.unitPrice,
+      unitCost: input.unitCost,
+      filamentId: input.filamentId,
+      material: input.material,
+      grams: input.grams ?? 0,
+      printMinutes: input.printMinutes ?? 0,
+    },
+    "pending_payment",
+    "transfer",
+    actor,
+  );
+  const saved = await repo.saveInquiryAnswer(id, {
     unitPrice: input.unitPrice,
     unitCost: input.unitCost,
     estFilamentId: input.filamentId,
@@ -151,42 +276,50 @@ export async function answerInquiry(
     answeredBy: actor.id,
     answeredByName: actor.name,
   });
-  if (!row) {
+  if (!saved) {
+    await deleteManualSale(sale.id).catch(() => undefined);
     throw new ValidationError("La consulta cambió. Actualizá la página.");
+  }
+  const row = (await repo.setInquirySale(id, sale.id)) ?? saved;
+  // La cotización anterior (si había) deja de valer: se va su pedido pendiente.
+  if (before.saleId && before.saleId !== sale.id) {
+    await dropPendingSale(before.saleId).catch((error) =>
+      console.error("[consultas] no se pudo quitar el pedido anterior:", error),
+    );
   }
   await recordAudit({
     actorId: actor.id,
     action: "inquiry.answered",
     entityType: "inquiry",
     entityId: id,
-    metadata: { title: row.title, unitPrice: input.unitPrice },
+    metadata: {
+      title: row.title,
+      unitPrice: input.unitPrice,
+      saleId: sale.id,
+    },
   });
   await notify(
     "inquiry_answered",
-    "Consulta respondida",
+    "Cotización lista · pendiente de pago",
     `${row.title} — ${formatQuoteMoney(input.unitPrice)}${row.quantity > 1 ? " c/u" : ""} · ${row.customerName}`,
     actor,
   );
   revalidatePath(PAGE);
+  revalidatePath("/admin/pedidos");
   return row;
 }
 
-/** Hoy en Argentina, como lo manda el formulario de ventas (AAAA-MM-DD). */
-function todayAr(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Argentina/Buenos_Aires",
-  }).format(new Date());
-}
-
 /**
- * Confirmar: la consulta pasa a confirmada Y se crea sola la venta en estado
- * "confirmado" (pedido de Ale, 2026-11-17: "que el pedido pase solo a pedido
- * confirmado"), así aparece en Pedidos y en la cola de impresión sin volver a
- * cargar nada. El precio y el costo son los que puso el operador al responder.
+ * Confirmar (el cliente señó): el pedido de la cotización pasa de "pendiente
+ * de pago" a "confirmado", entra a la cola de impresión y ahí se descuenta el
+ * filamento. Se elige cómo pagó.
+ *
+ * Las cotizaciones viejas (de antes del 2026-11-25) no tienen pedido: para
+ * esas se crea directo en "confirmado", como se hacía.
  *
  * Primero se TOMA la consulta (answered → confirmed en una sentencia) y recién
- * después se crea la venta: dos toques seguidos no pueden crear dos pedidos.
- * Si la venta falla, la consulta vuelve a "respondida".
+ * después se toca el pedido: dos toques seguidos no pueden confirmar dos
+ * veces. Si falla, la consulta vuelve a "cotizada".
  */
 async function confirmInquiry(
   id: string,
@@ -200,18 +333,10 @@ async function confirmInquiry(
       "Solo se puede confirmar una consulta que ya tiene respuesta.",
     );
   }
-  const unitPrice = Number(before.unitPrice);
-  const unitCost = Number(before.unitCost);
-  const grams = Number(before.estGrams ?? 0);
-  const minutes = before.estMinutes ?? 0;
-  // Lo calculado por el operador: el costo lo resuelve el servidor desde el
-  // filamento (y se descuenta su stock), igual que una venta cargada a mano.
-  const fromCalc =
-    (before.estFilamentId != null || before.estMaterial != null) &&
-    (grams > 0 || minutes > 0);
-  if (!(unitPrice > 0) || (!fromCalc && !(unitCost > 0))) {
+  const quoted = quotedOf(before);
+  if (!before.saleId && !quoteHasCost(quoted).ok) {
     throw new ValidationError(
-      "A la respuesta le falta el cálculo del costo. Pedile al operador que calcule el precio de nuevo y volvé a confirmar.",
+      "A la cotización le falta el cálculo del costo. Pedile al operador que la cree de nuevo y volvé a confirmar.",
     );
   }
   const claimed = await repo.claimInquiryConfirmation(id);
@@ -220,28 +345,19 @@ async function confirmInquiry(
   }
   let row = claimed;
   try {
-    const sale = await registerManualSale({
-      input: {
-        saleDate: todayAr(),
-        customerName: claimed.customerName,
-        detail: claimed.title.slice(0, 300),
-        quantity: claimed.quantity,
-        total: unitPrice * claimed.quantity,
+    if (before.saleId) {
+      // El pedido ya existe (se creó con la cotización): pasa a confirmado.
+      await repo.setSalePaymentMethod(before.saleId, paymentMethod);
+      await updateManualSaleStatus(before.saleId, "confirmed");
+    } else {
+      const sale = await createInquirySale(
+        quoted,
+        "confirmed",
         paymentMethod,
-        status: "confirmed",
-        ...(fromCalc
-          ? {
-              filamentId: before.estFilamentId ?? undefined,
-              material: before.estMaterial ?? undefined,
-              grams,
-              printMinutes: minutes,
-            }
-          : {}),
-      },
-      actorId: actor.id,
-      ...(fromCalc ? {} : { manualCost: unitCost * claimed.quantity }),
-    });
-    row = (await repo.setInquirySale(id, sale.id)) ?? claimed;
+        actor,
+      );
+      row = (await repo.setInquirySale(id, sale.id)) ?? claimed;
+    }
   } catch (error) {
     await repo.setInquiryStatus(id, "answered");
     throw error;
@@ -260,7 +376,7 @@ async function confirmInquiry(
   });
   await notify(
     "inquiry_confirmed",
-    "Consulta CONFIRMADA → pedido creado",
+    "Consulta CONFIRMADA → pedido a producción",
     `${row.title}${times(row.quantity)} — ${row.customerName}`,
     actor,
   );
@@ -279,16 +395,40 @@ export async function changeInquiryStatus(
   if (to === "confirmed") return confirmInquiry(id, paymentMethod, actor);
   const before = await repo.findInquiryById(id);
   if (!before) throw new NotFoundError("La consulta ya no existe.");
-  if (to === "reopen" && before.saleId) {
-    // El pedido ya existe: reabrir y volver a confirmar lo duplicaría.
+  if (to === "reopen" && before.saleId && before.status === "confirmed") {
+    // El pedido ya está confirmado: reabrir y volver a confirmar lo duplicaría.
     throw new ValidationError(
       "Esta consulta ya generó un pedido. Si hay que cambiar algo, editá el pedido.",
     );
   }
   const next = to === "reopen" ? (before.message ? "answered" : "pending") : to;
   if (next === before.status) return before;
+  // El pedido pendiente acompaña a la cotización: si no se hizo, se cancela;
+  // si se reabre, vuelve a esperar el pago.
+  if (before.saleId && next === "cancelled") {
+    await updateManualSaleStatus(
+      before.saleId,
+      "cancelled",
+      "La consulta no se hizo",
+    );
+  }
+  if (before.saleId && next === "answered") {
+    const sale = await getManualSale(before.saleId);
+    if (!sale || sale.status === "cancelled") {
+      // Cancelado es un estado final: se arma de nuevo el pedido pendiente.
+      if (sale) await deleteManualSale(before.saleId);
+      const fresh = await createInquirySale(
+        quotedOf(before),
+        "pending_payment",
+        "transfer",
+        actor,
+      );
+      await repo.setInquirySale(id, fresh.id);
+    }
+  }
   const row = await repo.setInquiryStatus(id, next);
   if (!row) throw new NotFoundError("La consulta ya no existe.");
+  revalidatePath("/admin/pedidos");
   await recordAudit({
     actorId: actor.id,
     action: "inquiry.status_changed",
@@ -348,8 +488,18 @@ export async function deleteInquiry(
   if (!row) return;
   const ownPending = row.createdBy === actor.id && row.status === "pending";
   if (!canDelete && !ownPending) throw new UnauthorizedError();
+  // Una cotización sin cobrar no deja un pedido huérfano en Pedidos. Un pedido
+  // ya confirmado NO se toca: es una venta real.
+  if (row.status !== "confirmed") {
+    await dropPendingSale(row.saleId).catch(() => undefined);
+  }
+  const chatImages = await repo.listInquiryChatImages(id).catch(() => []);
   await repo.deleteInquiryRow(id);
-  for (const url of [...row.images, ...row.files.map((f) => f.url)]) {
+  for (const url of [
+    ...row.images,
+    ...row.files.map((f) => f.url),
+    ...chatImages,
+  ]) {
     const path = storagePath(url);
     if (path) await deleteObject(BUCKET, path).catch(() => undefined);
   }

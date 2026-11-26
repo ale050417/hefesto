@@ -12,8 +12,9 @@ export const INQUIRY_STATUSES = [
 export type InquiryStatus = (typeof INQUIRY_STATUSES)[number];
 
 export const INQUIRY_STATUS_LABEL: Record<InquiryStatus, string> = {
-  pending: "Sin responder",
-  answered: "Respondida",
+  pending: "Sin cotizar",
+  // Con la cotización se crea el pedido en "pendiente de pago" (2026-11-25).
+  answered: "Cotizada · espera seña",
   confirmed: "Confirmada",
   cancelled: "No se hizo",
 };
@@ -142,3 +143,14 @@ export const inquiryStatusSchema = z.object({
 });
 export type InquiryStatusChange = z.infer<typeof inquiryStatusSchema>["to"];
 export type InquiryPaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+/** Chat de la consulta: largo máximo de un mensaje. */
+export const MAX_CHAT_BODY = 2000;
+
+export const chatMessageSchema = z.object({
+  body: z
+    .string()
+    .trim()
+    .max(MAX_CHAT_BODY, `Máximo ${MAX_CHAT_BODY} caracteres.`)
+    .default(""),
+});

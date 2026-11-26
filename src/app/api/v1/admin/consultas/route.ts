@@ -1,7 +1,7 @@
 import { apiOk, requireApiPerm, withApi } from "@/core/api/respond";
 import { apiActor } from "@/core/api/upload";
 import { createInquiry } from "@/features/consultas/flow";
-import { listInquiries } from "@/features/consultas/queries";
+import { chatSummaries, listInquiries } from "@/features/consultas/queries";
 import {
   INQUIRY_STATUS_LABEL,
   MAX_INQUIRY_FILES,
@@ -24,9 +24,17 @@ export const dynamic = "force-dynamic";
 export const GET = withApi("admin/consultas", async (request: Request) => {
   const auth = await requireApiPerm(request, "consultas", "ver");
   if ("response" in auth) return auth.response;
-  const rows = await listInquiries();
+  const [rows, chats] = await Promise.all([
+    listInquiries(),
+    // El chat es un agregado: si falla, la lista igual sale (sin numeritos).
+    chatSummaries(auth.user.id).catch(
+      () => new Map<string, { messages: number; unread: number }>(),
+    ),
+  ]);
   return apiOk({
-    items: rows.map((r) => toInquiryView(r, auth.user.id)),
+    // Cada consulta trae `chatMessages` y `chatUnread` (mensajes del chat y
+    // cuántos le faltan leer a quien consulta).
+    items: rows.map((r) => toInquiryView(r, auth.user.id, chats.get(r.id))),
     statuses: INQUIRY_STATUS_LABEL,
     maxImages: MAX_INQUIRY_IMAGES,
     maxFiles: MAX_INQUIRY_FILES,

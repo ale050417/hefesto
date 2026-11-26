@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Modal } from "@/components/ui/modal";
@@ -28,13 +29,14 @@ import {
 import type { InquiryView } from "../view";
 import { AnswerForm } from "./answer-form";
 import { AttachButton } from "./attach";
+import { InquiryChat } from "./inquiry-chat";
 
 type Filter = "open" | InquiryStatus | "all";
 
 const FILTERS: Array<[Filter, string]> = [
   ["open", "Abiertas"],
-  ["pending", "Sin responder"],
-  ["answered", "Respondidas"],
+  ["pending", "Sin cotizar"],
+  ["answered", "Cotizadas"],
   ["confirmed", "Confirmadas"],
   ["cancelled", "No se hicieron"],
   ["all", "Todas"],
@@ -60,10 +62,13 @@ function matches(row: InquiryView, filter: Filter): boolean {
 
 /**
  * Lista de consultas. Las fechas llegan ya formateadas desde la página.
- * - Quien tiene "editar" (operador) responde con el precio.
- * - Quien tiene "crear" (atención al cliente) copia el mensaje armado, lo
- *   manda y después toca Confirmado: ahí se crea solo el pedido.
- * Todo (fotos, audios, respuesta, pedido) queda en la misma consulta.
+ * - Cada consulta tiene su CHAT (2026-11-25): la vendedora y el operador
+ *   conversan ahí, con fotos, hasta dejar definido el pedido.
+ * - Quien tiene "editar" (operador) crea la cotización: queda armado el
+ *   mensaje y se crea el pedido en "pendiente de pago".
+ * - Quien tiene "crear" (atención al cliente) copia o manda el mensaje y,
+ *   cuando el cliente seña, lo confirma: el pedido pasa a "confirmado".
+ * Todo (fotos, audios, chat, cotización, pedido) queda en la misma consulta.
  */
 export function InquiryList({
   inquiries,
@@ -87,6 +92,24 @@ export function InquiryList({
   const [answering, setAnswering] = useState<InquiryView | null>(null);
   const [deleting, setDeleting] = useState<InquiryView | null>(null);
   const [confirming, setConfirming] = useState<InquiryView | null>(null);
+  const [chatId, setChatId] = useState<string | null>(null);
+  // Chats que se abrieron en esta visita: su numerito de "sin leer" se va
+  // aunque la lista todavía no se haya vuelto a pedir.
+  const [readIds, setReadIds] = useState<Set<string>>(() => new Set());
+  const canChat = canAnswer || canManage;
+  const chatting = inquiries.find((r) => r.id === chatId) ?? null;
+  const router = useRouter();
+
+  // La lista se actualiza sola (mensajes nuevos, cotizaciones): cada 20 s con
+  // la pestaña visible y sin un formulario abierto encima.
+  const busyModal = !!answering || !!confirming || !!deleting;
+  useEffect(() => {
+    if (busyModal) return;
+    const timer = setInterval(() => {
+      if (!document.hidden) router.refresh();
+    }, 20_000);
+    return () => clearInterval(timer);
+  }, [router, busyModal]);
 
   const { deleteResource: removeInquiry } = useDeleteResource({
     action: (id: string) => deleteInquiryAction(id),
@@ -108,7 +131,11 @@ export function InquiryList({
     });
     if (!res.ok) return;
     toast(
-      to === "cancelled" ? "Marcada como no se hizo" : "Consulta reabierta",
+      to === "cancelled"
+        ? row.saleId
+          ? "Marcada como no se hizo: el pedido pendiente quedó cancelado"
+          : "Marcada como no se hizo"
+        : "Consulta reabierta",
       "success",
     );
   }
@@ -227,9 +254,9 @@ export function InquiryList({
                         <b className="text-fg">
                           {r.unitPrice != null
                             ? `${formatQuoteMoney(r.unitPrice)}${r.quantity > 1 ? ` c/u · total ${formatQuoteMoney(r.unitPrice * r.quantity)}` : ""}`
-                            : "Respuesta"}
+                            : "Cotización"}
                         </b>
-                        {r.answeredBy ? ` · respondió ${r.answeredBy}` : ""}
+                        {r.answeredBy ? ` · cotizó ${r.answeredBy}` : ""}
                         {r.answeredAt ? ` · ${r.answeredAt}` : ""}
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -253,6 +280,27 @@ export function InquiryList({
                     <pre className="[font-family:inherit] text-sm break-words whitespace-pre-wrap">
                       {r.message}
                     </pre>
+                  </div>
+                ) : null}
+
+                {r.status === "answered" && r.saleId ? (
+                  <div
+                    className="rounded-md px-3 py-2 text-sm"
+                    style={{
+                      background: "rgba(var(--gold-rgb), 0.1)",
+                      color: "var(--gold-bright)",
+                    }}
+                  >
+                    <b>Pedido pendiente de pago.</b> Mandale la cotización al
+                    cliente; cuando señe, tocá «Señó · Confirmar pedido».
+                    {canSeeOrders ? (
+                      <>
+                        {" "}
+                        <Link href="/admin/pedidos" className="underline">
+                          Ver en Pedidos
+                        </Link>
+                      </>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -284,7 +332,28 @@ export function InquiryList({
                   {open && (canManage || canAnswer) ? (
                     <AttachButton inquiryId={r.id} />
                   ) : null}
-                  {canManage && !open && !r.saleId ? (
+                  {canChat ? (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => {
+                        setChatId(r.id);
+                        setReadIds((s) => new Set(s).add(r.id));
+                      }}
+                    >
+                      💬 Chat
+                      {r.chatUnread > 0 && !readIds.has(r.id) ? (
+                        <span className="badge badge-danger">
+                          {r.chatUnread}
+                        </span>
+                      ) : r.chatMessages > 0 ? (
+                        <span className="text-faint">· {r.chatMessages}</span>
+                      ) : null}
+                    </button>
+                  ) : null}
+                  {canManage &&
+                  (r.status === "cancelled" ||
+                    (r.status === "confirmed" && !r.saleId)) ? (
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
@@ -314,8 +383,8 @@ export function InquiryList({
                       onClick={() => setAnswering(r)}
                     >
                       {r.status === "pending"
-                        ? "Responder"
-                        : "Cambiar respuesta"}
+                        ? "Crear cotización"
+                        : "Cambiar cotización"}
                     </button>
                   ) : null}
                   {canManage && r.status === "answered" ? (
@@ -324,7 +393,7 @@ export function InquiryList({
                       className="btn btn-primary btn-sm"
                       onClick={() => setConfirming(r)}
                     >
-                      Confirmado
+                      Señó · Confirmar pedido
                     </button>
                   ) : null}
                 </div>
@@ -333,6 +402,57 @@ export function InquiryList({
           })}
         </div>
       )}
+
+      {/* El chat va primero: la foto en grande y la cotización se abren
+          encima sin cerrarlo (no se pierde lo que se estaba escribiendo). */}
+      <Modal
+        open={!!chatting}
+        onClose={() => {
+          setChatId(null);
+          router.refresh();
+        }}
+        title={
+          chatting
+            ? `Chat · ${chatting.customerName} — ${chatting.quantity > 1 ? `${chatting.quantity} × ` : ""}${chatting.title}`
+            : "Chat"
+        }
+        size="lg"
+      >
+        {chatting ? (
+          <div className="flex flex-col gap-3">
+            <InquiryChat
+              key={chatting.id}
+              inquiryId={chatting.id}
+              onZoom={setZoom}
+            />
+            {canAnswer &&
+            (chatting.status === "pending" ||
+              chatting.status === "answered") ? (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] pt-3">
+                <span className="text-faint text-[12.5px]">
+                  {chatting.status === "pending"
+                    ? "¿Ya está todo definido y tenés el precio?"
+                    : "Ya tiene cotización: el pedido espera la seña."}
+                </span>
+                <button
+                  type="button"
+                  className={cn(
+                    "btn",
+                    chatting.status === "pending"
+                      ? "btn-primary"
+                      : "btn-secondary",
+                  )}
+                  onClick={() => setAnswering(chatting)}
+                >
+                  {chatting.status === "pending"
+                    ? "Crear cotización"
+                    : "Cambiar cotización"}
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal open={!!zoom} onClose={() => setZoom(null)} title="Foto" size="lg">
         {zoom ? (
@@ -358,7 +478,11 @@ export function InquiryList({
       <Modal
         open={!!answering}
         onClose={() => setAnswering(null)}
-        title="Responder consulta"
+        title={
+          answering?.status === "answered"
+            ? "Cambiar cotización"
+            : "Crear cotización"
+        }
         size="lg"
       >
         {answering && !estimator ? (
@@ -411,8 +535,8 @@ export function InquiryList({
 }
 
 /**
- * El cliente aceptó: se elige cómo paga y se crea solo el pedido en estado
- * confirmado (aparece en Pedidos y en la cola de impresión).
+ * El cliente señó: se elige cómo pagó y el pedido de la cotización pasa de
+ * "pendiente de pago" a confirmado (entra a la cola de impresión).
  */
 function ConfirmSale({
   inquiry,
@@ -431,10 +555,10 @@ function ConfirmSale({
     try {
       const res = await runAction(
         () => changeInquiryStatusAction(inquiry.id, "confirmed", method),
-        { label: "Creando el pedido…" },
+        { label: "Confirmando el pedido…" },
       );
       if (!res.ok) return;
-      toast("Confirmada: el pedido ya está en Pedidos", "success");
+      toast("Confirmado: el pedido pasó a producción", "success");
       onDone();
     } finally {
       setBusy(false);
@@ -444,10 +568,10 @@ function ConfirmSale({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm">
-        Se va a crear el pedido de <b>{inquiry.customerName}</b>:{" "}
+        El pedido de <b>{inquiry.customerName}</b> (
         {inquiry.quantity > 1 ? `${inquiry.quantity} × ` : ""}
-        {inquiry.title}, por <b>{formatQuoteMoney(total)}</b>. Entra como{" "}
-        <b>confirmado</b> a Pedidos y a la cola de impresión.
+        {inquiry.title}, <b>{formatQuoteMoney(total)}</b>) pasa de pendiente de
+        pago a <b>confirmado</b> y entra a la cola de impresión.
       </p>
       <div className="field">
         <label htmlFor="confirm-method">¿Cómo paga?</label>
@@ -479,7 +603,7 @@ function ConfirmSale({
           disabled={busy}
           onClick={() => void confirm()}
         >
-          Confirmar y crear pedido
+          Señó · Confirmar pedido
         </button>
       </div>
     </div>

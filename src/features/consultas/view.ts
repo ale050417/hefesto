@@ -33,8 +33,11 @@ export type InquiryView = {
   createdAt: string;
   answeredAt: string | null;
   confirmedAt: string | null;
-  /** Pedido que se creó al confirmar. */
+  /** Pedido de la cotización (pendiente de pago hasta que el cliente seña). */
   saleId: string | null;
+  /** Chat de la consulta: mensajes en total y sin leer por quien mira. */
+  chatMessages: number;
+  chatUnread: number;
 };
 
 const num = (v: string | null) => (v == null ? null : Number(v));
@@ -42,6 +45,7 @@ const num = (v: string | null) => (v == null ? null : Number(v));
 export function toInquiryView(
   row: Inquiry,
   viewerId: string | null,
+  chat: { messages: number; unread: number } = { messages: 0, unread: 0 },
 ): InquiryView {
   return {
     id: row.id,
@@ -73,5 +77,7 @@ export function toInquiryView(
     answeredAt: row.answeredAt?.toISOString() ?? null,
     confirmedAt: row.confirmedAt?.toISOString() ?? null,
     saleId: row.saleId,
+    chatMessages: chat.messages,
+    chatUnread: chat.unread,
   };
 }

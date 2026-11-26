@@ -42,8 +42,12 @@ Map<String, dynamic> inquiryJson(
   String createdAt = '2026-11-16T14:00:00.000Z',
   String? answeredAt,
   String? confirmedAt,
+  int? chatMessages,
+  int? chatUnread,
 }) =>
     {
+      'chatMessages': ?chatMessages,
+      'chatUnread': ?chatUnread,
       'id': id,
       'customerName': customerName,
       'customerPhone': customerPhone,
@@ -89,9 +93,13 @@ Map<String, dynamic> answeredJson(
   String? confirmedAt,
   String? saleId,
   List<Map<String, dynamic>> files = const [],
+  int? chatMessages,
+  int? chatUnread,
 }) =>
     inquiryJson(
       id,
+      chatMessages: chatMessages,
+      chatUnread: chatUnread,
       status: status,
       quantity: quantity,
       customerPhone: customerPhone,
@@ -116,6 +124,18 @@ Map<String, dynamic> answeredJson(
       confirmedAt: confirmedAt,
     );
 
+/// Un mensaje del chat con la forma real de `ChatMessageView`
+/// (`/api/v1/admin/consultas/:id/messages`).
+Map<String, dynamic> chatMessageJson(
+  String id, {
+  String author = 'Lucas',
+  bool mine = false,
+  String body = '¿De qué tamaño lo quiere?',
+  String? image,
+  String createdAt = '2026-11-25T14:03:11.000Z',
+}) =>
+    {'id': id, 'author': author, 'mine': mine, 'body': body, 'image': image, 'createdAt': createdAt};
+
 /// JSON con la forma real de `GET /api/v1/admin/consultas`.
 Map<String, dynamic> consultasJson() => {
       'items': [
@@ -139,8 +159,8 @@ Map<String, dynamic> consultasJson() => {
         ),
       ],
       'statuses': {
-        'pending': 'Sin responder',
-        'answered': 'Respondida',
+        'pending': 'Sin cotizar',
+        'answered': 'Cotizada · espera seña',
         'confirmed': 'Confirmada',
         'cancelled': 'No se hizo',
       },
@@ -253,8 +273,8 @@ void main() {
     });
 
     test('rótulos, tope de fotos y filtros con sus cuentas', () {
-      expect(d.labelOf(InquiryStatus.pending), 'Sin responder');
-      expect(d.labelOf(InquiryStatus.answered), 'Respondida');
+      expect(d.labelOf(InquiryStatus.pending), 'Sin cotizar');
+      expect(d.labelOf(InquiryStatus.answered), 'Cotizada · espera seña');
       expect(d.labelOf(InquiryStatus.confirmed), 'Confirmada');
       expect(d.labelOf(InquiryStatus.cancelled), 'No se hizo');
       expect(d.maxImages, 6);
@@ -269,7 +289,7 @@ void main() {
       expect(d.count(InquiryFilter.cancelled), 1);
       expect(d.count(InquiryFilter.all), 4);
       expect(InquiryFilter.values.map((f) => f.label),
-          ['Abiertas', 'Sin responder', 'Respondidas', 'Confirmadas', 'No se hicieron', 'Todas']);
+          ['Abiertas', 'Sin cotizar', 'Cotizadas', 'Confirmadas', 'No se hicieron', 'Todas']);
     });
   });
 
@@ -615,6 +635,123 @@ void main() {
         ).keys,
         {'dimensions', 'colors', 'deliveryTime', 'message'},
       );
+    });
+  });
+
+  group('chat de la consulta', () {
+    test('la consulta trae cuántos mensajes tiene y cuántos sin leer', () {
+      final q = Consulta.fromJson(inquiryJson('c', chatMessages: 7, chatUnread: 3));
+      expect(q.chatMessages, 7);
+      expect(q.chatUnread, 3);
+    });
+
+    test('un servidor viejo no los manda: quedan en 0 y no rompe nada', () {
+      final q = Consulta.fromJson(inquiryJson('c'));
+      expect(q.chatMessages, 0);
+      expect(q.chatUnread, 0);
+      // Basura o negativos, también 0; como texto se entiende.
+      final odd = Consulta.fromJson({...inquiryJson('c'), 'chatMessages': 'x', 'chatUnread': -4});
+      expect((odd.chatMessages, odd.chatUnread), (0, 0));
+      final str = Consulta.fromJson({...inquiryJson('c'), 'chatMessages': '12', 'chatUnread': null});
+      expect((str.chatMessages, str.chatUnread), (12, 0));
+      // El listado entero sin esos campos se sigue leyendo.
+      expect(ConsultasData.fromJson(consultasJson()).items.every((i) => i.chatUnread == 0), isTrue);
+    });
+
+    test('ChatMessage lee un mensaje con texto, uno propio y uno que es solo una foto', () {
+      final m = ChatMessage.fromJson(chatMessageJson('m1'));
+      expect(m.id, 'm1');
+      expect(m.author, 'Lucas');
+      expect(m.mine, isFalse);
+      expect(m.body, '¿De qué tamaño lo quiere?');
+      expect(m.image, isNull);
+      expect(m.createdAt!.isAtSameMomentAs(DateTime.utc(2026, 11, 25, 14, 3, 11)), isTrue);
+      expect(m.createdAt!.isUtc, isFalse, reason: 'se muestra en hora local');
+
+      final mine = ChatMessage.fromJson(chatMessageJson('m2', author: 'Antonella', mine: true, body: 'Lo quiere de 12 cm'));
+      expect(mine.mine, isTrue);
+
+      final photo = ChatMessage.fromJson(chatMessageJson('m3', body: '', image: 'https://cdn.test/foto.webp'));
+      expect(photo.body, '');
+      expect(photo.image, 'https://cdn.test/foto.webp');
+    });
+
+    test('ChatMessage tolera datos faltantes o raros', () {
+      final m = ChatMessage.fromJson({'id': 'x'});
+      expect(m.author, 'Alguien del equipo');
+      expect(m.mine, isFalse);
+      expect(m.body, '');
+      expect(m.image, isNull);
+      expect(m.createdAt, isNull);
+      expect(ChatMessage.fromJson({'id': 'y', 'image': '', 'createdAt': 'ayer', 'mine': 'sí'}).image, isNull);
+    });
+
+    test('ChatPage: mensajes en orden, tope de letras y lo que no tiene id se descarta', () {
+      final page = ChatPage.fromJson({
+        'items': [
+          chatMessageJson('a'),
+          {'body': 'sin id'},
+          'basura',
+          chatMessageJson('b', mine: true),
+        ],
+        'maxLength': 1500,
+      });
+      expect(page.items.map((m) => m.id), ['a', 'b']);
+      expect(page.maxLength, 1500);
+      final empty = ChatPage.fromJson({});
+      expect(empty.items, isEmpty);
+      expect(empty.maxLength, 2000);
+      expect(ChatPage.fromJson({'maxLength': 0}).maxLength, 2000);
+    });
+
+    test('mergeChatMessages no repite y ordena por fecha', () {
+      ChatMessage msg(String id, String at) => ChatMessage.fromJson(chatMessageJson(id, createdAt: at));
+      final a = msg('a', '2026-11-25T14:00:00.000Z');
+      final b = msg('b', '2026-11-25T14:05:00.000Z');
+      final c = msg('c', '2026-11-25T14:02:00.000Z');
+      final current = [a, b];
+      // Nada nuevo: devuelve la misma lista.
+      expect(identical(mergeChatMessages(current, [a, b]), current), isTrue);
+      // Uno repetido y uno nuevo, más viejo que el último: queda en su lugar.
+      expect(mergeChatMessages(current, [b, c]).map((m) => m.id), ['a', 'c', 'b']);
+      // Repetido dentro de lo que llega.
+      expect(mergeChatMessages(const [], [a, a, b]).map((m) => m.id), ['a', 'b']);
+      // Sin fecha: al final, en el orden en que llegó.
+      final noDate = ChatMessage.fromJson({'id': 'z', 'body': 'sin fecha'});
+      expect(mergeChatMessages(current, [noDate]).map((m) => m.id), ['a', 'b', 'z']);
+    });
+  });
+
+  group('flujo de la cotización', () {
+    final d = ConsultasData.fromJson(consultasJson());
+
+    test('cotizada = espera la seña (pedido pendiente de pago)', () {
+      expect(d.items[0].awaitingDeposit, isFalse);
+      expect(d.items[1].awaitingDeposit, isTrue);
+      expect(d.items[2].awaitingDeposit, isFalse);
+      expect(d.items[3].awaitingDeposit, isFalse);
+      // El pedido ya existe desde la cotización.
+      final quoted = Consulta.fromJson(answeredJson('q', saleId: 'sale-pend'));
+      expect(quoted.hasOrder, isTrue);
+      expect(quoted.awaitingDeposit, isTrue);
+      expect(quoted.orderTotal, 30000);
+    });
+
+    test('se reabre solo lo que no se hizo, también si tiene pedido; nunca una confirmada', () {
+      expect(d.items[0].canReopen, isFalse);
+      expect(d.items[1].canReopen, isFalse);
+      expect(d.items[2].canReopen, isFalse);
+      expect(d.items[3].canReopen, isTrue);
+      expect(Consulta.fromJson(answeredJson('x', status: 'cancelled', saleId: 'sale-1')).canReopen, isTrue);
+      expect(Consulta.fromJson(answeredJson('y', status: 'confirmed')).canReopen, isFalse);
+    });
+
+    test('rótulos de la app si el servidor no manda los suyos', () {
+      final bare = ConsultasData.fromJson({'items': <dynamic>[]});
+      expect(bare.labelOf(InquiryStatus.pending), 'Sin cotizar');
+      expect(bare.labelOf(InquiryStatus.answered), 'Cotizada · espera seña');
+      expect(bare.labelOf(InquiryStatus.confirmed), 'Confirmada');
+      expect(bare.labelOf(InquiryStatus.cancelled), 'No se hizo');
     });
   });
 }

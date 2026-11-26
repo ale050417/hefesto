@@ -4,8 +4,10 @@ import { z } from "zod";
 import { getCurrentUser } from "@/core/auth/session";
 import { can } from "@/core/auth/permissions";
 import { type ActionResult, toActionError } from "@/core/errors";
+import { getChat, postChatMessage, type ChatMessageView } from "./chat";
 import * as flow from "./flow";
 import {
+  chatMessageSchema,
   inquiryAnswerSchema,
   inquiryCreateSchema,
   inquiryStatusSchema,
@@ -186,6 +188,78 @@ export async function deleteInquiryAction(id: string): Promise<ActionResult> {
       await can("consultas", "eliminar"),
     );
     return { ok: true };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+/* ---------- Chat de la consulta (2026-11-25) ---------- */
+
+/** Puede chatear quien carga consultas o quien las responde. */
+async function chatActor(): Promise<flow.Actor | null> {
+  const [create, edit] = await Promise.all([
+    can("consultas", "crear"),
+    can("consultas", "editar"),
+  ]);
+  if (!create && !edit) return null;
+  return currentActor();
+}
+
+/**
+ * Mensajes de la conversación; con `after` (fecha ISO del último que ya se
+ * tiene), solo los nuevos. Leerlos la marca como leída.
+ */
+export async function getInquiryChatAction(
+  id: string,
+  after?: string | null,
+): Promise<ActionResult<ChatMessageView[]>> {
+  const actor = await chatActor();
+  if (!actor) return NOT_STAFF;
+  const parsedId = idSchema.safeParse(id);
+  if (!parsedId.success) return invalid("Consulta inválida.");
+  const since = after ? new Date(after) : null;
+  try {
+    const data = await getChat(
+      parsedId.data,
+      actor,
+      since && !Number.isNaN(since.getTime()) ? since : null,
+    );
+    return { ok: true, data };
+  } catch (error) {
+    return { ok: false, error: toActionError(error) };
+  }
+}
+
+/** Manda un mensaje (FormData: inquiryId, body y, opcional, file = una foto). */
+export async function sendInquiryMessageAction(
+  formData: FormData,
+): Promise<ActionResult<ChatMessageView>> {
+  const actor = await chatActor();
+  if (!actor) return NOT_STAFF;
+  const id = idSchema.safeParse(formData.get("inquiryId"));
+  if (!id.success) return invalid("Consulta inválida.");
+  const body = chatMessageSchema.safeParse({
+    body: String(formData.get("body") ?? ""),
+  });
+  if (!body.success) {
+    return invalid(body.error.issues[0]?.message ?? "Revisá el mensaje.");
+  }
+  const file = formData.get("file");
+  let image: Buffer | null = null;
+  if (file instanceof File && file.size > 0) {
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      return invalid("Formato no permitido (JPG, PNG o WebP)");
+    }
+    if (file.size > MAX_BYTES) return invalid("La foto supera los 8 MB");
+    image = Buffer.from(await file.arrayBuffer());
+  }
+  try {
+    const data = await postChatMessage(
+      id.data,
+      { body: body.data.body, image },
+      actor,
+    );
+    return { ok: true, data };
   } catch (error) {
     return { ok: false, error: toActionError(error) };
   }

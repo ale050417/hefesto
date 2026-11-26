@@ -63,8 +63,33 @@ class ConsultasApi {
         await _api.sendJson('POST', '/admin/consultas/$id/answer', body: d.toJson()),
       );
 
-  /// Confirmar / no se hizo / reabrir. Confirmar crea el pedido (entra como
-  /// confirmado a Ventas y a la cola): por eso lleva cómo paga el cliente.
+  /// Chat de la consulta, el mensaje más viejo primero. Con [after] (la fecha
+  /// del último que ya se tiene) vuelven solo los nuevos. Leer marca la
+  /// conversación como leída para quien consulta.
+  Future<ChatPage> messages(String id, {DateTime? after}) async => ChatPage.fromJson(await _api.getJson(
+        '/admin/consultas/$id/messages',
+        query: {if (after != null) 'after': after.toUtc().toIso8601String()},
+      ));
+
+  /// Manda un mensaje al chat: texto, UNA foto (JPG/PNG/WebP de hasta 4 MB) o
+  /// las dos cosas. Con foto va como `multipart` (campo `file` + `body`).
+  Future<ChatMessage> sendMessage(String id, {String body = '', PickedPhoto? photo}) async {
+    final path = '/admin/consultas/$id/messages';
+    final text = body.trim();
+    final json = photo == null
+        ? await _api.sendJson('POST', path, body: {'body': text})
+        : await _api.uploadImage(
+            path,
+            bytes: photo.bytes,
+            filename: photo.filename,
+            fields: {if (text.isNotEmpty) 'body': text},
+          );
+    return ChatMessage.fromJson(json);
+  }
+
+  /// Confirmar / no se hizo / reabrir. El pedido ya existe desde la cotización
+  /// (pendiente de pago): confirmar lo pasa a confirmado y a la cola, por eso
+  /// lleva cómo paga el cliente; "no se hizo" lo cancela.
   Future<Consulta> move(String id, InquiryMove to, {String? paymentMethod}) async => Consulta.fromJson(
         await _api.sendJson('POST', '/admin/consultas/$id/status', body: {
           'to': to.api,
@@ -100,9 +125,10 @@ void invalidateConsultas(ProviderContainer container) {
   container.invalidate(consultasProvider);
 }
 
-/// Tras CONFIRMAR una consulta: además del listado, todo lo que muestra
-/// ventas, porque el servidor acaba de crear un pedido (inicio, Ventas, la
-/// cola de impresión y el stock: lo mismo que refresca `invalidateBoard`).
+/// Tras COTIZAR, CONFIRMAR, descartar o reabrir una consulta: además del
+/// listado, todo lo que muestra ventas, porque el servidor acaba de crear o
+/// mover un pedido (inicio, Ventas, la cola de impresión y el stock: lo mismo
+/// que refresca `invalidateBoard`).
 void invalidateConsultaConfirmed(ProviderContainer container) {
   invalidateConsultas(container);
   invalidateBoard(container);

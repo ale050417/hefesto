@@ -14,6 +14,7 @@ import {
  */
 export type AdminNotificationKind =
   | "inquiry"
+  | "inquiry_message"
   | "inquiry_answered"
   | "inquiry_confirmed"
   | "order"
@@ -39,15 +40,23 @@ export const ADMIN_NOTIFICATION_KINDS: KindDef[] = [
     module: "consultas",
   },
   {
+    key: "inquiry_message",
+    label: "Mensajes en consultas",
+    description:
+      "Cuando alguien del equipo escribe en el chat de una consulta.",
+    module: "consultas",
+  },
+  {
     key: "inquiry_answered",
-    label: "Consultas respondidas",
-    description: "Cuando el operador le pone precio a una consulta.",
+    label: "Cotizaciones listas",
+    description:
+      "Cuando el operador crea la cotización y el pedido queda pendiente de pago.",
     module: "consultas",
   },
   {
     key: "inquiry_confirmed",
     label: "Consultas confirmadas",
-    description: "Cuando una consulta se confirma y pasa a ser un pedido.",
+    description: "Cuando el cliente seña y el pedido pasa a confirmado.",
     module: "consultas",
   },
   {

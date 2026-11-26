@@ -7,7 +7,7 @@ import { getEstimatorContext } from "@/features/calculator/service";
 import { InquiryList } from "@/features/consultas/components/inquiry-list";
 import { NuevaConsultaButton } from "@/features/consultas/components/nueva-consulta-button";
 import { inquiryProduct } from "@/features/consultas/product-prefill";
-import { listInquiries } from "@/features/consultas/queries";
+import { chatSummaries, listInquiries } from "@/features/consultas/queries";
 import { toInquiryView } from "@/features/consultas/view";
 import { DEFAULT_QUOTE_DEFAULTS } from "@/features/quotes/build-quote";
 import { listProductsForSale } from "@/features/products/services/catalogService";
@@ -48,8 +48,16 @@ export default async function ConsultasPage() {
   const estimator = estimatorR?.value ?? null;
   const products = (productsR?.value ?? []).map(inquiryProduct);
 
+  const chats = (
+    await safeLoad(
+      "chat",
+      chatSummaries(user?.id ?? null),
+      new Map<string, { messages: number; unread: number }>(),
+    )
+  ).value;
+
   const rows = listR.value.map((row) => {
-    const v = toInquiryView(row, user?.id ?? null);
+    const v = toInquiryView(row, user?.id ?? null, chats.get(row.id));
     return {
       ...v,
       createdAt: fmt(v.createdAt) ?? "",
@@ -66,8 +74,8 @@ export default async function ConsultasPage() {
           <div className="eyebrow">Antes del pedido</div>
           <h1 className="page-title">Consultas</h1>
           <div className="page-sub">
-            Lo que pregunta la gente: se carga acá, el operador pone el precio y
-            sale el mensaje listo para mandar
+            Lo que pregunta la gente: se carga acá, se conversa con el operador
+            en el chat y, con la cotización, queda el pedido esperando la seña
           </div>
         </div>
         <NuevaConsultaButton />

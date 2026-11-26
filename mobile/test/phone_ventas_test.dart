@@ -35,6 +35,7 @@ import 'package:hefesto/features/admin/admin_shell.dart';
 import 'package:hefesto/features/admin/admin_widgets.dart';
 import 'package:hefesto/features/admin/calculadora/price_estimator_sheet.dart';
 import 'package:hefesto/features/admin/consultas/consulta_answer_screen.dart';
+import 'package:hefesto/features/admin/consultas/consulta_chat_screen.dart';
 import 'package:hefesto/features/admin/consultas/consulta_form_screen.dart';
 import 'package:hefesto/features/admin/consultas/consultas_api.dart';
 import 'package:hefesto/features/admin/consultas/consultas_models.dart';
@@ -53,8 +54,8 @@ import 'package:hefesto/features/admin/ventas_extra/ventas_extra_api.dart';
 import 'package:hefesto/features/admin/ventas_extra/ventas_extra_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show Session, User;
 
-import 'admin_consultas_models_test.dart' show answeredJson, inquiryJson;
-import 'admin_consultas_screens_test.dart' show FakeConsultasApi;
+import 'admin_consultas_models_test.dart' show answeredJson, chatMessageJson, inquiryJson;
+import 'admin_consultas_screens_test.dart' show FakeConsultasApi, saveQuote;
 import 'support/calc_kit.dart';
 import 'support/device_kit.dart';
 import 'support/notifications_kit.dart';
@@ -674,8 +675,8 @@ List<Map<String, dynamic>> _refFiles(String id, [int n = 3]) => [
 List<String> _refPhotos(String id) => [for (var i = 0; i < 6; i++) 'https://cdn.test/consultas/$id/$i.jpg'];
 
 const _inquiryStatuses = {
-  'pending': 'Sin responder',
-  'answered': 'Respondida',
+  'pending': 'Sin cotizar',
+  'answered': 'Cotizada · espera seña',
   'confirmed': 'Confirmada',
   'cancelled': 'No se hizo',
 };
@@ -723,6 +724,22 @@ ConsultasData _smallConsultas() => ConsultasData.fromJson({
       'maxFiles': 8,
       'paymentMethods': {'transfer': 'Transferencia', 'mercadopago': 'MercadoPago', 'cash': 'Efectivo'},
     });
+
+/// Chat de una consulta con todo al límite: nombre larguísimo, mensajes de
+/// varios renglones, una foto con texto, una foto sola y varios días.
+List<Map<String, dynamic>> _extremeChat() => [
+      chatMessageJson('m1', author: _longName, body: _longNote, createdAt: '2026-11-23T15:00:00.000Z'),
+      chatMessageJson('m2', author: 'Ale', mine: true, body: _longNote, createdAt: '2026-11-23T15:02:00.000Z'),
+      chatMessageJson('m3', author: _longName, body: 'Ok', createdAt: '2026-11-24T09:00:00.000Z'),
+      chatMessageJson('m4',
+          author: _longName,
+          body: 'Así quedaría la base, mirá el grabado.',
+          image: 'https://cdn.test/consultas/c1/chat/base.webp',
+          createdAt: '2026-11-24T09:01:00.000Z'),
+      chatMessageJson('m5',
+          author: 'Ale', mine: true, body: '', image: 'https://cdn.test/consultas/c1/chat/ref.webp', createdAt: '2026-11-25T14:03:00.000Z'),
+      chatMessageJson('m6', author: 'Ale', mine: true, body: 'Lo quiere de 12 cm', createdAt: '2026-11-25T14:04:00.000Z'),
+    ];
 
 /// Listado largo: 16 consultas en todos los estados.
 ConsultasData _bigConsultas() => ConsultasData.fromJson({
@@ -2871,7 +2888,7 @@ void main() {
       expectNoLayoutErrors(tester);
       expect(find.byType(PriceEstimatorSheet), findsNothing);
     }
-    final saveAnswer = find.widgetWithText(GoldButton, 'Guardar respuesta');
+    final saveAnswer = saveQuote;
     final saveNew = find.widgetWithText(GoldButton, 'Cargar consulta');
 
     /// Trae el campo a la vista (las listas arman sus filas de a poco) y escribe.
@@ -2905,7 +2922,203 @@ void main() {
         pumpPhone(tester, ConsultaAnswerScreen(consulta: q),
             phone: phone, theme: theme, textScale: textScale, me: me, overrides: ov(_smallConsultas(), api ?? FakeConsultasApi()));
 
+    final chatInput = find.byKey(const Key('chat-input'));
+    final chatSend = find.widgetWithIcon(IconButton, Icons.send_rounded);
+    final chatPhoto = find.widgetWithIcon(IconButton, Icons.photo_camera_outlined);
+
+    Future<FakeConsultasApi> openChat(
+      WidgetTester tester,
+      Phone phone,
+      Consulta q, {
+      FakeConsultasApi? api,
+      List<Map<String, dynamic>>? chat,
+      PhotoSource? photos,
+      MeInfo? who,
+      double textScale = 1,
+      HefestoThemeMode theme = HefestoThemeMode.dark,
+    }) async {
+      final fake = api ?? FakeConsultasApi();
+      fake.chat.addAll(chat ?? _extremeChat());
+      await pumpPhone(tester, ConsultaChatScreen(consulta: q),
+          phone: phone, theme: theme, textScale: textScale, me: who ?? me, overrides: ov(_smallConsultas(), fake, photos));
+      return fake;
+    }
+
+    /// La barra de escribir entera (foto, campo y enviar) se puede tocar.
+    void expectInputBarReachable(WidgetTester tester, String when) {
+      expectReachable(tester, chatInput, what: 'el campo del chat $when');
+      expectReachable(tester, chatSend, what: 'el botón de enviar $when');
+      expectReachable(tester, chatPhoto, what: 'el botón de foto $when');
+    }
+
     for (final phone in Phone.both) {
+      testWidgets('chat: conversación, teclado, enviar, foto y reintento en ${phone.name}', (tester) async {
+        final photos = FakePhotoSource(gallery: [fakePhoto('pieza.jpg')]);
+        final api = await openChat(tester, phone, _smallConsultas().items[0], photos: photos);
+        // Encabezado con nombre y producto larguísimos: recortados, sin desbordar.
+        expect(find.descendant(of: find.byType(AppBar), matching: find.text(_longName)), findsOneWidget);
+        expectReachable(tester, find.byTooltip('Ver la consulta'), what: 'el botón del resumen');
+        // Quien cotiza tiene el botón principal a mano.
+        final quote = find.widgetWithText(GoldButton, 'Crear cotización');
+        expectReachable(tester, quote, what: 'el botón Crear cotización');
+        expectInputBarReachable(tester, 'al abrir');
+        // Abre en lo último.
+        expect(find.text('Lo quiere de 12 cm').hitTestable(), findsOneWidget);
+        _expectAbove(tester, find.text('Lo quiere de 12 cm'), chatInput, reason: 'el último mensaje');
+        await shoot(tester, 'consulta_chat');
+
+        // Teclado: el campo y enviar quedan arriba del teclado; la franja de
+        // cotizar se corre para dejarle lugar a la conversación.
+        await openKeyboard(tester, chatInput);
+        expectFocusedFieldVisible(tester);
+        expectInputBarReachable(tester, 'con el teclado');
+        expect(quote, findsNothing);
+        expect(find.text('Lo quiere de 12 cm').hitTestable(), findsOneWidget, reason: 'lo último sigue a la vista con el teclado');
+        await shoot(tester, 'consulta_chat_teclado');
+        // Un mensaje de varios renglones: el campo crece hasta su tope y nada se tapa.
+        await _type(tester, chatInput, _longNote);
+        expectNoLayoutErrors(tester);
+        expectFocusedFieldVisible(tester);
+        expectInputBarReachable(tester, 'con un mensaje largo y el teclado');
+        await shoot(tester, 'consulta_chat_teclado_largo');
+        await tester.tap(chatSend);
+        await settle(tester, 6);
+        expectNoLayoutErrors(tester);
+        expect(api.sent.single.body, _longNote);
+        expectInputBarReachable(tester, 'después de enviar');
+        await closeKeyboard(tester);
+
+        // Foto: la hoja de dónde sale, la vista previa y enviar.
+        await _tap(tester, chatPhoto);
+        expectNoLayoutErrors(tester);
+        _expectSheetBelowStatusBar(tester);
+        expectReachable(tester, find.text('Sacar una foto'), what: 'la opción de la cámara');
+        await shoot(tester, 'consulta_chat_foto_hoja');
+        await tester.tap(find.text('Elegir de la galería'));
+        await settle(tester, 8);
+        expectNoLayoutErrors(tester);
+        expect(find.text('Foto lista para mandar'), findsOneWidget);
+        expectReachable(tester, find.byTooltip('Quitar la foto'), what: 'quitar la foto elegida');
+        expectInputBarReachable(tester, 'con una foto elegida');
+        await shoot(tester, 'consulta_chat_foto_lista');
+        // Con foto y teclado a la vez.
+        await openKeyboard(tester, chatInput);
+        expectFocusedFieldVisible(tester);
+        expectInputBarReachable(tester, 'con foto y teclado');
+        await closeKeyboard(tester);
+        await tester.tap(chatSend);
+        await settle(tester, 6);
+        expectNoLayoutErrors(tester);
+        expect(api.sent.last.photo, 'pieza.jpg');
+
+        // Uno que no sale: el motivo (larguísimo) y los dos botones a mano.
+        api.failSend = ApiException('offline', _longServerError);
+        await _type(tester, chatInput, 'Este no sale');
+        await tester.tap(chatSend);
+        await settle(tester, 6);
+        expectNoLayoutErrors(tester);
+        expect(find.text(_longServerError), findsOneWidget);
+        final retry = find.widgetWithText(TextButton, 'Reintentar');
+        expectReachable(tester, retry, what: 'Reintentar');
+        expectReachable(tester, find.widgetWithText(TextButton, 'Descartar'), what: 'Descartar');
+        _expectAbove(tester, retry, chatInput, reason: 'Reintentar (no lo tapa la barra de escribir)');
+        await shoot(tester, 'consulta_chat_fallo');
+        api.failSend = null;
+        await tester.tap(retry);
+        await settle(tester, 6);
+        expectNoLayoutErrors(tester);
+        expect(api.sent.last.body, 'Este no sale');
+        expect(retry, findsNothing);
+
+        // La foto de un mensaje, a pantalla completa.
+        await tester.dragUntilVisible(find.byType(NetImage).first, find.byType(ListView), const Offset(0, 120));
+        await settle(tester, 3);
+        await tester.tap(find.byType(NetImage).first);
+        await _nav(tester);
+        expect(find.byType(PhotoViewerScreen), findsOneWidget);
+        expectReachable(tester, find.byType(BackButton), what: 'la flecha de volver de la foto');
+        await tester.tap(find.byType(BackButton));
+        await _nav(tester);
+        expect(find.byType(PhotoViewerScreen), findsNothing);
+      });
+
+      testWidgets('chat: resumen, cotizada, vacío y error en ${phone.name}', (tester) async {
+        // El resumen de una consulta con textos larguísimos, seis fotos y adjuntos.
+        await openChat(tester, phone, _smallConsultas().items[0]);
+        await _tap(tester, find.byTooltip('Ver la consulta'));
+        expectNoLayoutErrors(tester);
+        expect(find.byType(ConsultaSummarySheet), findsOneWidget);
+        _expectSheetBelowStatusBar(tester);
+        await shoot(tester, 'consulta_chat_resumen');
+        await scrollToEnd(tester, scrollable: _inSheet(find.byType(Scrollable)).first);
+        expectReachable(tester, _inSheet(find.text('video del modelo.mp4')), what: 'el último adjunto del resumen');
+        await shoot(tester, 'consulta_chat_resumen_final');
+
+        // Cotizada con el total de 13 cifras: el aviso del pedido y "Cambiar cotización".
+        await openChat(tester, phone, _smallConsultas().items[1]);
+        expect(find.text(r'Pedido pendiente de pago · $9.875.555.555.679'), findsOneWidget);
+        expectReachable(tester, find.widgetWithText(GoldButton, 'Cambiar cotización'), what: 'el botón Cambiar cotización');
+        expectInputBarReachable(tester, 'en una cotizada');
+        await shoot(tester, 'consulta_chat_cotizada');
+        // Su resumen: pedido pendiente de pago y el mensaje con sus botones.
+        await _tap(tester, find.byTooltip('Ver la consulta'));
+        expectNoLayoutErrors(tester);
+        _expectSheetBelowStatusBar(tester);
+        await scrollToEnd(tester, scrollable: _inSheet(find.byType(Scrollable)).first);
+        expectReachable(tester, _inSheet(find.widgetWithText(OutlinedButton, 'WhatsApp')), what: 'WhatsApp en el resumen');
+        await shoot(tester, 'consulta_chat_resumen_cotizada');
+
+        // La vendedora (no cotiza): ve el pedido pendiente, sin botón.
+        await openChat(tester, phone, _smallConsultas().items[1],
+            who: staffWith(['consultas'], role: 'atencion al cliente', actions: const ['ver', 'crear']));
+        expect(find.text('Cambiar cotización'), findsNothing);
+        expect(find.text(r'Pedido pendiente de pago · $9.875.555.555.679'), findsOneWidget);
+        await shoot(tester, 'consulta_chat_vendedora');
+
+        // Sin mensajes, también con el teclado abierto (queda poco lugar).
+        await openChat(tester, phone, _smallConsultas().items[0], chat: const []);
+        expect(find.text('Todavía no hay mensajes.'), findsOneWidget);
+        expectInputBarReachable(tester, 'sin mensajes');
+        await shoot(tester, 'consulta_chat_vacio');
+        await openKeyboard(tester, chatInput);
+        expectFocusedFieldVisible(tester);
+        expectInputBarReachable(tester, 'sin mensajes y con el teclado');
+        await shoot(tester, 'consulta_chat_vacio_teclado');
+        await closeKeyboard(tester);
+
+        // No carga: el aviso larguísimo con "Reintentar", también con teclado.
+        final api = FakeConsultasApi()..failChat = ApiException('offline', _longServerError);
+        await openChat(tester, phone, _smallConsultas().items[0], api: api);
+        expect(find.text(_longServerError), findsOneWidget);
+        expectReachable(tester, find.widgetWithText(GoldButton, 'Reintentar'), what: 'Reintentar del chat');
+        await shoot(tester, 'consulta_chat_error');
+        await openKeyboard(tester, chatInput);
+        expectInputBarReachable(tester, 'con el error y el teclado');
+        await closeKeyboard(tester);
+      });
+
+      testWidgets('chat: se abre desde la tarjeta y "Crear cotización" lleva al formulario en ${phone.name}', (tester) async {
+        final api = FakeConsultasApi()..chat.addAll(_extremeChat());
+        await openList(tester, phone, _smallConsultas(), api: api);
+        await _tap(tester, find.byKey(const ValueKey('chat-c1')));
+        await _nav(tester);
+        expectNoLayoutErrors(tester);
+        expect(find.byType(ConsultaChatScreen), findsOneWidget);
+        expect(api.chatFetches.single.id, 'c1');
+        await tester.tap(find.widgetWithText(GoldButton, 'Crear cotización'));
+        await _nav(tester);
+        expectNoLayoutErrors(tester);
+        expect(find.byType(ConsultaAnswerScreen), findsOneWidget);
+        expectReachable(tester, saveAnswer, what: 'el botón Crear cotización del formulario');
+        await tester.tap(find.byType(BackButton));
+        await _nav(tester);
+        expect(find.byType(ConsultaAnswerScreen), findsNothing);
+        await tester.tap(find.byType(BackButton));
+        await _nav(tester);
+        expect(find.byType(ConsultaChatScreen), findsNothing);
+        expect(find.byType(AdminConsultasScreen), findsOneWidget);
+      });
+
       testWidgets('listado largo con datos extremos en ${phone.name}', (tester) async {
         await openList(tester, phone, _bigConsultas());
         expect(find.descendant(of: find.byType(AppBar), matching: find.text('Consultas')), findsOneWidget);
@@ -2931,7 +3144,7 @@ void main() {
         });
         addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(SystemChannels.platform, null));
         await openList(tester, phone, _smallConsultas());
-        await _tap(tester, find.text('Respondidas (1)'));
+        await _tap(tester, find.text('Cotizadas (1)'));
         await _reveal(tester, find.text(r'Precio: $987.654.321 c/u'));
         expect(find.text(r'Total (9999 unidades): $9.875.555.555.679'), findsOneWidget);
         expect(find.textContaining('Respondió $_longName'), findsOneWidget);
@@ -2964,11 +3177,11 @@ void main() {
         await openList(tester, phone, _smallConsultas(), api: api);
         // "Confirmado" abre la hoja: el texto con nombre, producto y total
         // larguísimos se desplaza y los dos botones quedan a mano.
-        await _tap(tester, find.widgetWithText(FilledButton, 'Confirmado'));
+        await _tap(tester, find.widgetWithText(FilledButton, 'Señó · Confirmar pedido'));
         expectNoLayoutErrors(tester);
         expect(find.byType(ConfirmOrderSheet), findsOneWidget);
         _expectSheetBelowStatusBar(tester);
-        final yes = find.widgetWithText(GoldButton, 'Confirmar y crear pedido');
+        final yes = find.widgetWithText(GoldButton, 'Confirmar pedido');
         final notYet = find.widgetWithText(TextButton, 'Todavía no');
         expectReachable(tester, yes, what: 'el botón Confirmar y crear pedido');
         expectReachable(tester, notYet, what: 'el botón Todavía no');
@@ -3002,7 +3215,7 @@ void main() {
         expect(find.byType(ConfirmOrderSheet), findsNothing);
         expect(api.moves.single.to, InquiryMove.confirm);
         expect(api.paidWith, 'mercadopago');
-        expect(find.text('Confirmada: el pedido ya está en Pedidos'), findsOneWidget);
+        expect(find.text('Confirmado: el pedido pasó a producción'), findsOneWidget);
         await shoot(tester, 'consultas_confirmada_aviso');
 
         // Confirmada con pedido: lo dice entero y no ofrece reabrir.
@@ -3016,7 +3229,7 @@ void main() {
         expect(api.moves.last.to, InquiryMove.reopen);
 
         // Eliminar: el diálogo con el nombre larguísimo y sus acciones a mano.
-        await _tap(tester, find.text('Sin responder (1)'));
+        await _tap(tester, find.text('Sin cotizar (1)'));
         await _tap(tester, find.widgetWithText(TextButton, 'Eliminar'));
         expectNoLayoutErrors(tester);
         expectReachable(tester, _inDialog(find.widgetWithText(TextButton, 'Eliminar')), what: 'Eliminar del diálogo');
@@ -3063,8 +3276,8 @@ void main() {
         await openList(tester, phone, ConsultasData.fromJson({'items': [answeredJson('r')]}),
             who: staffWith(['consultas'], role: 'operator', actions: const ['ver']));
         expect(fab, findsNothing);
-        expect(find.text('Cambiar respuesta'), findsNothing);
-        expect(find.text('Confirmado'), findsNothing);
+        expect(find.text('Cambiar cotización'), findsNothing);
+        expect(find.text('Señó · Confirmar pedido'), findsNothing);
         expect(find.text('Eliminar'), findsNothing);
         expect(find.text('Copiar mensaje'), findsOneWidget);
         await _toEnd(tester);
@@ -3088,7 +3301,7 @@ void main() {
         final api = FakeConsultasApi();
         final files = FakeAttachmentSource([fakeFile('Audio de WhatsApp larguísimo del cliente con todos los detalles del pedido.ogg')]);
         await openList(tester, phone, _smallConsultas(), api: api, files: files, photos: FakePhotoSource());
-        await _tap(tester, find.text('Sin responder (1)'));
+        await _tap(tester, find.text('Sin cotizar (1)'));
         // Los tres adjuntos se ven y el nombre larguísimo no desborda.
         await _reveal(tester, find.text('diseño.pdf'));
         expect(find.byType(AttachmentRow), findsNWidgets(3));
@@ -3117,7 +3330,7 @@ void main() {
       testWidgets('responder: teclado en el primer y el último campo, guardar y ver el mensaje en ${phone.name}', (tester) async {
         final api = FakeConsultasApi()..builtMessage = _longMessage;
         await openList(tester, phone, _smallConsultas(), api: api);
-        await _tap(tester, find.widgetWithText(FilledButton, 'Responder'));
+        await _tap(tester, find.widgetWithText(FilledButton, 'Crear cotización'));
         await _nav(tester);
         expectNoLayoutErrors(tester);
         expect(find.byType(ConsultaAnswerScreen), findsOneWidget);
@@ -3183,7 +3396,7 @@ void main() {
         expect(api.answered!.draft.toJson()['unitCost'], isNull);
         expect(api.answered!.draft.message, isNull);
         // El resultado: mensaje larguísimo que se desplaza, "Listo" siempre a mano.
-        expect(find.text('Respuesta guardada'), findsOneWidget);
+        expect(find.text('Cotización creada'), findsOneWidget);
         final done = find.widgetWithText(GoldButton, 'Listo');
         expectReachable(tester, done, what: 'el botón Listo');
         await shoot(tester, 'consulta_respuesta_guardada');
@@ -3199,7 +3412,7 @@ void main() {
         final api = FakeConsultasApi()..failWith = ApiException('invalid', _longServerError);
         await openAnswer(tester, phone, _smallConsultas().items[1], api: api);
         // Viene cargada con la respuesta anterior (datos extremos).
-        expect(find.text('Cambiar respuesta'), findsOneWidget);
+        expect(find.text('Cambiar cotización'), findsNWidgets(2));
         await shoot(tester, 'consulta_cambiar_respuesta');
 
         // Borrar el "desde cuántas" deja el precio por cantidad sin su par.
@@ -3338,11 +3551,11 @@ void main() {
       await openList(tester, Phone.small, _smallConsultas(), api: api, textScale: 1.3);
       await _reveal(tester, find.widgetWithText(OutlinedButton, 'WhatsApp'));
       await shoot(tester, 'consultas_respuesta_grande');
-      await _tap(tester, find.text('Respondidas (1)'));
-      await _tap(tester, find.widgetWithText(FilledButton, 'Confirmado'));
+      await _tap(tester, find.text('Cotizadas (1)'));
+      await _tap(tester, find.widgetWithText(FilledButton, 'Señó · Confirmar pedido'));
       expectNoLayoutErrors(tester);
       _expectSheetBelowStatusBar(tester);
-      expectReachable(tester, find.widgetWithText(GoldButton, 'Confirmar y crear pedido'), what: 'Confirmar y crear pedido con letra grande');
+      expectReachable(tester, find.widgetWithText(GoldButton, 'Confirmar pedido'), what: 'Confirmar y crear pedido con letra grande');
       expectReachable(tester, find.widgetWithText(TextButton, 'Todavía no'), what: 'Todavía no con letra grande');
       await shoot(tester, 'consultas_confirmar_hoja_grande');
       await scrollToEnd(tester, scrollable: _inSheet(find.byType(Scrollable)).first);
@@ -3352,7 +3565,7 @@ void main() {
       await settle(tester, 8);
       expect(find.byType(ConfirmOrderSheet), findsNothing);
 
-      await _tap(tester, find.text('Sin responder (1)'));
+      await _tap(tester, find.text('Sin cotizar (1)'));
       await _reveal(tester, find.text('diseño.pdf'));
       await shoot(tester, 'consultas_adjuntos_grande');
       await _tap(tester, find.widgetWithText(OutlinedButton, 'Adjuntar'));
@@ -3412,8 +3625,49 @@ void main() {
       await shoot(tester, 'consulta_alta_grande_fotos');
     });
 
+    testWidgets('chat con letra grande (1,3×) en el teléfono chico', (tester) async {
+      final photos = FakePhotoSource(gallery: [fakePhoto('pieza.jpg')]);
+      final api = await openChat(tester, Phone.small, _smallConsultas().items[0], photos: photos, textScale: 1.3);
+      expectReachable(tester, find.widgetWithText(GoldButton, 'Crear cotización'), what: 'Crear cotización con letra grande');
+      expectInputBarReachable(tester, 'con letra grande');
+      await shoot(tester, 'consulta_chat_grande');
+      await openKeyboard(tester, chatInput);
+      expectFocusedFieldVisible(tester);
+      await _type(tester, chatInput, _longNote);
+      expectNoLayoutErrors(tester);
+      expectFocusedFieldVisible(tester);
+      expectInputBarReachable(tester, 'con letra grande, mensaje largo y teclado');
+      await shoot(tester, 'consulta_chat_grande_teclado');
+      await closeKeyboard(tester);
+      // Foto elegida + un envío que falla: todo sigue entrando.
+      await _tap(tester, chatPhoto);
+      _expectSheetBelowStatusBar(tester);
+      await tester.tap(find.text('Elegir de la galería'));
+      await settle(tester, 8);
+      expectNoLayoutErrors(tester);
+      expectInputBarReachable(tester, 'con letra grande y una foto elegida');
+      api.failSend = ApiException('offline', _longServerError);
+      await tester.tap(chatSend);
+      await settle(tester, 6);
+      expectNoLayoutErrors(tester);
+      expectReachable(tester, find.widgetWithText(TextButton, 'Reintentar'), what: 'Reintentar con letra grande');
+      await shoot(tester, 'consulta_chat_grande_fallo');
+      // El resumen y la cotizada.
+      await _tap(tester, find.byTooltip('Ver la consulta'));
+      expectNoLayoutErrors(tester);
+      _expectSheetBelowStatusBar(tester);
+      await scrollToEnd(tester, scrollable: _inSheet(find.byType(Scrollable)).first);
+      await shoot(tester, 'consulta_chat_grande_resumen');
+      await openChat(tester, Phone.small, _smallConsultas().items[1], textScale: 1.3);
+      expectReachable(tester, find.widgetWithText(GoldButton, 'Cambiar cotización'), what: 'Cambiar cotización con letra grande');
+      expectInputBarReachable(tester, 'con letra grande en una cotizada');
+      await shoot(tester, 'consulta_chat_grande_cotizada');
+    });
+
     for (final mode in [HefestoThemeMode.light, HefestoThemeMode.warm]) {
       testWidgets('tema ${mode.name}: listado, respuesta y formularios', (tester) async {
+        await openChat(tester, Phone.small, _smallConsultas().items[1], theme: mode);
+        await shoot(tester, 'consulta_chat_${mode.name}');
         await openList(tester, Phone.small, _smallConsultas(), theme: mode);
         await shoot(tester, 'consultas_lista_${mode.name}');
         await _reveal(tester, find.widgetWithText(OutlinedButton, 'WhatsApp'));

@@ -206,7 +206,7 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
     final leave = await confirmDialog(
       context,
       title: '¿Descartar los cambios?',
-      message: 'La respuesta no se guardó.',
+      message: 'La cotización no se guardó.',
       confirmLabel: 'Descartar',
       cancelLabel: 'Seguir editando',
       destructive: true,
@@ -241,7 +241,9 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
               message: messageToSend(typed: _message.text, saved: _q.message),
             ),
           );
-      invalidateConsultas(container);
+      // La cotización crea (o reemplaza) el pedido en pendiente de pago:
+      // además de las consultas se refresca Ventas.
+      invalidateConsultaConfirmed(container);
       if (mounted) setState(() => _result = answered);
     } on ApiException catch (e) {
       if (mounted) setState(() => _serverError = e.message);
@@ -309,7 +311,7 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
         );
 
     final scaffold = Scaffold(
-      appBar: AppBar(title: Text(hadMessage ? 'Cambiar respuesta' : 'Responder')),
+      appBar: AppBar(title: Text(hadMessage ? 'Cambiar cotización' : 'Crear cotización')),
       body: SafeArea(
         child: Column(
           children: [
@@ -464,7 +466,7 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
                     const SizedBox(height: 10),
                   ],
                   GoldButton(
-                    label: 'Guardar respuesta',
+                    label: hadMessage ? 'Cambiar cotización' : 'Crear cotización',
                     icon: Icons.check_rounded,
                     loading: _saving,
                     onPressed: _saving ? null : _save,
@@ -486,8 +488,10 @@ class _ConsultaAnswerScreenState extends ConsumerState<ConsultaAnswerScreen> {
   }
 }
 
-/// Resultado de responder: el mensaje tal cual lo va a mandar atención al
-/// cliente, para que el operador lo revise antes de irse.
+/// Resultado de cotizar: el pedido quedó en pendiente de pago y este es el
+/// mensaje tal cual lo va a mandar atención al cliente, para que el operador
+/// lo revise antes de irse. Se cierra con `true` (también con "atrás"): quien
+/// abrió la pantalla avisa "Cotización creada…".
 class _AnswerSaved extends StatelessWidget {
   const _AnswerSaved({required this.consulta});
   final Consulta consulta;
@@ -495,8 +499,18 @@ class _AnswerSaved extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = context.hc;
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) Navigator.of(context).pop(true);
+      },
+      child: _body(context, c),
+    );
+  }
+
+  Widget _body(BuildContext context, HefestoColors c) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Respuesta guardada')),
+      appBar: AppBar(title: const Text('Cotización creada')),
       body: SafeArea(
         child: Column(
           children: [
@@ -511,8 +525,8 @@ class _AnswerSaved extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Listo. Este es el mensaje que atención al cliente le va a mandar a '
-                          '${consulta.customerName}.',
+                          'Listo: el pedido quedó pendiente de pago. Este es el mensaje que '
+                          'atención al cliente le va a mandar a ${consulta.customerName}.',
                           style: TextStyle(fontSize: 13.5, color: c.textDim, height: 1.4),
                         ),
                       ),

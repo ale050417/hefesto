@@ -72,7 +72,7 @@ class ConsultaMessageBlock extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SectionLabel('Respuesta'),
+          const SectionLabel('Cotización'),
           const SizedBox(height: 6),
           for (final (i, line) in lines.indexed)
             Text(
@@ -118,6 +118,98 @@ class ConsultaMessageBlock extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Aviso de una consulta ya cotizada: su pedido está en "pendiente de pago"
+/// hasta que el cliente seña. Con el total, que es lo que hay que cobrar.
+class PendingOrderBanner extends StatelessWidget {
+  const PendingOrderBanner({super.key, required this.consulta});
+  final Consulta consulta;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.hc;
+    final total = consulta.orderTotal;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Brand.info.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Brand.info.withValues(alpha: 0.40)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 1),
+            child: Icon(Icons.hourglass_top_rounded, size: 18, color: Brand.info),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Pedido pendiente de pago',
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: c.text),
+                ),
+                if (total != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Total del pedido: ${formatConsultaMoney(total)}',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Brand.gold),
+                  ),
+                ],
+                const SizedBox(height: 4),
+                Text(
+                  'Mandale el mensaje al cliente. Cuando señe, confirmá el pedido.',
+                  style: TextStyle(fontSize: 12, color: c.textDim, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Botón "Chat" de una consulta. Con mensajes sin leer lo dice ("Chat · 3")
+/// y marca el ícono; si no, muestra apagado cuántos mensajes hay.
+class ConsultaChatButton extends StatelessWidget {
+  const ConsultaChatButton({super.key, required this.consulta, required this.onPressed});
+  final Consulta consulta;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = context.hc;
+    final unread = consulta.chatUnread;
+    final count = consulta.chatMessages;
+    final icon = Icon(
+      unread > 0 ? Icons.mark_chat_unread_rounded : Icons.chat_bubble_outline_rounded,
+      size: 18,
+    );
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: unread > 0 ? Badge(smallSize: 8, child: icon) : icon,
+      label: unread > 0
+          ? Text('Chat · $unread', style: const TextStyle(fontWeight: FontWeight.w800))
+          : Text.rich(
+              TextSpan(
+                text: 'Chat',
+                children: [
+                  if (count > 0)
+                    TextSpan(
+                      text: '  $count',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: c.textFaint),
+                    ),
+                ],
+              ),
+            ),
     );
   }
 }

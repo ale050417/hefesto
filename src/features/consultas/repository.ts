@@ -1,6 +1,11 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { db } from "@/core/db";
-import { inquiries } from "@/core/db/schema";
+import {
+  inquiries,
+  inquiryMessages,
+  inquiryReads,
+  manualSales,
+} from "@/core/db/schema";
 import type { InquiryStatus } from "./schemas";
 
 export type Inquiry = typeof inquiries.$inferSelect;
@@ -183,4 +188,110 @@ export async function setInquiryStatus(
 
 export async function deleteInquiryRow(id: string): Promise<void> {
   await db.delete(inquiries).where(eq(inquiries.id, id));
+}
+
+/** Cómo paga el cliente: se sabe recién cuando seña (el pedido ya existe). */
+export async function setSalePaymentMethod(
+  saleId: string,
+  paymentMethod: "transfer" | "mercadopago" | "cash",
+): Promise<void> {
+  await db
+    .update(manualSales)
+    .set({ paymentMethod })
+    .where(eq(manualSales.id, saleId));
+}
+
+// --- Chat de la consulta (0086) ---
+
+export type InquiryMessage = typeof inquiryMessages.$inferSelect;
+
+/** Tope de mensajes que se traen de una conversación (los últimos). */
+const CHAT_PAGE = 300;
+
+/** Mensajes en orden; con `after`, solo los posteriores a esa fecha. */
+export async function listInquiryMessages(
+  inquiryId: string,
+  after?: Date | null,
+): Promise<InquiryMessage[]> {
+  const rows = await db
+    .select()
+    .from(inquiryMessages)
+    .where(
+      and(
+        eq(inquiryMessages.inquiryId, inquiryId),
+        after ? gt(inquiryMessages.createdAt, after) : undefined,
+      ),
+    )
+    .orderBy(desc(inquiryMessages.createdAt), desc(inquiryMessages.id))
+    .limit(CHAT_PAGE);
+  return rows.reverse();
+}
+
+export async function insertInquiryMessage(values: {
+  inquiryId: string;
+  authorId: string | null;
+  authorName: string | null;
+  body: string;
+  image: string | null;
+}): Promise<InquiryMessage> {
+  const [row] = await db.insert(inquiryMessages).values(values).returning();
+  return row!;
+}
+
+/** Marca la conversación como leída por esta persona (hasta ahora). */
+export async function markInquiryRead(
+  inquiryId: string,
+  profileId: string,
+): Promise<void> {
+  const readAt = new Date();
+  await db
+    .insert(inquiryReads)
+    .values({ inquiryId, profileId, readAt })
+    .onConflictDoUpdate({
+      target: [inquiryReads.inquiryId, inquiryReads.profileId],
+      set: { readAt },
+    });
+}
+
+export type ChatSummary = { messages: number; unread: number };
+
+/**
+ * Por consulta: cuántos mensajes tiene y cuántos le faltan leer a esta
+ * persona (los de otros, posteriores a su última lectura). Una sola consulta
+ * a la base para toda la lista.
+ */
+export async function chatSummaries(
+  viewerId: string | null,
+): Promise<Map<string, ChatSummary>> {
+  const viewer = viewerId ?? "00000000-0000-0000-0000-000000000000";
+  const rows = await db
+    .select({
+      inquiryId: inquiryMessages.inquiryId,
+      messages: sql<number>`count(*)::int`,
+      unread: sql<number>`count(*) filter (where ${inquiryMessages.authorId} is distinct from ${viewer}::uuid and (${inquiryReads.readAt} is null or ${inquiryMessages.createdAt} > ${inquiryReads.readAt}))::int`,
+    })
+    .from(inquiryMessages)
+    .leftJoin(
+      inquiryReads,
+      and(
+        eq(inquiryReads.inquiryId, inquiryMessages.inquiryId),
+        eq(inquiryReads.profileId, viewer),
+      ),
+    )
+    .groupBy(inquiryMessages.inquiryId);
+  return new Map(
+    rows.map((r) => [r.inquiryId, { messages: r.messages, unread: r.unread }]),
+  );
+}
+
+/** Fotos del chat de una consulta (para borrarlas del storage con ella). */
+export async function listInquiryChatImages(
+  inquiryId: string,
+): Promise<string[]> {
+  const rows = await db
+    .select({ image: inquiryMessages.image })
+    .from(inquiryMessages)
+    .where(eq(inquiryMessages.inquiryId, inquiryId))
+    .orderBy(asc(inquiryMessages.createdAt));
+  return rows.map((r) => r.image).filter((u): u is string => !!u);
 }

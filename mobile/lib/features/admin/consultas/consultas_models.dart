@@ -3,8 +3,8 @@ import '../filamentos/parse_util.dart';
 
 /// Estado de una consulta en la API.
 enum InquiryStatus {
-  pending('pending', 'Sin responder'),
-  answered('answered', 'Respondida'),
+  pending('pending', 'Sin cotizar'),
+  answered('answered', 'Cotizada · espera seña'),
   confirmed('confirmed', 'Confirmada'),
   cancelled('cancelled', 'No se hizo');
 
@@ -76,6 +76,8 @@ class Consulta {
     this.createdAt,
     this.answeredAt,
     this.confirmedAt,
+    this.chatMessages = 0,
+    this.chatUnread = 0,
   });
 
   final String id;
@@ -120,8 +122,15 @@ class Consulta {
   /// La respuesta ya tiene con qué costear el pedido (calculadora o costo viejo).
   bool get hasCostBasis => calc != null || unitCost != null;
 
-  /// Pedido que se creó al confirmar (null si todavía no hay).
+  /// Pedido de la cotización: se crea en "pendiente de pago" apenas el
+  /// operador cotiza y pasa a confirmado cuando el cliente seña (null si
+  /// todavía no hay cotización).
   final String? saleId;
+
+  /// Chat de la consulta: mensajes en total y los que escribieron otros y
+  /// quien mira todavía no leyó (0 si el servidor es viejo y no los manda).
+  final int chatMessages;
+  final int chatUnread;
 
   /// Precio por unidad comprando [bulkFrom] o más (van juntos, o ninguno).
   final double? bulkPrice;
@@ -153,9 +162,17 @@ class Consulta {
   /// Lo que va a valer el pedido al confirmar (precio × cantidad).
   double? get orderTotal => unitPrice == null ? null : unitPrice! * quantity;
 
-  /// Ya generó un pedido: no se puede reabrir (el pedido sigue su camino en
-  /// Ventas y en la cola).
+  /// Ya tiene su pedido (pendiente de pago mientras está cotizada; confirmado
+  /// cuando el cliente señó).
   bool get hasOrder => saleId != null;
+
+  /// Cotizada y esperando la seña: su pedido está en "pendiente de pago".
+  bool get awaitingDeposit => status == InquiryStatus.answered;
+
+  /// "No se hizo" se puede reabrir (el servidor le arma de nuevo el pedido
+  /// pendiente si estaba cotizada). Una confirmada no: su pedido ya está en
+  /// producción.
+  bool get canReopen => status == InquiryStatus.cancelled;
 
   /// Sigue en juego: se puede responder (o cambiar la respuesta) y descartar.
   bool get isOpen => status == InquiryStatus.pending || status == InquiryStatus.answered;
@@ -202,15 +219,102 @@ class Consulta {
       createdAt: dateOf(j['createdAt']),
       answeredAt: dateOf(j['answeredAt']),
       confirmedAt: dateOf(j['confirmedAt']),
+      chatMessages: _count(j['chatMessages']),
+      chatUnread: _count(j['chatUnread']),
     );
   }
+
+  static int _count(Object? v) {
+    final n = intOf(v);
+    return n < 0 ? 0 : n;
+  }
+}
+
+/// Un mensaje del chat de una consulta (`/admin/consultas/:id/messages`).
+class ChatMessage {
+  const ChatMessage({
+    required this.id,
+    required this.author,
+    required this.mine,
+    required this.body,
+    this.image,
+    this.createdAt,
+  });
+
+  final String id;
+  final String author;
+
+  /// Lo mandó quien está mirando.
+  final bool mine;
+
+  /// Puede venir vacío si el mensaje es solo una foto.
+  final String body;
+
+  /// Dirección de la foto, o null.
+  final String? image;
+
+  /// Hora local.
+  final DateTime? createdAt;
+
+  factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage(
+        id: strOf(j['id']),
+        author: strOf(j['author'], 'Alguien del equipo'),
+        mine: boolOf(j['mine']),
+        body: strOf(j['body']),
+        image: strOrNull(j['image']),
+        createdAt: dateOf(j['createdAt']),
+      );
+}
+
+/// Lo que devuelve `GET /admin/consultas/:id/messages`: los mensajes (el más
+/// viejo primero) y el largo máximo de un mensaje.
+class ChatPage {
+  const ChatPage({required this.items, this.maxLength = defaultChatMaxLength});
+  final List<ChatMessage> items;
+  final int maxLength;
+
+  factory ChatPage.fromJson(Map<String, dynamic> j) {
+    final max = intOf(j['maxLength'], defaultChatMaxLength);
+    return ChatPage(
+      // Sin id no se puede saber si ya lo tenemos: se descarta.
+      items: [
+        for (final m in mapsOf(j['items']))
+          if (strOf(m['id']).isNotEmpty) ChatMessage.fromJson(m),
+      ],
+      maxLength: max > 0 ? max : defaultChatMaxLength,
+    );
+  }
+}
+
+/// Largo máximo de un mensaje del chat si el servidor no manda el suyo.
+const defaultChatMaxLength = 2000;
+
+/// Suma [incoming] a [current] sin repetir (por `id`) y deja todo en orden de
+/// fecha. Hace falta porque un mismo mensaje puede llegar dos veces (por la
+/// respuesta al mandarlo y por el pedido periódico de novedades).
+List<ChatMessage> mergeChatMessages(List<ChatMessage> current, Iterable<ChatMessage> incoming) {
+  final seen = {for (final m in current) m.id};
+  final fresh = [
+    for (final m in incoming)
+      if (seen.add(m.id)) m,
+  ];
+  if (fresh.isEmpty) return current;
+  final all = [...current, ...fresh];
+  final order = {for (final (i, m) in all.indexed) m.id: i};
+  // Orden estable: por fecha y, a igual fecha (o sin fecha), como llegaron.
+  all.sort((a, b) {
+    final ta = a.createdAt, tb = b.createdAt;
+    final byDate = (ta == null || tb == null) ? 0 : ta.compareTo(tb);
+    return byDate != 0 ? byDate : order[a.id]!.compareTo(order[b.id]!);
+  });
+  return all;
 }
 
 /// Filtros del listado (chips).
 enum InquiryFilter {
   open('Abiertas'),
-  pending('Sin responder'),
-  answered('Respondidas'),
+  pending('Sin cotizar'),
+  answered('Cotizadas'),
   confirmed('Confirmadas'),
   cancelled('No se hicieron'),
   all('Todas');

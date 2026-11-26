@@ -13,13 +13,14 @@ import '../admin_module.dart';
 import '../admin_widgets.dart';
 import '../filamentos/shared_widgets.dart';
 import 'consulta_answer_screen.dart';
+import 'consulta_chat_screen.dart';
 import 'consulta_form_screen.dart';
 import 'consultas_api.dart';
 import 'consultas_models.dart';
 import 'consultas_widgets.dart';
 
-/// Color de cada estado: lo que espera respuesta en amarillo, lo respondido en
-/// azul, lo confirmado en verde y lo que no se hizo, apagado.
+/// Color de cada estado: lo que falta cotizar en amarillo, lo cotizado (espera
+/// la seña) en azul, lo confirmado en verde y lo que no se hizo, apagado.
 Color inquiryStatusColor(InquiryStatus s, HefestoColors c) => switch (s) {
       InquiryStatus.pending => Brand.warning,
       InquiryStatus.answered => Brand.info,
@@ -34,10 +35,11 @@ IconData inquiryStatusIcon(InquiryStatus s) => switch (s) {
       InquiryStatus.cancelled => Icons.cancel_outlined,
     };
 
-/// Consultas: atención al cliente carga lo que pregunta la gente, el operador
-/// responde con el precio, el costo y los datos, el servidor arma el mensaje y
-/// atención al cliente lo manda y marca si se confirmó (ahí se crea el pedido
-/// solo) o no se hizo. (Se abre desde "Más".)
+/// Consultas: atención al cliente carga lo que pregunta la gente y conversa
+/// con el operador en el chat de la consulta; el operador crea la cotización
+/// (ahí se arma el pedido en "pendiente de pago" y el mensaje para el
+/// cliente); atención al cliente lo manda y, cuando el cliente seña, confirma
+/// (el pedido pasa a confirmado) o marca que no se hizo. (Se abre desde "Más".)
 class AdminConsultasScreen extends ConsumerWidget {
   const AdminConsultasScreen({super.key});
 
@@ -110,14 +112,30 @@ class _ConsultasBodyState extends ConsumerState<_ConsultasBody> {
   }
 
   Future<void> _answer(Consulta q) async {
-    await Navigator.of(context).push<bool>(
+    final saved = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => ConsultaAnswerScreen(consulta: q)),
     );
+    if (saved == true && mounted) showToast(context, quoteCreatedNotice);
+  }
+
+  /// Abre el chat de la consulta. Al volver se pide de nuevo el listado: leer
+  /// el chat lo marcó como leído y puede haber cambiado la cotización.
+  Future<void> _chat(Consulta q) async {
+    final container = ProviderScope.containerOf(context, listen: false);
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => ConsultaChatScreen(consulta: q)),
+    );
+    invalidateConsultas(container);
   }
 
   /// Corre una acción sobre [q] y avisa cómo salió (abajo, como aviso breve).
   /// La acción devuelve el texto del aviso.
-  Future<void> _run(Consulta q, Future<String> Function() action, String fallback) async {
+  Future<void> _run(
+    Consulta q,
+    Future<String> Function() action,
+    String fallback, {
+    void Function(ProviderContainer) refresh = invalidateConsultas,
+  }) async {
     if (_busyId != null) return;
     final messenger = ScaffoldMessenger.of(context);
     final container = ProviderScope.containerOf(context, listen: false);
@@ -125,7 +143,7 @@ class _ConsultasBodyState extends ConsumerState<_ConsultasBody> {
     String message;
     try {
       message = await action();
-      invalidateConsultas(container);
+      refresh(container);
     } on ApiException catch (e) {
       message = e.message;
     } catch (_) {
@@ -138,24 +156,31 @@ class _ConsultasBodyState extends ConsumerState<_ConsultasBody> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  /// "No se hizo" y "Reabrir" (confirmar va por su hoja: crea un pedido).
+  /// "No se hizo" y "Reabrir" (confirmar va por su hoja: pide cómo paga). El
+  /// pedido pendiente acompaña a la cotización: se cancela con "No se hizo" y
+  /// vuelve a esperar el pago al reabrir, así que también se refresca Ventas.
   Future<void> _move(Consulta q, InquiryMove to) => _run(
         q,
         () async {
           await ref.read(consultasApiProvider).move(q.id, to);
-          return to == InquiryMove.reopen ? 'Consulta reabierta' : 'Quedó como "No se hizo"';
+          if (to == InquiryMove.reopen) return 'Consulta reabierta';
+          return q.hasOrder || q.awaitingDeposit
+              ? 'Quedó como "No se hizo" y se canceló el pedido pendiente'
+              : 'Quedó como "No se hizo"';
         },
         'No pudimos cambiar el estado. Probá de nuevo.',
+        refresh: invalidateConsultaConfirmed,
       );
 
-  /// Confirmar crea el pedido: se pregunta antes y se elige cómo paga.
+  /// El cliente señó: el pedido pasa a confirmado. Se pregunta antes y se
+  /// elige cómo pagó.
   Future<void> _confirm(Consulta q) async {
     if (_busyId != null) return;
     final ok = await showAppSheet<bool>(
       context,
       builder: (_) => ConfirmOrderSheet(consulta: q, data: widget.data),
     );
-    if (ok == true && mounted) showToast(context, 'Confirmada: el pedido ya está en Pedidos');
+    if (ok == true && mounted) showToast(context, 'Confirmado: el pedido pasó a producción');
   }
 
   Future<void> _delete(Consulta q) async {
@@ -280,9 +305,9 @@ class _ConsultasBodyState extends ConsumerState<_ConsultasBody> {
                 icon: Icons.forum_outlined,
                 title: 'Todavía no hay consultas',
                 subtitle: canCreate
-                    ? 'Cuando un cliente pregunte por algo, cargalo acá con «Nueva consulta» '
-                        'y el taller te responde con el precio.'
-                    : 'Cuando atención al cliente cargue una consulta, aparece acá para responderla.',
+                    ? 'Cuando un cliente pregunte por algo, cargalo acá con «Nueva consulta»: '
+                        'lo charlás con el taller por el chat y te pasan la cotización.'
+                    : 'Cuando atención al cliente cargue una consulta, aparece acá para cotizarla.',
               ),
             )
           else if (items.isEmpty)
@@ -292,7 +317,7 @@ class _ConsultasBodyState extends ConsumerState<_ConsultasBody> {
                 icon: _filter == InquiryFilter.open ? Icons.verified_rounded : Icons.inbox_outlined,
                 title: _filter == InquiryFilter.open ? 'No hay consultas abiertas' : 'Nada en esta vista',
                 subtitle: _filter == InquiryFilter.open
-                    ? 'Todo respondido y cerrado.'
+                    ? 'Todo cotizado y cerrado.'
                     : 'Probá con otro filtro.',
               ),
             )
@@ -302,7 +327,9 @@ class _ConsultasBodyState extends ConsumerState<_ConsultasBody> {
                 consulta: q,
                 statusLabel: d.labelOf(q.status),
                 busy: _busyId == q.id,
-                // Responder / cambiar la respuesta: el operador, mientras siga abierta.
+                // El chat: quien carga consultas o quien las cotiza (regla del servidor).
+                onChat: canCreate || canEdit ? () => _chat(q) : null,
+                // Crear / cambiar la cotización: el operador, mientras siga abierta.
                 onAnswer: canEdit && q.isOpen ? () => _answer(q) : null,
                 // Adjuntar mientras siga abierta: quien la cargó (con `crear`) o
                 // quien puede responderla. Las fotos piden `crear` en el
@@ -313,8 +340,8 @@ class _ConsultasBodyState extends ConsumerState<_ConsultasBody> {
                 // Cerrar o reabrir: quien carga las consultas (atención al cliente).
                 onConfirm: canCreate && q.status == InquiryStatus.answered ? () => _confirm(q) : null,
                 onCancel: canCreate && q.isOpen ? () => _move(q, InquiryMove.cancel) : null,
-                // Si al confirmar ya se creó el pedido, no se puede reabrir.
-                onReopen: canCreate && !q.isOpen && !q.hasOrder ? () => _move(q, InquiryMove.reopen) : null,
+                // Solo lo que no se hizo: una confirmada ya tiene su pedido en producción.
+                onReopen: canCreate && q.canReopen ? () => _move(q, InquiryMove.reopen) : null,
                 onDelete: q.deletableBy(canDelete: canDelete) ? () => _delete(q) : null,
               ),
               const SizedBox(height: 10),
@@ -330,6 +357,7 @@ class _ConsultaCard extends StatelessWidget {
     required this.consulta,
     required this.statusLabel,
     required this.busy,
+    required this.onChat,
     required this.onAnswer,
     required this.onAttach,
     required this.onConfirm,
@@ -340,6 +368,7 @@ class _ConsultaCard extends StatelessWidget {
   final Consulta consulta;
   final String statusLabel;
   final bool busy;
+  final VoidCallback? onChat;
   final VoidCallback? onAnswer;
   final VoidCallback? onAttach;
   final VoidCallback? onConfirm;
@@ -360,7 +389,8 @@ class _ConsultaCard extends StatelessWidget {
     final loaded = q.createdAt == null
         ? 'Cargó ${q.author}'
         : 'Cargó ${q.author} · ${formatDateTime(q.createdAt!)}';
-    final hasActions = onAnswer != null ||
+    final hasActions = onChat != null ||
+        onAnswer != null ||
         onAttach != null ||
         onConfirm != null ||
         onCancel != null ||
@@ -435,6 +465,10 @@ class _ConsultaCard extends StatelessWidget {
               onTap: () => _openFile(context, f),
             ),
           ],
+          if (q.awaitingDeposit) ...[
+            const SizedBox(height: 10),
+            PendingOrderBanner(consulta: q),
+          ],
           if (q.message != null) ...[
             const SizedBox(height: 10),
             ConsultaMessageBlock(consulta: q),
@@ -447,24 +481,27 @@ class _ConsultaCard extends StatelessWidget {
               runSpacing: 4,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                if (onAnswer != null)
-                  q.message == null
-                      ? FilledButton.icon(
-                          onPressed: unlessBusy(onAnswer),
-                          icon: const Icon(Icons.reply_rounded, size: 18),
-                          label: const Text('Responder'),
-                        )
-                      : OutlinedButton.icon(
-                          onPressed: unlessBusy(onAnswer),
-                          icon: const Icon(Icons.edit_outlined, size: 18),
-                          label: const Text('Cambiar respuesta'),
-                        ),
                 if (onConfirm != null)
                   FilledButton.icon(
                     onPressed: unlessBusy(onConfirm),
                     icon: const Icon(Icons.check_rounded, size: 18),
-                    label: const Text('Confirmado'),
+                    label: const Text('Señó · Confirmar pedido'),
                   ),
+                if (onChat != null)
+                  // El chat no espera a la acción en curso: es otra pantalla.
+                  ConsultaChatButton(key: ValueKey('chat-${q.id}'), consulta: q, onPressed: onChat),
+                if (onAnswer != null)
+                  q.message == null
+                      ? FilledButton.icon(
+                          onPressed: unlessBusy(onAnswer),
+                          icon: const Icon(Icons.request_quote_rounded, size: 18),
+                          label: const Text('Crear cotización'),
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: unlessBusy(onAnswer),
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          label: const Text('Cambiar cotización'),
+                        ),
                 if (onAttach != null)
                   OutlinedButton.icon(
                     onPressed: unlessBusy(onAttach),
@@ -530,17 +567,17 @@ class _IconLine extends StatelessWidget {
   }
 }
 
-/// Texto de la hoja de confirmación: qué pedido se va a crear y por cuánto.
+/// Texto de la hoja de confirmación: qué pedido se confirma y por cuánto.
 String confirmOrderText(Consulta q) {
   final total = q.orderTotal;
   final amount = total == null ? '' : ', por ${formatConsultaMoney(total)}';
-  return 'Se va a crear el pedido de ${q.customerName}: ${q.quantity} × ${q.title}$amount. '
-      'Entra como confirmado a Pedidos y a la cola de impresión.';
+  return 'El cliente señó el pedido de ${q.customerName}: ${q.quantity} × ${q.title}$amount. '
+      'El pedido pasa a confirmado y entra a la cola de impresión.';
 }
 
-/// Hoja de "Confirmado": confirmar crea el pedido solo (entra como confirmado
-/// a Ventas y a la cola), así que se avisa qué se va a crear y se pregunta
-/// cómo paga el cliente. Se cierra con `true` si confirmó.
+/// Hoja de "Señó · Confirmar pedido": el pedido ya existe (pendiente de pago
+/// desde la cotización) y acá pasa a confirmado y a la cola, así que se avisa
+/// y se pregunta cómo pagó el cliente. Se cierra con `true` si confirmó.
 class ConfirmOrderSheet extends ConsumerStatefulWidget {
   const ConfirmOrderSheet({super.key, required this.consulta, required this.data});
   final Consulta consulta;
@@ -567,7 +604,7 @@ class _ConfirmOrderSheetState extends ConsumerState<ConfirmOrderSheet> {
       await ref
           .read(consultasApiProvider)
           .move(widget.consulta.id, InquiryMove.confirm, paymentMethod: _method);
-      // Hay un pedido nuevo: además de las consultas, el inicio, Ventas y la cola.
+      // El pedido cambió de estado: además de las consultas, el inicio, Ventas y la cola.
       invalidateConsultaConfirmed(container);
       if (mounted) popIfCurrent(context, true);
     } on ApiException catch (e) {
@@ -585,7 +622,7 @@ class _ConfirmOrderSheetState extends ConsumerState<ConfirmOrderSheet> {
   Widget build(BuildContext context) {
     final c = context.hc;
     return SheetBody(
-      title: 'Confirmar y crear el pedido',
+      title: 'Confirmar el pedido',
       footer: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -594,7 +631,7 @@ class _ConfirmOrderSheetState extends ConsumerState<ConfirmOrderSheet> {
             const SizedBox(height: 10),
           ],
           GoldButton(
-            label: 'Confirmar y crear pedido',
+            label: 'Confirmar pedido',
             icon: Icons.check_rounded,
             loading: _saving,
             onPressed: _saving ? null : _confirm,

@@ -190,7 +190,7 @@ export function AnswerForm({
         setErrors(res.error.fields ?? { _: res.error.message });
         return;
       }
-      toast("Respuesta enviada", "success");
+      toast("Cotización creada: el pedido quedó pendiente de pago", "success");
       onDone();
     } finally {
       setBusy(false);
@@ -419,7 +419,9 @@ export function AnswerForm({
           disabled={busy}
           onClick={() => void save()}
         >
-          Enviar respuesta
+          {inquiry.status === "answered"
+            ? "Guardar cotización"
+            : "Crear cotización"}
         </button>
       </div>
     </div>
